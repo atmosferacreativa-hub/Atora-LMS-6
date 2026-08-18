@@ -38,6 +38,14 @@ if ( $exists ) {
 		$params[] = '%' . $wpdb->esc_like( $search_filter ) . '%';
 	}
 
+	// PT-6.3 (6.4.0): filtro por tipo — 'type' no es su propia columna,
+	// va embebido en variables._message_type (ver Messaging_Router::enqueue()).
+	$type_filter = sanitize_key( (string) wp_unslash( $_GET['msg_type'] ?? '' ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+	if ( '' !== $type_filter ) {
+		$where    .= ' AND q.variables LIKE %s';
+		$params[] = '%"_message_type":"' . $wpdb->esc_like( $type_filter ) . '"%';
+	}
+
 	$has_priority_column = false !== $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$wpdb->prepare(
 			"SHOW COLUMNS FROM {$queue_table} LIKE %s",
@@ -99,6 +107,12 @@ if ( $exists ) {
 				<option value="<?php echo esc_attr( $st ); ?>" <?php selected( sanitize_key( (string) wp_unslash( $_GET['status'] ?? '' ) ), $st ); ?>><?php echo esc_html( $st ); ?></option>
 			<?php endforeach; ?>
 		</select>
+		<select name="msg_type">
+			<option value=""><?php esc_html_e( 'Todos los tipos', 'atora-lms' ); ?></option>
+			<?php foreach ( array( 'assignment_graded', 'assignment_due_soon', 'submission_received', 'student_inactive', 'at_risk_flagged', 'improvement_plan_assigned', 'lesson_published', 'section_announcement', 'student_digest', 'teacher_digest' ) as $t ) : ?>
+				<option value="<?php echo esc_attr( $t ); ?>" <?php selected( $type_filter, $t ); ?>><?php echo esc_html( $t ); ?></option>
+			<?php endforeach; ?>
+		</select>
 		<input type="search" name="s" value="<?php echo esc_attr( sanitize_text_field( (string) wp_unslash( $_GET['s'] ?? '' ) ) ); ?>" placeholder="<?php esc_attr_e( 'Buscar template…', 'atora-lms' ); ?>">
 		<button type="submit" class="button"><?php esc_html_e( 'Filtrar', 'atora-lms' ); ?></button>
 	</form>
@@ -114,6 +128,7 @@ if ( $exists ) {
 				<th><?php esc_html_e( 'Último evento', 'atora-lms' ); ?></th>
 				<th><?php esc_html_e( 'Usuario', 'atora-lms' ); ?></th>
 				<th><?php esc_html_e( 'Fecha', 'atora-lms' ); ?></th>
+				<th><?php esc_html_e( 'Acción', 'atora-lms' ); ?></th>
 			</tr>
 		</thead>
 		<tbody>
@@ -155,6 +170,13 @@ if ( $exists ) {
 					<td><?php echo esc_html( $event_label ); ?></td>
 					<td><?php echo esc_html( (string) absint( $row->user_id ?? 0 ) ); ?></td>
 					<td><?php echo esc_html( (string) sanitize_text_field( $row->sent_at ?: $row->scheduled_at ) ); ?></td>
+					<td>
+						<?php if ( 'failed' === sanitize_key( (string) ( $row->status ?? '' ) ) ) : ?>
+							<a class="button button-small" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=atora_retry_message&queue_id=' . absint( $row->id ?? 0 ) ), 'atora_retry_message_' . absint( $row->id ?? 0 ) ) ); ?>"><?php esc_html_e( 'Reintentar', 'atora-lms' ); ?></a>
+						<?php else : ?>
+							—
+						<?php endif; ?>
+					</td>
 				</tr>
 			<?php endforeach; ?>
 		</tbody>

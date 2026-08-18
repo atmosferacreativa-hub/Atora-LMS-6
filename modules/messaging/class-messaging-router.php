@@ -234,6 +234,8 @@ class Messaging_Router {
 		// Admin settings.
 		if ( is_admin() ) {
 			add_action( 'atora_lms_admin_menu', array( __CLASS__, 'register_admin_menu' ) );
+			// PT-6.3 (6.4.0): reintento manual desde la bandeja.
+			add_action( 'admin_post_atora_retry_message', array( __CLASS__, 'handle_retry_message' ) );
 		}
 
 		// Inicializar canales.
@@ -1339,6 +1341,39 @@ class Messaging_Router {
 			),
 			array( '%d', '%s', '%s', '%s' )
 		);
+	}
+
+	/**
+	 * PT-6.3 (6.4.0): reintento manual — pasa un mensaje 'failed' de
+	 * vuelta a 'pending' para que el cron de cada 5 minutos lo retome.
+	 * No reintenta automáticamente (no existía ningún reintento antes
+	 * de este sprint, confirmado por auditoría) — es una acción
+	 * explícita del admin, no un cambio de comportamiento del cron.
+	 *
+	 * @return void
+	 */
+	public static function handle_retry_message(): void {
+		$queue_id = absint( $_GET['queue_id'] ?? 0 ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+		check_admin_referer( 'atora_retry_message_' . $queue_id );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Sin permisos.', 'atora-lms' ), '', array( 'response' => 403 ) );
+		}
+
+		if ( $queue_id ) {
+			global $wpdb;
+			$wpdb->update(
+				"{$wpdb->prefix}atora_message_queue",
+				array( 'status' => 'pending', 'error_message' => '' ),
+				array( 'id' => $queue_id ),
+				array( '%s', '%s' ),
+				array( '%d' )
+			);
+			self::log_queue_event( $queue_id, 'manual_retry', array( 'by_user_id' => get_current_user_id() ) );
+		}
+
+		wp_safe_redirect( wp_get_referer() ?: admin_url( 'admin.php?page=atora-messaging&tab=inbox' ) );
+		exit;
 	}
 
 	/** @return void */
