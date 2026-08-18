@@ -8,14 +8,14 @@
  * de baja sin sesión. Sin UI aquí — eso es [atora_preferencias]
  * (class-messaging-preferences-shortcode.php).
  *
- * Nada de esto cambia cómo Messaging_Router::user_accepts_channel()
- * decide hoy si un usuario acepta WhatsApp/Telegram (esa lectura
- * sigue siendo solo `atora_consent_whatsapp`/`atora_consent_telegram`,
- * escritos desde el registro o el CRM, sin tocar — regla 3 del
- * sprint). La verificación de teléfono es una condición NUEVA que
- * esta clase exige antes de escribir consentimiento desde la pantalla
- * de preferencias — un tercer punto de escritura más estricto que los
- * dos que ya existían, no una restricción retroactiva sobre ellos.
+ * `can_receive_whatsapp()` (PT-3, 6.5.1) es la ÚNICA fuente de verdad
+ * sobre si un usuario puede recibir WhatsApp: consentimiento + teléfono
+ * no vacío + teléfono verificado. Antes de 6.5.1, Messaging_Router y
+ * Campaign_Service leían `atora_consent_whatsapp` cada uno por su
+ * cuenta, sin exigir verificación — un consentimiento heredado de un
+ * registro viejo (con `atora_phone_verified = 0`) bastaba para recibir
+ * WhatsApp real. Ningún otro punto del código debe volver a evaluar
+ * estas tres condiciones por su cuenta; todos pasan por aquí.
  *
  * @package ATORA_LMS\Messaging
  * @since   6.4.0
@@ -145,19 +145,32 @@ class Preferences {
 	}
 
 	/**
-	 * PT-4.3: WhatsApp solo cuenta como "activo" en la pantalla de
-	 * preferencias si hay consentimiento Y número verificado. No
-	 * cambia lo que Messaging_Router realmente consulta al enviar
-	 * (eso sigue siendo solo el consentimiento, ver docblock de la
-	 * clase) — esto es para que la UI muestre el estado real.
+	 * PT-3 (6.5.1): única fuente de verdad para "¿puede este usuario
+	 * recibir WhatsApp de verdad?" — consentimiento + teléfono no vacío
+	 * + teléfono verificado. Antes de esto, Messaging_Router y
+	 * Campaign_Service solo miraban el consentimiento; un registro
+	 * viejo con consentimiento heredado pero sin verificar terminaba
+	 * recibiendo mensajes por un canal que nunca confirmó.
+	 *
+	 * @param int $user_id
+	 * @return bool
+	 */
+	public static function can_receive_whatsapp( int $user_id ): bool {
+		return (bool) get_user_meta( $user_id, 'atora_consent_whatsapp', true )
+			&& self::is_phone_verified( $user_id )
+			&& '' !== trim( (string) get_user_meta( $user_id, 'atora_phone', true ) );
+	}
+
+	/**
+	 * Alias histórico de can_receive_whatsapp() — se mantiene porque la
+	 * pantalla de preferencias [atora_preferencias] ya lo usa para
+	 * mostrar el estado del canal; misma lógica, un solo lugar.
 	 *
 	 * @param int $user_id
 	 * @return bool
 	 */
 	public static function is_whatsapp_active( int $user_id ): bool {
-		return (bool) get_user_meta( $user_id, 'atora_consent_whatsapp', true )
-			&& self::is_phone_verified( $user_id )
-			&& '' !== trim( (string) get_user_meta( $user_id, 'atora_phone', true ) );
+		return self::can_receive_whatsapp( $user_id );
 	}
 
 	/**
