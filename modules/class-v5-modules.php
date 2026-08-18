@@ -208,6 +208,9 @@ class V5_Modules {
 		$dir = ATORA_LMS_MODULES_DIR . 'messaging/';
 		self::require_file( $dir . 'class-whatsapp.php' );
 		self::require_file( $dir . 'class-telegram-bot.php' );
+		// PT-5.1: la tabla del agrupador se crea desde
+		// Messaging_Router::init(), así que debe cargarse antes.
+		self::require_file( $dir . 'class-messaging-digest-store.php' );
 		self::require_file( $dir . 'class-messaging-router.php' );
 		if ( class_exists( 'ATORA\Messaging\Messaging_Router' ) ) {
 			\ATORA\Messaging\Messaging_Router::init();

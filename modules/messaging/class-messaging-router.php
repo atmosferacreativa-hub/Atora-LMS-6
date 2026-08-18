@@ -153,6 +153,11 @@ class Messaging_Router {
 		add_filter( 'cron_schedules', array( __CLASS__, 'add_cron_intervals' ) );
 		self::ensure_queue_schema();
 
+		// PT-5.1 (6.4.0): tabla del agrupador de resúmenes.
+		if ( class_exists( '\ATORA\Messaging\Digest_Store' ) ) {
+			Digest_Store::ensure_table();
+		}
+
 		// Cron: procesar la cola de mensajes cada 5 minutos.
 		add_action( 'atora_messaging_cron', array( __CLASS__, 'process_queue' ) );
 		if ( ! wp_next_scheduled( 'atora_messaging_cron' ) ) {
@@ -198,7 +203,22 @@ class Messaging_Router {
 	 * @return bool
 	 */
 	public static function send( int $user_id, string $type, string $template, array $variables = array(), array $options = array() ): bool {
-		$options  = is_array( $options ) ? $options : array();
+		$options = is_array( $options ) ? $options : array();
+
+		// PT-5.1 (6.4.0): decidir si este mensaje se agrupa en vez de
+		// despacharse ya. Dos condiciones independientes, cualquiera
+		// basta: (a) el tipo es 'low' por diseño — decisión de la
+		// institución, no configurable por el estudiante (p.ej.
+		// lesson_published siempre se agrupa); (b) el estudiante
+		// configuró esa categoría como "resumen" en sus preferencias
+		// (PT-4.2), sin importar la prioridad del tipo.
+		if ( empty( $options['skip_digest'] ) && self::should_digest( $user_id, $type, $options ) ) {
+			if ( class_exists( '\ATORA\Messaging\Digest_Store' ) ) {
+				Digest_Store::add_item( $user_id, $type, $template, $variables );
+			}
+			return true;
+		}
+
 		$channels = self::resolve_channels( $user_id, $type );
 
 		if ( empty( $channels ) ) {
@@ -568,6 +588,33 @@ class Messaging_Router {
 	 */
 	public static function get_type_categories(): array {
 		return self::$type_categories;
+	}
+
+	/**
+	 * PT-5.1: true si este envío debe agruparse en vez de despacharse
+	 * ya. Ver el comentario en send() para las dos condiciones.
+	 *
+	 * @param int    $user_id
+	 * @param string $type
+	 * @param array  $options
+	 * @return bool
+	 */
+	private static function should_digest( int $user_id, string $type, array $options ): bool {
+		$priority = ! empty( $options['priority'] )
+			? self::normalize_priority_label( (string) $options['priority'] )
+			: self::default_priority_label_for_type( $type );
+
+		if ( 'low' === $priority ) {
+			return true;
+		}
+
+		$category = self::category_for_type( $type );
+		if ( null === $category || ! class_exists( '\ATORA\Messaging\Preferences' ) ) {
+			return false;
+		}
+
+		$prefs = Preferences::get( $user_id );
+		return 'digest' === ( $prefs['frequency'][ $category ] ?? 'instant' );
 	}
 
 	/**
