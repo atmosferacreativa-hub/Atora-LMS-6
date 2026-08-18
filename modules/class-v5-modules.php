@@ -213,6 +213,13 @@ class V5_Modules {
 			\ATORA\Messaging\Messaging_Router::init();
 		}
 
+		// PT-4 (6.4.0): modelo de preferencias + shortcode [atora_preferencias].
+		self::require_file( $dir . 'class-messaging-preferences.php' );
+		self::require_file( $dir . 'class-messaging-preferences-shortcode.php' );
+		if ( class_exists( 'ATORA\Messaging\Preferences_Shortcode' ) ) {
+			\ATORA\Messaging\Preferences_Shortcode::init();
+		}
+
 		// PT-3 (6.4.0): puente eventos académicos → Messaging_Router.
 		// Vive detrás del mismo gate del módulo 'messaging' (esta
 		// función) porque no tiene sentido registrar sus listeners si

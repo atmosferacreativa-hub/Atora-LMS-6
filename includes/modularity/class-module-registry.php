@@ -129,7 +129,7 @@ class CLMS_Module_Registry {
 				'group'               => 'communication',
 				'requires'            => array(),
 				'provides_pages'      => array( 'atora-messaging' ),
-				'provides_shortcodes' => array(),
+				'provides_shortcodes' => array( 'atora_preferencias' ),
 				'tables'              => array(),
 				'core'                => false,
 			),
