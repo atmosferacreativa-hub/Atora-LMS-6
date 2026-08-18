@@ -1065,7 +1065,15 @@ class CRM_V2 {
 			return false;
 		}
 
-		return (bool) get_user_meta( $user_id, 'atora_consent_whatsapp', true );
+		// PT-3.3 (6.5.1): decisión de envío real — pasa por
+		// Preferences::can_receive_whatsapp() (consentimiento + teléfono
+		// + verificado), no solo el meta de consentimiento crudo. Esta
+		// clase declara su propio método con el mismo nombre que
+		// CRM_V2_Pipeline_Trait::contact_can_receive_whatsapp() — el de
+		// la clase gana (PHP: método propio sobre trait), así que es
+		// este el que de verdad se ejecuta; se corrige igual en ambos
+		// por si acaso.
+		return class_exists( '\ATORA\Messaging\Preferences' ) && \ATORA\Messaging\Preferences::can_receive_whatsapp( $user_id );
 	}
 
 	/**

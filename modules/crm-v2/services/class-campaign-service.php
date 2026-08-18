@@ -688,7 +688,9 @@ class Campaign_Service {
 		}
 		if ( 'whatsapp' === $channel ) {
 			if ( $user_id > 0 ) {
-				return (bool) get_user_meta( $user_id, 'atora_consent_whatsapp', true );
+				// PT-3.3 (6.5.1): antes solo miraba el consentimiento —
+				// mismo hallazgo que Messaging_Router::user_accepts_channel().
+				return class_exists( '\ATORA\Messaging\Preferences' ) && \ATORA\Messaging\Preferences::can_receive_whatsapp( $user_id );
 			}
 			return self::contact_has_channel_consent( $contact_id, 'consent_whatsapp' );
 		}

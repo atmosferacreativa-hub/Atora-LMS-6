@@ -1108,7 +1108,13 @@ class Messaging_Router {
 	private static function user_accepts_channel( int $user_id, string $channel ): bool {
 		switch ( $channel ) {
 			case 'whatsapp':
-				return (bool) get_user_meta( $user_id, 'atora_consent_whatsapp', true );
+				// PT-3.2 (6.5.1): antes solo miraba el consentimiento — un
+				// registro con atora_consent_whatsapp=1 heredado y
+				// atora_phone_verified=0 recibía WhatsApp real sin haber
+				// confirmado el número nunca. Preferences::
+				// can_receive_whatsapp() es ahora la única fuente de
+				// verdad; sin ella disponible, fail closed (no WhatsApp).
+				return class_exists( '\ATORA\Messaging\Preferences' ) && \ATORA\Messaging\Preferences::can_receive_whatsapp( $user_id );
 			case 'telegram':
 				return (bool) get_user_meta( $user_id, 'atora_consent_telegram', true );
 			case 'email':

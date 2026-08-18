@@ -267,6 +267,11 @@ if ( file_exists( $crm_inbox_rest_controller_file ) ) {
 	require_once $crm_inbox_rest_controller_file;
 }
 
+$crm_v2_file = __DIR__ . '/../modules/crm-v2/class-crm-v2.php';
+if ( file_exists( $crm_v2_file ) ) {
+	require_once $crm_v2_file;
+}
+
 foreach ( array( 'class-module-registry.php', 'class-install-profiles.php', 'class-profile-labels.php' ) as $mod_file ) {
 	$path = __DIR__ . '/../includes/modularity/' . $mod_file;
 	if ( file_exists( $path ) ) {

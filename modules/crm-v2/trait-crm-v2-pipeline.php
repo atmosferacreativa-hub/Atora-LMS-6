@@ -641,7 +641,10 @@ trait CRM_V2_Pipeline_Trait {
 			return false;
 		}
 
-		return (bool) get_user_meta( $user_id, 'atora_consent_whatsapp', true );
+		// PT-3.3 (6.5.1): decisión de envío real — pasa por
+		// Preferences::can_receive_whatsapp() (consentimiento + teléfono
+		// + verificado), no solo el meta de consentimiento crudo.
+		return class_exists( '\ATORA\Messaging\Preferences' ) && \ATORA\Messaging\Preferences::can_receive_whatsapp( $user_id );
 	}
 
 	/**
