@@ -26,6 +26,18 @@ para usar el mismo filtro. Ver test de regresión en
 
 ---
 
+## PT-4.4 — `clms-email-hub` ("Marketing") no estaba en el inventario PT-4.1
+
+Al gatear las entradas de CRM/Comercio/IA/Analytics se encontró una
+quinta entrada de menú registrada directamente por
+`trait-admin-menu-hubs.php` (línea ~767, "Marketing", cap
+`crm_manage_campaigns`, `render_email_hub_page()`) que el inventario
+PT-4.1 no capturó. No se gateó en este pase — no está claro sin leer
+`render_email_hub_page()` a fondo si conceptualmente pertenece a `crm`,
+`email-engine` o `automation` (probablemente combina piezas de los
+tres). Queda pendiente: añadirla al inventario y decidir su slug antes
+de gatearla.
+
 ## PT-4.3.2 — "Cluster de puntos de entrada" no tenía duplicación real que resolver
 
 La OT de cierre pedía redirigir "el otro" de los 2 candidatos que el
