@@ -34,6 +34,12 @@ class Contact_Actions_REST_Controller {
 	public static function register_routes(): void {
 		$ns  = self::REST_NAMESPACE;
 		$can = array( 'ATORA\CRM_V2\Rest\CRM_REST_Controller', 'can_access' );
+		// PT-1.2 (6.5.1): /tag y /stage crean/modifican estado del contacto,
+		// exigen can_manage. /email ya tiene su propio candado más preciso
+		// (crm_send_email, ver send_email()) — subirla a can_manage
+		// bloquearía a crm_operator, que tiene crm_send_email pero no
+		// clms_manage_crm, así que se deja como estaba a propósito.
+		$can_manage = array( 'ATORA\CRM_V2\Rest\CRM_REST_Controller', 'can_manage' );
 
 		register_rest_route( $ns, '/contacts/autocomplete', array(
 			'methods'             => 'GET',
@@ -56,13 +62,13 @@ class Contact_Actions_REST_Controller {
 		register_rest_route( $ns, '/contacts/(?P<contact_id>\d+)/tag', array(
 			'methods'             => 'POST',
 			'callback'            => array( __CLASS__, 'add_tag' ),
-			'permission_callback' => $can,
+			'permission_callback' => $can_manage,
 		) );
 
 		register_rest_route( $ns, '/contacts/(?P<contact_id>\d+)/stage', array(
 			'methods'             => 'POST',
 			'callback'            => array( __CLASS__, 'move_stage' ),
-			'permission_callback' => $can,
+			'permission_callback' => $can_manage,
 		) );
 
 		register_rest_route( $ns, '/contacts/(?P<contact_id>\d+)/timeline', array(
