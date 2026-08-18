@@ -751,6 +751,26 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 			array( $this, 'render_academic_hub_page' )
 		);
 
+		// ── Estudiantes — hub visible: matrículas, progreso, gradebook, certificados ──
+		add_submenu_page(
+			'clms-dashboard',
+			__( 'Estudiantes', 'atora-lms' ),
+			__( '🎓 Estudiantes', 'atora-lms' ),
+			'read',
+			'atora-students-hub',
+			array( $this, 'render_students_hub_page' )
+		);
+
+		// ── Docentes — hub visible ─────────────────────────────────────────────
+		add_submenu_page(
+			'clms-dashboard',
+			__( 'Docentes', 'atora-lms' ),
+			__( '🧑‍🏫 Docentes', 'atora-lms' ),
+			'read',
+			'atora-teachers-hub',
+			array( $this, 'render_teachers_hub_page' )
+		);
+
 		// ── PT-4.4.3 (6.3.0): CRM, Marketing, Comercio y Calendario dejan de
 		// ser entradas de primer nivel — se reubican bajo los hubs
 		// "Crecimiento" y "Comunicación" (más abajo). Sus registros
