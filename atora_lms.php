@@ -660,6 +660,10 @@ add_action( 'init', static function () {
 	require_once ATORA_LMS_DIR . 'includes/admin-menu/class-menu-debug-guard.php';
 	if ( class_exists( 'CLMS_Menu_Debug_Guard' ) ) { CLMS_Menu_Debug_Guard::init(); }
 
+	// PT-4.3.4: redirecciones de slugs de menú retirados de la navegación visible.
+	require_once ATORA_LMS_DIR . 'includes/admin-menu/class-legacy-slug-redirects.php';
+	if ( class_exists( 'CLMS_Legacy_Slug_Redirects' ) ) { CLMS_Legacy_Slug_Redirects::init(); }
+
 	// Registro de versión actual y anterior para facilitar rollback controlado.
 	$current_version = (string) get_option( 'atora_lms_current_version', '' );
 	if ( $current_version !== ATORA_LMS_VERSION ) {
