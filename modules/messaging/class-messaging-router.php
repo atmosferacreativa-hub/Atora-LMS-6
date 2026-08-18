@@ -220,6 +220,19 @@ class Messaging_Router {
 			$options['priority'] = self::default_priority_label_for_type( $type );
 		}
 
+		// PT-4.4 (6.4.0): enlace de baja en todo mensaje de una categoría
+		// desactivable, salvo que el llamador ya haya puesto el suyo.
+		// Solo send() lo hace — enqueue() lo siguen usando directo los 3
+		// call sites de antes de este sprint (automation, crm-v2) sin
+		// que su comportamiento cambie.
+		if ( empty( $variables['unsubscribe_url'] ) && class_exists( '\ATORA\Messaging\Preferences' ) ) {
+			$category = self::category_for_type( $type );
+			if ( null !== $category ) {
+				$token = Preferences::generate_unsubscribe_token( $user_id, $category );
+				$variables['unsubscribe_url'] = home_url( '/?atora_unsubscribe=' . $token );
+			}
+		}
+
 		$queued = self::enqueue(
 			array(
 				'user_id'   => $user_id,

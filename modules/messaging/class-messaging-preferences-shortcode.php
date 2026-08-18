@@ -24,6 +24,68 @@ class Preferences_Shortcode {
 		add_action( 'wp_ajax_atora_save_preferences', array( __CLASS__, 'ajax_save_preferences' ) );
 		add_action( 'wp_ajax_atora_request_phone_verification', array( __CLASS__, 'ajax_request_verification' ) );
 		add_action( 'wp_ajax_atora_verify_phone_code', array( __CLASS__, 'ajax_verify_code' ) );
+
+		// PT-4.4: baja sin sesión desde el enlace de cada mensaje.
+		add_action( 'template_redirect', array( __CLASS__, 'maybe_handle_unsubscribe_link' ) );
+	}
+
+	/**
+	 * PT-4.4: `?atora_unsubscribe=TOKEN` — funciona sin iniciar sesión.
+	 * Un estudiante que no puede darse de baja fácil termina bloqueando
+	 * el número, y eso cuesta el canal completo para esa persona.
+	 *
+	 * @return void
+	 */
+	public static function maybe_handle_unsubscribe_link(): void {
+		if ( ! isset( $_GET['atora_unsubscribe'] ) ) { return; } // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+
+		$token  = sanitize_text_field( wp_unslash( (string) $_GET['atora_unsubscribe'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$result = Preferences::verify_unsubscribe_token( $token );
+
+		nocache_headers();
+
+		if ( ! $result['ok'] ) {
+			self::render_unsubscribe_page(
+				__( 'Este enlace ya no es válido', 'atora-lms' ),
+				__( 'Puede que haya vencido. Inicia sesión y entra a tus preferencias para hacer el cambio ahí.', 'atora-lms' ),
+				false
+			);
+			exit;
+		}
+
+		$user_id  = (int) $result['user_id'];
+		$category = (string) $result['category'];
+
+		if ( 'all' === $category ) {
+			Preferences::unsubscribe_all( $user_id );
+			$body = __( 'No recibirás más avisos por WhatsApp, Telegram ni correo de notificaciones (el correo transaccional de tu cuenta sigue activo).', 'atora-lms' );
+		} else {
+			Preferences::save( $user_id, array( 'categories' => array( $category => false ) ) );
+			$body = __( 'Actualizamos tus preferencias para este tipo de aviso.', 'atora-lms' );
+		}
+
+		self::render_unsubscribe_page( __( 'Listo, hecho', 'atora-lms' ), $body, true );
+		exit;
+	}
+
+	/**
+	 * Página mínima de confirmación — sin depender del tema activo,
+	 * para que funcione igual sin iniciar sesión.
+	 *
+	 * @param string $title
+	 * @param string $body
+	 * @param bool   $ok
+	 * @return void
+	 */
+	private static function render_unsubscribe_page( string $title, string $body, bool $ok ): void {
+		?><!DOCTYPE html><html <?php language_attributes(); ?>><head><meta charset="<?php bloginfo( 'charset' ); ?>">
+		<meta name="viewport" content="width=device-width,initial-scale=1"><title><?php echo esc_html( $title ); ?></title></head>
+		<body style="font-family:-apple-system,system-ui,sans-serif;max-width:420px;margin:60px auto;padding:0 20px;text-align:center;color:#0f172a">
+			<div style="font-size:40px"><?php echo $ok ? '✅' : '⚠️'; ?></div>
+			<h1 style="font-size:20px"><?php echo esc_html( $title ); ?></h1>
+			<p style="color:#475569;font-size:14px"><?php echo esc_html( $body ); ?></p>
+			<p><a href="<?php echo esc_url( home_url( '/' ) ); ?>" style="color:#1d4ed8"><?php esc_html_e( 'Volver al inicio', 'atora-lms' ); ?></a></p>
+		</body></html><?php
 	}
 
 	/**
