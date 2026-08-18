@@ -223,6 +223,12 @@ class V5_Modules {
 			\ATORA\Messaging\Preferences_Shortcode::init();
 		}
 
+		// PT-5.2 (6.4.0): cron que consume Digest_Store.
+		self::require_file( $dir . 'class-messaging-digest-cron.php' );
+		if ( class_exists( 'ATORA\Messaging\Digest_Cron' ) ) {
+			\ATORA\Messaging\Digest_Cron::init();
+		}
+
 		// PT-3 (6.4.0): puente eventos académicos → Messaging_Router.
 		// Vive detrás del mismo gate del módulo 'messaging' (esta
 		// función) porque no tiene sentido registrar sus listeners si
