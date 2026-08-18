@@ -254,7 +254,13 @@ trait CRM_Access_Trait {
 
 		// Admin.
 		if ( is_admin() ) {
-			add_action( 'atora_lms_admin_menu',        array( __CLASS__, 'register_admin_menu' ) );
+			// PT-4.3.3 (6.3.0): sin hook a register_admin_menu() — este
+			// registro (cap 'read', visible bajo clms-dashboard) coexistía
+			// con 'atora-crm-v2' (el hub, cap clms_access_crm_view) como
+			// una segunda entrada "CRM" visible en el sidebar al mismo
+			// tiempo. El hub ya sirve 'atora-crm' como alias legacy oculto
+			// (render_crm_v2_page() detecta page=atora-crm y renderiza el
+			// fallback legacy) — una sola entrada visible de CRM ahora.
 			add_action( 'wp_ajax_atora_crm_search',    array( __CLASS__, 'ajax_search' ) );
 			add_action( 'wp_ajax_atora_crm_note_save', array( __CLASS__, 'ajax_save_note' ) );
 			add_action( 'wp_ajax_atora_crm_tag',       array( __CLASS__, 'ajax_add_tag' ) );
