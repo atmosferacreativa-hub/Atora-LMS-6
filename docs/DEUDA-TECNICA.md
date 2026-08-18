@@ -26,6 +26,21 @@ para usar el mismo filtro. Ver test de regresión en
 
 ---
 
+## PT-4.3.2 — "Cluster de puntos de entrada" no tenía duplicación real que resolver
+
+La OT de cierre pedía redirigir "el otro" de los 2 candidatos que el
+inventario PT-4.1 corrigió (de 3 a 2). Pero el inventario ya documentó
+que `clms-control-center` no es un duplicado de `clms-dashboard`: es un
+dashboard de overview comercial/analítico distinto, enlazado
+deliberadamente desde tarjetas de navegación y un botón — no código
+muerto ni una copia. Redirigirlo habría eliminado esa funcionalidad sin
+necesidad real. **Decisión (confirmada):** no se aplica ninguna
+redirección aquí. `clms-dashboard` sigue siendo el único punto de
+entrada de primer nivel; `clms-control-center` sigue como vista
+secundaria oculta e intencional. Si en el futuro se decide fusionar su
+contenido dentro del panel principal, es una decisión de producto, no
+una limpieza de duplicados.
+
 ## PT-4.2 — Métodos render_atora_*_page() huérfanos en trait-admin-menu-hubs.php
 
 Al colapsar el doble registro de `atora-emails`, `atora-newsletter`,
