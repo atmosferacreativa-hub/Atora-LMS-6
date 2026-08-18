@@ -148,11 +148,13 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] && ! empty( $_POST['atora_messaging_a
 
 $tab = isset( $_GET['tab'] ) ? sanitize_key( (string) wp_unslash( $_GET['tab'] ) ) : 'inbox'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 $tabs = array(
+	'estado'      => __( 'Estado', 'atora-lms' ), // PT-6.1/6.2 (6.4.0)
 	'inbox'       => __( 'Bandeja', 'atora-lms' ),
 	'whatsapp'    => __( 'WhatsApp', 'atora-lms' ),
 	'telegram'    => __( 'Telegram', 'atora-lms' ),
 	'routing'     => __( 'Enrutamiento', 'atora-lms' ),
 	'preferences' => __( 'Preferencias de estudiantes', 'atora-lms' ), // PT-4.5 (6.4.0)
+	'simulator'   => __( 'Simulador', 'atora-lms' ), // PT-6.4 (6.4.0)
 );
 if ( ! isset( $tabs[ $tab ] ) ) {
 	$tab = 'inbox';
