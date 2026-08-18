@@ -989,6 +989,140 @@ trait CLMS_Admin_Menu_Widgets_And_Hubs_Trait {
 		<?php
 	}
 
+	/**
+	 * Hub simple genérico — PT-4.4.3 (6.3.0): grid de tarjetas
+	 * icono+título+descripción+enlace, sin queries de stats en vivo.
+	 * Reutiliza el CSS existente de `atora-hub__quick-grid` (mismo
+	 * patrón que "Red de hubs ATORA" en los hubs ya existentes) como
+	 * contenido principal en vez de sección secundaria.
+	 *
+	 * @param string $context  Etiqueta corta arriba del título (p.ej. "Estudiantes").
+	 * @param string $title    Título principal de la página.
+	 * @param string $subtitle Descripción de una línea.
+	 * @param array  $links    Lista de array{title,description,url} (build_nav_item()).
+	 */
+	protected function render_simple_hub_page( string $context, string $title, string $subtitle, array $links ): void {
+		if ( ! current_user_can( 'read' ) ) {
+			wp_die( esc_html__( 'No tienes permisos.', 'atora-lms' ) );
+		}
+
+		$links = $this->unique_hub_items_by_url( $links, 0, true );
+		$today = wp_date( get_option( 'date_format' ) );
+		?>
+		<div class="wrap atora-hub">
+			<div class="atora-hub__header">
+				<div>
+					<span class="atora-hub__context"><?php echo esc_html( $context ); ?></span>
+					<h1 class="atora-hub__title"><?php echo esc_html( $title ); ?></h1>
+					<p class="atora-hub__date"><?php echo esc_html( $today ); ?></p>
+					<p class="atora-hub__subtitle"><?php echo esc_html( $subtitle ); ?></p>
+				</div>
+			</div>
+
+			<?php if ( $links ) : ?>
+			<div class="atora-hub__quick">
+				<div class="atora-hub__quick-grid">
+					<?php foreach ( $links as $item ) : ?>
+					<a class="atora-hub__quick-link" href="<?php echo esc_url( (string) $item['url'] ); ?>">
+						<strong><?php echo esc_html( (string) $item['title'] ); ?></strong>
+						<span><?php echo esc_html( (string) $item['description'] ); ?></span>
+					</a>
+					<?php endforeach; ?>
+				</div>
+			</div>
+			<?php else : ?>
+			<p><?php esc_html_e( 'No hay páginas disponibles con tu rol actual.', 'atora-lms' ); ?></p>
+			<?php endif; ?>
+		</div>
+		<?php
+	}
+
+	/** Hub "Estudiantes" — matrículas, progreso, gradebook, certificados (PT-4.4.3). */
+	public function render_students_hub_page(): void {
+		$links = array(
+			$this->build_nav_item( __( 'Gradebook', 'atora-lms' ), __( 'Calificaciones y cálculo por curso.', 'atora-lms' ), admin_url( 'admin.php?page=clms-gradebook' ) ),
+			$this->build_nav_item( __( 'Speedgrader', 'atora-lms' ), __( 'Corrección rápida de entregas pendientes.', 'atora-lms' ), admin_url( 'admin.php?page=clms-speedgrader' ) ),
+			$this->build_nav_item( __( 'Estudiantes', 'atora-lms' ), __( 'Usuarios con rol Estudiante.', 'atora-lms' ), admin_url( 'users.php?role=lms_student' ) ),
+			$this->build_nav_item( __( 'Migración LMS', 'atora-lms' ), __( 'Estado de matrícula y progreso en tablas propias.', 'atora-lms' ), admin_url( 'admin.php?page=atora-lms-migration' ) ),
+		);
+		$this->render_simple_hub_page(
+			__( 'Estudiantes', 'atora-lms' ),
+			__( 'Estudiantes', 'atora-lms' ),
+			__( 'Matrícula, progreso, calificaciones y certificados en un solo lugar.', 'atora-lms' ),
+			$links
+		);
+	}
+
+	/** Hub "Docentes" (PT-4.4.3). */
+	public function render_teachers_hub_page(): void {
+		$links = array(
+			$this->build_nav_item( __( 'Perfil de instructor', 'atora-lms' ), __( 'Vista de instructor para el usuario actual.', 'atora-lms' ), admin_url( 'admin.php?page=clms-instructor-profile' ) ),
+			$this->build_nav_item( __( 'Docentes y contenidos', 'atora-lms' ), __( 'Gestión de contenidos por docente.', 'atora-lms' ), admin_url( 'admin.php?page=clms-academic-content' ) ),
+			$this->build_nav_item( __( 'Docentes (listado)', 'atora-lms' ), __( 'CPT de docentes registrados.', 'atora-lms' ), admin_url( 'edit.php?post_type=atora_teacher' ) ),
+		);
+		$this->render_simple_hub_page(
+			__( 'Docentes', 'atora-lms' ),
+			__( 'Docentes', 'atora-lms' ),
+			__( 'Perfiles, contenidos y gestión docente.', 'atora-lms' ),
+			$links
+		);
+	}
+
+	/** Hub "Comunicación" — mensajería, calendario, email (PT-4.4.3). */
+	public function render_communication_hub_page(): void {
+		$links = array(
+			$this->build_nav_item( __( 'Mensajería', 'atora-lms' ), __( 'WhatsApp, Telegram y ruteo de mensajes.', 'atora-lms' ), admin_url( 'admin.php?page=atora-messaging' ) ),
+			$this->build_nav_item( __( 'Calendario', 'atora-lms' ), __( 'Eventos y sincronización externa.', 'atora-lms' ), admin_url( 'admin.php?page=atora-calendar' ) ),
+			$this->build_nav_item( __( 'Emails', 'atora-lms' ), __( 'Plantillas, colas y envío transaccional.', 'atora-lms' ), admin_url( 'admin.php?page=atora-emails' ) ),
+			$this->build_nav_item( __( 'Newsletter', 'atora-lms' ), __( 'Boletín y archivo público.', 'atora-lms' ), admin_url( 'admin.php?page=atora-newsletter' ) ),
+			$this->build_nav_item( __( 'Mensajes', 'atora-lms' ), __( 'Bandeja de mensajería interna.', 'atora-lms' ), admin_url( 'admin.php?page=clms-messages' ) ),
+		);
+		$this->render_simple_hub_page(
+			__( 'Comunicación', 'atora-lms' ),
+			__( 'Comunicación', 'atora-lms' ),
+			__( 'Mensajería, calendario y email en un solo lugar.', 'atora-lms' ),
+			$links
+		);
+	}
+
+	/**
+	 * Hub "Crecimiento" — CRM, comercio, afiliados (PT-4.4.3). Oculto por
+	 * completo del sidebar en perfil institucional (register_admin_pages()
+	 * lo gatea con is_active('crm')||is_active('commerce')||is_active('affiliates')).
+	 */
+	public function render_growth_hub_page(): void {
+		$links = array(
+			$this->build_nav_item( __( 'CRM', 'atora-lms' ), __( 'Contactos, pipeline y scoring.', 'atora-lms' ), admin_url( 'admin.php?page=atora-crm-v2' ) ),
+			$this->build_nav_item( __( 'Comercio', 'atora-lms' ), __( 'Ventas, carritos y checkout.', 'atora-lms' ), admin_url( 'admin.php?page=clms-commercial-hub' ) ),
+			$this->build_nav_item( __( 'Afiliados', 'atora-lms' ), __( 'Programa de afiliados y comisiones.', 'atora-lms' ), admin_url( 'admin.php?page=atora-affiliates' ) ),
+			$this->build_nav_item( __( 'Marketing', 'atora-lms' ), __( 'Campañas de email y CRM.', 'atora-lms' ), admin_url( 'admin.php?page=clms-email-hub' ) ),
+			$this->build_nav_item( __( 'Automatizaciones', 'atora-lms' ), __( 'Reglas automáticas.', 'atora-lms' ), admin_url( 'admin.php?page=atora-automations' ) ),
+			$this->build_nav_item( __( 'Webhooks', 'atora-lms' ), __( 'Integraciones salientes.', 'atora-lms' ), admin_url( 'admin.php?page=atora-webhooks' ) ),
+		);
+		$this->render_simple_hub_page(
+			__( 'Crecimiento', 'atora-lms' ),
+			__( 'Crecimiento', 'atora-lms' ),
+			__( 'CRM, comercio, afiliados y automatización comercial.', 'atora-lms' ),
+			$links
+		);
+	}
+
+	/** Hub "Informes" — analítica + reportes académicos (PT-4.4.3). */
+	public function render_reports_hub_page(): void {
+		$links = array(
+			$this->build_nav_item( __( 'Analytics', 'atora-lms' ), __( 'Panel de analítica de la plataforma.', 'atora-lms' ), admin_url( 'admin.php?page=atora-analytics-dashboard' ) ),
+			$this->build_nav_item( __( 'Reportes académicos', 'atora-lms' ), __( 'Reportes de desempeño académico.', 'atora-lms' ), admin_url( 'admin.php?page=clms-academic-reports' ) ),
+			$this->build_nav_item( __( 'Formularios', 'atora-lms' ), __( 'Constructor de formularios.', 'atora-lms' ), admin_url( 'admin.php?page=atora-forms' ) ),
+			$this->build_nav_item( __( 'Popups', 'atora-lms' ), __( 'Gestor de popups.', 'atora-lms' ), admin_url( 'admin.php?page=atora-popups' ) ),
+		);
+		$this->render_simple_hub_page(
+			__( 'Informes', 'atora-lms' ),
+			__( 'Informes', 'atora-lms' ),
+			__( 'Analítica de plataforma y reportes académicos.', 'atora-lms' ),
+			$links
+		);
+	}
+
 	public function render_academic_hub_page(): void {
 		if ( ! current_user_can( 'read' ) ) {
 			wp_die( esc_html__( 'No tienes permisos.', 'atora-lms' ) );

@@ -1014,7 +1014,7 @@ class Messaging_Router {
 		}
 
 		add_submenu_page(
-			'clms-dashboard',
+			'', // PT-4.4.3: reubicado bajo el hub "Comunicación" (atora-communication-hub).
 			__( 'Mensajería', 'atora-lms' ),
 			__( 'Mensajería', 'atora-lms' ),
 			'manage_options',

@@ -751,53 +751,89 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 			array( $this, 'render_academic_hub_page' )
 		);
 
-		// ── CRM — visible para todos con acceso CRM, si el módulo 'crm' está activo ──
+		// ── PT-4.4.3 (6.3.0): CRM, Marketing, Comercio y Calendario dejan de
+		// ser entradas de primer nivel — se reubican bajo los hubs
+		// "Crecimiento" y "Comunicación" (más abajo). Sus registros
+		// individuales pasan a ocultos (parent=''): siguen alcanzables por
+		// URL directa y desde las tarjetas del hub nuevo, con exactamente
+		// la misma lógica de capability que tenían — regla del sprint,
+		// ninguna página se elimina, solo se reubica.
+
+		// ── CRM (oculta) — si el módulo 'crm' está activo ─────────────────────
 		if ( ( current_user_can( 'clms_access_crm_view' ) || current_user_can( 'manage_options' ) )
 			&& ( ! class_exists( 'CLMS_Module_Registry' ) || CLMS_Module_Registry::is_active( 'crm' ) ) ) {
 			add_submenu_page(
-				'clms-dashboard',
+				'',
 				__( 'CRM', 'atora-lms' ),
-				__( '🤝 CRM', 'atora-lms' ),
+				__( 'CRM', 'atora-lms' ),
 				'clms_access_crm_view',
 				'atora-crm-v2',
 				array( $this, 'render_crm_v2_page' )
 			);
 		}
 
-		// ── Marketing — solo para quien gestiona campañas ─────────────────────
+		// ── Marketing (oculta) — solo para quien gestiona campañas ────────────
 		if ( current_user_can( 'crm_manage_campaigns' ) || current_user_can( 'clms_manage_crm' ) || current_user_can( 'manage_options' ) ) {
 			add_submenu_page(
-				'clms-dashboard',
+				'',
 				__( 'Marketing', 'atora-lms' ),
-				__( '📧 Marketing', 'atora-lms' ),
+				__( 'Marketing', 'atora-lms' ),
 				'crm_manage_campaigns',
 				'clms-email-hub',
 				array( $this, 'render_email_hub_page' )
 			);
 		}
 
-		// ── Comercio — solo para rol comercial o admin, si 'commerce' está activo ──
+		// ── Comercio (oculta) — si 'commerce' está activo ─────────────────────
 		if ( current_user_can( $commerce_cap )
 			&& ( ! class_exists( 'CLMS_Module_Registry' ) || CLMS_Module_Registry::is_active( 'commerce' ) ) ) {
 			add_submenu_page(
-				'clms-dashboard',
+				'',
 				__( 'Comercio', 'atora-lms' ),
-				__( '🛒 Comercio', 'atora-lms' ),
+				__( 'Comercio', 'atora-lms' ),
 				$commerce_cap,
 				'clms-commercial-hub',
 				array( $this, 'render_commercial_hub_page' )
 			);
 		}
 
-		// ── Calendario — visible para todos, si el módulo 'calendar' está activo ──
+		// ── Calendario (oculta) — si el módulo 'calendar' está activo ─────────
 		if ( ! class_exists( 'CLMS_Module_Registry' ) || CLMS_Module_Registry::is_active( 'calendar' ) ) {
 			add_submenu_page(
-				'clms-dashboard',
+				'',
 				__( 'Calendario', 'atora-lms' ),
-				__( '📅 Calendario', 'atora-lms' ),
+				__( 'Calendario', 'atora-lms' ),
 				'read',
 				'atora-calendar',
 				array( $this, 'render_calendar_page' )
+			);
+		}
+
+		// ── Comunicación — hub visible: mensajería, calendario, email ─────────
+		add_submenu_page(
+			'clms-dashboard',
+			__( 'Comunicación', 'atora-lms' ),
+			__( '💬 Comunicación', 'atora-lms' ),
+			'read',
+			'atora-communication-hub',
+			array( $this, 'render_communication_hub_page' )
+		);
+
+		// ── Crecimiento — hub visible: CRM, comercio, afiliados. Oculto por
+		// completo si ninguno de sus módulos constituyentes está activo
+		// (p.ej. perfil institucional, que los desactiva a todos) ───────────
+		$growth_active = ! class_exists( 'CLMS_Module_Registry' )
+			|| CLMS_Module_Registry::is_active( 'crm' )
+			|| CLMS_Module_Registry::is_active( 'commerce' )
+			|| CLMS_Module_Registry::is_active( 'affiliates' );
+		if ( $growth_active && ( current_user_can( 'clms_access_crm_view' ) || current_user_can( $commerce_cap ) || current_user_can( 'manage_options' ) ) ) {
+			add_submenu_page(
+				'clms-dashboard',
+				__( 'Crecimiento', 'atora-lms' ),
+				__( '📈 Crecimiento', 'atora-lms' ),
+				'read',
+				'atora-growth-hub',
+				array( $this, 'render_growth_hub_page' )
 			);
 		}
 

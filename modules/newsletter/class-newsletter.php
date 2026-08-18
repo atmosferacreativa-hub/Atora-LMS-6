@@ -613,7 +613,7 @@ class Newsletter {
 		}
 
 		add_submenu_page(
-			'clms-dashboard',
+			'', // PT-4.4.3: reubicado bajo el hub "Comunicación" (atora-communication-hub).
 			__( 'Newsletter', 'atora-lms' ),
 			__( 'Newsletter', 'atora-lms' ),
 			'manage_options',
