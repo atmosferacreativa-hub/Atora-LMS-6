@@ -59,7 +59,7 @@ class ATORA_LMS_Migration_Admin {
 	 */
 	public static function register_menu(): void {
 		add_submenu_page(
-			'clms-dashboard',
+			'', // PT-4.4.3: reubicado bajo el hub "Estudiantes" (atora-students-hub).
 			__( 'Migración LMS', 'atora-lms' ),
 			__( '🗄 Migración LMS', 'atora-lms' ),
 			'manage_options',
