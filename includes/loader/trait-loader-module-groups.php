@@ -109,6 +109,11 @@ trait CLMS_Loader_Module_Groups_Trait {
 					'dependencies' => array( 'CLMS_Helper' ),
 				),
 				array(
+					'file'         => 'includes/academic/class-teacher-digest-service.php',
+					'class'        => 'CLMS_Teacher_Digest_Service',
+					'dependencies' => array( 'CLMS_Helper' ),
+				),
+				array(
 					'file'         => 'includes/gradebook/class-gradebook-normalizer.php',
 					'class'        => 'CLMS_Gradebook_Normalizer',
 					'dependencies' => array(),
