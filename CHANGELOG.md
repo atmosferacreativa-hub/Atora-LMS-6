@@ -1,5 +1,47 @@
 # CHANGELOG — ATORA LMS
 
+## 6.3.0 (2026-08-18)
+
+### Cutover + Modularidad — despliegue institucional
+
+Actualizar desde 6.2.1 no cambia nada por defecto: todos los módulos
+quedan activos (perfil `academia`) y la lectura LMS sigue en `legacy`
+hasta que un administrador elija explícitamente lo contrario.
+
+**Cutover F4 (lectura LMS desde tablas propias)**
+
+- **NUEVO — `LMS_Parity::cutover_ready()`**: gate programático (dualwrite activo, 0 divergencias en 14 días, reconciliación diaria sin pendientes, las 4 tablas núcleo con filas), usado tanto por el panel de Migración LMS como por el endpoint AJAX del flip.
+- **NUEVO — `wp atora lms cutover --status|--run|--rollback`**: comando WP-CLI para despliegues sin acceso al panel admin, reutilizando el mismo gate.
+- **MEJORA — endpoint de flip/rollback**: antes solo verificaba `atora_lms_dualwrite` del lado servidor (más débil que el gate mostrado en el panel); ahora usa `cutover_ready()` completo. Cada flip/rollback queda registrado en `atora_lms_cutover_log`.
+- **FIX — `LMS_Enrollment_Service::get_access_expiry_by_wp_id()`**: no filtraba por `status IN ('active','completed')` a diferencia de sus lectores hermanos; podía devolver la caducidad de una matrícula `unenrolled`.
+- **NUEVO — `docs/CUTOVER-F4.md`**: procedimiento operativo para el equipo que ejecuta el cutover.
+
+**Sistema de modularidad**
+
+- **NUEVO — `CLMS_Module_Registry`**: registro declarativo de 19 módulos (slug, label, dependencias, páginas y shortcodes que aporta). Opción `atora_active_modules`, default = todos activos. Los módulos núcleo (`lms`, `academic`, `gradebook`, `security`) no se pueden desactivar.
+- **NUEVO — gate de carga en los 3 sistemas de módulos del plugin**: `CLMS_Loader` (convención `condition => 'module:slug'`), `ATORA\V5_Modules::boot()` (guard por módulo en cada `load_*()`), y las llamadas sueltas de `atora_lms_require_module_if_active()`. Desactivar un módulo detiene su carga real — archivo, clase y hooks — no solo lo oculta.
+- **NUEVO — `CLMS_Module_Guard`**: defensa en profundidad — shortcode de un módulo inactivo devuelve vacío (o aviso solo-admin), acceso directo a su página admin da `wp_die()` claro, nunca error fatal.
+- **NUEVO — Admin → ATORA → Módulos**: activar/desactivar con validación de dependencias (bloquea desactivar si hay dependientes activos, activa en cascada lo requerido). Desactivar nunca borra datos.
+- **NUEVO — perfiles de instalación** (`CLMS_Install_Profiles`): `academia` (todo activo, default), `institucional` (LMS académico puro, sin CRM/comercio/afiliados/newsletter/streaming), `corporativo` (institucional + CRM/automatización/email). Selección como paso 1 del onboarding; cambio posterior desde Módulos con vista previa de qué se activa/desactiva.
+- **NUEVO — vocabulario institucional**: helper `atora_profile_label($key, $default)`, activo solo bajo perfil `institucional`.
+
+**Consolidación del menú de administración**
+
+- **FIX — 8 slugs con doble registro** (`atora-emails`, `atora-newsletter`, `atora-messaging`, `atora-automations`, `atora-webhooks`, `atora-security`, `atora-affiliates`, `atora-calendar`): scaffolding residual de cuando los módulos se cableaban directo en el hub de menú. Colapsados a un solo registro cada uno.
+- **FIX — CRM mostraba dos entradas "CRM" simultáneas** en el sidebar (un registro legacy del módulo `crm` con cap `read`, coexistiendo con la entrada real `atora-crm-v2`). Consolidado a una sola.
+- **FIX — Analytics ×3** (`atora-analytics`, `atora-analytics-dashboard`, `clms-analytics`): redirección 301 centralizada (`CLMS_Legacy_Slug_Redirects`) hacia la entrada real, sin 404 ni "no tienes permitido acceder".
+- **NUEVO — menú reorganizado en 8 secciones**: Panel, Academia, Estudiantes, Docentes, Comunicación, Crecimiento (oculto en perfil institucional), Informes, Ajustes. Ninguna página se eliminó — las que dejaron de ser entradas de primer nivel siguen alcanzables por URL directa y desde tarjetas de navegación en su hub nuevo.
+- **NUEVO — chequeos en modo `WP_DEBUG`**: slug de menú registrado más de una vez, o página huérfana (sin módulo dueño, o de un módulo inactivo que igual quedó registrada). Panel de diagnóstico visible en Ajustes.
+- **NUEVO — `docs/MENU-INVENTARIO.md`**: inventario completo de las páginas admin del plugin.
+
+**Limpieza**
+
+- Eliminado `modules/commerce/` (directorio vacío desde hacía tiempo, sin código).
+- `uninstall.php`: 16 tablas custom que faltaban en la lista de borrado opt-in (mayormente de CRM v2 y del motor de secuencias de email, desfase previo a este sprint) — de 52 a 69 tablas.
+- `docs/CRM-V1-V2-PARIDAD.md`: documento de decisión para una futura evaluación de retiro de `modules/crm/` (v1) — no se retira nada en este sprint.
+
+---
+
 ## 6.2.1 (2026-07-30)
 
 ### Blindaje ante despliegues incompletos (hosting compartido / Softaculous)
