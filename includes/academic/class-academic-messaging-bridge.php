@@ -27,6 +27,51 @@ class CLMS_Academic_Messaging_Bridge {
 
 		// PT-3.1 — assignment_graded.
 		add_action( 'clms_grade_published', array( __CLASS__, 'on_grade_published' ) );
+
+		// PT-3.2 — submission_received.
+		add_action( 'clms_submission_created', array( __CLASS__, 'on_submission_created' ), 10, 3 );
+	}
+
+	/**
+	 * PT-3.2: al recibir una entrega → docente de la sección.
+	 *
+	 * @param int $submission_id
+	 * @param int $lesson_id
+	 * @param int $student_id
+	 */
+	public static function on_submission_created( $submission_id, $lesson_id, $student_id ): void {
+		if ( ! \ATORA\Messaging\Messaging_Router::is_academic_routing_enabled() ) { return; }
+
+		$lesson_id  = absint( $lesson_id );
+		$student_id = absint( $student_id );
+		if ( ! $lesson_id || ! $student_id ) { return; }
+
+		$course_id = class_exists( 'CLMS_Helper' ) && method_exists( 'CLMS_Helper', 'get_course_id_from_lesson' )
+			? absint( CLMS_Helper::get_course_id_from_lesson( $lesson_id ) )
+			: 0;
+		if ( ! $course_id ) { return; }
+
+		$teacher_id = class_exists( '\ATORA\LMS\Section_Service' )
+			? \ATORA\LMS\Section_Service::get_effective_instructor( $student_id, $course_id )
+			: null;
+		if ( ! $teacher_id ) { return; }
+
+		\ATORA\Messaging\Messaging_Router::send(
+			(int) $teacher_id,
+			'submission_received',
+			'atora_submission_received',
+			array(
+				'teacher_name'    => self::display_name( (int) $teacher_id ),
+				'student_name'    => self::display_name( $student_id ),
+				'lesson_title'    => sanitize_text_field( (string) get_the_title( $lesson_id ) ),
+				'course_title'    => sanitize_text_field( (string) get_the_title( $course_id ) ),
+				'button_url'      => (string) get_permalink( $lesson_id ),
+			),
+			array(
+				'dedupe_key'            => "submission_received_{$submission_id}",
+				'dedupe_window_minutes' => 15,
+			)
+		);
 	}
 
 	/**
