@@ -1394,6 +1394,24 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 					</div>
 				</div>
 
+				<?php if ( defined( 'WP_DEBUG' ) && WP_DEBUG && current_user_can( 'manage_options' ) && class_exists( 'CLMS_Menu_Debug_Guard' ) ) :
+					$menu_dupes   = CLMS_Menu_Debug_Guard::get_duplicate_findings();
+					$menu_orphans = CLMS_Menu_Debug_Guard::get_orphan_findings();
+					if ( $menu_dupes || $menu_orphans ) : ?>
+				<div class="atora-hub__guide" style="border-color:#fca5a5;background:#fef2f2">
+					<h3 class="atora-hub__guide-title" style="color:#991b1b"><?php esc_html_e( '⚠ Diagnóstico de menú (solo WP_DEBUG) — PT-4.5', 'atora-lms' ); ?></h3>
+					<div style="font-size:12px;color:#7f1d1d;line-height:1.6">
+						<?php foreach ( $menu_dupes as $dup_slug => $dup_parents ) : ?>
+							<p style="margin:4px 0"><strong>Duplicado:</strong> <code><?php echo esc_html( $dup_slug ); ?></code> — <?php echo esc_html( implode( ', ', $dup_parents ) ); ?></p>
+						<?php endforeach; ?>
+						<?php foreach ( $menu_orphans as $orphan_slug => $orphan_reason ) : ?>
+							<p style="margin:4px 0"><strong>Huérfana:</strong> <code><?php echo esc_html( $orphan_slug ); ?></code> — <?php echo esc_html( $orphan_reason ); ?></p>
+						<?php endforeach; ?>
+					</div>
+				</div>
+					<?php endif;
+				endif; ?>
+
 				<div class="atora-hub__guide">
 					<h3 class="atora-hub__guide-title"><?php esc_html_e( 'Flujo recomendado en 3 pasos', 'atora-lms' ); ?></h3>
 					<div class="atora-hub__guide-list">
