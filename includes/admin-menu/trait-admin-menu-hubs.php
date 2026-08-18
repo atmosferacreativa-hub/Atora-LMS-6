@@ -751,8 +751,9 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 			array( $this, 'render_academic_hub_page' )
 		);
 
-		// ── CRM — visible para todos con acceso CRM ────────────────────────
-		if ( current_user_can( 'clms_access_crm_view' ) || current_user_can( 'manage_options' ) ) {
+		// ── CRM — visible para todos con acceso CRM, si el módulo 'crm' está activo ──
+		if ( ( current_user_can( 'clms_access_crm_view' ) || current_user_can( 'manage_options' ) )
+			&& ( ! class_exists( 'CLMS_Module_Registry' ) || CLMS_Module_Registry::is_active( 'crm' ) ) ) {
 			add_submenu_page(
 				'clms-dashboard',
 				__( 'CRM', 'atora-lms' ),
@@ -775,8 +776,9 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 			);
 		}
 
-		// ── Comercio — solo para rol comercial o admin ────────────────────────
-		if ( current_user_can( $commerce_cap ) ) {
+		// ── Comercio — solo para rol comercial o admin, si 'commerce' está activo ──
+		if ( current_user_can( $commerce_cap )
+			&& ( ! class_exists( 'CLMS_Module_Registry' ) || CLMS_Module_Registry::is_active( 'commerce' ) ) ) {
 			add_submenu_page(
 				'clms-dashboard',
 				__( 'Comercio', 'atora-lms' ),
@@ -809,24 +811,28 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 				'clms-settings-hub',
 				array( $this, 'render_settings_hub_page' )
 			);
-			// ── IA — subítem de Ajustes (Fase II S5) ─────────────────────────
-			add_submenu_page(
-				'clms-dashboard',
-				__( 'Inteligencia Artificial', 'atora-lms' ),
-				__( '🧠 IA', 'atora-lms' ),
-				$settings_cap,
-				'clms-ai-hub',
-				array( $this, 'render_ai_hub_page' )
-			);
-			// ── Analytics — subítem de Ajustes (Fase IV S12) ─────────────────
-			add_submenu_page(
-				'clms-dashboard',
-				__( 'Analytics', 'atora-lms' ),
-				__( '📊 Analytics', 'atora-lms' ),
-				$settings_cap,
-				'atora-analytics-dashboard',
-				array( $this, 'render_analytics_dashboard_page' )
-			);
+			// ── IA — subítem de Ajustes (Fase II S5), si 'ai' está activo ─────
+			if ( ! class_exists( 'CLMS_Module_Registry' ) || CLMS_Module_Registry::is_active( 'ai' ) ) {
+				add_submenu_page(
+					'clms-dashboard',
+					__( 'Inteligencia Artificial', 'atora-lms' ),
+					__( '🧠 IA', 'atora-lms' ),
+					$settings_cap,
+					'clms-ai-hub',
+					array( $this, 'render_ai_hub_page' )
+				);
+			}
+			// ── Analytics — subítem de Ajustes (Fase IV S12), si 'analytics' está activo ──
+			if ( ! class_exists( 'CLMS_Module_Registry' ) || CLMS_Module_Registry::is_active( 'analytics' ) ) {
+				add_submenu_page(
+					'clms-dashboard',
+					__( 'Analytics', 'atora-lms' ),
+					__( '📊 Analytics', 'atora-lms' ),
+					$settings_cap,
+					'atora-analytics-dashboard',
+					array( $this, 'render_analytics_dashboard_page' )
+				);
+			}
 		}
 
 		// Páginas ocultas del sidebar — accesibles por URL directa (admin.php?page=…).
