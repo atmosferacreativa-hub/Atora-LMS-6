@@ -152,6 +152,46 @@ if ( ! function_exists( 'atora_test_reset_user_caps' ) ) {
 if ( ! function_exists( 'is_email' ) ) {
 	function is_email( $email ) { return filter_var( (string) $email, FILTER_VALIDATE_EMAIL ) ? $email : false; }
 }
+if ( ! function_exists( 'get_user_by' ) ) {
+	function get_user_by( string $field, $value ) { return false; }
+}
+if ( ! function_exists( 'wpautop' ) ) {
+	function wpautop( string $s ): string { return '<p>' . $s . '</p>'; }
+}
+if ( ! function_exists( 'sanitize_textarea_field' ) ) {
+	function sanitize_textarea_field( $s ): string { return trim( strip_tags( (string) $s ) ); }
+}
+if ( ! function_exists( 'wp_strip_all_tags' ) ) {
+	function wp_strip_all_tags( string $s ): string { return trim( strip_tags( $s ) ); }
+}
+
+/** Stub mínimo de WP_REST_Response — solo lo que usan los controllers CRM bajo test. */
+if ( ! class_exists( 'WP_REST_Response' ) ) {
+	class WP_REST_Response {
+		private $data;
+		private int $status;
+		public function __construct( $data = null, int $status = 200 ) {
+			$this->data   = $data;
+			$this->status = $status;
+		}
+		public function get_data() { return $this->data; }
+		public function get_status(): int { return $this->status; }
+	}
+}
+if ( ! function_exists( 'rest_ensure_response' ) ) {
+	function rest_ensure_response( $data ) {
+		return $data instanceof WP_REST_Response ? $data : new WP_REST_Response( $data, 200 );
+	}
+}
+/** Stub mínimo de WP_REST_Request — parámetros planos, sin rutas/sanitización de WP real. */
+if ( ! class_exists( 'WP_REST_Request' ) ) {
+	class WP_REST_Request {
+		private array $params;
+		public function __construct( array $params = array() ) { $this->params = $params; }
+		public function get_param( string $key ) { return $this->params[ $key ] ?? null; }
+		public function get_json_params(): array { return $this->params; }
+	}
+}
 if ( ! function_exists( 'wp_hash' ) )  { function wp_hash( string $data ): string { return hash_hmac( 'sha256', $data, 'test-salt' ); } }
 if ( ! function_exists( 'wp_salt' ) )  { function wp_salt( string $scheme = 'auth' ): string { return 'test-salt-' . $scheme; } }
 if ( ! function_exists( 'wp_rand' ) )  { function wp_rand( int $min = 0, int $max = 0 ): int { return random_int( $min, $max ?: PHP_INT_MAX ); } }
@@ -215,6 +255,16 @@ if ( file_exists( $crm_access_trait_file ) ) {
 $crm_v2_rest_controller_file = __DIR__ . '/../modules/crm-v2/rest/class-crm-rest-controller.php';
 if ( file_exists( $crm_v2_rest_controller_file ) ) {
 	require_once $crm_v2_rest_controller_file;
+}
+
+$crm_email_service_file = __DIR__ . '/../modules/crm-v2/services/class-crm-email-service.php';
+if ( file_exists( $crm_email_service_file ) ) {
+	require_once $crm_email_service_file;
+}
+
+$crm_inbox_rest_controller_file = __DIR__ . '/../modules/crm-v2/rest/class-inbox-rest-controller.php';
+if ( file_exists( $crm_inbox_rest_controller_file ) ) {
+	require_once $crm_inbox_rest_controller_file;
 }
 
 foreach ( array( 'class-module-registry.php', 'class-install-profiles.php', 'class-profile-labels.php' ) as $mod_file ) {

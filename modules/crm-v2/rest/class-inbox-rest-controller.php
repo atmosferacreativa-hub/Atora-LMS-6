@@ -49,9 +49,25 @@ class Inbox_REST_Controller {
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( __CLASS__, 'reply_email' ),
-				'permission_callback' => array( '\\ATORA\\CRM_V2\\Rest\\CRM_REST_Controller', 'can_access' ),
+				'permission_callback' => array( __CLASS__, 'can_send_email' ),
 			)
 		);
+	}
+
+	/**
+	 * PT-2.3 (6.5.1): can_access no basta para disparar correo en nombre
+	 * de la institución — exige además crm_send_email, la misma
+	 * capability que ya gatea el envío individual desde la ficha 360
+	 * (Contact_Actions_REST_Controller::send_email()). Se reutiliza en
+	 * vez de crear una capability nueva para la misma acción.
+	 *
+	 * @return bool
+	 */
+	public static function can_send_email(): bool {
+		if ( ! CRM_REST_Controller::can_access() ) {
+			return false;
+		}
+		return current_user_can( 'crm_send_email' ) || current_user_can( 'clms_manage_crm' ) || current_user_can( 'manage_options' );
 	}
 
 	/**
@@ -157,11 +173,25 @@ class Inbox_REST_Controller {
 	 * @return \WP_REST_Response
 	 */
 	public static function reply_email( \WP_REST_Request $request ): \WP_REST_Response {
-		$to             = sanitize_email( (string) $request->get_param( 'to' ) );
-		$subject        = sanitize_text_field( (string) $request->get_param( 'subject' ) );
-		$message        = sanitize_textarea_field( (string) $request->get_param( 'message' ) );
-		$contact_id     = absint( $request->get_param( 'contact_id' ) );
+		$to              = sanitize_email( (string) $request->get_param( 'to' ) );
+		$subject         = sanitize_text_field( (string) $request->get_param( 'subject' ) );
+		$message         = sanitize_textarea_field( (string) $request->get_param( 'message' ) );
+		$contact_id      = absint( $request->get_param( 'contact_id' ) );
 		$conversation_id = absint( $request->get_param( 'conversation_id' ) );
+
+		// PT-2.1 (6.5.1): sin contact_id ni conversation_id, no hay nada
+		// que verificar — antes esto se saltaba las dos comprobaciones de
+		// abajo y dejaba pasar cualquier destinatario.
+		if ( ! $contact_id && ! $conversation_id ) {
+			return new \WP_REST_Response(
+				array(
+					'success' => false,
+					'message' => __( 'Indica un contacto o una conversación para responder.', 'atora-lms' ),
+				),
+				400
+			);
+		}
+
 		if ( $conversation_id && ! CRM_REST_Controller::conversation_id_is_visible( $conversation_id ) ) {
 			return new \WP_REST_Response(
 				array(
@@ -180,6 +210,37 @@ class Inbox_REST_Controller {
 				403
 			);
 		}
+
+		// PT-2.2 (6.5.1): el destinatario se deriva del contacto/
+		// conversación en el servidor — nunca se confía en el parámetro
+		// `to` para decidir a dónde se envía. Si `to` llegó y no coincide,
+		// es una señal de mal uso: se rechaza en vez de enviarlo igual.
+		// Si solo llegó conversation_id, aprovechamos para completar
+		// contact_id con el de la conversación (para el log de actividad
+		// más abajo).
+		if ( ! $contact_id && $conversation_id ) {
+			$contact_id = self::contact_id_for_conversation( $conversation_id );
+		}
+		$resolved_email = self::resolve_recipient_email( $contact_id, $conversation_id );
+		if ( '' === $resolved_email ) {
+			return new \WP_REST_Response(
+				array(
+					'success' => false,
+					'message' => __( 'No se pudo determinar el email del contacto.', 'atora-lms' ),
+				),
+				404
+			);
+		}
+		if ( '' !== $to && strtolower( $to ) !== strtolower( $resolved_email ) ) {
+			return new \WP_REST_Response(
+				array(
+					'success' => false,
+					'message' => __( 'El destinatario indicado no coincide con el email registrado del contacto.', 'atora-lms' ),
+				),
+				409
+			);
+		}
+		$to = $resolved_email;
 
 		if ( '' === $to || ! is_email( $to ) || '' === $message ) {
 			return rest_ensure_response( array( 'success' => false, 'message' => __( 'Datos incompletos para enviar respuesta.', 'atora-lms' ) ) );
@@ -208,6 +269,59 @@ class Inbox_REST_Controller {
 						?? ( $sent ? __( 'Respuesta encolada.', 'atora-lms' ) : __( 'No fue posible enviar la respuesta.', 'atora-lms' ) )
 					)
 				),
+			)
+		);
+	}
+
+	/**
+	 * PT-2.2 (6.5.1): email real del contacto o de la conversación,
+	 * resuelto en el servidor. `contact_id` tiene prioridad si llegan
+	 * los dos.
+	 *
+	 * @param int $contact_id
+	 * @param int $conversation_id
+	 * @return string Email en minúsculas, o '' si no se pudo resolver.
+	 */
+	private static function resolve_recipient_email( int $contact_id, int $conversation_id ): string {
+		global $wpdb;
+
+		if ( $contact_id ) {
+			$email = (string) $wpdb->get_var(
+				$wpdb->prepare( "SELECT email FROM {$wpdb->prefix}atora_contacts WHERE id = %d LIMIT 1", $contact_id )
+			);
+			return sanitize_email( $email );
+		}
+
+		if ( $conversation_id ) {
+			$email = (string) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT ct.email
+					 FROM {$wpdb->prefix}atora_conversations c
+					 LEFT JOIN {$wpdb->prefix}atora_contacts ct ON ct.id = c.contact_id
+					 WHERE c.id = %d
+					 LIMIT 1",
+					$conversation_id
+				)
+			);
+			return sanitize_email( $email );
+		}
+
+		return '';
+	}
+
+	/**
+	 * @param int $conversation_id
+	 * @return int contact_id vinculado, o 0.
+	 */
+	private static function contact_id_for_conversation( int $conversation_id ): int {
+		global $wpdb;
+
+		return absint(
+			$wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT contact_id FROM {$wpdb->prefix}atora_conversations WHERE id = %d LIMIT 1",
+					$conversation_id
+				)
 			)
 		);
 	}
