@@ -29,6 +29,7 @@ require_once $autoload;
 if ( ! defined( 'ABSPATH' ) )         { define( 'ABSPATH', '/tmp/wp/' ); }
 if ( ! defined( 'ATORA_LMS_VERSION' ) ) { define( 'ATORA_LMS_VERSION', '6.0.0' ); }
 if ( ! defined( 'DAY_IN_SECONDS' ) )  { define( 'DAY_IN_SECONDS', 86400 ); }
+if ( ! defined( 'HOUR_IN_SECONDS' ) ) { define( 'HOUR_IN_SECONDS', 3600 ); }
 if ( ! defined( 'MINUTE_IN_SECONDS' ) ) { define( 'MINUTE_IN_SECONDS', 60 ); }
 if ( ! defined( 'OBJECT' ) )          { define( 'OBJECT', 'OBJECT' ); }
 if ( ! defined( 'ARRAY_A' ) )         { define( 'ARRAY_A', 'ARRAY_A' ); }
@@ -140,6 +141,11 @@ foreach ( array(
 $messaging_router_file = __DIR__ . '/../modules/messaging/class-messaging-router.php';
 if ( file_exists( $messaging_router_file ) ) {
 	require_once $messaging_router_file;
+}
+
+$inactivity_service_file = __DIR__ . '/../includes/academic/class-student-inactivity-reminder-service.php';
+if ( file_exists( $inactivity_service_file ) ) {
+	require_once $inactivity_service_file;
 }
 
 foreach ( array( 'class-module-registry.php', 'class-install-profiles.php', 'class-profile-labels.php' ) as $mod_file ) {

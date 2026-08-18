@@ -98,6 +98,21 @@ class Messaging_Router {
 	 *
 	 * @return void
 	 */
+	/** Option: corte maestro de enrutamiento académico (PT-2.4, 6.4.0). Default false = comportamiento 6.3.0 exacto. */
+	const OPT_ACADEMIC_ROUTING = 'atora_academic_routing_enabled';
+
+	/**
+	 * PT-2.4 (6.4.0): true solo si un admin activó explícitamente el
+	 * enrutamiento académico desde el panel. Con false (default), todo
+	 * disparador académico (PT-2, PT-3) debe comportarse exactamente
+	 * como en 6.3.0 — sin excepción.
+	 *
+	 * @return bool
+	 */
+	public static function is_academic_routing_enabled(): bool {
+		return (bool) get_option( self::OPT_ACADEMIC_ROUTING, false );
+	}
+
 	public static function init(): void {
 		// Registrar intervalo antes de programar cron para evitar acoplamiento entre módulos.
 		add_filter( 'cron_schedules', array( __CLASS__, 'add_cron_intervals' ) );

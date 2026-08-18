@@ -1,3 +1,49 @@
+# Deuda técnica — Sprints 6.3.0 y 6.4.0
+
+## PT-2.2 (6.4.0) — Doble cooldown en el recordatorio de inactividad, a propósito
+
+Con el enrutamiento académico activo, `CLMS_Student_Inactivity_Reminder_Service`
+ahora tiene DOS mecanismos de cooldown corriendo en paralelo para el
+mismo envío:
+
+1. **`META_LAST_SENT . $course_id`** (usermeta, existía desde 6.3.0) —
+   se sigue escribiendo en `run_daily_check()` sin importar qué camino
+   de envío se use.
+2. **`dedupe_key` del router** (`"inactive_{$student_id}_{$course_id}"`,
+   `dedupe_window_minutes = cooldown_hours * 60`) — nuevo, solo aplica
+   cuando `should_use_router()` es true.
+
+**Por qué no se unificó ya:** mismo criterio que la paridad de F4 en
+6.3.0 — correr ambos un ciclo y comparar antes de confiar en uno solo.
+Si el router demuestra que su dedupe cubre exactamente los mismos casos
+que el meta legacy (ni más falso-negativo, ni menos), retirar el
+`META_LAST_SENT` en 6.5.0 y dejar solo el `dedupe_key`. Si diverge,
+investigar por qué antes de tocar nada.
+
+**Cómo verificarlo:** comparar `atora_message_queue` (filtrando por
+`template = 'atora_student_inactive'`) contra el usermeta
+`_clms_last_inactivity_reminder_{course_id}` de una muestra de
+estudiantes, durante al menos una semana con el flag activo en un
+entorno de prueba.
+
+## PT-2.3 (6.4.0) — Plantilla de email `atora_student_inactive` pendiente de crear en Email Engine
+
+El canal email del router (`dispatch_channel()` en
+`Messaging_Router`, caso `'email'`) no usa `CLMS_Email::send()` como el
+camino legacy — encola vía `\ATORA\EmailEngine\Email_Queue::enqueue()`,
+que resuelve el contenido por `template_key` dentro del sistema de
+plantillas de Email Engine, no por el `subject`/`body` que
+`send_reminder_via_router()` calcula. Esas variables (`subject`,
+`headline`, `body`, `button_text`, `button_url`, `footer_note`) SÍ se
+pasan en `variables`, listas para que una plantilla de Email Engine con
+`template_key = 'atora_student_inactive'` las use — pero esa plantilla
+no existe todavía, es contenido a crear desde el admin de Email Engine,
+no código. Sin ella, el canal de respaldo a email caerá a lo que Email
+Queue haga por defecto ante una plantilla ausente (a verificar/crear
+antes de activar el flag en producción).
+
+---
+
 # Deuda técnica — Sprint 6.3.0
 
 Documento vivo. Cada entrada anota qué se encontró, por qué no se resolvió
