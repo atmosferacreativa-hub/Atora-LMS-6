@@ -909,7 +909,6 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 			'edit.php?post_type=lm_lesson',
 			'edit.php?post_type=atora_teacher',
 			'edit.php?post_type=clms_rubric',
-			'atora-calendar',
 			'atora-analytics',
 			'atora-live-streaming',
 			);

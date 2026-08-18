@@ -54,7 +54,14 @@ class Calendar {
 
 		// Admin.
 		if ( is_admin() ) {
-			add_action( 'atora_lms_admin_menu',    array( __CLASS__, 'register_admin_menu' ) );
+			// PT-4.2.2 (6.3.0): sin hook a register_admin_menu() — el hub
+			// (trait-admin-menu-hubs.php) ya registra 'atora-calendar' con
+			// cap 'read' + su propia lógica de permisos granular
+			// (can_access_calendar_page()); esta clase, al registrarse
+			// después vía el puente atora_lms_admin_menu, siempre se
+			// auto-bloqueaba (ver guard en register_admin_menu()) y nunca
+			// llegó a ejecutarse — era ya código muerto. Se deja el método
+			// por si se necesita reactivar, pero sin el hook.
 			add_action( 'wp_ajax_atora_cal_save',  array( __CLASS__, 'ajax_save_event' ) );
 			add_action( 'wp_ajax_atora_cal_delete',array( __CLASS__, 'ajax_delete_event' ) );
 		}
