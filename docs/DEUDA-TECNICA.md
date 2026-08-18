@@ -26,6 +26,38 @@ para usar el mismo filtro. Ver test de regresión en
 
 ---
 
+## PT-3.4 — Poca superficie visible bajo institucional que realmente necesite el vocabulario
+
+Al aplicar `atora_profile_label()` en los puntos visibles (orden de
+prioridad de la OT: menú → encabezados CRM/comercio → columnas de
+listados → dashboard docente), se encontró que **el hallazgo de
+PT-4.4.3 ya resuelve la mayor parte del problema por sí solo**: el
+perfil `institucional` desactiva `crm`/`commerce`/`affiliates` por
+defecto, y desde PT-4.4.3 el hub "Crecimiento" que los agrupa
+desaparece por completo del sidebar cuando ninguno de los tres está
+activo. La vocabulario comercial ("Contactos", "Producto", "Cliente")
+vive dentro de `modules/crm/views/admin.php`, `modules/crm-v2/*` y las
+vistas de comercio — exactamente los archivos que la propia OT dice no
+tocar ("No tocar cadenas en vistas de módulos que el perfil
+institucional desactiva — es trabajo perdido").
+
+Se revisó si el CPT núcleo `lm_cohort` (`includes/class-cpt.php`,
+siempre activo, parte de Academia) debía renombrarse a "Sección" — se
+decidió que no: sus labels ya dicen "Cohorte" a secas (académico), no
+"Cohorte comercial" (el término específico del ejemplo de la OT, que
+parece referirse a un concepto de agrupación del lado comercial/CRM,
+no al CPT académico). Renombrarlo sin evidencia de que sea el término
+correcto habría sido un cambio de UI visible para TODOS los perfiles
+(academia incluido) sin justificación clara — violaría la regla de
+cero cambio de comportamiento por defecto.
+
+**Lo que sí se aplicó:** las 5 claves nuevas del mapa (`enrollment`,
+`program`, `section`, `teacher`, `coordinator`, PT-3.4.2) y el test de
+PT-3.4.3 (`tests/Modularity/ProfileLabelsTest.php`) verificando que
+`academia`/`corporativo` devuelven el default y solo `institucional`
+cambia. El helper queda listo y probado para cuando alguien identifique
+un string hardcodeado específico que sí valga la pena envolver.
+
 ## PT-4.4.3 — Excepciones deliberadas al conteo estricto de 8 entradas
 
 La estructura final tiene 8 hubs de primer nivel (Panel, Academia,

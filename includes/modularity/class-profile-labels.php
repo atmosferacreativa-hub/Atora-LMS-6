@@ -40,6 +40,16 @@ class CLMS_Profile_Labels {
 			'deal'            => __( 'Matrícula en curso', 'atora-lms' ),
 			'pipeline'        => __( 'Proceso de admisión', 'atora-lms' ),
 			'customer'        => __( 'Estudiante activo', 'atora-lms' ),
+			// PT-3.4.2 (cierre 6.3.0): claves añadidas al aplicar el
+			// vocabulario en menú/encabezados reales.
+			'enrollment'      => __( 'Matrícula', 'atora-lms' ),
+			'enrollments'     => __( 'Matrículas', 'atora-lms' ),
+			'program'         => __( 'Programa de formación', 'atora-lms' ),
+			'section'         => __( 'Sección', 'atora-lms' ),
+			'sections'        => __( 'Secciones', 'atora-lms' ),
+			'teacher'         => __( 'Docente', 'atora-lms' ),
+			'teachers'        => __( 'Docentes', 'atora-lms' ),
+			'coordinator'     => __( 'Coordinador académico', 'atora-lms' ),
 		);
 	}
 
