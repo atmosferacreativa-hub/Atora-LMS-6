@@ -35,6 +35,9 @@ class Preferences {
 	const META_VERIFY_EXPIRES   = 'atora_phone_verify_expires';
 	const META_VERIFY_ATTEMPTS  = 'atora_phone_verify_attempts';
 	const META_VERIFY_WINDOW    = 'atora_phone_verify_window_start';
+	/** PT-5 (6.5.1): intentos de VALIDAR un código, contador independiente del de SOLICITAR uno (META_VERIFY_ATTEMPTS/META_VERIFY_WINDOW, que limita pedir códigos nuevos). */
+	const META_VERIFY_CODE_ATTEMPTS = 'atora_phone_verify_code_attempts';
+	const MAX_CODE_ATTEMPTS         = 5;
 
 	const CATEGORIES = array( 'academico', 'recordatorios', 'institucional' );
 
@@ -273,6 +276,9 @@ class Preferences {
 		update_user_meta( $user_id, self::META_VERIFY_CODE_HASH, wp_hash( $code ) );
 		update_user_meta( $user_id, self::META_VERIFY_EXPIRES, time() + ( self::CODE_TTL_MINUTES * MINUTE_IN_SECONDS ) );
 		self::register_verify_attempt( $user_id );
+		// PT-5.2 (6.5.1): un código nuevo resetea el contador de intentos
+		// de validación del código anterior.
+		delete_user_meta( $user_id, self::META_VERIFY_CODE_ATTEMPTS );
 
 		if ( ! class_exists( '\ATORA\Messaging\WhatsApp' ) ) {
 			return array( 'ok' => false, 'reason' => 'whatsapp_no_disponible' );
@@ -296,6 +302,16 @@ class Preferences {
 			return array( 'ok' => false, 'reason' => 'formato_invalido' );
 		}
 
+		// PT-5.1 (6.5.1): tope de intentos de VALIDACIÓN — antes nada
+		// contaba los códigos incorrectos, solo la solicitud de códigos
+		// nuevos (3/hora, ya existía). Sin esto, un código de 6 dígitos
+		// es fuerza-bruteable dentro de su ventana de 10 minutos.
+		$code_attempts = absint( get_user_meta( $user_id, self::META_VERIFY_CODE_ATTEMPTS, true ) );
+		if ( $code_attempts >= self::MAX_CODE_ATTEMPTS ) {
+			self::invalidate_current_code( $user_id );
+			return array( 'ok' => false, 'reason' => 'demasiados_intentos' );
+		}
+
 		$expires = absint( get_user_meta( $user_id, self::META_VERIFY_EXPIRES, true ) );
 		if ( ! $expires || time() > $expires ) {
 			return array( 'ok' => false, 'reason' => 'codigo_expirado' );
@@ -303,8 +319,15 @@ class Preferences {
 
 		$stored_hash = (string) get_user_meta( $user_id, self::META_VERIFY_CODE_HASH, true );
 		if ( '' === $stored_hash || ! hash_equals( $stored_hash, wp_hash( $code ) ) ) {
+			update_user_meta( $user_id, self::META_VERIFY_CODE_ATTEMPTS, $code_attempts + 1 );
+			if ( $code_attempts + 1 >= self::MAX_CODE_ATTEMPTS ) {
+				self::invalidate_current_code( $user_id );
+				return array( 'ok' => false, 'reason' => 'demasiados_intentos' );
+			}
 			return array( 'ok' => false, 'reason' => 'codigo_incorrecto' );
 		}
+
+		delete_user_meta( $user_id, self::META_VERIFY_CODE_ATTEMPTS );
 
 		$phone = trim( (string) get_user_meta( $user_id, 'atora_phone', true ) );
 		update_user_meta( $user_id, self::META_PHONE_VERIFIED, true );
@@ -326,8 +349,23 @@ class Preferences {
 	public static function invalidate_phone_verification( int $user_id ): void {
 		delete_user_meta( $user_id, self::META_PHONE_VERIFIED );
 		delete_user_meta( $user_id, self::META_PHONE_VERIFIED_HASH );
+		self::invalidate_current_code( $user_id );
+	}
+
+	/**
+	 * PT-5.1 (6.5.1): invalida solo el código de verificación vigente
+	 * (por vencimiento del tope de intentos) — a diferencia de
+	 * invalidate_phone_verification(), NO toca un teléfono ya
+	 * verificado previamente. Exige solicitar un código nuevo para
+	 * seguir intentando.
+	 *
+	 * @param int $user_id
+	 * @return void
+	 */
+	private static function invalidate_current_code( int $user_id ): void {
 		delete_user_meta( $user_id, self::META_VERIFY_CODE_HASH );
 		delete_user_meta( $user_id, self::META_VERIFY_EXPIRES );
+		delete_user_meta( $user_id, self::META_VERIFY_CODE_ATTEMPTS );
 	}
 
 	/**
