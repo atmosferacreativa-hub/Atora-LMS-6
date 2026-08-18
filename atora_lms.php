@@ -656,6 +656,10 @@ add_action( 'init', static function () {
 	if ( class_exists( 'CLMS_Module_Guard' ) ) { CLMS_Module_Guard::init(); }
 	if ( class_exists( 'CLMS_Module_Admin_Page' ) ) { CLMS_Module_Admin_Page::init(); }
 
+	// PT-4.2.4: red de seguridad contra slugs de menú admin duplicados (solo WP_DEBUG).
+	require_once ATORA_LMS_DIR . 'includes/admin-menu/class-menu-debug-guard.php';
+	if ( class_exists( 'CLMS_Menu_Debug_Guard' ) ) { CLMS_Menu_Debug_Guard::init(); }
+
 	// Registro de versión actual y anterior para facilitar rollback controlado.
 	$current_version = (string) get_option( 'atora_lms_current_version', '' );
 	if ( $current_version !== ATORA_LMS_VERSION ) {
