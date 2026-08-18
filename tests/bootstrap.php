@@ -137,6 +137,11 @@ foreach ( array(
 	}
 }
 
+$messaging_router_file = __DIR__ . '/../modules/messaging/class-messaging-router.php';
+if ( file_exists( $messaging_router_file ) ) {
+	require_once $messaging_router_file;
+}
+
 foreach ( array( 'class-module-registry.php', 'class-install-profiles.php', 'class-profile-labels.php' ) as $mod_file ) {
 	$path = __DIR__ . '/../includes/modularity/' . $mod_file;
 	if ( file_exists( $path ) ) {

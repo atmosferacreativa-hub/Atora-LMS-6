@@ -37,7 +37,54 @@ class Messaging_Router {
 		'new_course'       => array( 'email', 'telegram' ),
 		'marketing'        => array( 'email', 'telegram' ),
 		'inactivity'       => array( 'email', 'whatsapp' ),
+		// PT-1 (6.4.0) — tipos académicos. WhatsApp primero: es el canal
+		// que de verdad se lee en el piloto (conectividad intermitente,
+		// uso mayoritariamente móvil). Los de prioridad baja (candidatos
+		// a resumen, PT-5) no usan WhatsApp por defecto para no gastar
+		// cupo de plantillas en tráfico no urgente.
+		'assignment_graded'         => array( 'whatsapp', 'email' ),
+		'assignment_due_soon'       => array( 'whatsapp', 'email' ),
+		'submission_received'       => array( 'whatsapp', 'email' ),
+		'student_inactive'          => array( 'whatsapp', 'email' ),
+		'at_risk_flagged'           => array( 'whatsapp', 'email' ),
+		'improvement_plan_assigned' => array( 'whatsapp', 'email' ),
+		'lesson_published'          => array( 'email' ),
+		'section_announcement'      => array( 'email' ),
 	);
+
+	/**
+	 * PT-1.3 (6.4.0): categoría de preferencia de cada tipo académico —
+	 * lo que el estudiante activa/desactiva por separado en
+	 * [atora_preferencias] (PT-4). Un tipo ausente de este mapa (p.ej.
+	 * '2fa_code', 'purchase') es transaccional: no aparece en la
+	 * pantalla de preferencias y no se puede desactivar.
+	 *
+	 * @var array<string,string>
+	 */
+	private static array $type_categories = array(
+		'assignment_graded'         => 'academico',
+		'submission_received'       => 'academico',
+		'at_risk_flagged'           => 'academico',
+		'improvement_plan_assigned' => 'academico',
+		'assignment_due_soon'       => 'recordatorios',
+		'student_inactive'          => 'recordatorios',
+		'lesson_published'          => 'recordatorios',
+		'section_announcement'      => 'institucional',
+	);
+
+	/**
+	 * Tipos que NUNCA deben enviarse al propio estudiante afectado —
+	 * PT-1.2. `at_risk_flagged` va al docente/coordinador, que deciden
+	 * cómo abordarlo; decírselo directo al estudiante por WhatsApp es
+	 * contraproducente y potencialmente dañino. Cualquier código que
+	 * despache este tipo (PT-3.4) debe excluir explícitamente al
+	 * estudiante flaggeado de la lista de destinatarios — este método
+	 * es el punto único para verificarlo, no confiar solo en el
+	 * comentario.
+	 *
+	 * @var string[]
+	 */
+	private static array $never_student_facing = array( 'at_risk_flagged' );
 
 	/**
 	 * Cache de existencia de columna `priority` en la cola.
@@ -414,8 +461,19 @@ class Messaging_Router {
 		$type = sanitize_key( $type );
 
 		$critical_types = array( '2fa_code' );
-		$high_types     = array( 'purchase', 'grade', 'live_reminder_1h' );
-		$low_types      = array( 'marketing' );
+		// PT-1.1 (6.4.0): assignment_due_soon, at_risk_flagged e
+		// improvement_plan_assigned son 'high' — el estudiante/docente
+		// los espera o requieren acción con plazo. submission_received,
+		// student_inactive y section_announcement no se listan aquí a
+		// propósito: caen al 'medium' del fallback, que es la etiqueta
+		// que el resto del código llama 'normal' en la OT.
+		$high_types = array(
+			'purchase', 'grade', 'live_reminder_1h',
+			'assignment_graded', 'assignment_due_soon',
+			'at_risk_flagged', 'improvement_plan_assigned',
+		);
+		// lesson_published es 'low': candidato natural a resumen (PT-5).
+		$low_types = array( 'marketing', 'lesson_published' );
 
 		if ( in_array( $type, $critical_types, true ) ) {
 			return 'critical';
@@ -428,6 +486,38 @@ class Messaging_Router {
 		}
 
 		return 'medium';
+	}
+
+	/**
+	 * PT-1.3 (6.4.0): categoría de preferencia del tipo, o null si es
+	 * transaccional (no aparece en [atora_preferencias], no se puede
+	 * desactivar).
+	 *
+	 * @param string $type Tipo de mensaje.
+	 * @return string|null 'academico' | 'recordatorios' | 'institucional' | null.
+	 */
+	public static function category_for_type( string $type ): ?string {
+		return self::$type_categories[ sanitize_key( $type ) ] ?? null;
+	}
+
+	/**
+	 * @return array<string,string> Todas las categorías conocidas, para poblar la UI de preferencias (PT-4).
+	 */
+	public static function get_type_categories(): array {
+		return self::$type_categories;
+	}
+
+	/**
+	 * PT-1.2 (6.4.0): true si `$type` no debe enviarse jamás al propio
+	 * estudiante afectado (hoy solo `at_risk_flagged`). El código que
+	 * despacha este tipo debe llamar esto para el user_id del
+	 * estudiante flaggeado antes de decidir destinatarios.
+	 *
+	 * @param string $type Tipo de mensaje.
+	 * @return bool
+	 */
+	public static function is_never_student_facing( string $type ): bool {
+		return in_array( sanitize_key( $type ), self::$never_student_facing, true );
 	}
 
 	/**
