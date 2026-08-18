@@ -39,6 +39,74 @@ class CLMS_Academic_Messaging_Bridge {
 		// coordinador, nunca al estudiante (PT-1.2).
 		add_action( 'clms_ai_inactivity_alert_generated', array( __CLASS__, 'on_at_risk_signal' ), 10, 3 );
 		add_action( 'clms_ai_low_grade_alert_generated', array( __CLASS__, 'on_at_risk_signal' ), 10, 3 );
+
+		// PT-3.6 — lesson_published. Prioridad 30: después de
+		// CLMS_Notifications (10) y CLMS_Messaging (20), mismo hook,
+		// tercer listener independiente.
+		add_action( 'transition_post_status', array( __CLASS__, 'on_lesson_published' ), 30, 3 );
+	}
+
+	/**
+	 * PT-3.6: lección publicada → estudiantes matriculados en el curso.
+	 * Prioridad 'low' (candidato natural a resumen, PT-5) — sin el
+	 * agrupador todavía construido, sale como mensaje individual, igual
+	 * que hoy hacen CLMS_Notifications/CLMS_Messaging para este mismo
+	 * evento.
+	 *
+	 * Nota: se notifica a nivel de curso (course-wide), no de sección
+	 * — igual que los dos listeners existentes sobre este hook. Una
+	 * lección no tiene una sección propia en el modelo de datos actual
+	 * (pertenece al curso); "estudiantes de la sección" de la OT no
+	 * tiene una asignación 1:1 sin ambigüedad aquí.
+	 *
+	 * @param string   $new_status
+	 * @param string   $old_status
+	 * @param \WP_Post $post
+	 */
+	public static function on_lesson_published( $new_status, $old_status, $post ): void {
+		if ( ! \ATORA\Messaging\Messaging_Router::is_academic_routing_enabled() ) { return; }
+		if ( 'publish' !== $new_status || 'publish' === $old_status ) { return; }
+		if ( ! is_object( $post ) || 'lm_lesson' !== ( $post->post_type ?? '' ) ) { return; }
+
+		$lesson_id = absint( $post->ID );
+		$course_id = class_exists( 'CLMS_Helper' ) && method_exists( 'CLMS_Helper', 'get_course_id_from_lesson' )
+			? absint( CLMS_Helper::get_course_id_from_lesson( $lesson_id ) )
+			: 0;
+		if ( ! $course_id ) { return; }
+
+		$student_ids = class_exists( 'CLMS_Helper' ) && method_exists( 'CLMS_Helper', 'get_enrolled_student_ids' )
+			? (array) CLMS_Helper::get_enrolled_student_ids( $course_id )
+			: array();
+
+		$lesson_title = sanitize_text_field( (string) get_the_title( $lesson_id ) );
+		$course_title = sanitize_text_field( (string) get_the_title( $course_id ) );
+		$button_url   = (string) get_permalink( $lesson_id );
+
+		foreach ( $student_ids as $student_id ) {
+			$student_id = absint( $student_id );
+			if ( ! $student_id ) { continue; }
+
+			// PT-3.7: exactamente el escenario del ejemplo de la OT — un
+			// docente que publica varias lecciones seguidas no debe
+			// generar una notificación por cada una.
+			if ( ! \ATORA\Messaging\Messaging_Router::under_recipient_cap( $student_id ) ) { continue; }
+
+			\ATORA\Messaging\Messaging_Router::send(
+				$student_id,
+				'lesson_published',
+				'atora_lesson_published',
+				array(
+					'student_name' => self::display_name( $student_id ),
+					'lesson_title' => $lesson_title,
+					'course_title' => $course_title,
+					'button_url'   => $button_url,
+				),
+				array(
+					'dedupe_key'            => "lesson_published_{$lesson_id}_{$student_id}",
+					'dedupe_window_minutes' => 24 * 60,
+				)
+			);
+		}
 	}
 
 	/**
