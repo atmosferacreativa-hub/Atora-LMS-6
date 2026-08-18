@@ -34,7 +34,7 @@ class Tasks_REST_Controller {
 				array(
 					'methods'             => 'POST',
 					'callback'            => array( __CLASS__, 'create_task' ),
-					'permission_callback' => array( '\\ATORA\\CRM_V2\\Rest\\CRM_REST_Controller', 'can_access' ),
+					'permission_callback' => array( '\\ATORA\\CRM_V2\\Rest\\CRM_REST_Controller', 'can_manage' ),
 				),
 			)
 		);
@@ -45,7 +45,7 @@ class Tasks_REST_Controller {
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( __CLASS__, 'complete_task' ),
-				'permission_callback' => array( '\\ATORA\\CRM_V2\\Rest\\CRM_REST_Controller', 'can_access' ),
+				'permission_callback' => array( '\\ATORA\\CRM_V2\\Rest\\CRM_REST_Controller', 'can_manage' ),
 			)
 		);
 	}
