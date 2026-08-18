@@ -5,6 +5,26 @@ en este sprint, y una propuesta para cuándo se aborde.
 
 ---
 
+## PT-5.3 — Resumen para 6.4.0 (cierre del sprint)
+
+Tres piezas de deuda quedan documentadas y listas para la próxima
+ronda de planeación:
+
+1. **Patrón de doble registro de menú** (PT-4.2) — resuelto en este
+   sprint para los 8 slugs + calendario + CRM que se encontraron, con
+   una red en `WP_DEBUG` (`CLMS_Menu_Debug_Guard`) para detectar si
+   reaparece. Causa histórica documentada más abajo.
+2. **Vocabulario institucional** (PT-3.4) — el helper y las claves
+   están completos y probados; casi no hay superficie visible bajo
+   `institucional` que lo necesite hoy, porque PT-4.4.3 ya oculta
+   Crecimiento (donde vive el vocabulario comercial real) por defecto.
+3. **Flag `clms_crm_v2_enabled`** — ver `docs/CRM-V1-V2-PARIDAD.md`
+   §4: default `false`, sin migración automática, y `V5_Modules::
+   load_crm()` carga v1 y v2 en cada request sin importar el flag. El
+   hallazgo más importante de ese documento — v2 depende de v1 en
+   runtime para primitivas núcleo (acceso, logging, tags) — cambia por
+   completo el marco de cualquier futura decisión de retiro.
+
 ## PT-1 — Gate de cutover AJAX no compartía lógica con el panel (resuelto en este sprint)
 
 Antes de este sprint, `ajax_toggle_read_source()` solo verificaba
