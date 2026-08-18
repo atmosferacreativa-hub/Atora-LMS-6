@@ -651,6 +651,8 @@ add_action( 'init', static function () {
 	require_once ATORA_LMS_DIR . 'includes/modularity/class-module-registry.php';
 	require_once ATORA_LMS_DIR . 'includes/modularity/class-module-guard.php';
 	require_once ATORA_LMS_DIR . 'includes/modularity/class-module-admin-page.php';
+	require_once ATORA_LMS_DIR . 'includes/modularity/class-install-profiles.php';
+	require_once ATORA_LMS_DIR . 'includes/modularity/class-profile-labels.php';
 	if ( class_exists( 'CLMS_Module_Guard' ) ) { CLMS_Module_Guard::init(); }
 	if ( class_exists( 'CLMS_Module_Admin_Page' ) ) { CLMS_Module_Admin_Page::init(); }
 

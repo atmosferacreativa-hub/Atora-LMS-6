@@ -137,7 +137,9 @@ foreach ( array(
 	}
 }
 
-$modularity_file = __DIR__ . '/../includes/modularity/class-module-registry.php';
-if ( file_exists( $modularity_file ) ) {
-	require_once $modularity_file;
+foreach ( array( 'class-module-registry.php', 'class-install-profiles.php' ) as $mod_file ) {
+	$path = __DIR__ . '/../includes/modularity/' . $mod_file;
+	if ( file_exists( $path ) ) {
+		require_once $path;
+	}
 }

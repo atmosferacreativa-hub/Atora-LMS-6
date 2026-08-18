@@ -1,12 +1,14 @@
 <?php
 /**
- * Onboarding Wizard — ATORA LMS v6.0.0 (Sprint S18)
+ * Onboarding Wizard — ATORA LMS v6.0.0 (Sprint S18), + perfil de
+ * instalación como paso 1 desde 6.3.0 (PT-3.2).
  *
- * 4 pasos en admin para configuración inicial:
- *   Paso 1: Tu academia (nombre, logo, zona horaria)
- *   Paso 2: Email (provider SMTP/SES/SendGrid/Brevo)
- *   Paso 3: Primer contacto (importación manual)
- *   Paso 4: Primera campaña (asunto + mensaje + lanzar)
+ * 5 pasos en admin para configuración inicial:
+ *   Paso 1: Perfil de instalación (academia / institucional / corporativo)
+ *   Paso 2: Tu academia (nombre, logo, zona horaria)
+ *   Paso 3: Email (provider SMTP/SES/SendGrid/Brevo)
+ *   Paso 4: Primer contacto (importación manual)
+ *   Paso 5: Primera campaña (asunto + mensaje + lanzar)
  *
  * Se muestra solo si get_option('atora_onboarding_complete') !== '1'.
  *
@@ -96,26 +98,39 @@ class ATORA_Onboarding_Wizard {
 
 		switch ( $step ) {
 			case 1:
-				self::save_step1();
+				self::save_step_profile();
 				break;
 			case 2:
-				self::save_step2();
+				self::save_step1();
 				break;
 			case 3:
-				self::save_step3();
+				self::save_step2();
 				break;
 			case 4:
+				self::save_step3();
+				break;
+			case 5:
 				self::save_step4();
 				return; // redirect handled inside
 		}
 
-		$next = min( 4, $step + 1 );
+		$next = min( 5, $step + 1 );
 		update_option( self::OPTION_STEP, $next );
 		wp_safe_redirect( admin_url( 'admin.php?page=' . self::PAGE_SLUG . '&step=' . $next ) );
 		exit;
 	}
 
-	/** Paso 1: academia. */
+	/** Paso 1: perfil de instalación (PT-3.2). */
+	private static function save_step_profile(): void {
+		if ( ! class_exists( 'CLMS_Install_Profiles' ) ) { return; }
+		$profile = sanitize_key( (string) wp_unslash( $_POST['install_profile'] ?? 'academia' ) );
+		if ( ! isset( CLMS_Install_Profiles::get_profiles()[ $profile ] ) ) {
+			$profile = 'academia';
+		}
+		CLMS_Install_Profiles::apply( $profile );
+	}
+
+	/** Paso 2: academia. */
 	private static function save_step1(): void {
 		$academy = array(
 			'name'     => sanitize_text_field( (string) wp_unslash( $_POST['academy_name'] ?? '' ) ),
@@ -189,10 +204,11 @@ class ATORA_Onboarding_Wizard {
 		$academy      = (array) get_option( self::OPTION_ACADEMY, array() );
 
 		$steps = array(
-			1 => array( 'icon' => '🏫', 'label' => __( 'Tu academia', 'atora-lms' ) ),
-			2 => array( 'icon' => '📧', 'label' => __( 'Email', 'atora-lms' ) ),
-			3 => array( 'icon' => '👤', 'label' => __( 'Primer contacto', 'atora-lms' ) ),
-			4 => array( 'icon' => '📣', 'label' => __( 'Primera campaña', 'atora-lms' ) ),
+			1 => array( 'icon' => '🧩', 'label' => __( 'Perfil', 'atora-lms' ) ),
+			2 => array( 'icon' => '🏫', 'label' => __( 'Tu academia', 'atora-lms' ) ),
+			3 => array( 'icon' => '📧', 'label' => __( 'Email', 'atora-lms' ) ),
+			4 => array( 'icon' => '👤', 'label' => __( 'Primer contacto', 'atora-lms' ) ),
+			5 => array( 'icon' => '📣', 'label' => __( 'Primera campaña', 'atora-lms' ) ),
 		);
 		?>
 		<div class="wrap" style="max-width:680px;font-family:sans-serif">
@@ -253,7 +269,27 @@ class ATORA_Onboarding_Wizard {
 				<input type="hidden" name="atora_onboarding_step" value="<?php echo esc_attr( (string) $current_step ); ?>">
 
 				<?php if ( 1 === $current_step ) : ?>
-				<!-- PASO 1: Tu academia -->
+				<!-- PASO 1: Perfil de instalación (PT-3.2) -->
+				<h2 style="font-size:18px;font-weight:700;margin:0 0 8px">🧩 <?php esc_html_e( '¿Qué tipo de instalación es esta?', 'atora-lms' ); ?></h2>
+				<p style="color:#64748b;font-size:13px;margin:0 0 20px"><?php esc_html_e( 'Puedes cambiarlo después desde ATORA → Módulos. Elegir un perfil solo activa/desactiva módulos — no borra datos.', 'atora-lms' ); ?></p>
+				<div style="display:grid;gap:12px">
+					<?php
+					$profiles     = class_exists( 'CLMS_Install_Profiles' ) ? CLMS_Install_Profiles::get_profiles() : array();
+					$saved_profile = class_exists( 'CLMS_Install_Profiles' ) ? CLMS_Install_Profiles::current() : 'academia';
+					foreach ( $profiles as $key => $def ) :
+					?>
+					<label style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:.5px solid #e2e8f0;border-radius:10px;cursor:pointer">
+						<input type="radio" name="install_profile" value="<?php echo esc_attr( $key ); ?>" <?php checked( $saved_profile, $key ); ?> style="margin-top:3px">
+						<span>
+							<strong style="display:block;font-size:14px;color:#0f172a"><?php echo esc_html( $def['label'] ); ?></strong>
+							<span style="display:block;font-size:12px;color:#64748b;margin-top:2px"><?php echo esc_html( $def['description'] ); ?></span>
+						</span>
+					</label>
+					<?php endforeach; ?>
+				</div>
+
+				<?php elseif ( 2 === $current_step ) : ?>
+				<!-- PASO 2: Tu academia -->
 				<h2 style="font-size:18px;font-weight:700;margin:0 0 20px">🏫 <?php esc_html_e( 'Tu academia', 'atora-lms' ); ?></h2>
 				<div style="display:grid;gap:16px">
 					<label style="font-size:13px;font-weight:600;color:#0f172a;display:block">
@@ -292,8 +328,8 @@ class ATORA_Onboarding_Wizard {
 					</label>
 				</div>
 
-				<?php elseif ( 2 === $current_step ) : ?>
-				<!-- PASO 2: Email provider -->
+				<?php elseif ( 3 === $current_step ) : ?>
+				<!-- PASO 3: Email provider -->
 				<h2 style="font-size:18px;font-weight:700;margin:0 0 20px">📧 <?php esc_html_e( 'Configuración de Email', 'atora-lms' ); ?></h2>
 				<div style="display:grid;gap:16px">
 					<label style="font-size:13px;font-weight:600;color:#0f172a;display:block">
@@ -332,8 +368,8 @@ class ATORA_Onboarding_Wizard {
 					</label>
 				</div>
 
-				<?php elseif ( 3 === $current_step ) : ?>
-				<!-- PASO 3: Primer contacto -->
+				<?php elseif ( 4 === $current_step ) : ?>
+				<!-- PASO 4: Primer contacto -->
 				<h2 style="font-size:18px;font-weight:700;margin:0 0 8px">👤 <?php esc_html_e( 'Añade tu primer contacto', 'atora-lms' ); ?></h2>
 				<p style="color:#64748b;font-size:13px;margin:0 0 20px"><?php esc_html_e( 'Importa un lead o estudiante para probar el sistema.', 'atora-lms' ); ?></p>
 				<div style="display:grid;gap:16px">
@@ -357,8 +393,8 @@ class ATORA_Onboarding_Wizard {
 					</label>
 				</div>
 
-				<?php elseif ( 4 === $current_step ) : ?>
-				<!-- PASO 4: Primera campaña -->
+				<?php elseif ( 5 === $current_step ) : ?>
+				<!-- PASO 5: Primera campaña -->
 				<h2 style="font-size:18px;font-weight:700;margin:0 0 8px">📣 <?php esc_html_e( 'Lanza tu primera campaña', 'atora-lms' ); ?></h2>
 				<p style="color:#64748b;font-size:13px;margin:0 0 20px"><?php esc_html_e( 'Crea un email rápido y envíalo a tus contactos actuales.', 'atora-lms' ); ?></p>
 				<div style="display:grid;gap:16px">
@@ -391,7 +427,7 @@ class ATORA_Onboarding_Wizard {
 					<?php endif; ?>
 
 					<div style="display:flex;gap:10px">
-						<?php if ( $current_step < 4 ) : ?>
+						<?php if ( $current_step < 5 && 1 !== $current_step ) : ?>
 						<a href="<?php echo esc_url( admin_url( 'admin.php?page=' . self::PAGE_SLUG . '&step=' . ( $current_step + 1 ) ) ); ?>"
 						   style="color:#64748b;font-size:13px;text-decoration:none;padding:8px 14px">
 							<?php esc_html_e( 'Omitir paso', 'atora-lms' ); ?>
@@ -399,7 +435,7 @@ class ATORA_Onboarding_Wizard {
 						<?php endif; ?>
 						<button type="submit" class="button button-primary"
 							style="padding:9px 24px;font-size:14px;font-weight:600;border-radius:8px;height:auto">
-							<?php echo 4 === $current_step
+							<?php echo 5 === $current_step
 								? esc_html__( '🎉 Finalizar setup', 'atora-lms' )
 								: esc_html__( 'Continuar →', 'atora-lms' );
 							?>

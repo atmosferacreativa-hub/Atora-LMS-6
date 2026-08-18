@@ -26,6 +26,31 @@ para usar el mismo filtro. Ver test de regresión en
 
 ---
 
+## PT-3 — Ambigüedad de la OT sobre automation/webhooks/mcp en el perfil institucional
+
+La OT lista explícitamente qué módulos SÍ trae `institucional` y qué
+módulos NO trae ("sin crm, commerce, affiliates, newsletter, email-engine
+comercial, live-streaming"), pero no menciona `automation`, `webhooks` ni
+`mcp` en ninguna de las dos listas. Se optó por excluirlos del perfil
+institucional (encajan en el espíritu "sin módulos comerciales/de
+crecimiento" del perfil), documentado en
+`CLMS_Install_Profiles::INSTITUCIONAL_BASE`. Si esto no es lo que se
+quería, es un cambio de una línea en esa constante — no requiere tocar
+nada más.
+
+## PT-3 — Onboarding: `atora_onboarding_step` guardado con la numeración vieja
+
+Insertar el paso de perfil como paso 1 (OT 3.2) renumeró los 4 pasos
+existentes a 2-5. Un admin que estuviera literalmente a mitad del wizard
+en el momento exacto de actualizar a 6.3.0 vería el paso guardado
+(`atora_onboarding_step`, ej. "3" = antes "Primer contacto") apuntar
+ahora a un paso distinto ("Email"). Es una ventana de impacto muy
+acotada (onboarding sin completar + actualización de versión simultánea)
+y no se migró la option por no justificar la complejidad frente al
+riesgo real. Si aparece como problema real, la migración es trivial:
+sumar 1 a `atora_onboarding_step` una sola vez en el upgrade path si
+`atora_onboarding_complete !== '1'`.
+
 ## PT-2 — Slugs con implementación duplicada (decisión de scope, no deuda a resolver)
 
 Cinco slugs del registro de módulos (`security`, `messaging`, `analytics`,
