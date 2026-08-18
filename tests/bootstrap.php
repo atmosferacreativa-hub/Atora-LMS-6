@@ -99,8 +99,33 @@ if ( ! function_exists( 'update_option' ) )    {
 if ( ! function_exists( 'atora_test_reset_options' ) ) {
 	function atora_test_reset_options(): void { $GLOBALS['__atora_test_options'] = array(); }
 }
-if ( ! function_exists( 'get_user_meta' ) )    { function get_user_meta( int $id, string $k = '', bool $single = false ) { return $single ? '' : array(); } }
-if ( ! function_exists( 'update_user_meta' ) ) { function update_user_meta( int $id, string $k, $v ): bool { return true; } }
+$GLOBALS['__atora_test_user_meta'] = array();
+if ( ! function_exists( 'get_user_meta' ) )    {
+	function get_user_meta( int $id, string $k = '', bool $single = false ) {
+		if ( '' === $k ) { return $GLOBALS['__atora_test_user_meta'][ $id ] ?? array(); }
+		$has = isset( $GLOBALS['__atora_test_user_meta'][ $id ][ $k ] );
+		if ( ! $single ) { return $has ? array( $GLOBALS['__atora_test_user_meta'][ $id ][ $k ] ) : array(); }
+		return $has ? $GLOBALS['__atora_test_user_meta'][ $id ][ $k ] : '';
+	}
+}
+if ( ! function_exists( 'update_user_meta' ) ) {
+	function update_user_meta( int $id, string $k, $v ): bool {
+		$GLOBALS['__atora_test_user_meta'][ $id ][ $k ] = $v;
+		return true;
+	}
+}
+if ( ! function_exists( 'delete_user_meta' ) ) {
+	function delete_user_meta( int $id, string $k ): bool {
+		unset( $GLOBALS['__atora_test_user_meta'][ $id ][ $k ] );
+		return true;
+	}
+}
+if ( ! function_exists( 'atora_test_reset_user_meta' ) ) {
+	function atora_test_reset_user_meta(): void { $GLOBALS['__atora_test_user_meta'] = array(); }
+}
+if ( ! function_exists( 'wp_hash' ) )  { function wp_hash( string $data ): string { return hash_hmac( 'sha256', $data, 'test-salt' ); } }
+if ( ! function_exists( 'wp_salt' ) )  { function wp_salt( string $scheme = 'auth' ): string { return 'test-salt-' . $scheme; } }
+if ( ! function_exists( 'wp_rand' ) )  { function wp_rand( int $min = 0, int $max = 0 ): int { return random_int( $min, $max ?: PHP_INT_MAX ); } }
 if ( ! function_exists( 'wp_cache_get' ) )     { function wp_cache_get( string $k, string $g = '' ) { return false; } }
 if ( ! function_exists( 'wp_cache_set' ) )     { function wp_cache_set( string $k, $v, string $g = '', int $ttl = 0 ): bool { return true; } }
 if ( ! function_exists( 'wp_cache_delete' ) )  { function wp_cache_delete( string $k, string $g = '' ): bool { return true; } }
@@ -146,6 +171,11 @@ if ( file_exists( $messaging_router_file ) ) {
 $inactivity_service_file = __DIR__ . '/../includes/academic/class-student-inactivity-reminder-service.php';
 if ( file_exists( $inactivity_service_file ) ) {
 	require_once $inactivity_service_file;
+}
+
+$preferences_file = __DIR__ . '/../modules/messaging/class-messaging-preferences.php';
+if ( file_exists( $preferences_file ) ) {
+	require_once $preferences_file;
 }
 
 foreach ( array( 'class-module-registry.php', 'class-install-profiles.php', 'class-profile-labels.php' ) as $mod_file ) {
