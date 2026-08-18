@@ -75,7 +75,7 @@ class Calendar_Events_REST_Controller {
 		register_rest_route( $ns, '/calendar/task/(?P<task_id>\d+)/reschedule', array(
 			'methods'             => 'POST',
 			'callback'            => array( __CLASS__, 'reschedule_task' ),
-			'permission_callback' => $cb,
+			'permission_callback' => array( 'ATORA\CRM_V2\Rest\CRM_REST_Controller', 'can_manage' ),
 		) );
 	}
 
@@ -131,6 +131,18 @@ class Calendar_Events_REST_Controller {
 		global $wpdb;
 
 		$task_id = absint( $request->get_param( 'task_id' ) );
+		// PT-1 (6.5.1): hallazgo adicional no cubierto por la auditoría —
+		// esta ruta no verificaba alcance, a diferencia de
+		// Tasks_REST_Controller::complete_task() sobre la misma tabla.
+		// Cualquier can_access podía ver el detalle de tareas de otros
+		// docentes.
+		if ( ! CRM_REST_Controller::task_id_is_visible( $task_id ) ) {
+			return new \WP_REST_Response(
+				array( 'success' => false, 'message' => __( 'No tienes permisos para esta tarea.', 'atora-lms' ) ),
+				403
+			);
+		}
+
 		$table   = $wpdb->prefix . 'atora_crm_tasks';
 
 		$task = $wpdb->get_row(
@@ -188,6 +200,15 @@ class Calendar_Events_REST_Controller {
 
 		if ( ! $task_id || ! $due_at ) {
 			return new \WP_REST_Response( array( 'success' => false, 'message' => 'Datos incompletos.' ), 400 );
+		}
+
+		// PT-1 (6.5.1): mismo hallazgo que get_task_detail() — sin esto,
+		// cualquier can_manage podía reprogramar la tarea de otro docente.
+		if ( ! CRM_REST_Controller::task_id_is_visible( $task_id ) ) {
+			return new \WP_REST_Response(
+				array( 'success' => false, 'message' => __( 'No tienes permisos para esta tarea.', 'atora-lms' ) ),
+				403
+			);
 		}
 
 		// Normalizar a UTC Y-m-d H:i:s
