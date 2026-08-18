@@ -352,6 +352,37 @@ class Section_Service {
 		return $id ? (int) $id : null;
 	}
 
+	/**
+	 * PT-3.4 (6.4.0): coordinador de la sección, si hay uno asignado.
+	 * Reutiliza la misma tabla pivote de docentes (`atora_section_teachers`)
+	 * con `role = 'coordinator'` — no requiere una tabla ni columna
+	 * nueva. Sin filas de ese role para la sección, devuelve null: por
+	 * diseño, ninguna sección tiene coordinador asignado por defecto,
+	 * así que ninguna notificación de coordinador se envía hasta que un
+	 * admin asigne uno explícitamente.
+	 *
+	 * @param int $section_id
+	 * @return int|null
+	 */
+	public static function get_coordinator( int $section_id ): ?int {
+		global $wpdb;
+
+		if ( ! $section_id ) {
+			return null;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		$id = $wpdb->get_var(
+			$wpdb->prepare(
+				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				"SELECT user_id FROM {$wpdb->prefix}" . self::TABLE_SECTION_TEACHERS . " WHERE section_id = %d AND role = 'coordinator' LIMIT 1",
+				$section_id
+			)
+		);
+
+		return $id ? (int) $id : null;
+	}
+
 	// ── Asignación de estudiantes ─────────────────────────────────────────────
 
 	/**
@@ -641,6 +672,29 @@ class Section_Service {
 		$teacher_ids = is_array( $teacher_ids ) ? array_values( array_filter( array_map( 'absint', $teacher_ids ) ) ) : array();
 
 		return ! empty( $teacher_ids ) ? $teacher_ids[0] : null;
+	}
+
+	/**
+	 * PT-3.4 (6.4.0): coordinador efectivo de un alumno en un curso —
+	 * mismo algoritmo que get_effective_instructor() pero para
+	 * get_coordinator(). Sin fallback legacy (el concepto de
+	 * coordinador es nuevo, no había nada previo a este sprint).
+	 *
+	 * @param int $user_id
+	 * @param int $wp_course_id
+	 * @return int|null
+	 */
+	public static function get_effective_coordinator( int $user_id, int $wp_course_id ): ?int {
+		$sections = self::get_student_sections_for_course( $user_id, $wp_course_id );
+
+		foreach ( $sections as $section ) {
+			$coordinator = self::get_coordinator( (int) $section['id'] );
+			if ( $coordinator ) {
+				return $coordinator;
+			}
+		}
+
+		return null;
 	}
 
 	/**
