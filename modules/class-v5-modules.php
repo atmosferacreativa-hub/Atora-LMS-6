@@ -212,6 +212,15 @@ class V5_Modules {
 		if ( class_exists( 'ATORA\Messaging\Messaging_Router' ) ) {
 			\ATORA\Messaging\Messaging_Router::init();
 		}
+
+		// PT-3 (6.4.0): puente eventos académicos → Messaging_Router.
+		// Vive detrás del mismo gate del módulo 'messaging' (esta
+		// función) porque no tiene sentido registrar sus listeners si
+		// el módulo de mensajería está apagado.
+		self::require_file( ATORA_LMS_DIR . 'includes/academic/class-academic-messaging-bridge.php' );
+		if ( class_exists( 'CLMS_Academic_Messaging_Bridge' ) ) {
+			CLMS_Academic_Messaging_Bridge::init();
+		}
 	}
 
 	/** @return void */
