@@ -39,7 +39,7 @@ class Pipeline_REST_Controller {
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( __CLASS__, 'move_sales_card' ),
-				'permission_callback' => array( '\\ATORA\\CRM_V2\\Rest\\CRM_REST_Controller', 'can_access' ),
+				'permission_callback' => array( '\\ATORA\\CRM_V2\\Rest\\CRM_REST_Controller', 'can_manage' ),
 			)
 		);
 
@@ -59,7 +59,7 @@ class Pipeline_REST_Controller {
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( __CLASS__, 'move_academic_card' ),
-				'permission_callback' => array( '\\ATORA\\CRM_V2\\Rest\\CRM_REST_Controller', 'can_access' ),
+				'permission_callback' => array( '\\ATORA\\CRM_V2\\Rest\\CRM_REST_Controller', 'can_manage' ),
 			)
 		);
 	}
