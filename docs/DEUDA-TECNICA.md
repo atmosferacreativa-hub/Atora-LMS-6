@@ -26,6 +26,29 @@ para usar el mismo filtro. Ver test de regresión en
 
 ---
 
+## PT-4.4.3 — Excepciones deliberadas al conteo estricto de 8 entradas
+
+La estructura final tiene 8 hubs de primer nivel (Panel, Academia,
+Estudiantes, Docentes, Comunicación, Crecimiento, Informes, Ajustes)
+más dos excepciones documentadas, no accidentales:
+
+- **`atora-modules`** se deja visible en el sidebar además de enlazada
+  desde Ajustes — es el único punto desde el que se revierte una
+  desactivación de módulos (PT-4.4.4). Ocultarla y que algo fallara en
+  el hub Ajustes dejaría la instalación sin salida.
+- **`atora-onboarding`** y **`clms-template-parts`** no se tocaron —
+  el primero es temporal (se auto-remueve al completar el wizard), el
+  segundo es una utilidad no mencionada en el alcance de PT-4 (gestor
+  de header/footer, sin relación con los 19 módulos).
+
+Los hubs nuevos (Estudiantes, Docentes, Comunicación, Crecimiento,
+Informes) son deliberadamente simples — grid de tarjetas
+icono+título+descripción+enlace sin queries de stats en vivo
+(`render_simple_hub_page()`), a diferencia de Academia/Comercio/
+Ajustes que sí las tienen. Decisión confirmada por el solicitante dado
+que no hay entorno WP real disponible para verificar renderizado antes
+de entregar.
+
 ## PT-4.4 — `clms-email-hub` ("Marketing") no estaba en el inventario PT-4.1
 
 Al gatear las entradas de CRM/Comercio/IA/Analytics se encontró una
