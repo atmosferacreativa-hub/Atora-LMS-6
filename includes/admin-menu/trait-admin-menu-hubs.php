@@ -847,29 +847,42 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 				'clms-settings-hub',
 				array( $this, 'render_settings_hub_page' )
 			);
-			// ── IA — subítem de Ajustes (Fase II S5), si 'ai' está activo ─────
+			// ── IA (oculta, PT-4.4.3) — reubicada bajo el hub Ajustes, si 'ai' está activo ──
 			if ( ! class_exists( 'CLMS_Module_Registry' ) || CLMS_Module_Registry::is_active( 'ai' ) ) {
 				add_submenu_page(
-					'clms-dashboard',
+					'',
 					__( 'Inteligencia Artificial', 'atora-lms' ),
-					__( '🧠 IA', 'atora-lms' ),
+					__( 'IA', 'atora-lms' ),
 					$settings_cap,
 					'clms-ai-hub',
 					array( $this, 'render_ai_hub_page' )
 				);
 			}
-			// ── Analytics — subítem de Ajustes (Fase IV S12), si 'analytics' está activo ──
-			if ( ! class_exists( 'CLMS_Module_Registry' ) || CLMS_Module_Registry::is_active( 'analytics' ) ) {
-				add_submenu_page(
-					'clms-dashboard',
-					__( 'Analytics', 'atora-lms' ),
-					__( '📊 Analytics', 'atora-lms' ),
-					$settings_cap,
-					'atora-analytics-dashboard',
-					array( $this, 'render_analytics_dashboard_page' )
-				);
-			}
 		}
+
+		// ── Analytics (oculta, PT-4.4.3) — reubicada bajo el hub "Informes",
+		// si 'analytics' está activo. Fuera del if ($settings_cap) porque
+		// Informes es legible por cualquiera con 'read', no solo admins ────
+		if ( ! class_exists( 'CLMS_Module_Registry' ) || CLMS_Module_Registry::is_active( 'analytics' ) ) {
+			add_submenu_page(
+				'',
+				__( 'Analytics', 'atora-lms' ),
+				__( 'Analytics', 'atora-lms' ),
+				$settings_cap,
+				'atora-analytics-dashboard',
+				array( $this, 'render_analytics_dashboard_page' )
+			);
+		}
+
+		// ── Informes — hub visible: analítica + reportes académicos ──────────
+		add_submenu_page(
+			'clms-dashboard',
+			__( 'Informes', 'atora-lms' ),
+			__( '📊 Informes', 'atora-lms' ),
+			'read',
+			'atora-reports-hub',
+			array( $this, 'render_reports_hub_page' )
+		);
 
 		// Páginas ocultas del sidebar — accesibles por URL directa (admin.php?page=…).
 		// Los widgets del Escritorio las enlazan como "Ver completo".
@@ -1327,7 +1340,21 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 			);
 		$cards = $this->unique_hub_items_by_url( $cards, 0, true );
 
-		$quick_links = $this->get_operational_hub_links( 'clms-settings-hub', 8 );
+		// PT-4.4.4: IA, licencia y módulos quedan alcanzables desde Ajustes
+		// (antes eran entradas de primer nivel separadas o no estaban
+		// enlazadas desde ningún lado). 'atora-modules' se deja ADEMÁS
+		// visible en el sidebar (no se oculta): es el único punto desde el
+		// que se revierte una desactivación de módulos, así que se
+		// prioriza que sea imposible perderla de vista sobre el conteo
+		// estricto de 8 entradas.
+		$settings_extra_links = array(
+			$this->build_nav_item( __( 'Inteligencia Artificial', 'atora-lms' ), __( 'Copilotos, exámenes con IA y proveedores.', 'atora-lms' ), admin_url( 'admin.php?page=clms-ai-hub' ) ),
+			$this->build_nav_item( __( 'Licencia', 'atora-lms' ), __( 'Estado y activación de la licencia.', 'atora-lms' ), admin_url( 'admin.php?page=atora-license' ) ),
+			$this->build_nav_item( __( 'Módulos', 'atora-lms' ), __( 'Activa o desactiva módulos del plugin.', 'atora-lms' ), admin_url( 'admin.php?page=atora-modules' ) ),
+		);
+
+		$quick_links = array_merge( $settings_extra_links, $this->get_operational_hub_links( 'clms-settings-hub', 8 ) );
+		$quick_links = $this->unique_hub_items_by_url( $quick_links, 11, true );
 			?>
 			<div class="wrap atora-hub atora-hub--settings">
 				<div class="atora-hub__header">

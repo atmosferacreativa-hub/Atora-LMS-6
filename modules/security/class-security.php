@@ -56,7 +56,7 @@ class Security {
 	 */
 	public static function register_settings_page(): void {
 		add_submenu_page(
-			'clms-dashboard',
+			'', // PT-4.4.3: reubicado bajo el hub "Ajustes" (clms-settings-hub).
 			__( 'Seguridad', 'atora-lms' ),
 			__( 'Seguridad', 'atora-lms' ),
 			'manage_options',

@@ -306,7 +306,7 @@ class Licensing {
 	 */
 	public static function register_page(): void {
 		add_submenu_page(
-			'clms-dashboard',
+			'', // PT-4.4.3: reubicado bajo el hub "Ajustes" (clms-settings-hub).
 			__( 'Licencia', 'atora-lms' ),
 			__( 'Licencia', 'atora-lms' ),
 			'manage_options',
