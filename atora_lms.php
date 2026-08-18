@@ -702,6 +702,15 @@ add_action( 'init', static function () {
 	atora_lms_require_module( 'modules/lms/class-lms-section-service.php' );
 	atora_lms_require_module( 'modules/lms/class-lms-section-projector.php' );
 
+	// ── F4 task 1.6: comando WP-CLI `wp atora lms cutover` ───────────────────
+	if ( defined( 'WP_CLI' ) && WP_CLI ) {
+		atora_lms_require_module( 'modules/lms/class-lms-cli.php', static function() {
+			if ( class_exists( '\ATORA\LMS\LMS_CLI' ) ) {
+				\ATORA\LMS\LMS_CLI::init();
+			}
+		} );
+	}
+
 	// ── Fase V S16: LMS Compatibility Layer ──────────────────────────────────
 	atora_lms_require_module( 'includes/class-lms-compatibility-layer.php', static function() {
 		ATORA_LMS_Compatibility_Layer::init();

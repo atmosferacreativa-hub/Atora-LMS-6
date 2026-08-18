@@ -475,6 +475,73 @@ class LMS_Parity {
 		return max( 0, (int) floor( ( time() - strtotime( $last ) ) / DAY_IN_SECONDS ) );
 	}
 
+	// ── Gate de cutover (F4 — task 1.3) ───────────────────────────────────────
+
+	/**
+	 * Tablas núcleo cuyo conteo de filas debe ser > 0 antes del flip.
+	 */
+	const CORE_TABLES = array( 'atora_courses', 'atora_lessons', 'atora_enrollments', 'atora_program_enrollments' );
+
+	/**
+	 * Evalúa si el cutover a lectura de tablas puede ejecutarse (D-006).
+	 *
+	 * Condiciones: `atora_lms_dualwrite` activo, 0 divergencias en los
+	 * últimos 14 días, reconciliación diaria sin pendientes, y las 4 tablas
+	 * núcleo con filas > 0. No usa estado en caché aparte de la option de
+	 * reconciliación, que ya se refresca por cron diario (F2.4).
+	 *
+	 * @return array{ready:bool, reasons:string[]}
+	 */
+	public static function cutover_ready(): array {
+		$reasons = array();
+
+		if ( ! (bool) get_option( 'atora_lms_dualwrite', false ) ) {
+			$reasons[] = 'atora_lms_dualwrite está inactivo.';
+		}
+
+		$divergences = self::total_divergences();
+		if ( $divergences > 0 ) {
+			$reasons[] = sprintf( '%d divergencia(s) registradas en los últimos 14 días.', $divergences );
+		}
+
+		$reconcile = (array) get_option( 'atora_lms_reconcile_result', array() );
+		if ( empty( $reconcile ) ) {
+			$reasons[] = 'La reconciliación diaria aún no se ha ejecutado.';
+		} else {
+			$pending = isset( $reconcile['total'] ) ? (int) $reconcile['total'] : array_sum( (array) ( $reconcile['reconcile'] ?? array() ) );
+			if ( $pending > 0 ) {
+				$reasons[] = sprintf( 'La última reconciliación reportó %d pendiente(s)/huérfano(s).', $pending );
+			}
+		}
+
+		foreach ( self::core_table_counts() as $table => $count ) {
+			if ( $count <= 0 ) {
+				$reasons[] = sprintf( 'La tabla %s no tiene filas.', $table );
+			}
+		}
+
+		return array(
+			'ready'   => empty( $reasons ),
+			'reasons' => $reasons,
+		);
+	}
+
+	/**
+	 * Conteo de filas de las tablas núcleo (prefijadas), 0 si la tabla no existe.
+	 *
+	 * @return array<string,int>  nombre de tabla (con prefijo) => filas.
+	 */
+	private static function core_table_counts(): array {
+		global $wpdb;
+		$counts = array();
+		foreach ( self::CORE_TABLES as $name ) {
+			$table  = $wpdb->prefix . $name;
+			$exists = (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) === $table; // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$counts[ $table ] = $exists ? (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table}" ) : 0; // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		}
+		return $counts;
+	}
+
 	// ── Internos ──────────────────────────────────────────────────────────────
 
 	/**

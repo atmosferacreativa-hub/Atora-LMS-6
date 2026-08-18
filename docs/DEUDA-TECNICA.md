@@ -1,0 +1,87 @@
+# Deuda técnica — Sprint 6.3.0
+
+Documento vivo. Cada entrada anota qué se encontró, por qué no se resolvió
+en este sprint, y una propuesta para cuándo se aborde.
+
+---
+
+## PT-1 — Gate de cutover AJAX no compartía lógica con el panel (resuelto en este sprint)
+
+Antes de este sprint, `ajax_toggle_read_source()` solo verificaba
+`atora_lms_dualwrite`, mientras que el panel mostraba un gate más estricto
+(paridad + volumen) calculado aparte en la vista. Un usuario con
+`manage_options` podía forzar el flip llamando la acción AJAX directamente
+aunque el panel mostrara el gate en rojo. Se corrigió centralizando el gate
+en `LMS_Parity::cutover_ready()`, usado tanto por el panel como por el
+endpoint AJAX y el comando WP-CLI.
+
+## PT-1 — Bug de filtro de status en `get_access_expiry_by_wp_id()` (resuelto en este sprint)
+
+`LMS_Enrollment_Service::get_access_expiry_by_wp_id()` no filtraba por
+`status IN ('active', 'completed')`, a diferencia de sus métodos hermanos
+(`is_enrolled_by_wp_id()`, `get_enrolled_wp_course_ids()`). Podía devolver
+la caducidad de una fila `unenrolled` como si siguiera vigente. Corregido
+para usar el mismo filtro. Ver test de regresión en
+`tests/LMS/CutoverF4Test.php::test_get_access_expiry_by_wp_id_query_filters_by_status`.
+
+---
+
+## PT-2 — Tres sistemas de carga de módulos independientes
+
+El loader documentado (`trait-loader-module-groups.php` +
+`module_condition_passes()`) solo gobierna los 84 módulos bajo `includes/`
+(grupos `core`/`experience`/`integrations`/`ai`). Los módulos comerciales
+que un "modo institucional" necesita poder apagar — `affiliates`, `crm`,
+`crm-v2`, `newsletter`, `security`, `licensing`, `calendar`,
+`live-streaming`, `analytics`, `messaging`, `automation` — se cargan por un
+segundo sistema completamente distinto, `ATORA\V5_Modules::boot()`
+(`modules/class-v5-modules.php`), un orquestador escrito a mano con checks
+de contexto (`is_admin`/`is_ajax`/`is_cron`/...) por módulo, sin
+descriptor de dependencias ni condición reutilizable. Existe además un
+tercer patrón: llamadas sueltas a `atora_lms_require_module()` en
+`atora_lms.php` (LMS núcleo, webhooks, MCP, gamification, onboarding).
+
+**Por qué no se resolvió de raíz:** unificar los tres sistemas en un solo
+loader data-driven es un cambio de arquitectura, no una extensión — fuera
+del alcance "cero cambios de comportamiento por defecto" de este sprint.
+
+**Propuesta:** el registro de módulos de PT-2 debe interceptar los tres
+puntos de entrada (condición en `module_condition_passes()`, guard al
+inicio de cada `V5_Modules::load_*()`, guard en cada
+`atora_lms_require_module()` suelto) en vez de asumir un único choke
+point. Una unificación real de los tres sistemas queda para una versión
+futura, cuando se pueda dedicar un sprint completo a esa refactorización.
+
+---
+
+## Nomenclatura `clms_` / `atora_`
+
+4.779 ocurrencias de `clms_` contra 2.172 de `atora_`; 140 clases `CLMS_`
+contra 87 con namespace `ATORA\`. Ambos prefijos conviven desde la
+migración de marca y se usan indistintamente según la antigüedad del
+archivo.
+
+**Por qué no se unifica ahora:** riesgo alto (miles de referencias en
+hooks, opciones de BD, meta keys — algunas seguramente usadas por
+integraciones externas o SQL directo) frente a beneficio bajo comparado
+con el resto de este sprint.
+
+**Propuesta para una versión futura:**
+1. Capa de compatibilidad de hooks: `add_action('atora_x', fn(...$a) => do_action('clms_x', ...$a))` en ambas direcciones para los hooks públicos documentados, sin tocar los emisores originales.
+2. Alias de clase (`class_alias('CLMS_Foo', 'ATORA\Foo')`) para las clases con mayor superficie pública, permitiendo que código externo migre a su ritmo.
+3. Nunca renombrar meta keys/opciones de BD en un solo paso — requeriría migración de datos, no solo de código.
+4. Congelar el prefijo nuevo (`atora_`) para todo código nuevo desde ya (ya es la convención de facto en los módulos recientes), sin tocar el código existente.
+
+---
+
+## `modules/commerce/` vacío
+
+Confirmado (PT-5.1, auditoría inicial del sprint): el directorio solo
+contiene `ABANDONED-CART-TEST-RESULTS.md`, sin código. El Commerce real
+vive en `includes/commerce/`. Pendiente de resolver en el paquete PT-5 de
+este mismo sprint (mover el `.md` a `docs/` y eliminar el directorio).
+
+## `modules/crm/` vs `modules/crm-v2/`
+
+No se toca en este sprint (fuera de alcance explícito, salvo el
+inventario de paridad). Ver `docs/CRM-V1-V2-PARIDAD.md`.

@@ -30,6 +30,8 @@ if ( ! defined( 'ABSPATH' ) )         { define( 'ABSPATH', '/tmp/wp/' ); }
 if ( ! defined( 'ATORA_LMS_VERSION' ) ) { define( 'ATORA_LMS_VERSION', '6.0.0' ); }
 if ( ! defined( 'DAY_IN_SECONDS' ) )  { define( 'DAY_IN_SECONDS', 86400 ); }
 if ( ! defined( 'MINUTE_IN_SECONDS' ) ) { define( 'MINUTE_IN_SECONDS', 60 ); }
+if ( ! defined( 'OBJECT' ) )          { define( 'OBJECT', 'OBJECT' ); }
+if ( ! defined( 'ARRAY_A' ) )         { define( 'ARRAY_A', 'ARRAY_A' ); }
 
 // Stub de $wpdb global
 global $wpdb;
@@ -81,8 +83,21 @@ if ( ! function_exists( 'wp_generate_uuid4' ) ) {
 }
 if ( ! function_exists( 'do_action' ) )        { function do_action( string $hook, ...$args ): void {} }
 if ( ! function_exists( 'apply_filters' ) )    { function apply_filters( string $hook, $value, ...$args ) { return $value; } }
-if ( ! function_exists( 'get_option' ) )       { function get_option( string $k, $default = false ) { return $default; } }
-if ( ! function_exists( 'update_option' ) )    { function update_option( string $k, $v ): bool { return true; } }
+$GLOBALS['__atora_test_options'] = array();
+if ( ! function_exists( 'get_option' ) )       {
+	function get_option( string $k, $default = false ) {
+		return array_key_exists( $k, $GLOBALS['__atora_test_options'] ) ? $GLOBALS['__atora_test_options'][ $k ] : $default;
+	}
+}
+if ( ! function_exists( 'update_option' ) )    {
+	function update_option( string $k, $v, $autoload = null ): bool {
+		$GLOBALS['__atora_test_options'][ $k ] = $v;
+		return true;
+	}
+}
+if ( ! function_exists( 'atora_test_reset_options' ) ) {
+	function atora_test_reset_options(): void { $GLOBALS['__atora_test_options'] = array(); }
+}
 if ( ! function_exists( 'get_user_meta' ) )    { function get_user_meta( int $id, string $k = '', bool $single = false ) { return $single ? '' : array(); } }
 if ( ! function_exists( 'update_user_meta' ) ) { function update_user_meta( int $id, string $k, $v ): bool { return true; } }
 if ( ! function_exists( 'wp_cache_get' ) )     { function wp_cache_get( string $k, string $g = '' ) { return false; } }
@@ -114,6 +129,8 @@ $lms_dir = __DIR__ . '/../modules/lms/';
 foreach ( array(
 	'class-lms-course-service.php',
 	'class-lms-enrollment-service.php',
+	'class-lms-read-router.php',
+	'class-lms-parity.php',
 ) as $lms ) {
 	if ( file_exists( $lms_dir . $lms ) ) {
 		require_once $lms_dir . $lms;

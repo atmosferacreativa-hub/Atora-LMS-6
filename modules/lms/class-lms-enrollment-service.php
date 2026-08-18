@@ -307,7 +307,7 @@ class LMS_Enrollment_Service {
 		$expires_at = $wpdb->get_var(
 			$wpdb->prepare(
 				"SELECT expires_at FROM {$wpdb->prefix}atora_enrollments
-				 WHERE user_id = %d AND wp_course_id = %d LIMIT 1",
+				 WHERE user_id = %d AND wp_course_id = %d AND status IN ('active', 'completed') LIMIT 1",
 				$user_id, $wp_course_id
 			)
 		);

@@ -340,13 +340,41 @@ class ATORA_LMS_Migration_Admin {
 		}
 
 		if ( 'tables' === $source ) {
-			// Gate mínimo: dualwrite debe estar activo.
-			$dualwrite = (bool) get_option( 'atora_lms_dualwrite', false );
-			if ( ! $dualwrite ) {
-				wp_send_json_error( array( 'message' => 'atora_lms_dualwrite está inactivo. Actívalo antes de hacer el flip.' ) );
+			// Gate D-006 completo (F4 — task 1.3), no solo dualwrite.
+			$gate = class_exists( '\ATORA\LMS\LMS_Parity' )
+				? \ATORA\LMS\LMS_Parity::cutover_ready()
+				: array( 'ready' => false, 'reasons' => array( 'LMS_Parity no disponible.' ) );
+
+			if ( empty( $gate['ready'] ) ) {
+				wp_send_json_error( array(
+					'message' => 'Gate de cutover no superado: ' . implode( ' ', $gate['reasons'] ),
+					'reasons' => $gate['reasons'],
+				) );
 			}
+
+			// Guardar snapshot de la fuente anterior antes del flip (F4 — task 1.4).
+			$snapshot   = get_option( 'atora_lms_cutover_log', array() );
+			$snapshot[] = array(
+				'action'     => 'flip',
+				'from'       => \ATORA\LMS\LMS_Read_Router::source(),
+				'to'         => 'tables',
+				'at'         => current_time( 'mysql', true ),
+				'by_user_id' => get_current_user_id(),
+			);
+			update_option( 'atora_lms_cutover_log', $snapshot, false );
+
 			// Guardar timestamp de cutover para el contador de días estables (F4.3).
 			update_option( 'atora_lms_cutover_at', current_time( 'mysql', true ), false );
+		} else {
+			$snapshot   = get_option( 'atora_lms_cutover_log', array() );
+			$snapshot[] = array(
+				'action'     => 'rollback',
+				'from'       => \ATORA\LMS\LMS_Read_Router::source(),
+				'to'         => 'legacy',
+				'at'         => current_time( 'mysql', true ),
+				'by_user_id' => get_current_user_id(),
+			);
+			update_option( 'atora_lms_cutover_log', $snapshot, false );
 		}
 
 		\ATORA\LMS\LMS_Read_Router::set_source( $source );

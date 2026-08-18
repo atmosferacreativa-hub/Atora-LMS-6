@@ -394,6 +394,9 @@ $reconcile_labels = array(
 		}
 		$pc_stable_days = \ATORA\LMS\LMS_Parity::get_postcutover_stable_days();
 	}
+	$cutover_gate = class_exists( '\ATORA\LMS\LMS_Parity' )
+		? \ATORA\LMS\LMS_Parity::cutover_ready()
+		: array( 'ready' => false, 'reasons' => array( 'LMS_Parity no disponible.' ) );
 	$f4_border = $is_tables_mode ? ( 0 === $pc_total ? '#86efac' : '#fca5a5' ) : '#bae6fd';
 	$f4_bg     = $is_tables_mode ? ( 0 === $pc_total ? '#f0fdf4' : '#fef2f2' ) : '#f0f9ff';
 	$f4_head   = $is_tables_mode ? ( 0 === $pc_total ? '#166534' : '#991b1b' ) : '#0369a1';
@@ -407,14 +410,25 @@ $reconcile_labels = array(
 			<button id="btn-f4-rollback" style="background:#dc2626;color:#fff;border:none;padding:6px 16px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">
 				↩ Rollback (tables → legacy)
 			</button>
-			<?php elseif ( $gate_ok ) : ?>
+			<?php elseif ( $cutover_gate['ready'] ) : ?>
 			<button id="btn-f4-flip" style="background:#16a34a;color:#fff;border:none;padding:6px 16px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">
 				🚀 Ejecutar flip (legacy → tables)
 			</button>
 			<?php else : ?>
-			<span style="font-size:11px;color:#64748b;background:#f1f5f9;padding:4px 10px;border-radius:20px">Gate D-006 no verde — flip bloqueado</span>
+			<span style="font-size:11px;color:#64748b;background:#f1f5f9;padding:4px 10px;border-radius:20px">Gate de cutover no superado — flip bloqueado</span>
 			<?php endif; ?>
 		</div>
+
+		<?php if ( ! $is_tables_mode && ! $cutover_gate['ready'] ) : ?>
+		<div style="font-size:11px;color:#991b1b;background:#fef2f2;border:.5px solid #fca5a5;border-radius:6px;padding:8px 12px;margin-bottom:12px">
+			<strong>Motivos:</strong>
+			<ul style="margin:4px 0 0;padding-left:18px">
+				<?php foreach ( $cutover_gate['reasons'] as $reason ) : ?>
+				<li><?php echo esc_html( $reason ); ?></li>
+				<?php endforeach; ?>
+			</ul>
+		</div>
+		<?php endif; ?>
 
 		<?php if ( $is_tables_mode ) : ?>
 		<!-- Post-cutover monitoring (F4.3) -->
