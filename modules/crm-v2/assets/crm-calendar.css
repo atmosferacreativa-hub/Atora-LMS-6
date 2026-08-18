@@ -1,0 +1,398 @@
+/* =============================================================
+ * ATORA LMS — CRM v2 Fase 2 — crm-calendar.css
+ *
+ * Estilos del calendario, layout, popover y sidebar.
+ * Se encola como handle separado 'atora-crm-calendar-ui'.
+ * ============================================================= */
+
+/* ── Layout principal 2 columnas ── */
+.crm-cal-layout {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 320px;
+	gap: 16px;
+	align-items: start;
+	margin-top: 14px;
+}
+
+.crm-cal-main {
+	min-width: 0;
+}
+
+.crm-cal-sidebar {
+	display: grid;
+	gap: 14px;
+}
+
+/* ── Toolbar propia ── */
+.crm-cal-toolbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	flex-wrap: wrap;
+	margin-bottom: 12px;
+	padding: 10px 14px;
+	background: #fff;
+	border: 1px solid #e2e8f0;
+	border-radius: 14px;
+}
+
+.crm-cal-toolbar__left,
+.crm-cal-toolbar__right {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+.crm-cal-nav {
+	min-width: 34px;
+	padding: 6px 10px !important;
+	font-size: 16px !important;
+	line-height: 1 !important;
+}
+
+.crm-cal-title {
+	font-size: 16px;
+	font-weight: 700;
+	color: #0f172a;
+	min-width: 160px;
+	text-transform: capitalize;
+}
+
+/* ── Botones de vista ── */
+.crm-cal-view-btns {
+	display: flex;
+	border: 1px solid #cbd5e1;
+	border-radius: 8px;
+	overflow: hidden;
+}
+
+.crm-cal-view-btns .button {
+	border: none !important;
+	border-radius: 0 !important;
+	border-right: 1px solid #cbd5e1 !important;
+	margin: 0 !important;
+	font-size: 13px !important;
+}
+
+.crm-cal-view-btns .button:last-child {
+	border-right: none !important;
+}
+
+.crm-cal-view-btns .button.is-active {
+	background: #1d4ed8 !important;
+	color: #fff !important;
+}
+
+/* ── Filtros de capa ── */
+.crm-cal-filter {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 13px;
+	cursor: pointer;
+	user-select: none;
+}
+
+.crm-cal-filter__dot {
+	display: inline-block;
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	flex-shrink: 0;
+}
+
+/* ── Montura del calendario ── */
+.crm-cal-mount {
+	background: #fff;
+	border: 1px solid #e2e8f0;
+	border-radius: 14px;
+	padding: 10px;
+	overflow: hidden;
+}
+
+/* ── Anular estilos de FC que chocan con WP admin ── */
+.crm-cal-mount .fc {
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+	font-size: 13px;
+}
+
+.crm-cal-mount .fc-toolbar {
+	display: none; /* Usamos la toolbar propia */
+}
+
+.crm-cal-mount .fc-daygrid-day-number,
+.crm-cal-mount .fc-col-header-cell-cushion {
+	color: #334155;
+	text-decoration: none;
+	font-weight: 600;
+}
+
+.crm-cal-mount .fc-daygrid-day.fc-day-today {
+	background: #eff6ff;
+}
+
+.crm-cal-mount .fc-daygrid-day.fc-day-today .fc-daygrid-day-number {
+	background: #1d4ed8;
+	color: #fff;
+	border-radius: 50%;
+	width: 24px;
+	height: 24px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+/* ── Eventos en el calendario ── */
+.fc-event.crm-cal-event {
+	border-radius: 6px;
+	padding: 2px 5px;
+	font-size: 12px;
+	cursor: pointer;
+	transition: opacity 0.15s;
+}
+
+.fc-event.crm-cal-event:hover {
+	opacity: 0.85;
+}
+
+.fc-event.crm-cal-event--done {
+	opacity: 0.5;
+	text-decoration: line-through;
+}
+
+/* Borde izquierdo más grueso según prioridad */
+.fc-event.crm-cal-event--urgent {
+	border-left: 3px solid #ef4444 !important;
+}
+
+.fc-event.crm-cal-event--high {
+	border-left: 3px solid #f59e0b !important;
+}
+
+/* ── Leyenda de tipos ── */
+.crm-cal-legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px 16px;
+	margin-top: 10px;
+	padding: 8px 10px;
+	background: #f8fafc;
+	border: 1px solid #e2e8f0;
+	border-radius: 10px;
+}
+
+.crm-cal-legend__item {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	font-size: 12px;
+	color: #475569;
+}
+
+.crm-cal-legend__dot {
+	display: inline-block;
+	width: 9px;
+	height: 9px;
+	border-radius: 50%;
+	flex-shrink: 0;
+}
+
+/* ── Sidebar — Formulario de nueva tarea ── */
+.crm-cal-new-task h3 {
+	margin: 0 0 12px;
+	font-size: 16px;
+	color: #0f172a;
+}
+
+.crm-cal-form {
+	display: grid;
+	gap: 10px;
+}
+
+.crm-cal-form label {
+	display: grid;
+	gap: 4px;
+	font-size: 13px;
+	font-weight: 600;
+	color: #334155;
+}
+
+.crm-cal-form input,
+.crm-cal-form select,
+.crm-cal-form textarea {
+	width: 100%;
+	padding: 8px 10px;
+	border: 1px solid #cbd5e1;
+	border-radius: 8px;
+	font-size: 13px;
+	background: #fff;
+	min-width: 0;
+}
+
+.crm-cal-form textarea {
+	resize: vertical;
+}
+
+.crm-cal-form__row {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 8px;
+}
+
+/* ── Sidebar — Lista de campañas próximas ── */
+.crm-cal-upcoming h3 {
+	margin: 0;
+}
+
+.crm-cal-campaign-list {
+	margin: 10px 0 0;
+	padding: 0;
+	list-style: none;
+	display: grid;
+	gap: 8px;
+}
+
+.crm-cal-campaign-item {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+	padding: 8px 10px;
+	border: 1px solid #e2e8f0;
+	border-radius: 10px;
+	background: #f8fafc;
+}
+
+.crm-cal-campaign-dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: #db2777;
+	margin-top: 5px;
+	flex-shrink: 0;
+}
+
+.crm-cal-campaign-item strong {
+	display: block;
+	font-size: 13px;
+	color: #0f172a;
+}
+
+.crm-cal-campaign-item small {
+	display: block;
+	font-size: 12px;
+	color: #64748b;
+}
+
+/* ── Popover de detalle ── */
+.crm-cal-overlay {
+	position: fixed;
+	inset: 0;
+	background: rgba(15, 23, 42, 0.35);
+	z-index: 99990;
+}
+
+.crm-cal-popover {
+	position: fixed;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	z-index: 99995;
+	width: 340px;
+	max-width: calc(100vw - 32px);
+	background: #fff;
+	border: 1px solid #e2e8f0;
+	border-radius: 16px;
+	padding: 20px;
+	box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
+}
+
+.crm-cal-popover__close {
+	position: absolute;
+	top: 12px;
+	right: 14px;
+	background: none;
+	border: none;
+	font-size: 20px;
+	cursor: pointer;
+	color: #64748b;
+	line-height: 1;
+	padding: 0;
+}
+
+.crm-cal-popover__close:hover {
+	color: #0f172a;
+}
+
+.crm-cal-popover__body h4 {
+	color: #0f172a;
+	padding-right: 24px;
+}
+
+.crm-cal-popover__dl {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	gap: 6px 10px;
+	font-size: 13px;
+	margin: 0;
+}
+
+.crm-cal-popover__dl dt {
+	font-weight: 600;
+	color: #64748b;
+	white-space: nowrap;
+}
+
+.crm-cal-popover__dl dd {
+	margin: 0;
+	color: #0f172a;
+	word-break: break-word;
+}
+
+.crm-cal-popover__actions {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+	margin-top: 14px;
+	padding-top: 12px;
+	border-top: 1px solid #e2e8f0;
+}
+
+.crm-cal-popover__actions .button {
+	font-size: 13px;
+}
+
+.crm-cal-pop-action {
+	cursor: pointer;
+}
+
+/* ── Responsive ── */
+@media (max-width: 1100px) {
+	.crm-cal-layout {
+		grid-template-columns: 1fr;
+	}
+
+	.crm-cal-sidebar {
+		grid-template-columns: 1fr 1fr;
+	}
+}
+
+@media (max-width: 680px) {
+	.crm-cal-toolbar {
+		flex-direction: column;
+		align-items: flex-start;
+	}
+
+	.crm-cal-toolbar__right {
+		flex-wrap: wrap;
+	}
+
+	.crm-cal-sidebar {
+		grid-template-columns: 1fr;
+	}
+
+	.crm-cal-form__row {
+		grid-template-columns: 1fr;
+	}
+}

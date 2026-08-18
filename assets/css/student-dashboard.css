@@ -1,0 +1,374 @@
+/**
+ * ATORA-LMS — Student Dashboard supplemental CSS
+ * Fixes para datos solapados / desalineados en el panel del estudiante.
+ * Los estilos base del dashboard están en class-dashboard.php → get_inline_css().
+ */
+
+/* ── Correcciones de layout general ── */
+.clms-sd {
+	width: 100%;
+	overflow-x: hidden;
+}
+
+/* Evita que las tarjetas desborden el contenedor */
+.clms-sd-card,
+.clms-sd-list-card,
+.clms-sd-mini,
+.clms-sd-stat,
+.clms-sd-module,
+.clms-sd-journey-item {
+	min-width: 0;
+	overflow: hidden;
+}
+
+/* ── Hero: columnas no se solapan ── */
+/*
+ * El dashboard puede renderizarse dentro de una columna angosta del tema aunque el viewport
+ * siga siendo de escritorio. Si el hero usa un grid rígido, la columna de métricas termina
+ * aplastando el copy principal y ambos bloques parecen solaparse.
+ *
+ * Lo resolvemos con flex-wrap: en escritorio ancho siguen saliendo lado a lado, pero cuando
+ * el contenedor real se estrecha, las métricas bajan debajo del texto sin romper el layout.
+ */
+.clms-sd-hero {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: start;
+	gap: 24px;
+}
+
+/* Mantiene la presencia visual del hero en escritorio amplio */
+@media (min-width: 1121px) {
+	.clms-sd-hero {
+		min-height: clamp(340px, 36vw, 520px);
+	}
+}
+
+.clms-sd-hero__copy,
+.clms-sd-hero__stats {
+	min-width: 0;
+	flex: 1 1 100%;
+}
+
+.clms-sd-hero__copy {
+	flex: 1.55 1 480px;
+	align-content: start;
+}
+
+.clms-sd-hero__title {
+	overflow-wrap: break-word;
+	word-break: normal;
+	hyphens: auto;
+}
+
+.clms-sd-hero__stats {
+	flex: .95 1 280px;
+	align-content: start;
+}
+
+/* ── Section head: badge no desborda al lado del título ── */
+.clms-sd-section-head {
+	align-items: flex-start;
+	gap: 12px;
+	flex-wrap: wrap;
+}
+
+/* ── Chips: nunca desbordan ── */
+.clms-sd .clms-sd-chip {
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* ── Assistant actions: grid responsivo ── */
+.clms-sd .clms-sd-assistant-actions {
+	display: grid;
+	gap: 8px;
+	grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+/* ── Lista de tarjetas: el aside no aplasta el contenido ── */
+.clms-sd-list-card__head {
+	gap: 10px;
+	align-items: start;
+}
+
+.clms-sd-list-card__main {
+	overflow: hidden;
+}
+
+.clms-sd-list-card__title,
+.clms-sd-mini__title {
+	overflow-wrap: anywhere;
+	word-break: break-word;
+	max-width: 100%;
+}
+
+/* ── Módulos: segunda columna no desborda ── */
+.clms-sd-module__value {
+	word-break: break-word;
+}
+
+/* ── Incident grid: cartas alineadas ── */
+.clms-sd-incident-grid {
+	align-items: stretch;
+}
+.clms-sd-incident-card {
+	box-sizing: border-box;
+}
+
+/* ── Courses grid: sin overflow ── */
+.clms-sd-course {
+	min-width: 0;
+}
+.clms-sd-course__title {
+	display: -webkit-box;
+	-webkit-line-clamp: 3;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+/* ── Route grid: columnas no se solapan ── */
+.clms-sd-route-main,
+.clms-sd-route-aside {
+	min-width: 0;
+	overflow: hidden;
+}
+
+/* ── Memory grid: sin desborde ── */
+.clms-sd-memory-block {
+	min-width: 0;
+	overflow: hidden;
+}
+
+/* ── Journey items: acciones no desborden ── */
+.clms-sd-journey-actions {
+	flex-shrink: 0;
+}
+
+/* ── Progress bars: nunca superan el 100% ── */
+.clms-sd-progress span {
+	max-width: 100%;
+}
+
+/* ── Texto general: overflow seguro ── */
+.clms-sd-text,
+.clms-sd-hero__text,
+.clms-sd-mini__meta,
+.clms-sd-course__meta,
+.clms-sd-list-card__meta {
+	overflow-wrap: anywhere;
+	word-break: break-word;
+}
+
+/* ── Responsive 1120px (tablet/large) ── */
+@media (max-width: 1120px) {
+	.clms-sd-hero {
+		min-height: 0;
+	}
+
+	.clms-sd-list-card__head {
+		grid-template-columns: 1fr;
+		gap: 8px;
+	}
+	.clms-sd-list-card__aside {
+		align-items: flex-start;
+	}
+	.clms-sd-list-card__aside--stack {
+		flex-direction: row;
+		align-items: center;
+	}
+}
+
+/* ── Responsive 960px ── */
+@media (max-width: 960px) {
+	.clms-sd .clms-sd-hero__actions .clms-sd-btn {
+		width: 100%;
+		justify-content: center;
+	}
+	.clms-sd-module {
+		grid-template-columns: 1fr;
+	}
+	.clms-sd-module__value {
+		text-align: left;
+	}
+}
+
+/* ── Responsive 782px (mobile WP) ── */
+@media (max-width: 782px) {
+	/* Courses: una sola columna */
+	.clms-sd-courses {
+		grid-template-columns: 1fr;
+	}
+
+	/* Hero stats: apiladas */
+	.clms-sd-stat-grid {
+		grid-template-columns: 1fr 1fr;
+	}
+
+	/* Section head: apilado */
+	.clms-sd-section-head {
+		flex-direction: column;
+		gap: 8px;
+	}
+
+	/* Incident grid: dos columnas en móvil */
+	.clms-sd-incident-grid {
+		grid-template-columns: 1fr 1fr;
+	}
+
+	/* List card: columna única */
+	.clms-sd-list-card__head,
+	.clms-sd-mini {
+		grid-template-columns: 1fr;
+	}
+
+	/* Aside alineado a la izquierda */
+	.clms-sd-list-card__aside,
+	.clms-sd-list-card__aside--stack {
+		align-items: flex-start;
+		flex-direction: row;
+		flex-wrap: wrap;
+	}
+
+	/* Hero actions: columna */
+	.clms-sd-hero__actions,
+	.clms-sd-course__actions {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	/* Botones full-width en móvil */
+	.clms-sd-btn {
+		width: 100%;
+		justify-content: center;
+	}
+
+	/* Journey: columna única */
+	.clms-sd-journey-item {
+		grid-template-columns: 1fr;
+		gap: 8px;
+	}
+	.clms-sd-journey-actions {
+		justify-content: flex-start;
+	}
+
+	/* Sticky CTA: estático en móvil */
+	.clms-sd-sticky-cta {
+		position: static;
+		padding: 0;
+	}
+
+	/* Steps: columna */
+	.clms-sd-step {
+		flex-direction: column;
+		align-items: flex-start;
+	}
+
+	/* Details: menos padding */
+	.clms-sd-details {
+		padding: 10px;
+	}
+
+	/* Memory grid: columna */
+	.clms-sd-memory-grid {
+		grid-template-columns: 1fr;
+	}
+
+	/* Route: columna */
+	.clms-sd-route-grid {
+		grid-template-columns: 1fr;
+	}
+}
+
+/* ── Responsive 640px (móvil pequeño) ── */
+@media (max-width: 640px) {
+	.clms-sd {
+		gap: 16px;
+	}
+
+	/* Stat grid: columna única */
+	.clms-sd-stat-grid {
+		grid-template-columns: 1fr;
+	}
+
+	/* Incident grid: columna */
+	.clms-sd-incident-grid {
+		grid-template-columns: 1fr;
+	}
+
+	/* Cards y hero: menos padding */
+	.clms-sd-hero,
+	.clms-sd-card {
+		padding: 18px;
+		border-radius: 18px;
+	}
+
+	/* Card body: menos gap */
+	.clms-sd-card__body {
+		gap: 10px;
+	}
+
+	/* Títulos más pequeños */
+	.clms-sd-title {
+		font-size: 22px;
+	}
+	.clms-sd-hero__title {
+		font-size: clamp(26px, 10vw, 42px);
+	}
+
+	/* List card y mini: menos padding */
+	.clms-sd-list-card,
+	.clms-sd-mini {
+		padding: 14px;
+	}
+
+	/* Course: menos padding */
+	.clms-sd-course__body,
+	.clms-sd-course__actions {
+		padding-left: 14px;
+		padding-right: 14px;
+	}
+
+	/* Section head: columna */
+	.clms-sd-section-head {
+		display: grid;
+		gap: 8px;
+	}
+
+	/* Link: altura mínima táctil */
+	.clms-sd-link {
+		min-height: 40px;
+		align-items: center;
+	}
+
+	/* Texto base un poco menor */
+	.clms-sd-hero__text,
+	.clms-sd-text {
+		font-size: 14px;
+		line-height: 1.65;
+	}
+
+	/* Onboard items: menos gap */
+	.clms-sd-onboard-list {
+		gap: 8px;
+	}
+
+	/* Eval: menos padding */
+	.clms-sd-eval {
+		padding: 12px;
+	}
+
+	/* Chips container: sin overflow horizontal */
+	.clms-sd-chips {
+		gap: 6px;
+	}
+}
+
+/* 6.1.1 — ancho consistente entre panel de estudiante y de docente */
+.clms-sd,
+.clms-td {
+	max-width: 1100px;
+	margin-inline: auto;
+}

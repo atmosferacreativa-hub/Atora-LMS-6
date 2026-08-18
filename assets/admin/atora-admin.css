@@ -1,0 +1,53 @@
+/**
+ * ATORA LMS — Design System Admin (Fase 12B)
+ * Variables CSS globales heredadas por todos los módulos.
+ */
+
+:root {
+  --atora-blue-950: #0f172a; --atora-blue-900: #1e3a8a; --atora-blue-700: #1d4ed8;
+  --atora-blue-500: #3b82f6; --atora-blue-100: #dbeafe; --atora-blue-50:  #eff6ff;
+  --atora-amber-500: #f59e0b; --atora-amber-100: #fef3c7;
+  --atora-success: #1D9E75; --atora-warning: #BA7517; --atora-danger: #E24B4A;
+  --atora-info: #378ADD; --atora-muted: #64748b;
+  --atora-bg: #f8fafc; --atora-surface: #ffffff;
+  --atora-border: #e2e8f0; --atora-border-soft: #f1f5f9;
+  --atora-text-primary: #0f172a; --atora-text-secondary: #475569; --atora-text-muted: #94a3b8;
+  --atora-radius-sm: 8px; --atora-radius-md: 12px; --atora-radius-lg: 16px; --atora-radius-xl: 20px;
+  --atora-shadow-sm: 0 1px 3px rgba(0,0,0,.06); --atora-shadow-md: 0 4px 12px rgba(0,0,0,.08);
+}
+
+.atora-card { background:var(--atora-surface); border:.5px solid var(--atora-border); border-radius:var(--atora-radius-lg); padding:1.125rem; box-shadow:var(--atora-shadow-sm); }
+
+.atora-badge { display:inline-flex; align-items:center; padding:2px 10px; border-radius:999px; font-size:11px; font-weight:600; line-height:1.6; }
+.atora-badge--ok      { background:#d1fae5; color:#065f46; }
+.atora-badge--warn    { background:#fef3c7; color:#92400e; }
+.atora-badge--danger  { background:#fee2e2; color:#991b1b; }
+.atora-badge--info    { background:#dbeafe; color:#1e3a8a; }
+.atora-badge--neutral { background:#f1f5f9; color:#475569; }
+
+.atora-btn { display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border-radius:var(--atora-radius-sm); font-size:13px; font-weight:600; cursor:pointer; border:.5px solid transparent; transition:all .15s; text-decoration:none; }
+.atora-btn--primary   { background:var(--atora-blue-700); color:#fff; border-color:var(--atora-blue-700); }
+.atora-btn--primary:hover { background:var(--atora-blue-900); color:#fff; }
+.atora-btn--secondary { background:var(--atora-surface); color:var(--atora-blue-700); border-color:var(--atora-blue-100); }
+.atora-btn--secondary:hover { background:var(--atora-blue-50); }
+.atora-btn--ghost     { background:none; color:var(--atora-text-secondary); border-color:var(--atora-border); }
+.atora-btn--ghost:hover { background:var(--atora-bg); color:var(--atora-text-primary); }
+
+.atora-table { width:100%; border-collapse:collapse; font-size:13px; }
+.atora-table th { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:var(--atora-text-muted); padding:8px 12px; text-align:left; border-bottom:.5px solid var(--atora-border); }
+.atora-table td { padding:10px 12px; border-bottom:.5px solid var(--atora-border-soft); color:var(--atora-text-secondary); vertical-align:middle; }
+.atora-table tbody tr:hover td { background:var(--atora-bg); }
+
+.atora-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:3rem; color:var(--atora-text-muted); text-align:center; gap:.75rem; }
+.atora-empty__icon  { font-size:2rem; opacity:.4; }
+.atora-empty__title { font-size:15px; font-weight:600; color:var(--atora-text-secondary); }
+.atora-empty__desc  { font-size:13px; max-width:320px; line-height:1.6; }
+
+.atora-breadcrumb { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--atora-text-muted); margin-bottom:1.25rem; }
+.atora-breadcrumb a { color:var(--atora-blue-700); text-decoration:none; }
+.atora-breadcrumb a:hover { text-decoration:underline; }
+.atora-breadcrumb__sep { opacity:.4; }
+.atora-breadcrumb__current { color:var(--atora-text-primary); font-weight:500; }
+
+.atora-section-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem; flex-wrap:wrap; gap:.5rem; }
+.atora-section-title { font-size:16px; font-weight:700; color:var(--atora-text-primary); }

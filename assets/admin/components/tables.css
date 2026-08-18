@@ -1,0 +1,73 @@
+.atora-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--atora-border);
+  border-radius: 10px;
+  background: var(--atora-card);
+}
+
+.atora-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.atora-table th,
+.atora-table td {
+  border-bottom: 1px solid var(--atora-border);
+  padding: 10px;
+  text-align: left;
+}
+
+.atora-table th {
+  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--atora-muted);
+  letter-spacing: 0.04em;
+  background: var(--atora-bg);
+}
+
+.atora-table tbody tr:last-child td { border-bottom: none; }
+.atora-table tbody tr:hover td { background: rgba(63, 152, 238, 0.04); }
+
+/* Estados de evaluación */
+.atora-status {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.atora-status.is-pending      { background: #fff8e8; color: #7a5000; }
+.atora-status.is-missing      { background: #fff0f0; color: #8f1e1e; }
+.atora-status.is-submitted    { background: #f0f6ff; color: #1a4a8c; }
+.atora-status.is-graded       { background: #ebf7ff; color: #0f4f7a; }
+.atora-status.needs-review    { background: #fff4df; color: #7a5000; }
+.atora-status.is-approved     { background: #e8f7ed; color: #1f6e3c; }
+.atora-status.is-failed       { background: #ffecec; color: #932a2a; }
+.atora-status.is-returned     { background: #f5f0ff; color: #3c2fa0; }
+.atora-status.is-in-review    { background: #f0f8ff; color: #0a4c6e; }
+.atora-status.has-rubric      { box-shadow: inset 0 0 0 1px rgba(111, 101, 211, 0.5); }
+.atora-status.manual-override { box-shadow: inset 0 0 0 1px rgba(63, 152, 238, 0.6); }
+.atora-status.ai-suggested    { box-shadow: inset 0 0 0 1px rgba(243, 179, 46, 0.7); }
+.atora-status.is-ia-pending   { background: #fffbea; color: #7a5000; }
+
+/* Riesgo académico */
+.atora-risk {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.atora-risk.is-low    { color: #1f6e3c; }
+.atora-risk.is-medium { color: #7a5000; }
+.atora-risk.is-high   { color: #932a2a; }
+
+.atora-risk::before {
+  content: '●';
+  font-size: 8px;
+}

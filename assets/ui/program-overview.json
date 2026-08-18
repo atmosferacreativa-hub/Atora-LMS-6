@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "preset": "default",
+  "theme": "light",
+  "variant": "default",
+  "props": {},
+  "sections": [
+    { "id": "hero",       "enabled": true, "variant": "default", "props": {}, "visibility": "always",        "roles": [], "style": {} },
+    { "id": "summary",    "enabled": true, "variant": "default", "props": {}, "visibility": "always",        "roles": [], "style": {} },
+    { "id": "progress",   "enabled": true, "variant": "default", "props": {}, "visibility": "enrolled_only", "roles": [], "style": {} },
+    { "id": "academic",   "enabled": true, "variant": "default", "props": {}, "visibility": "always",        "roles": [], "style": {} },
+    { "id": "modules",    "enabled": true, "variant": "default", "props": {}, "visibility": "always",        "roles": [], "style": {} },
+    { "id": "instructor", "enabled": true, "variant": "default", "props": {}, "visibility": "always",        "roles": [], "style": {} },
+    { "id": "cta",        "enabled": true, "variant": "default", "props": {}, "visibility": "always",        "roles": [], "style": {} }
+  ],
+  "limits": {
+    "modules": 0
+  }
+}

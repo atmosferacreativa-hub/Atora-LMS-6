@@ -1,0 +1,78 @@
+.atora-filter-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  align-items: end;
+}
+
+.atora-filter-row label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--atora-text);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.atora-filter-row input,
+.atora-filter-row select {
+  width: 100%;
+}
+
+.atora-filter-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding-top: 18px;
+}
+
+.atora-btn-secondary {
+  border: 1px solid var(--atora-border);
+  background: #fff;
+  color: var(--atora-text);
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.12s;
+}
+
+.atora-btn-secondary:hover { background: var(--atora-bg); }
+
+.atora-btn-primary {
+  background: var(--atora-primary);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.atora-btn-primary:hover { opacity: 0.88; }
+
+.atora-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.atora-form-group label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--atora-text);
+}
+
+.atora-form-group input,
+.atora-form-group select,
+.atora-form-group textarea {
+  width: 100%;
+}
+
+.atora-form-hint {
+  font-size: 11px;
+  color: var(--atora-muted);
+}

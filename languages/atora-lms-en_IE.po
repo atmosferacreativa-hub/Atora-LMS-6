@@ -1,0 +1,3390 @@
+# ATORA LMS – English (United States)
+# Copyright (C) 2026 ATORA LMS
+# This file is distributed under the same license as the ATORA LMS plugin.
+msgid ""
+msgstr ""
+"Project-Id-Version: ATORA LMS\n"
+"POT-Creation-Date: 2026-04-13\n"
+"PO-Revision-Date: 2026-04-13\n"
+"Language-Team: English (Ireland)\n"
+"Language: en_IE\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Generator: ATORA LMS i18n\n"
+
+msgid "%1$s - SpeedGrade"
+msgstr "%1$s - SpeedGrade"
+
+msgid "%1$s · %2$s pts totales"
+msgstr "%1$s · %2$s total pts"
+
+msgid "%d lecciones prácticas"
+msgstr "%d practical lessons"
+
+msgid "%d módulos estructurados"
+msgstr "%d structured modules"
+
+msgid "%d recursos"
+msgstr "%d resources"
+
+msgid "%d%% completado"
+msgstr "%d%% completed"
+
+msgid "%s matriculado/a correctamente."
+msgstr "%s enrolled successfully."
+
+msgid "%s palabras"
+msgstr "%s words"
+
+msgid "(hace %s días)"
+msgstr "(%s days ago)"
+
+msgid "(hace %s h)"
+msgstr "(%s h ago)"
+
+msgid "+ %d lecciones más disponibles tras inscribirse."
+msgstr "+ %d more lessons available after enrollment."
+
+msgid "AI Exams"
+msgstr "AI Exams"
+
+msgid "AI Quizzes"
+msgstr "AI Quizzes"
+
+msgid "API key de OpenAI no configurada."
+msgstr "OpenAI API key not configured."
+
+msgid "API key de Whisper no configurada."
+msgstr "Whisper API key not configured."
+
+msgid "API key de Whisper/OpenAI no configurada."
+msgstr "Whisper/OpenAI API key not configured."
+
+msgid ""
+"API keys, provider, and model are managed in <a href=\"%s\">Settings → APIs "
+"e IA</a>."
+msgstr ""
+"API keys, provider, and model are managed in <a href=\"%s\">Settings → APIs "
+"& AI</a>."
+
+msgid "APIs e IA"
+msgstr "APIs & AI"
+
+msgid "ATORA"
+msgstr "ATORA"
+
+msgid "ATORA LMS requires PHP 8.1 or higher. You are running PHP %s."
+msgstr "ATORA LMS requires PHP 8.1 or higher. You are running PHP %s."
+
+msgid ""
+"ATORA aún no ha verificado qué plantilla de lección está activa. Abre una "
+"lección en la vista pública para confirmar que se usa la plantilla del "
+"plugin."
+msgstr ""
+"ATORA has not yet verified which lesson template is active. Open a lesson in"
+" the public view to confirm the plugin template is being used."
+
+msgid "Abandono"
+msgstr "Dropout"
+
+msgid "Abre una lección para guardar el banco de preguntas."
+msgstr "Open a lesson to save the question bank."
+
+msgid "Abre una lección para guardar la guía de estudio."
+msgstr "Open a lesson to save the study guide."
+
+msgid "Abre una lección para guardar la presentación."
+msgstr "Open a lesson to save the presentation."
+
+msgid "Abre una lección para guardar las notas."
+msgstr "Open a lesson to save the notes."
+
+msgid "Abrir"
+msgstr "Open"
+
+msgid "Abrir analítica completa"
+msgstr "Open full analytics"
+
+msgid "Abrir asistente IA"
+msgstr "Open AI assistant"
+
+msgid "Abrir listado"
+msgstr "Open list"
+
+msgid "Academia"
+msgstr "Academy"
+
+msgid "Académico"
+msgstr "Academic"
+
+msgid "Acceso comunicado"
+msgstr "Access communicated"
+
+msgid "Acceso denegado en capa REST."
+msgstr "Access denied in REST layer."
+
+msgid "Acceso requerido"
+msgstr "Access required"
+
+msgid "Acceso rápido al hub comercial."
+msgstr "Quick access to the commercial hub."
+
+msgid "Acción"
+msgstr "Action"
+
+msgid "Acción desconocida."
+msgstr "Unknown action."
+
+msgid ""
+"Acepta HTML: &lt;strong&gt;, &lt;em&gt;, &lt;a href=&quot;...&quot;&gt;, "
+"&lt;ul&gt;&lt;li&gt;, &lt;p&gt;."
+msgstr ""
+"Accepts HTML: &lt;strong&gt;, &lt;em&gt;, &lt;a href=&quot;...&quot;&gt;, "
+"&lt;ul&gt;&lt;li&gt;, &lt;p&gt;."
+
+msgid "Activa"
+msgstr "Active"
+
+msgid "Activar logs de CLMS en %s"
+msgstr "Enable CLMS logs in %s"
+
+msgid "Actividad"
+msgstr "Activity"
+
+msgid "Actividad comercial reciente"
+msgstr "Recent commercial activity"
+
+msgid "Actividad pendiente"
+msgstr "Pending activity"
+
+msgid "Actividades sin completar"
+msgstr "Incomplete activities"
+
+msgid "Activo"
+msgstr "Active"
+
+msgid "Activo · %s"
+msgstr "Active · %s"
+
+msgid "Actualizada"
+msgstr "Updated"
+
+msgid "Actualizadas"
+msgstr "Updated"
+
+msgid "Actualizado"
+msgstr "Updated"
+
+msgid "Actualizar nivel"
+msgstr "Update level"
+
+msgid "Administra diplomados y programas con pricing y cross-sell."
+msgstr "Manage diplomas and programs with pricing and cross-sell."
+
+msgid "Administrador"
+msgstr "Administrator"
+
+msgid "Administras %1$d curso(s) con %2$d lección(es) activas."
+msgstr "You manage %1$d course(s) with %2$d active lesson(s)."
+
+msgid "Agotada"
+msgstr "Sold out"
+
+msgid "Ajustes centrales de academia, branding y APIs."
+msgstr "Central academy, branding, and API settings."
+
+msgid "Alumno"
+msgstr "Student"
+
+msgid "Analizar grupo"
+msgstr "Analyze group"
+
+msgid "Analítica"
+msgstr "Analytics"
+
+msgid "Anthropic devolvió respuesta vacía."
+msgstr "Anthropic returned an empty response."
+
+msgid "Anthropic devolvió una respuesta vacía."
+msgstr "Anthropic returned an empty response."
+
+msgid "Análisis del grupo"
+msgstr "Group analysis"
+
+msgid ""
+"Aquí encuentras tus accesos rápidos, perfil y visibilidad de tu ruta de "
+"aprendizaje."
+msgstr ""
+"Here you'll find your quick access, profile, and visibility of your learning"
+" path."
+
+msgid "Archivo"
+msgstr "File"
+
+msgid "Archivo de audio no encontrado."
+msgstr "Audio file not found."
+
+msgid "Archivo de cursos"
+msgstr "Course archive"
+
+msgid "Archivo de docentes"
+msgstr "Instructor archive"
+
+msgid "Archivo de lecciones"
+msgstr "Lesson archive"
+
+msgid "Archivo de programas"
+msgstr "Program archive"
+
+msgid "Archivo del recurso"
+msgstr "Resource file"
+
+msgid "Archivo demasiado grande."
+msgstr "File too large."
+
+msgid "Archivo demasiado grande. Máximo %s."
+msgstr "File too large. Maximum %s."
+
+msgid "Archivo guía AI"
+msgstr "AI guide file"
+
+msgid "Archivo listo para importar."
+msgstr "File ready to import."
+
+msgid "Archivo y curso requeridos."
+msgstr "File and course required."
+
+msgid "Archivos listos para enviar (%d)."
+msgstr "Files ready to send (%d)."
+
+msgid "Arrastra el archivo aquí"
+msgstr "Drag the file here"
+
+msgid "Arrastra el archivo guía aquí"
+msgstr "Drag the guide file here"
+
+msgid "Arrastra imágenes aquí"
+msgstr "Drag images here"
+
+msgid "Asignación inválida."
+msgstr "Invalid assignment."
+
+msgid "Asignación no encontrada."
+msgstr "Assignment not found."
+
+msgid "Asignar foto"
+msgstr "Assign photo"
+
+msgid "Asignar imagen destacada"
+msgstr "Assign featured image"
+
+msgid "Asistente"
+msgstr "Assistant"
+
+msgid "Asistente ATORA"
+msgstr "ATORA Assistant"
+
+msgid "Asistente IA"
+msgstr "AI Assistant"
+
+msgid "Asistente docente activo:"
+msgstr "Active teaching assistant:"
+
+msgid "Asunto"
+msgstr "Subject"
+
+msgid "Atributos de la lección"
+msgstr "Lesson attributes"
+
+msgid "Atributos del curso"
+msgstr "Course attributes"
+
+msgid "Atributos del docente"
+msgstr "Instructor attributes"
+
+msgid "Atributos del programa"
+msgstr "Program attributes"
+
+msgid "Audio"
+msgstr "Audio"
+
+msgid "Automatización y presencia docente"
+msgstr "Automation and instructor presence"
+
+msgid "Avance"
+msgstr "Progress"
+
+msgid "Avanzado"
+msgstr "Advanced"
+
+msgid "Aviso"
+msgstr "Notice"
+
+msgid "Aviso reciente"
+msgstr "Recent notice"
+
+msgid "Avisos pendientes"
+msgstr "Pending notices"
+
+msgid "Añade una pequeña presentación sobre ti."
+msgstr "Add a brief introduction about yourself."
+
+msgid "Añadir nueva"
+msgstr "Add new"
+
+msgid "Añadir nueva lección"
+msgstr "Add new lesson"
+
+msgid "Añadir nuevo"
+msgstr "Add new"
+
+msgid "Añadir nuevo curso"
+msgstr "Add new course"
+
+msgid "Añadir nuevo docente"
+msgstr "Add new instructor"
+
+msgid "Añadir nuevo nivel"
+msgstr "Add new level"
+
+msgid "Añadir nuevo programa"
+msgstr "Add new program"
+
+msgid "Añadir presentación"
+msgstr "Add presentation"
+
+msgid "Aún no cumples los requisitos para este certificado."
+msgstr "You don't yet meet the requirements for this certificate."
+
+msgid "Aún no has enviado esta tarea."
+msgstr "You haven't submitted this assignment yet."
+
+msgid "Aún no has respondido esta evaluación."
+msgstr "You haven't answered this assessment yet."
+
+msgid "Bajo el umbral de desempeño"
+msgstr "Below performance threshold"
+
+msgid "Banco generado."
+msgstr "Bank generated."
+
+msgid "Bandeja ATORA"
+msgstr "ATORA Inbox"
+
+msgid "Beneficios"
+msgstr "Benefits"
+
+msgid "Bloqueado"
+msgstr "Locked"
+
+msgid "Borrar historial"
+msgstr "Clear history"
+
+msgid "Bunny.net"
+msgstr "Bunny.net"
+
+msgid "Buscar cursos"
+msgstr "Search courses"
+
+msgid "Buscar docentes"
+msgstr "Search instructors"
+
+msgid "Buscar lecciones"
+msgstr "Search lessons"
+
+msgid "Buscar niveles"
+msgstr "Search levels"
+
+msgid "Buscar programas"
+msgstr "Search programs"
+
+msgid "CLMS_AI_Manager no está disponible para solicitudes IA."
+msgstr "CLMS_AI_Manager is not available for AI requests."
+
+msgid "CLMS_AI_Manager no está disponible."
+msgstr "CLMS_AI_Manager is not available."
+
+msgid "Caducada"
+msgstr "Expired"
+
+msgid "Calificaciones"
+msgstr "Grades"
+
+msgid "Calificación y revisión"
+msgstr "Grading and review"
+
+msgid "Calificada"
+msgstr "Graded"
+
+msgid "Calificadas"
+msgstr "Graded"
+
+msgid "Cambiar logo"
+msgstr "Change logo"
+
+msgid "Cargando…"
+msgstr "Loading…"
+
+msgid ""
+"Centro de comunicación operativa para feedback, avisos, seguimiento "
+"académico y recomendaciones inteligentes."
+msgstr ""
+"Operational communication hub for feedback, notices, academic tracking, and "
+"smart recommendations."
+
+msgid ""
+"Centro de herramientas de IA para evaluación, asistencia y configuración "
+"académica."
+msgstr "AI tools hub for assessment, assistance, and academic configuration."
+
+msgid ""
+"Centro operativo por rol para navegar programas, cursos, lecciones, "
+"evaluaciones, IA, comercio, analítica y mensajes."
+msgstr ""
+"Role-based operational hub for navigating programs, courses, lessons, "
+"assessments, AI, commerce, analytics, and messages."
+
+msgid "Cerrar sesión"
+msgstr "Log out"
+
+msgid "Certificado"
+msgstr "Certificate"
+
+msgid "Certificado al finalizar"
+msgstr "Certificate upon completion"
+
+msgid "Chunk demasiado grande (%s MB). Máx: %s MB."
+msgstr "Chunk too large (%s MB). Max: %s MB."
+
+msgid "Cola operativa de revisión y feedback."
+msgstr "Operational review and feedback queue."
+
+msgid "Colaborador"
+msgstr "Contributor"
+
+msgid "Comentarios por revisar"
+msgstr "Comments to review"
+
+msgid "Comenzar tu primera lección"
+msgstr "Start your first lesson"
+
+msgid "Comercial"
+msgstr "Commercial"
+
+msgid "Comercio"
+msgstr "Commerce"
+
+msgid "Comercio en ATORA"
+msgstr "Commerce in ATORA"
+
+msgid "Comercio, analítica y mensajes"
+msgstr "Commerce, analytics, and messages"
+
+msgid "Compacta"
+msgstr "Compact"
+
+msgid "Completa"
+msgstr "Complete"
+
+msgid "Completa esta actividad para continuar tu avance."
+msgstr "Complete this activity to continue your progress."
+
+msgid "Completa estudiante, asunto y mensaje antes de enviar."
+msgstr "Fill in student, subject, and message before sending."
+
+msgid "Completada"
+msgstr "Completed"
+
+msgid "Completado"
+msgstr "Completed"
+
+msgid "Completar perfil"
+msgstr "Complete profile"
+
+msgid "Completar tu perfil"
+msgstr "Complete your profile"
+
+msgid "Completitud"
+msgstr "Completion"
+
+msgid "Comprar curso"
+msgstr "Buy course"
+
+msgid "Comprar programa"
+msgstr "Buy program"
+
+msgid "Comunicación académica a través de feedback y revisión de entregas."
+msgstr "Academic communication through feedback and submission review."
+
+msgid "Con contraseña"
+msgstr "Password protected"
+
+msgid "Con fecha límite"
+msgstr "With deadline"
+
+msgid "Con registro"
+msgstr "With registration"
+
+msgid "Conf.: %s%%"
+msgstr "Conf.: %s%%"
+
+msgid "Confianza"
+msgstr "Confidence"
+
+msgid "Configuraciones activas"
+msgstr "Active configurations"
+
+msgid "Configuración"
+msgstr "Settings"
+
+msgid "Configuración IA"
+msgstr "AI Settings"
+
+msgid "Configuración de Atora"
+msgstr "Atora Settings"
+
+msgid "Configuración, exámenes IA y evaluación asistida."
+msgstr "Settings, AI exams, and assisted assessment."
+
+msgid "Conoce el contenido del curso"
+msgstr "Explore the course content"
+
+msgid "Consulta el progreso y las calificaciones por curso."
+msgstr "View progress and grades by course."
+
+msgid "Consulta vacía para embeddings."
+msgstr "Empty query for embeddings."
+
+msgid "Contenido"
+msgstr "Content"
+
+msgid "Continuar ahora"
+msgstr "Continue now"
+
+msgid "Continúa para mantener el ritmo."
+msgstr "Keep going to maintain your pace."
+
+msgid "Contraseña"
+msgstr "Password"
+
+msgid "Contraseña incorrecta."
+msgstr "Incorrect password."
+
+msgid "Control central"
+msgstr "Central control"
+
+msgid "Control de acceso y matriculación"
+msgstr "Access control and enrollment"
+
+msgid "Conversaciones"
+msgstr "Conversations"
+
+msgid "Conversiones"
+msgstr "Conversions"
+
+msgid "Conversiones y cross-sell"
+msgstr "Conversions and cross-sell"
+
+msgid "Conversiones y productos clave"
+msgstr "Conversions and key products"
+
+msgid "Conversiones, ventas y cross-sell"
+msgstr "Conversions, sales, and cross-sell"
+
+msgid "Copiado"
+msgstr "Copied"
+
+msgid "Copiado al portapapeles"
+msgstr "Copied to clipboard"
+
+msgid "Copiar"
+msgstr "Copy"
+
+msgid "Copiar al portapapeles"
+msgstr "Copy to clipboard"
+
+msgid "Copiar informe"
+msgstr "Copy report"
+
+msgid "Could not delete quiz"
+msgstr "Could not delete quiz"
+
+msgid "Crear presentación"
+msgstr "Create presentation"
+
+msgid "Crear rúbrica"
+msgstr "Create rubric"
+
+msgid "Criterios y matrices de evaluación."
+msgstr "Assessment criteria and rubrics."
+
+msgid "Cross-sell"
+msgstr "Cross-sell"
+
+msgid "Cruda: %s%%"
+msgstr "Raw: %s%%"
+
+msgid ""
+"Cuando avances en el curso, aquí verás patrones y recomendaciones útiles."
+msgstr ""
+"As you progress through the course, you'll see patterns and useful "
+"recommendations here."
+
+msgid ""
+"Cuando tengas lecciones activas, las verás aquí para continuar sin "
+"fricciones."
+msgstr ""
+"When you have active lessons, you'll see them here to continue seamlessly."
+
+msgid "Curso"
+msgstr "Course"
+
+msgid "Curso inválido."
+msgstr "Invalid course."
+
+msgid "Curso no encontrado."
+msgstr "Course not found."
+
+msgid "Curso no válido."
+msgstr "Invalid course."
+
+msgid "Curso requerido."
+msgstr "Course required."
+
+msgid "Curso:"
+msgstr "Course:"
+
+msgid "Cursos"
+msgstr "Courses"
+
+msgid "Cursos activos"
+msgstr "Active courses"
+
+msgid "Cursos comerciales"
+msgstr "Commercial courses"
+
+msgid "Cursos, progreso y pendientes"
+msgstr "Courses, progress, and pending items"
+
+msgid "Cuéntale algo a tus compañeros..."
+msgstr "Tell your classmates something..."
+
+msgid "Dashboard comercio"
+msgstr "Commerce dashboard"
+
+msgid "Datos inválidos."
+msgstr "Invalid data."
+
+msgid "Debes completar la compra antes de inscribirte en este curso."
+msgstr "You must complete the purchase before enrolling in this course."
+
+msgid "Debes completar la compra antes de inscribirte en este programa."
+msgstr "You must complete the purchase before enrolling in this program."
+
+msgid "Debes completar primero la lección anterior."
+msgstr "You must complete the previous lesson first."
+
+msgid "Debes completar todos los criterios de la rúbrica."
+msgstr "You must complete all rubric criteria."
+
+msgid "Debes estar inscrito en el curso para acceder a esta lección."
+msgstr "You must be enrolled in the course to access this lesson."
+
+msgid "Debes iniciar sesión para acceder a este recurso."
+msgstr "You must be logged in to access this resource."
+
+msgid "Debes iniciar sesión para acceder a las lecciones."
+msgstr "You must be logged in to access lessons."
+
+msgid "Debes iniciar sesión para analizar texto."
+msgstr "You must be logged in to analyze text."
+
+msgid "Debes iniciar sesión para revisar entregas."
+msgstr "You must be logged in to review submissions."
+
+msgid "Debes iniciar sesión para transcribir audio."
+msgstr "You must be logged in to transcribe audio."
+
+msgid "Debes iniciar sesión primero."
+msgstr "You must log in first."
+
+msgid "Debes iniciar sesión."
+msgstr "You must be logged in."
+
+msgid "Demasiadas preguntas seguidas. Espera un momento."
+msgstr "Too many questions in a row. Please wait a moment."
+
+msgid "Demasiadas solicitudes. Espera un momento antes de continuar."
+msgstr "Too many requests. Please wait a moment before continuing."
+
+msgid "Desactivado"
+msgstr "Disabled"
+
+msgid "Descripción"
+msgstr "Description"
+
+msgid "Descripción del video"
+msgstr "Video description"
+
+msgid "Desde"
+msgstr "From"
+
+msgid "Desmatriculado."
+msgstr "Unenrolled."
+
+msgid "Destinatarios"
+msgstr "Recipients"
+
+msgid "Detalle"
+msgstr "Detail"
+
+msgid "Detalle de %s"
+msgstr "Detail of %s"
+
+msgid "Detalles del curso"
+msgstr "Course details"
+
+msgid "Dificultad"
+msgstr "Difficulty"
+
+msgid "Diplomados y agrupaciones académicas."
+msgstr "Diplomas and academic groups."
+
+msgid "Directo"
+msgstr "Direct"
+
+msgid "Docente"
+msgstr "Instructor"
+
+msgid "Docente creado correctamente."
+msgstr "Instructor created successfully."
+
+msgid "Docente creado y asociado correctamente."
+msgstr "Instructor created and associated successfully."
+
+msgid "Docente líder"
+msgstr "Lead instructor"
+
+msgid "Docente reutilizado y asociado correctamente."
+msgstr "Instructor reused and associated successfully."
+
+msgid "Docente · %s"
+msgstr "Instructor · %s"
+
+msgid "Docente → estudiante"
+msgstr "Instructor → student"
+
+msgid "Docentes"
+msgstr "Instructors"
+
+msgid "Docentes del curso"
+msgstr "Course instructors"
+
+msgid "Docentes del programa"
+msgstr "Program instructors"
+
+msgid "Documento OpenAPI no disponible."
+msgstr "OpenAPI document not available."
+
+msgid "Documento OpenAPI público no disponible."
+msgstr "Public OpenAPI document not available."
+
+msgid "Driver: %s"
+msgstr "Driver: %s"
+
+msgid "Drop-in detectado en: %s"
+msgstr "Drop-in detected in: %s"
+
+msgid "Duración"
+msgstr "Duration"
+
+msgid "Duración estimada: %s"
+msgstr "Estimated duration: %s"
+
+msgid "Editar curso"
+msgstr "Edit course"
+
+msgid "Editar docente"
+msgstr "Edit instructor"
+
+msgid "Editar lección"
+msgstr "Edit lesson"
+
+msgid "Editar nivel"
+msgstr "Edit level"
+
+msgid "Editar presentación"
+msgstr "Edit presentation"
+
+msgid "Editar programa"
+msgstr "Edit program"
+
+msgid "Editar y revisar tu presencia pública."
+msgstr "Edit and review your public presence."
+
+msgid "Ej. 12 semanas / 6 meses"
+msgstr "E.g. 12 weeks / 6 months"
+
+msgid "Ej. 8 semanas"
+msgstr "E.g. 8 weeks"
+
+msgid "Ej. Agregar más ejemplos prácticos"
+msgstr "E.g. Add more practical examples"
+
+msgid "Ej. Aprendizaje basado en proyectos"
+msgstr "E.g. Project-based learning"
+
+msgid "Ej. El estudiante diseña una interfaz accesible..."
+msgstr "E.g. The student designs an accessible interface..."
+
+msgid "Ej. Fundamentos de diseño UX"
+msgstr "E.g. UX design fundamentals"
+
+msgid "Ej. Marketing Digital para emprendedores"
+msgstr "E.g. Digital Marketing for entrepreneurs"
+
+msgid "Ej. Módulo 1 · Fundamentos"
+msgstr "E.g. Module 1 · Fundamentals"
+
+msgid "Ej. Producto, Ingeniería, Educación"
+msgstr "E.g. Product, Engineering, Education"
+
+msgid "Ej. Recordatorio de entrega final"
+msgstr "E.g. Final submission reminder"
+
+msgid "Ej. Terminar este programa en 8 semanas"
+msgstr "E.g. Complete this program in 8 weeks"
+
+msgid "Ej. UX, marketing, IA aplicada"
+msgstr "E.g. UX, marketing, applied AI"
+
+msgid "El JSON de YouTube está incompleto o es demasiado largo."
+msgstr "The YouTube JSON is incomplete or too long."
+
+msgid "El archivo descargado está vacío."
+msgstr "The downloaded file is empty."
+
+msgid "El enlace no es válido o ha sido desactivado."
+msgstr "The link is not valid or has been deactivated."
+
+msgid "El enlace no existe o ha sido desactivado."
+msgstr "The link does not exist or has been deactivated."
+
+msgid "El helper del LMS no está disponible."
+msgstr "The LMS helper is not available."
+
+msgid "El mensaje está vacío."
+msgstr "The message is empty."
+
+msgid "El módulo IA no está disponible para esta actividad."
+msgstr "The AI module is not available for this activity."
+
+msgid "El módulo IA no está disponible."
+msgstr "The AI module is not available."
+
+msgid "El módulo de SpeedGrade no está disponible."
+msgstr "The SpeedGrade module is not available."
+
+msgid "El módulo de docentes no está disponible."
+msgstr "The instructors module is not available."
+
+msgid "El módulo de entregas no está disponible."
+msgstr "The submissions module is not available."
+
+msgid "El módulo de quiz no está disponible para REST."
+msgstr "The quiz module is not available for REST."
+
+msgid "El módulo de rúbricas no está disponible."
+msgstr "The rubrics module is not available."
+
+msgid "El nombre del docente es obligatorio."
+msgstr "Instructor name is required."
+
+msgid "El post no es una lección."
+msgstr "The post is not a lesson."
+
+msgid "El provider IA devolvió una respuesta inválida."
+msgstr "The AI provider returned an invalid response."
+
+msgid "El tiempo para responder esta evaluación ha terminado."
+msgstr "The time to answer this assessment has ended."
+
+msgid "El track de captions no tiene URL."
+msgstr "The captions track has no URL."
+
+msgid "El título de la lección es obligatorio."
+msgstr "Lesson title is required."
+
+msgid "El título de la rúbrica es obligatorio."
+msgstr "Rubric title is required."
+
+msgid "El título del curso es obligatorio."
+msgstr "Course title is required."
+
+msgid "El título del programa es obligatorio."
+msgstr "Program title is required."
+
+msgid "Eliminar recurso"
+msgstr "Delete resource"
+
+msgid "Email"
+msgstr "Email"
+
+msgid "Email y curso son requeridos."
+msgstr "Email and course are required."
+
+msgid "Empezar ahora"
+msgstr "Start now"
+
+msgid "En cola"
+msgstr "In queue"
+
+msgid "En cola…"
+msgstr "In queue…"
+
+msgid "En curso"
+msgstr "In progress"
+
+msgid "En progreso"
+msgstr "In progress"
+
+msgid "En revisión"
+msgstr "Under review"
+
+msgid "En riesgo"
+msgstr "At risk"
+
+msgid "Engagement"
+msgstr "Engagement"
+
+msgid "Enlace"
+msgstr "Link"
+
+msgid "Enlace activo:"
+msgstr "Active link:"
+
+msgid "Enlace no válido."
+msgstr "Invalid link."
+
+msgid "Enlace regenerado."
+msgstr "Link regenerated."
+
+msgid "Entidad"
+msgstr "Entity"
+
+msgid "Entrega creada"
+msgstr "Submission created"
+
+msgid "Entrega evaluada"
+msgstr "Submission graded"
+
+msgid "Entrega inválida para análisis IA."
+msgstr "Invalid submission for AI analysis."
+
+msgid "Entrega inválida."
+msgstr "Invalid submission."
+
+msgid "Entrega no disponible"
+msgstr "Submission not available"
+
+msgid "Entrega no válida"
+msgstr "Invalid submission"
+
+msgid "Entrega no válida."
+msgstr "Invalid submission."
+
+msgid "Entrega reciente"
+msgstr "Recent submission"
+
+msgid "Entregado"
+msgstr "Submitted"
+
+msgid "Entregas"
+msgstr "Submissions"
+
+msgid "Entregas huérfanas"
+msgstr "Orphan submissions"
+
+msgid "Entregas pendientes"
+msgstr "Pending submissions"
+
+msgid "Entregas pendientes por curso"
+msgstr "Pending submissions by course"
+
+msgid "Entregas registradas"
+msgstr "Registered submissions"
+
+msgid "Entregas sin revisar"
+msgstr "Unreviewed submissions"
+
+msgid "Enviada"
+msgstr "Sent"
+
+msgid "Enviadas"
+msgstr "Sent"
+
+msgid "Enviar mensaje"
+msgstr "Send message"
+
+msgid "Enviar mensaje directo"
+msgstr "Send direct message"
+
+msgid "Equipo docente"
+msgstr "Teaching team"
+
+msgid "Error HTTP en solicitud IA."
+msgstr "HTTP error in AI request."
+
+msgid "Error IA"
+msgstr "AI Error"
+
+msgid "Error al cargar estadísticas."
+msgstr "Error loading statistics."
+
+msgid "Error al descargar el archivo (HTTP %d)."
+msgstr "Error downloading file (HTTP %d)."
+
+msgid "Error al eliminar el usuario."
+msgstr "Error deleting user."
+
+msgid "Error al generar la respuesta."
+msgstr "Error generating response."
+
+msgid "Error al generar."
+msgstr "Error generating."
+
+msgid "Error al guardar."
+msgstr "Error saving."
+
+msgid "Error al iniciar."
+msgstr "Error starting."
+
+msgid "Error al procesar el CSV."
+msgstr "Error processing CSV."
+
+msgid "Error al procesar el archivo de audio."
+msgstr "Error processing audio file."
+
+msgid "Error de cURL: %s"
+msgstr "cURL error: %s"
+
+msgid "Error de conexión al guardar."
+msgstr "Connection error while saving."
+
+msgid "Error de conexión."
+msgstr "Connection error."
+
+msgid "Error de conexión. Inténtalo de nuevo."
+msgstr "Connection error. Please try again."
+
+msgid "Error de red."
+msgstr "Network error."
+
+msgid "Error de red. Intenta de nuevo."
+msgstr "Network error. Please try again."
+
+msgid "Error desconocido de la API."
+msgstr "Unknown API error."
+
+msgid "Error interno al matricular."
+msgstr "Internal error during enrollment."
+
+msgid "Error."
+msgstr "Error."
+
+msgid "Error: %s"
+msgstr "Error: %s"
+
+msgid "Escribe tu pregunta o instrucción…"
+msgstr "Write your question or instruction…"
+
+msgid "Escribe un email o usuario."
+msgstr "Enter an email or username."
+
+msgid "Escribe un email."
+msgstr "Enter an email."
+
+msgid "Escribe una contraseña de acceso."
+msgstr "Enter an access password."
+
+msgid ""
+"Espacio operativo para monetización, bundles, membresías y configuración "
+"comercial."
+msgstr ""
+"Operational space for monetization, bundles, memberships, and commercial "
+"configuration."
+
+msgid "Esperada: %1$s | Activa: %2$s"
+msgstr "Expected: %1$s | Active: %2$s"
+
+msgid "Esta invitación no corresponde a tu cuenta."
+msgstr "This invitation does not correspond to your account."
+
+msgid "Esta invitación ya alcanzó el límite de usos."
+msgstr "This invitation has already reached its usage limit."
+
+msgid "Esta lección aún no está disponible."
+msgstr "This lesson is not yet available."
+
+msgid "Esta lección estará disponible el %s."
+msgstr "This lesson will be available on %s."
+
+msgid ""
+"Esta lección no tiene criterios de evaluación IA definidos. Agrégalos en el "
+"metabox de la lección."
+msgstr ""
+"This lesson has no AI assessment criteria defined. Add them in the lesson "
+"metabox."
+
+msgid "Estado"
+msgstr "Status"
+
+msgid "Estado de caché y PHP"
+msgstr "Cache and PHP status"
+
+msgid "Estado: %s"
+msgstr "Status: %s"
+
+msgid "Este curso requiere completar la compra antes de inscribirte."
+msgstr "This course requires completing the purchase before enrolling."
+
+msgid ""
+"Este perfil se muestra automáticamente en cursos y programas cuando el "
+"docente está asociado."
+msgstr ""
+"This profile is automatically displayed in courses and programs when the "
+"instructor is associated."
+
+msgid "Este video de YouTube no tiene captions disponibles."
+msgstr "This YouTube video has no available captions."
+
+msgid ""
+"Este video no tiene captions activados. Para habilitar captions ve a YouTube"
+" Studio > Subtítulos."
+msgstr ""
+"This video has no captions enabled. To enable captions, go to YouTube Studio"
+" > Subtitles."
+
+msgid "Estructura principal de la oferta formativa."
+msgstr "Main structure of the educational offering."
+
+msgid "Estudiante"
+msgstr "Student"
+
+msgid "Estudiantes"
+msgstr "Students"
+
+msgid "Etiqueta de precio"
+msgstr "Price label"
+
+msgid "Evaluaciones"
+msgstr "Assessments"
+
+msgid "Evaluaciones entregadas"
+msgstr "Submitted assessments"
+
+msgid "Evaluación"
+msgstr "Assessment"
+
+msgid "Evaluación enviada correctamente."
+msgstr "Assessment submitted successfully."
+
+msgid "Evaluación y banco AI"
+msgstr "Assessment and AI bank"
+
+msgid "Evaluado por IA"
+msgstr "AI graded"
+
+msgid "Evento no válido. Eventos permitidos: "
+msgstr "Invalid event. Allowed events: "
+
+msgid "Evento registrado."
+msgstr "Event registered."
+
+msgid "Eventos"
+msgstr "Events"
+
+msgid "Eventos recientes"
+msgstr "Recent events"
+
+msgid "Eventos y salud del sistema"
+msgstr "Events and system health"
+
+msgid "Explora el resto del contenido disponible."
+msgstr "Explore the rest of the available content."
+
+msgid "Explora esta lección para seguir avanzando."
+msgstr "Explore this lesson to keep progressing."
+
+msgid "Externo"
+msgstr "External"
+
+msgid "Exámenes IA"
+msgstr "AI Exams"
+
+msgid "Failed to parse AI response"
+msgstr "Failed to parse AI response"
+
+msgid "Fallida"
+msgstr "Failed"
+
+msgid "Falló"
+msgstr "Failed"
+
+msgid "Falta la API key de Anthropic."
+msgstr "Anthropic API key is missing."
+
+msgid "Falta la API key de Gemini."
+msgstr "Gemini API key is missing."
+
+msgid "Falta la API key de OpenAI."
+msgstr "OpenAI API key is missing."
+
+msgid "Faltan datos para guardar la entrega."
+msgstr "Missing data to save the submission."
+
+msgid "Faltan datos."
+msgstr "Missing data."
+
+msgid "Fecha"
+msgstr "Date"
+
+msgid "Feedback"
+msgstr "Feedback"
+
+msgid "Feedback, avisos y comunicación operativa."
+msgstr "Feedback, notices, and operational communication."
+
+msgid "Filas de caché"
+msgstr "Cache rows"
+
+msgid "Filtrar"
+msgstr "Filter"
+
+msgid "Forma parte de un programa académico"
+msgstr "Part of an academic program"
+
+msgid "Foto del docente"
+msgstr "Instructor photo"
+
+msgid "Fuente"
+msgstr "Source"
+
+msgid "Fuentes"
+msgstr "Sources"
+
+msgid "Funnel"
+msgstr "Funnel"
+
+msgid "Funnel comercial, ingresos y productos clave."
+msgstr "Commercial funnel, revenue, and key products."
+
+msgid "Gemini devolvió respuesta vacía."
+msgstr "Gemini returned an empty response."
+
+msgid "Gemini devolvió una respuesta vacía."
+msgstr "Gemini returned an empty response."
+
+msgid "Generación asistida de cuestionarios y evaluaciones automáticas."
+msgstr "Assisted generation of quizzes and automatic assessments."
+
+msgid "General"
+msgstr "General"
+
+msgid "Generando revisión IA..."
+msgstr "Generating AI review..."
+
+msgid "Generando..."
+msgstr "Generating..."
+
+msgid "Generando…"
+msgstr "Generating…"
+
+msgid "Generando… puede tardar unos segundos."
+msgstr "Generating… this may take a few seconds."
+
+msgid "Generar análisis IA"
+msgstr "Generate AI analysis"
+
+msgid "Generar enlace"
+msgstr "Generate link"
+
+msgid "Generar plan de curso"
+msgstr "Generate course plan"
+
+msgid "Generar preguntas"
+msgstr "Generate questions"
+
+msgid "Generar →"
+msgstr "Generate →"
+
+msgid ""
+"Gestiona productos vinculados a cursos, programas, bundles y membresías."
+msgstr ""
+"Manage products linked to courses, programs, bundles, and memberships."
+
+msgid "Gestiona tu identidad y tus accesos principales."
+msgstr "Manage your identity and main access points."
+
+msgid "Google Drive"
+msgstr "Google Drive"
+
+msgid "Grupo"
+msgstr "Group"
+
+msgid "Guardado correctamente."
+msgstr "Saved successfully."
+
+msgid "Guardando…"
+msgstr "Saving…"
+
+msgid "Guardar ajustes"
+msgstr "Save settings"
+
+msgid "Guardar como notas"
+msgstr "Save as notes"
+
+msgid "Guardar como notas de la lección"
+msgstr "Save as lesson notes"
+
+msgid "Guardar como rúbrica oficial"
+msgstr "Save as official rubric"
+
+msgid "Guardar en banco de preguntas"
+msgstr "Save to question bank"
+
+msgid "Guardar en lección"
+msgstr "Save to lesson"
+
+msgid "Guía"
+msgstr "Guide"
+
+msgid "Guía de estudio guardada en la lección."
+msgstr "Study guide saved to the lesson."
+
+msgid "Hasta"
+msgstr "Until"
+
+msgid "Hilos por contexto"
+msgstr "Threads per context"
+
+msgid "Historial borrado."
+msgstr "History cleared."
+
+msgid "Historial borrado. ¿En qué te puedo ayudar?"
+msgstr "History cleared. How can I help you?"
+
+msgid "Hola, %s"
+msgstr "Hello, %s"
+
+msgid "Hola, {name}. Ya tienes sesión iniciada."
+msgstr "Hello, {name}. You are already logged in."
+
+msgid "Hybrid"
+msgstr "Hybrid"
+
+msgid "IA"
+msgstr "AI"
+
+msgid "IA / Docente"
+msgstr "AI / Instructor"
+
+msgid "IA académica"
+msgstr "Academic AI"
+
+msgid "IA asistida"
+msgstr "AI assisted"
+
+msgid "IA auto grade"
+msgstr "AI auto grade"
+
+msgid "IA en ATORA"
+msgstr "AI in ATORA"
+
+msgid "IA y perfil"
+msgstr "AI and profile"
+
+msgid "IA · %s"
+msgstr "AI · %s"
+
+msgid "ID de usuario inválido."
+msgstr "Invalid user ID."
+
+msgid "Identidad operativa dentro de ATORA."
+msgstr "Operational identity within ATORA."
+
+msgid "Identificador o curso inválido."
+msgstr "Invalid identifier or course."
+
+msgid "Imagen destacada"
+msgstr "Featured image"
+
+msgid "Imprimir / PDF"
+msgstr "Print / PDF"
+
+msgid "Ingresar"
+msgstr "Sign in"
+
+msgid "Ingresos"
+msgstr "Revenue"
+
+msgid "Ingresos estimados"
+msgstr "Estimated revenue"
+
+msgid "Ingresos estimados por producto"
+msgstr "Estimated revenue per product"
+
+msgid "Inicia sesión para ver tu perfil."
+msgstr "Log in to view your profile."
+
+msgid "Iniciando…"
+msgstr "Starting…"
+
+msgid "Iniciar sesión"
+msgstr "Log in"
+
+msgid "Inscribirme"
+msgstr "Enroll"
+
+msgid "Inscribirme ahora"
+msgstr "Enroll now"
+
+msgid "Inscripciones en cursos"
+msgstr "Course enrollments"
+
+msgid "Inscripción"
+msgstr "Enrollment"
+
+msgid "Inscripción confirmada"
+msgstr "Enrollment confirmed"
+
+msgid "Inscritos"
+msgstr "Enrolled"
+
+msgid "Instructores"
+msgstr "Instructors"
+
+msgid "Investigación pedagógica"
+msgstr "Pedagogical research"
+
+msgid "Investigar"
+msgstr "Research"
+
+msgid "Investigar tema"
+msgstr "Research topic"
+
+msgid "Invitación enviada."
+msgstr "Invitation sent."
+
+msgid "Invitación revocada."
+msgstr "Invitation revoked."
+
+msgid "Ir a mi panel"
+msgstr "Go to my dashboard"
+
+msgid "Ir al siguiente paso"
+msgstr "Go to next step"
+
+msgid "Jerarquía académica"
+msgstr "Academic hierarchy"
+
+msgid "La API key de OpenAI no está configurada."
+msgstr "The OpenAI API key is not configured."
+
+msgid "La IA devolvió un formato inesperado."
+msgstr "The AI returned an unexpected format."
+
+msgid "La actividad no tiene rúbrica ni criterios para evaluación IA segura."
+msgstr "The activity has no rubric or criteria for safe AI assessment."
+
+msgid "La contraseña debe tener al menos 8 caracteres."
+msgstr "Password must be at least 8 characters."
+
+msgid "La entrega no es válida para evaluación."
+msgstr "The submission is not valid for assessment."
+
+msgid "La entrega no tiene contenido de texto evaluable."
+msgstr "The submission has no evaluable text content."
+
+msgid "La entrega no tiene lección asociada."
+msgstr "The submission has no associated lesson."
+
+msgid "La entrega no tiene suficiente texto para evaluación IA automática."
+msgstr "The submission does not have enough text for automatic AI assessment."
+
+msgid "La entrega no tiene una lección asociada."
+msgstr "The submission has no associated lesson."
+
+msgid ""
+"La fuente del video no es YouTube y Whisper no está configurado. Añade una "
+"API key de OpenAI en Ajustes > IA."
+msgstr ""
+"The video source is not YouTube and Whisper is not configured. Add an OpenAI"
+" API key in Settings > AI."
+
+msgid "La invitación ha caducado."
+msgstr "The invitation has expired."
+
+msgid "La invitación no existe o no es válida."
+msgstr "The invitation does not exist or is not valid."
+
+msgid "La invitación no existe o ya no es válida."
+msgstr "The invitation does not exist or is no longer valid."
+
+msgid "La lección aún no está disponible."
+msgstr "The lesson is not yet available."
+
+msgid "La lección no es válida."
+msgstr "The lesson is not valid."
+
+msgid "La lección no tiene URL de video."
+msgstr "The lesson has no video URL."
+
+msgid "La nota debe ser numérica."
+msgstr "The grade must be numeric."
+
+msgid ""
+"La plantilla activa de lecciones no coincide con la de ATORA. Esto puede "
+"ocultar mejoras de UI en nuevos sitios."
+msgstr ""
+"The active lesson template does not match ATORA's. This may hide UI "
+"improvements on new sites."
+
+msgid "La revisión entre pares no está habilitada para esta lección."
+msgstr "Peer review is not enabled for this lesson."
+
+msgid "Las contraseñas no coinciden."
+msgstr "Passwords do not match."
+
+msgid "Las operaciones realizadas en esta sesión aparecerán aquí."
+msgstr "Operations performed in this session will appear here."
+
+msgid "Lecciones"
+msgstr "Lessons"
+
+msgid "Lecciones calificadas"
+msgstr "Graded lessons"
+
+msgid "Lecciones completadas"
+msgstr "Completed lessons"
+
+msgid "Lección"
+msgstr "Lesson"
+
+msgid "Lección completada"
+msgstr "Lesson completed"
+
+msgid "Lección en curso"
+msgstr "Lesson in progress"
+
+msgid "Lección inválida."
+msgstr "Invalid lesson."
+
+msgid "Lección no encontrada."
+msgstr "Lesson not found."
+
+msgid "Lección no válida."
+msgstr "Invalid lesson."
+
+msgid "Lección pendiente"
+msgstr "Pending lesson"
+
+msgid "Lección:"
+msgstr "Lesson:"
+
+msgid "Lectura"
+msgstr "Reading"
+
+msgid "Lectura operativa por rol del estado de la plataforma."
+msgstr "Role-based operational reading of the platform status."
+
+msgid "Libre"
+msgstr "Free"
+
+msgid "Libro"
+msgstr "Book"
+
+msgid "Libro de calificaciones"
+msgstr "Gradebook"
+
+msgid "Libro de calificaciones recalculado correctamente."
+msgstr "Gradebook recalculated successfully."
+
+msgid "Llevas un progreso global de %1$d%% y un promedio actual de %2$d%%."
+msgstr ""
+"You have an overall progress of %1$d%% and a current average of %2$d%%."
+
+msgid "Logs, salud y auditoría"
+msgstr "Logs, health, and audit"
+
+msgid "Los captions de YouTube están vacíos."
+msgstr "The YouTube captions are empty."
+
+msgid "Los puntajes deben estar entre 0 y 100."
+msgstr "Scores must be between 0 and 100."
+
+msgid ""
+"Límite de revisiones IA alcanzado. Espera unos minutos antes de continuar."
+msgstr "AI review limit reached. Please wait a few minutes before continuing."
+
+msgid "Malla del curso"
+msgstr "Course grid"
+
+msgid "Malla del programa"
+msgstr "Program grid"
+
+msgid "Mantenimiento"
+msgstr "Maintenance"
+
+msgid "Manual"
+msgstr "Manual"
+
+msgid "Marcar como leído"
+msgstr "Mark as read"
+
+msgid "María López | Estudiante | Excelente curso, muy práctico."
+msgstr "María López | Student | Excellent course, very practical."
+
+msgid "Material de apoyo"
+msgstr "Support material"
+
+msgid "Matriculado correctamente."
+msgstr "Enrolled successfully."
+
+msgid "Matrícula de %s eliminada."
+msgstr "Enrollment for %s removed."
+
+msgid "Mejorar"
+msgstr "Improve"
+
+msgid "Mejorar lección"
+msgstr "Improve lesson"
+
+msgid "Membresía"
+msgstr "Membership"
+
+msgid "Memcached"
+msgstr "Memcached"
+
+msgid "Mensaje"
+msgstr "Message"
+
+msgid "Mensaje enviado correctamente."
+msgstr "Message sent successfully."
+
+msgid "Mensaje vacío."
+msgstr "Empty message."
+
+msgid "Mensajes"
+msgstr "Messages"
+
+msgid "Mensajes recientes"
+msgstr "Recent messages"
+
+msgid "Mensajes y seguimiento"
+msgstr "Messages and tracking"
+
+msgid "Mentoría"
+msgstr "Mentoring"
+
+msgid "Metadatos LMS"
+msgstr "LMS metadata"
+
+msgid "Mi panel"
+msgstr "My dashboard"
+
+msgid "Mi perfil"
+msgstr "My profile"
+
+msgid "Mi perfil ATORA"
+msgstr "My ATORA profile"
+
+msgid "Mide tu progreso y actividad académica."
+msgstr "Track your progress and academic activity."
+
+msgid "Miembro desde"
+msgstr "Member since"
+
+msgid "Miniatura"
+msgstr "Thumbnail"
+
+msgid "Miniatura del video"
+msgstr "Video thumbnail"
+
+msgid "Minimizar"
+msgstr "Minimize"
+
+msgid "Mis cursos"
+msgstr "My courses"
+
+msgid "Missing content or course_id"
+msgstr "Missing content or course_id"
+
+msgid "Missing content_type or content"
+msgstr "Missing content_type or content"
+
+msgid "Modelo académico"
+msgstr "Academic model"
+
+msgid "Modelo académico del programa"
+msgstr "Program academic model"
+
+msgid "Modelo: %s"
+msgstr "Model: %s"
+
+msgid "Modo"
+msgstr "Mode"
+
+msgid "Motor"
+msgstr "Engine"
+
+msgid "Máximo %d archivos por entrega."
+msgstr "Maximum %d files per submission."
+
+msgid "Módulo de mantenimiento no disponible."
+msgstr "Maintenance module not available."
+
+msgid "Módulo de revisión entre pares no disponible."
+msgstr "Peer review module not available."
+
+msgid "N.° de lecciones"
+msgstr "No. of lessons"
+
+msgid "N.° de slides"
+msgstr "No. of slides"
+
+msgid "N/D"
+msgstr "N/A"
+
+msgid "Navegación de usuario"
+msgstr "User navigation"
+
+msgid "Nivel"
+msgstr "Level"
+
+msgid "Niveles"
+msgstr "Levels"
+
+msgid "No"
+msgstr "No"
+
+msgid "No autorizado."
+msgstr "Unauthorized."
+
+msgid "No configurado"
+msgstr "Not configured"
+
+msgid "No detectado"
+msgstr "Not detected"
+
+msgid "No disponible"
+msgstr "Not available"
+
+msgid "No encontramos una entrega para revisar."
+msgstr "We couldn't find a submission to review."
+
+msgid "No estás asignado a esta revisión."
+msgstr "You are not assigned to this review."
+
+msgid "No hay API key configurada para embeddings."
+msgstr "No API key configured for embeddings."
+
+msgid "No hay actividades registradas para este estudiante en el curso."
+msgstr "No activities registered for this student in the course."
+
+msgid "No hay alumnos inscritos en este curso."
+msgstr "No students enrolled in this course."
+
+msgid ""
+"No hay contenido de lección disponible. Abre una lección antes de usar esta "
+"herramienta."
+msgstr "No lesson content available. Open a lesson before using this tool."
+
+msgid "No hay contenido suficiente para analizar en la entrega."
+msgstr "Not enough content to analyze in the submission."
+
+msgid "No hay datos académicos suficientes todavía."
+msgstr "Not enough academic data yet."
+
+msgid "No hay entregas con los filtros seleccionados."
+msgstr "No submissions with the selected filters."
+
+msgid "No hay eventos comerciales recientes."
+msgstr "No recent commercial events."
+
+msgid "No hay invitaciones que limpiar."
+msgstr "No invitations to clean up."
+
+msgid ""
+"No hay mensajes todavía. Aquí aparecerán avisos del sistema, seguimiento "
+"docente, IA y recomendaciones."
+msgstr ""
+"No messages yet. System notices, instructor tracking, AI, and "
+"recommendations will appear here."
+
+msgid "No hay preguntas válidas."
+msgstr "No valid questions."
+
+msgid "No hay quiz en esta lección."
+msgstr "No quiz in this lesson."
+
+msgid ""
+"No hay un curso activo para analizar. Abre un curso antes de usar esta "
+"herramienta."
+msgstr "No active course to analyze. Open a course before using this tool."
+
+msgid "No leídos"
+msgstr "Unread"
+
+msgid "No pudimos validar la solicitud."
+msgstr "We could not validate the request."
+
+msgid "No puedes asignar esta lección a otro instructor."
+msgstr "You cannot assign this lesson to another instructor."
+
+msgid "No puedes asignar este curso a otro instructor."
+msgstr "You cannot assign this course to another instructor."
+
+msgid "No puedes asignar este programa a otro instructor."
+msgstr "You cannot assign this program to another instructor."
+
+msgid "No puedes eliminarte a ti mismo."
+msgstr "You cannot delete yourself."
+
+msgid "No puedes escribirle a ese estudiante desde este contexto."
+msgstr "You cannot write to that student from this context."
+
+msgid "No puedes mover esta lección a un curso ajeno."
+msgstr "You cannot move this lesson to another instructor's course."
+
+msgid "No puedes reasignar esta lección a otro instructor."
+msgstr "You cannot reassign this lesson to another instructor."
+
+msgid "No puedes reasignar este curso a otro instructor."
+msgstr "You cannot reassign this course to another instructor."
+
+msgid "No puedes reasignar este programa a otro instructor."
+msgstr "You cannot reassign this program to another instructor."
+
+msgid "No se definió un modelo de Anthropic."
+msgstr "No Anthropic model was defined."
+
+msgid "No se definió un modelo de Gemini."
+msgstr "No Gemini model was defined."
+
+msgid "No se definió un modelo de OpenAI."
+msgstr "No OpenAI model was defined."
+
+msgid "No se encontraron cursos"
+msgstr "No courses found"
+
+msgid "No se encontraron cursos en la papelera"
+msgstr "No courses found in trash"
+
+msgid "No se encontraron cursos vinculados en los productos de la orden."
+msgstr "No linked courses found in order products."
+
+msgid "No se encontraron docentes"
+msgstr "No instructors found"
+
+msgid "No se encontraron docentes en la papelera"
+msgstr "No instructors found in trash"
+
+msgid "No se encontraron entregas huérfanas."
+msgstr "No orphan submissions found."
+
+msgid "No se encontraron lecciones"
+msgstr "No lessons found"
+
+msgid "No se encontraron lecciones en la papelera"
+msgstr "No lessons found in trash"
+
+msgid "No se encontraron programas"
+msgstr "No programs found"
+
+msgid "No se encontraron programas en la papelera"
+msgstr "No programs found in trash"
+
+msgid "No se encontró CLMS_Grading."
+msgstr "CLMS_Grading not found."
+
+msgid ""
+"No se encontró contenido para generar preguntas. Agrega texto a la lección o"
+" selecciona un archivo."
+msgstr ""
+"No content found to generate questions. Add text to the lesson or select a "
+"file."
+
+msgid "No se encontró el evaluador IA de criterios naturales."
+msgstr "Natural criteria AI evaluator not found."
+
+msgid "No se encontró el inicio del JSON en la respuesta de YouTube."
+msgstr "JSON start not found in YouTube response."
+
+msgid "No se encontró el módulo de entregas para IA."
+msgstr "Submissions module for AI not found."
+
+msgid "No se encontró ningún usuario con ese email."
+msgstr "No user found with that email."
+
+msgid "No se encontró ytInitialPlayerResponse en la página de YouTube."
+msgstr "ytInitialPlayerResponse not found on the YouTube page."
+
+msgid "No se proporcionaron mensajes."
+msgstr "No messages were provided."
+
+msgid "No se pudieron extraer criterios de la rúbrica generada."
+msgstr "Could not extract criteria from the generated rubric."
+
+msgid "No se pudieron extraer preguntas del quiz generado."
+msgstr "Could not extract questions from the generated quiz."
+
+msgid "No se pudieron guardar los docentes. Intenta nuevamente."
+msgstr "Could not save instructors. Please try again."
+
+msgid "No se pudo cargar el contexto de la entrega."
+msgstr "Could not load submission context."
+
+msgid "No se pudo cargar el detalle del estudiante."
+msgstr "Could not load student detail."
+
+msgid "No se pudo completar la inscripción."
+msgstr "Could not complete enrollment."
+
+msgid "No se pudo completar la matrícula."
+msgstr "Could not complete enrollment."
+
+msgid "No se pudo construir el contexto de evaluación IA."
+msgstr "Could not build AI assessment context."
+
+msgid "No se pudo crear el docente."
+msgstr "Could not create instructor."
+
+msgid "No se pudo crear el docente. Intenta nuevamente."
+msgstr "Could not create instructor. Please try again."
+
+msgid "No se pudo crear la entrega."
+msgstr "Could not create submission."
+
+msgid "No se pudo crear la invitación."
+msgstr "Could not create invitation."
+
+msgid "No se pudo eliminar el curso."
+msgstr "Could not delete course."
+
+msgid "No se pudo eliminar el programa."
+msgstr "Could not delete program."
+
+msgid "No se pudo eliminar la lección."
+msgstr "Could not delete lesson."
+
+msgid "No se pudo enviar el mensaje."
+msgstr "Could not send message."
+
+msgid "No se pudo extraer el ID del video de YouTube."
+msgstr "Could not extract YouTube video ID."
+
+msgid "No se pudo extraer texto de los captions."
+msgstr "Could not extract text from captions."
+
+msgid "No se pudo generar el embedding."
+msgstr "Could not generate embedding."
+
+msgid "No se pudo generar la revisión IA."
+msgstr "Could not generate AI review."
+
+msgid "No se pudo guardar uno de los archivos adjuntos."
+msgstr "Could not save one of the attachments."
+
+msgid "No se pudo guardar."
+msgstr "Could not save."
+
+msgid "No se pudo inicializar el perfil. Recarga la página."
+msgstr "Could not initialize profile. Reload the page."
+
+msgid "No se pudo leer el archivo de audio."
+msgstr "Could not read audio file."
+
+msgid "No se pudo parsear la respuesta de Anthropic."
+msgstr "Could not parse Anthropic response."
+
+msgid "No se pudo parsear la respuesta de Gemini."
+msgstr "Could not parse Gemini response."
+
+msgid "No se pudo parsear la respuesta de OpenAI."
+msgstr "Could not parse OpenAI response."
+
+msgid "No se pudo parsear ytInitialPlayerResponse (JSON inválido)."
+msgstr "Could not parse ytInitialPlayerResponse (invalid JSON)."
+
+msgid "No se pudo resolver usuario desde la orden."
+msgstr "Could not resolve user from order."
+
+msgid "No se pudo serializar el body para la solicitud IA."
+msgstr "Could not serialize body for AI request."
+
+msgid "No se pudo validar la generación IA."
+msgstr "Could not validate AI generation."
+
+msgid "No se pudo validar la solicitud."
+msgstr "Could not validate request."
+
+msgid "No se puede eliminar a un administrador desde aquí."
+msgstr "An administrator cannot be deleted from here."
+
+msgid "No se recibió audio."
+msgstr "No audio received."
+
+msgid "No se seleccionaron archivos."
+msgstr "No files selected."
+
+msgid "No se seleccionó ningún archivo."
+msgstr "No file selected."
+
+msgid "No solicitado"
+msgstr "Not requested"
+
+msgid "No tienes acceso a esta lección."
+msgstr "You don't have access to this lesson."
+
+msgid "No tienes acceso a este curso."
+msgstr "You don't have access to this course."
+
+msgid "No tienes acceso a este recurso de la lección."
+msgstr "You don't have access to this lesson resource."
+
+msgid "No tienes acceso."
+msgstr "You don't have access."
+
+msgid "No tienes permiso para esta revisión."
+msgstr "You don't have permission for this review."
+
+msgid "No tienes permiso para ver este certificado."
+msgstr "You don't have permission to view this certificate."
+
+msgid "No tienes permisos para acceder a esta página."
+msgstr "You don't have permission to access this page."
+
+msgid "No tienes permisos para asignar esta rúbrica."
+msgstr "You don't have permission to assign this rubric."
+
+msgid "No tienes permisos para asignar revisiones en esta lección."
+msgstr "You don't have permission to assign reviews in this lesson."
+
+msgid "No tienes permisos para crear docentes."
+msgstr "You don't have permission to create instructors."
+
+msgid "No tienes permisos para crear lecciones en este curso."
+msgstr "You don't have permission to create lessons in this course."
+
+msgid "No tienes permisos para editar el quiz de esta lección."
+msgstr "You don't have permission to edit the quiz for this lesson."
+
+msgid "No tienes permisos para editar esta lección."
+msgstr "You don't have permission to edit this lesson."
+
+msgid "No tienes permisos para editar esta rúbrica."
+msgstr "You don't have permission to edit this rubric."
+
+msgid "No tienes permisos para editar este curso."
+msgstr "You don't have permission to edit this course."
+
+msgid "No tienes permisos para editar este programa."
+msgstr "You don't have permission to edit this program."
+
+msgid "No tienes permisos para editar la rúbrica de esta lección."
+msgstr "You don't have permission to edit the rubric for this lesson."
+
+msgid "No tienes permisos para eliminar esta lección."
+msgstr "You don't have permission to delete this lesson."
+
+msgid "No tienes permisos para eliminar esta rúbrica."
+msgstr "You don't have permission to delete this rubric."
+
+msgid "No tienes permisos para eliminar este curso."
+msgstr "You don't have permission to delete this course."
+
+msgid "No tienes permisos para eliminar este programa."
+msgstr "You don't have permission to delete this program."
+
+msgid "No tienes permisos para enviar esta tarea."
+msgstr "You don't have permission to submit this assignment."
+
+msgid "No tienes permisos para generar análisis IA para esta entrega."
+msgstr ""
+"You don't have permission to generate AI analysis for this submission."
+
+msgid "No tienes permisos para revisar esta entrega."
+msgstr "You don't have permission to review this submission."
+
+msgid "No tienes permisos para transcribir esta lección."
+msgstr "You don't have permission to transcribe this lesson."
+
+msgid "No tienes permisos para ver asignaciones de esta lección."
+msgstr "You don't have permission to view assignments for this lesson."
+
+msgid "No tienes permisos para ver entregas de esta lección."
+msgstr "You don't have permission to view submissions for this lesson."
+
+msgid "No tienes permisos para ver esta rúbrica."
+msgstr "You don't have permission to view this rubric."
+
+msgid "No tienes permisos para ver esta transcripción."
+msgstr "You don't have permission to view this transcription."
+
+msgid "No tienes permisos para ver este perfil."
+msgstr "You don't have permission to view this profile."
+
+msgid "No tienes permisos para ver la rúbrica de esta lección."
+msgstr "You don't have permission to view the rubric for this lesson."
+
+msgid "No tienes permisos."
+msgstr "You don't have permissions."
+
+msgid "Nombre del docente"
+msgstr "Instructor name"
+
+msgid "Nonce inválido."
+msgstr "Invalid nonce."
+
+msgid "Norm.: %s%%"
+msgstr "Norm.: %s%%"
+
+msgid "Nota"
+msgstr "Grade"
+
+msgid "Nota final"
+msgstr "Final grade"
+
+msgid "Nota final %s/100"
+msgstr "Final grade %s/100"
+
+msgid "Nota final (0–100)"
+msgstr "Final grade (0–100)"
+
+msgid "Nota promedio"
+msgstr "Average grade"
+
+msgid "Nota: %s"
+msgstr "Grade: %s"
+
+msgid "Notas bajas"
+msgstr "Low grades"
+
+msgid "Notas guardadas en la lección."
+msgstr "Notes saved to the lesson."
+
+msgid "Nueva lección"
+msgstr "New lesson"
+
+msgid "Nuevo curso"
+msgstr "New course"
+
+msgid "Nuevo docente"
+msgstr "New instructor"
+
+msgid "Nuevo nivel"
+msgstr "New level"
+
+msgid "Nuevo programa"
+msgstr "New program"
+
+msgid "Número de criterios"
+msgstr "Number of criteria"
+
+msgid "Número de preguntas"
+msgstr "Number of questions"
+
+msgid "OPcache"
+msgstr "OPcache"
+
+msgid "OPcache: %s"
+msgstr "OPcache: %s"
+
+msgid "Object cache"
+msgstr "Object cache"
+
+msgid "Objetivo de aprendizaje"
+msgstr "Learning objective"
+
+msgid "Observabilidad"
+msgstr "Observability"
+
+msgid "Observación..."
+msgstr "Observation..."
+
+msgid "Ocurrió un error al generar la revisión IA."
+msgstr "An error occurred while generating the AI review."
+
+msgid "Opcional"
+msgstr "Optional"
+
+msgid "OpenAI Whisper"
+msgstr "OpenAI Whisper"
+
+msgid "OpenAI Whisper (HTTP %1$d): %2$s"
+msgstr "OpenAI Whisper (HTTP %1$d): %2$s"
+
+msgid "OpenAI devolvió embeddings vacíos."
+msgstr "OpenAI returned empty embeddings."
+
+msgid "OpenAI devolvió respuesta vacía."
+msgstr "OpenAI returned an empty response."
+
+msgid "Operación"
+msgstr "Operation"
+
+msgid "Orden"
+msgstr "Order"
+
+msgid "Orden #%d"
+msgstr "Order #%d"
+
+msgid "Orden procesada"
+msgstr "Order processed"
+
+msgid "Otro"
+msgstr "Other"
+
+msgid "PDF"
+msgstr "PDF"
+
+msgid "Pago único / 12 cuotas / Membresía incluida"
+msgstr "Single payment / 12 installments / Membership included"
+
+msgid "Panel"
+msgstr "Dashboard"
+
+msgid "Panel ATORA"
+msgstr "ATORA Dashboard"
+
+msgid "Panel del estudiante"
+msgstr "Student dashboard"
+
+msgid "Paquete"
+msgstr "Bundle"
+
+msgid "Para crear un docente nuevo debes indicar el nombre."
+msgstr "To create a new instructor, you must provide a name."
+
+msgid "Parámetros inválidos."
+msgstr "Invalid parameters."
+
+msgid "Parámetros requeridos."
+msgstr "Required parameters."
+
+msgid "Peer review"
+msgstr "Peer review"
+
+msgid "Pendiente"
+msgstr "Pending"
+
+msgid "Pendientes"
+msgstr "Pending"
+
+msgid "Pendientes con vencimiento"
+msgstr "Pending with deadline"
+
+msgid "Pendientes por curso"
+msgstr "Pending by course"
+
+msgid "Perfil actualizado."
+msgstr "Profile updated."
+
+msgid "Perfil docente"
+msgstr "Instructor profile"
+
+msgid "Perfil docente no encontrado"
+msgstr "Instructor profile not found"
+
+msgid "Permiso denegado"
+msgstr "Permission denied"
+
+msgid "Personaliza recomendaciones y acompañamiento"
+msgstr "Customize recommendations and support"
+
+msgid "Planificador de curso"
+msgstr "Course planner"
+
+msgid "Planificar"
+msgstr "Plan"
+
+msgid "Planificar curso"
+msgstr "Plan course"
+
+msgid "Podcast"
+msgstr "Podcast"
+
+msgid "Portada, video y tarea"
+msgstr "Cover, video, and assignment"
+
+msgid "Precio"
+msgstr "Price"
+
+msgid "Preguntas"
+msgstr "Questions"
+
+msgid "Presencia pública y comercial del docente."
+msgstr "Instructor's public and commercial presence."
+
+msgid "Presentación"
+msgstr "Presentation"
+
+msgid "Presentación actualizada."
+msgstr "Presentation updated."
+
+msgid "Presentación generada: %s diapositivas."
+msgstr "Presentation generated: %s slides."
+
+msgid "Presentación guardada en la lección."
+msgstr "Presentation saved to the lesson."
+
+msgid "Presentación no disponible. Recarga la página."
+msgstr "Presentation not available. Reload the page."
+
+msgid "Primer contenido disponible"
+msgstr "First available content"
+
+msgid "Procesando"
+msgstr "Processing"
+
+msgid "Procesando…"
+msgstr "Processing…"
+
+msgid "Producto"
+msgstr "Product"
+
+msgid "Producto #%d"
+msgstr "Product #%d"
+
+msgid "Productos"
+msgstr "Products"
+
+msgid "Productos, bundles y membresías."
+msgstr "Products, bundles, and memberships."
+
+msgid "Productos, bundles, membresías y operación comercial."
+msgstr "Products, bundles, memberships, and commercial operation."
+
+msgid "Programa"
+msgstr "Program"
+
+msgid "Programa inválido para inscripción."
+msgstr "Invalid program for enrollment."
+
+msgid "Programa no encontrado."
+msgstr "Program not found."
+
+msgid "Programas"
+msgstr "Programs"
+
+msgid "Programas activos"
+msgstr "Active programs"
+
+msgid "Programas comerciales"
+msgstr "Commercial programs"
+
+msgid "Programas, cursos y lecciones"
+msgstr "Programs, courses, and lessons"
+
+msgid "Progreso"
+msgstr "Progress"
+
+msgid "Progreso promedio por curso"
+msgstr "Average progress by course"
+
+msgid "Progreso, completitud y carga docente"
+msgstr "Progress, completion, and instructor workload"
+
+msgid "Prom. Final"
+msgstr "Final Avg."
+
+msgid "Prom. Quiz"
+msgstr "Quiz Avg."
+
+msgid "Prom. Tareas"
+msgstr "Assignment Avg."
+
+msgid "Promedio final"
+msgstr "Final average"
+
+msgid "Propósito del mensaje"
+msgstr "Message purpose"
+
+msgid "Proveedor activo, modelos, APIs y parámetros base de operación."
+msgstr "Active provider, models, APIs, and base operation parameters."
+
+msgid "Provider desconocido: %s"
+msgstr "Unknown provider: %s"
+
+msgid ""
+"Puedes subir hasta %1$d archivos. Tipos permitidos: %2$s. Máximo %3$s por "
+"archivo."
+msgstr ""
+"You can upload up to %1$d files. Allowed types: %2$s. Maximum %3$s per file."
+
+msgid "Pulso académico"
+msgstr "Academic pulse"
+
+msgid "Punto de entrada para acompañamiento docente y respuestas operativas."
+msgstr "Entry point for instructor support and operational responses."
+
+msgid "Página %1$s de %2$s (%3$s entregas)"
+msgstr "Page %1$s of %2$s (%3$s submissions)"
+
+msgid "Página comercial del curso"
+msgstr "Course commercial page"
+
+msgid "Página comercial del programa"
+msgstr "Program commercial page"
+
+msgid "Público objetivo"
+msgstr "Target audience"
+
+msgid "Quitar"
+msgstr "Remove"
+
+msgid "Quitar foto"
+msgstr "Remove photo"
+
+msgid "Quitar imagen destacada"
+msgstr "Remove featured image"
+
+msgid "Quiz"
+msgstr "Quiz"
+
+msgid "Quiz deleted"
+msgstr "Quiz deleted"
+
+msgid "Quiz generated successfully"
+msgstr "Quiz generated successfully"
+
+msgid "Quiz no habilitado."
+msgstr "Quiz not enabled."
+
+msgid "Quiz not found"
+msgstr "Quiz not found"
+
+msgid "Quiz pendiente"
+msgstr "Pending quiz"
+
+msgid "Quiz saved"
+msgstr "Quiz saved"
+
+msgid "Re-transcribir (YouTube Captions)"
+msgstr "Re-transcribe (YouTube Captions)"
+
+msgid "Re-transcribir con Whisper"
+msgstr "Re-transcribe with Whisper"
+
+msgid "Recalcular libro de calificaciones"
+msgstr "Recalculate gradebook"
+
+msgid "Recomendaciones"
+msgstr "Recommendations"
+
+msgid ""
+"Recomendación para más de 500 alumnos concurrentes: object cache "
+"(Redis/Memcached), OPcache y caché de página."
+msgstr ""
+"Recommendation for more than 500 concurrent students: object cache "
+"(Redis/Memcached), OPcache, and page cache."
+
+msgid "Recomendado: %s"
+msgstr "Recommended: %s"
+
+msgid "Recordatorio"
+msgstr "Reminder"
+
+msgid "Recurso"
+msgstr "Resource"
+
+msgid "Recuérdame"
+msgstr "Remember me"
+
+msgid "Redactar comunicación"
+msgstr "Draft communication"
+
+msgid "Redis"
+msgstr "Redis"
+
+msgid "Refuerzo"
+msgstr "Reinforcement"
+
+msgid "Regenerar análisis IA"
+msgstr "Regenerate AI analysis"
+
+msgid "Regenerar enlace"
+msgstr "Regenerate link"
+
+msgid "Registrarse"
+msgstr "Register"
+
+msgid "Relación y calendario"
+msgstr "Relationship and schedule"
+
+msgid "Rendimiento"
+msgstr "Performance"
+
+msgid "Reproducir video"
+msgstr "Play video"
+
+msgid "Requisitos"
+msgstr "Requirements"
+
+msgid "Respuesta IA inválida."
+msgstr "Invalid AI response."
+
+msgid "Respuesta JSON inválida en solicitud IA."
+msgstr "Invalid JSON response in AI request."
+
+msgid "Respuesta de Whisper no válida."
+msgstr "Invalid Whisper response."
+
+msgid "Respuesta inválida del servidor."
+msgstr "Invalid server response."
+
+msgid "Resumen"
+msgstr "Summary"
+
+msgid ""
+"Resumen académico, comercial y de salud del sistema ajustado al rol actual."
+msgstr ""
+"Academic, commercial, and system health summary adjusted to the current "
+"role."
+
+msgid "Resumen de tu actividad y avance."
+msgstr "Summary of your activity and progress."
+
+msgid "Retención"
+msgstr "Retention"
+
+msgid "Retención, engagement y rendimiento"
+msgstr "Retention, engagement, and performance"
+
+msgid "Retoma el contenido para mantener el ritmo de avance."
+msgstr "Resume the content to maintain your progress pace."
+
+msgid "Retoma tu siguiente lección con un solo paso."
+msgstr "Resume your next lesson in one step."
+
+msgid ""
+"Revisa avisos, progreso y feedback reciente desde la experiencia del alumno."
+msgstr ""
+"Review notices, progress, and recent feedback from the student experience."
+
+msgid ""
+"Revisa cómo impactan los modos manual, asistido por IA y autoevaluado en las"
+" notas."
+msgstr ""
+"Review how manual, AI-assisted, and self-assessed modes impact grades."
+
+msgid "Revisa entregas y entra al revisor unificado."
+msgstr "Review submissions and enter the unified reviewer."
+
+msgid "Revisa esta lección para avanzar en tu curso."
+msgstr "Review this lesson to advance in your course."
+
+msgid "Revisa feedback y avisos académicos."
+msgstr "Review feedback and academic notices."
+
+msgid "Revisa las landings y CTA configuradas para venta por curso."
+msgstr "Review the landing pages and CTAs configured for course sales."
+
+msgid "Revisada"
+msgstr "Reviewed"
+
+msgid "Revisadas"
+msgstr "Reviewed"
+
+msgid "Revisado por docente"
+msgstr "Reviewed by instructor"
+
+msgid "Revisar"
+msgstr "Review"
+
+msgid "Revisión"
+msgstr "Review"
+
+msgid "Revisión IA generada correctamente."
+msgstr "AI review generated successfully."
+
+msgid "Revisión disponible"
+msgstr "Review available"
+
+msgid "Revisión enviada correctamente."
+msgstr "Review submitted successfully."
+
+msgid "Revocada"
+msgstr "Revoked"
+
+msgid "Revocar"
+msgstr "Revoke"
+
+msgid "Rol"
+msgstr "Role"
+
+msgid "Ruta académica"
+msgstr "Academic path"
+
+msgid "Rúbrica"
+msgstr "Rubric"
+
+msgid ""
+"Rúbrica guardada. Puedes asignarla a una lección desde el metabox de "
+"relación."
+msgstr ""
+"Rubric saved. You can assign it to a lesson from the relationship metabox."
+
+msgid "Rúbrica no encontrada."
+msgstr "Rubric not found."
+
+msgid "Rúbricas"
+msgstr "Rubrics"
+
+msgid "Salud"
+msgstr "Health"
+
+msgid "Se detectaron criterios inválidos en la revisión."
+msgstr "Invalid criteria detected in the review."
+
+msgid "Se detectó un archivo inválido."
+msgstr "An invalid file was detected."
+
+msgid "Se necesitan al menos 2 entregas para asignar revisiones."
+msgstr "At least 2 submissions are needed to assign reviews."
+
+msgid "Se reutilizó un docente reciente con el mismo nombre."
+msgstr "A recent instructor with the same name was reused."
+
+msgid "Seguimiento"
+msgstr "Tracking"
+
+msgid "Seguimiento de conversiones, ventas y productos con mejor desempeño."
+msgstr "Tracking of conversions, sales, and best-performing products."
+
+msgid "Selecciona un archivo CSV."
+msgstr "Select a CSV file."
+
+msgid "Selecciona un curso"
+msgstr "Select a course"
+
+msgid "Selecciona un curso para ver el libro de calificaciones."
+msgstr "Select a course to view the gradebook."
+
+msgid "Selecciona un estudiante"
+msgstr "Select a student"
+
+msgid "Selecciona una página"
+msgstr "Select a page"
+
+msgid "Seleccionar"
+msgstr "Select"
+
+msgid "Seleccionar archivo"
+msgstr "Select file"
+
+msgid "Seleccionar imagen"
+msgstr "Select image"
+
+msgid "Seleccionar imágenes de galería"
+msgstr "Select gallery images"
+
+msgid "Seleccionar logo"
+msgstr "Select logo"
+
+msgid "Seleccionar miniatura"
+msgstr "Select thumbnail"
+
+msgid "Sesiones, actividades y contenidos."
+msgstr "Sessions, activities, and content."
+
+msgid "Siguiente"
+msgstr "Next"
+
+msgid "Siguiente lección"
+msgstr "Next lesson"
+
+msgid "Siguientes accesos"
+msgstr "Upcoming access"
+
+msgid "Sin actividad reciente"
+msgstr "No recent activity"
+
+msgid "Sin auditoría registrada."
+msgstr "No audit registered."
+
+msgid "Sin clasificación"
+msgstr "Unclassified"
+
+msgid "Sin datos"
+msgstr "No data"
+
+msgid "Sin docentes seleccionados."
+msgstr "No instructors selected."
+
+msgid "Sin historial para resumir."
+msgstr "No history to summarize."
+
+msgid "Sin imagen"
+msgstr "No image"
+
+msgid "Sin imágenes seleccionadas."
+msgstr "No images selected."
+
+msgid "Sin permisos"
+msgstr "No permissions"
+
+msgid "Sin permisos para usar el asistente."
+msgstr "No permissions to use the assistant."
+
+msgid "Sin permisos."
+msgstr "No permissions."
+
+msgid "Sin sesión."
+msgstr "No session."
+
+msgid "Sin texto para guardar."
+msgstr "No text to save."
+
+msgid "Sin texto."
+msgstr "No text."
+
+msgid "Sistema"
+msgstr "System"
+
+msgid "Sistema de matrícula no disponible."
+msgstr "Enrollment system not available."
+
+msgid "Sistema · %s"
+msgstr "System · %s"
+
+msgid "Sobrescritura"
+msgstr "Overwrite"
+
+msgid "Solicitar información"
+msgstr "Request information"
+
+msgid "Solicitud IA inválida."
+msgstr "Invalid AI request."
+
+msgid "Solicitud inválida."
+msgstr "Invalid request."
+
+msgid "Solicitud no válida."
+msgstr "Invalid request."
+
+msgid "Solo puedes subir 1 archivo."
+msgstr "You can only upload 1 file."
+
+msgid "Solo se permiten archivos CSV o TXT."
+msgstr "Only CSV or TXT files are allowed."
+
+msgid "SpeedGrade"
+msgstr "SpeedGrade"
+
+msgid "Subtítulo"
+msgstr "Subtitle"
+
+msgid "Sí"
+msgstr "Yes"
+
+msgid "Tabla"
+msgstr "Table"
+
+msgid "Tabla de invitaciones no encontrada."
+msgstr "Invitations table not found."
+
+msgid "Tamaño (MB)"
+msgstr "Size (MB)"
+
+msgid "Tarea"
+msgstr "Assignment"
+
+msgid "Tarea pendiente"
+msgstr "Pending assignment"
+
+msgid "Tareas calificadas"
+msgstr "Graded assignments"
+
+msgid "Te has inscrito correctamente."
+msgstr "You have enrolled successfully."
+
+msgid "Tema"
+msgstr "Topic"
+
+msgid "Tema (dejar en blanco para usar la lección)"
+msgstr "Topic (leave blank to use the lesson)"
+
+msgid "Tema a investigar"
+msgstr "Topic to research"
+
+msgid "Tema del curso"
+msgstr "Course topic"
+
+msgid "Tendencias"
+msgstr "Trends"
+
+msgid "Texto CTA"
+msgstr "CTA text"
+
+msgid ""
+"Tienes %1$d actividad(es) pendiente(s), un progreso global de %2$d%% y un "
+"promedio actual de %3$d%%."
+msgstr ""
+"You have %1$d pending activity/ies, an overall progress of %2$d%%, and a "
+"current average of %3$d%%."
+
+msgid ""
+"Tienes %1$d entrega(s) pendiente(s) por revisar en %2$d curso(s) y %3$d "
+"lección(es) activas."
+msgstr ""
+"You have %1$d pending submission(s) to review in %2$d course(s) and %3$d "
+"active lesson(s)."
+
+msgid "Tienes %1$d pendiente(s) y %2$d entrega(s) con feedback reciente."
+msgstr ""
+"You have %1$d pending item(s) and %2$d submission(s) with recent feedback."
+
+msgid "Tienes %d entrega(s) con feedback reciente."
+msgstr "You have %d submission(s) with recent feedback."
+
+msgid "Tienes %d pendiente(s) por completar."
+msgstr "You have %d pending item(s) to complete."
+
+msgid ""
+"Tienes foco en cursos, lecciones, evaluaciones, IA académica y tu presencia "
+"docente."
+msgstr ""
+"Your focus is on courses, lessons, assessments, academic AI, and your "
+"instructor presence."
+
+msgid ""
+"Tienes foco operativo en comercio, seguimiento, analítica y coordinación "
+"transversal."
+msgstr ""
+"Your operational focus is on commerce, tracking, analytics, and cross-"
+"functional coordination."
+
+msgid "Tienes una actividad por completar."
+msgstr "You have one activity to complete."
+
+msgid ""
+"Tienes visibilidad completa del núcleo ATORA: operación académica, IA, "
+"comercio, analítica y configuración."
+msgstr ""
+"You have full visibility of the ATORA core: academic operations, AI, "
+"commerce, analytics, and settings."
+
+msgid "Tipo"
+msgstr "Type"
+
+msgid "Tipo de archivo no permitido."
+msgstr "File type not allowed."
+
+msgid "Tipo de artefacto desconocido."
+msgstr "Unknown artifact type."
+
+msgid "Tipo de recomendación"
+msgstr "Recommendation type"
+
+msgid "Tipo:"
+msgstr "Type:"
+
+msgid "Todas las inscripciones estaban sincronizadas. Nada que reparar."
+msgstr "All enrollments were synchronized. Nothing to repair."
+
+msgid "Todas las lecciones"
+msgstr "All lessons"
+
+msgid "Todas las lecciones tienen su índice de curso correcto."
+msgstr "All lessons have their correct course index."
+
+msgid "Todos"
+msgstr "All"
+
+msgid "Todos los cursos"
+msgstr "All courses"
+
+msgid "Todos los docentes"
+msgstr "All instructors"
+
+msgid "Todos los niveles"
+msgstr "All levels"
+
+msgid "Todos los programas"
+msgstr "All programs"
+
+msgid "Todos los puntajes deben ser numéricos."
+msgstr "All scores must be numeric."
+
+msgid "Token generado (no se envió email)."
+msgstr "Token generated (no email was sent)."
+
+msgid "Token requerido."
+msgstr "Token required."
+
+msgid "Tono"
+msgstr "Tone"
+
+msgid "Top ingresos por producto"
+msgstr "Top revenue by product"
+
+msgid "Total"
+msgstr "Total"
+
+msgid "Transcribir (YouTube Captions)"
+msgstr "Transcribe (YouTube Captions)"
+
+msgid "Transcribir con Whisper (OpenAI)"
+msgstr "Transcribe with Whisper (OpenAI)"
+
+msgid "Transcripción en cola. Procesando…"
+msgstr "Transcription queued. Processing…"
+
+msgid "Transcripción fallida."
+msgstr "Transcription failed."
+
+msgid "Transcripción guardada."
+msgstr "Transcription saved."
+
+msgid "Transcripción programada."
+msgstr "Transcription scheduled."
+
+msgid "Transients LMS"
+msgstr "LMS transients"
+
+msgid "Transients de quiz"
+msgstr "Quiz transients"
+
+msgid "Trigger: %s"
+msgstr "Trigger: %s"
+
+msgid "Tu docente"
+msgstr "Your instructor"
+
+msgid "Tu evaluación ya se está procesando. Espera unos segundos."
+msgstr ""
+"Your assessment is already being processed. Please wait a few seconds."
+
+msgid "Tu progreso personal"
+msgstr "Your personal progress"
+
+msgid "Tu sesión expiró o el servicio no está disponible."
+msgstr "Your session expired or the service is unavailable."
+
+msgid "Tu sesión expiró. Recarga la página e intenta de nuevo."
+msgstr "Your session expired. Reload the page and try again."
+
+msgid "Título"
+msgstr "Title"
+
+msgid "URL"
+msgstr "URL"
+
+msgid "URL del webhook inválida."
+msgstr "Invalid webhook URL."
+
+msgid "URL directa (MP4)"
+msgstr "Direct URL (MP4)"
+
+msgid "URL externa"
+msgstr "External URL"
+
+msgid "URL inválida para la solicitud IA."
+msgstr "Invalid URL for AI request."
+
+msgid "Umbral: %s%%"
+msgstr "Threshold: %s%%"
+
+msgid "Uno de los archivos no pudo subirse correctamente."
+msgstr "One of the files could not be uploaded correctly."
+
+msgid "Uno de los archivos tiene un formato no permitido."
+msgstr "One of the files has a disallowed format."
+
+msgid "Uno de los puntajes excede el máximo permitido por la rúbrica."
+msgstr "One of the scores exceeds the maximum allowed by the rubric."
+
+msgid ""
+"Usa la misma key de OpenAI si usas el modelo %s de OpenAI. Si dejas vacío, "
+"se usará la key de OpenAI del bloque anterior."
+msgstr ""
+"Use the same OpenAI key if you use the OpenAI model %s. If left empty, the "
+"OpenAI key from the previous block will be used."
+
+msgid "Usar"
+msgstr "Use"
+
+msgid "Usar archivo"
+msgstr "Use file"
+
+msgid "Usar como foto"
+msgstr "Use as photo"
+
+msgid "Usar como imagen destacada"
+msgstr "Use as featured image"
+
+msgid "Usar imagen"
+msgstr "Use image"
+
+msgid "Usar imágenes seleccionadas"
+msgstr "Use selected images"
+
+msgid "Usuario"
+msgstr "User"
+
+msgid "Usuario \"%s\" eliminado junto con: %s."
+msgstr "User \"%s\" deleted along with: %s."
+
+msgid "Usuario \"%s\" eliminado. Sus contenidos se conservaron."
+msgstr "User \"%s\" deleted. Their content was preserved."
+
+msgid "Usuario %d"
+msgstr "User %d"
+
+msgid "Usuario creado y matriculado."
+msgstr "User created and enrolled."
+
+msgid "Usuario encontrado:"
+msgstr "User found:"
+
+msgid "Usuario inválido."
+msgstr "Invalid user."
+
+msgid "Usuario no encontrado."
+msgstr "User not found."
+
+msgid "Usuario no encontrado. Usa email o nombre de usuario exactos."
+msgstr "User not found. Use exact email or username."
+
+msgid "Usuario o correo"
+msgstr "Username or email"
+
+msgid "Vence %s"
+msgstr "Expires %s"
+
+msgid "Venta adicional"
+msgstr "Upsell"
+
+msgid "Ventas académicas"
+msgstr "Academic sales"
+
+msgid "Ver"
+msgstr "View"
+
+msgid "Ver curso"
+msgstr "View course"
+
+msgid "Ver cursos"
+msgstr "View courses"
+
+msgid "Ver dashboard de comercio"
+msgstr "View commerce dashboard"
+
+msgid "Ver detalle"
+msgstr "View detail"
+
+msgid "Ver detalles"
+msgstr "View details"
+
+msgid "Ver docente"
+msgstr "View instructor"
+
+msgid "Ver docentes"
+msgstr "View instructors"
+
+msgid "Ver el curso"
+msgstr "View course"
+
+msgid "Ver lecciones"
+msgstr "View lessons"
+
+msgid "Ver lección"
+msgstr "View lesson"
+
+msgid "Ver libro de calificaciones"
+msgstr "View gradebook"
+
+msgid "Ver mi curso"
+msgstr "View my course"
+
+msgid "Ver presentación"
+msgstr "View presentation"
+
+msgid "Ver producto"
+msgstr "View product"
+
+msgid "Ver programa"
+msgstr "View program"
+
+msgid "Ver programas"
+msgstr "View programs"
+
+msgid "Ver →"
+msgstr "View →"
+
+msgid "Video"
+msgstr "Video"
+
+msgid "Video %s"
+msgstr "Video %s"
+
+msgid "Video transcription module not available"
+msgstr "Video transcription module not available"
+
+msgid "Vimeo"
+msgstr "Vimeo"
+
+msgid "Visibilidad automática"
+msgstr "Automatic visibility"
+
+msgid "Visibilidad de tu progreso, cursos y programas."
+msgstr "Visibility of your progress, courses, and programs."
+
+msgid "Visión integral del estado del negocio."
+msgstr "Comprehensive view of the business status."
+
+msgid ""
+"Visión unificada del rendimiento académico, el comercio y la observabilidad "
+"de ATORA."
+msgstr ""
+"Unified view of academic performance, commerce, and ATORA observability."
+
+msgid "Vista activa"
+msgstr "Active view"
+
+msgid "Vista detallada de malla de calificaciones y auditoría por actividad."
+msgstr "Detailed view of grading grid and activity audit."
+
+msgid "Vista explícita del perfil público y comercial del docente."
+msgstr "Explicit view of the instructor's public and commercial profile."
+
+msgid "Vista formal de calificaciones por curso."
+msgstr "Formal view of grades by course."
+
+msgid "Vista:"
+msgstr "View:"
+
+msgid "Volver al curso"
+msgstr "Back to course"
+
+msgid "Volver al hub principal de ATORA."
+msgstr "Back to ATORA main hub."
+
+msgid "WP_CACHE"
+msgstr "WP_CACHE"
+
+msgid "WP_CACHE (page cache): %s"
+msgstr "WP_CACHE (page cache): %s"
+
+msgid "Webhook no encontrado."
+msgstr "Webhook not found."
+
+msgid "Whisper devolvió un error."
+msgstr "Whisper returned an error."
+
+msgid "Whisper no devolvió texto."
+msgstr "Whisper returned no text."
+
+msgid "Whisper no devolvió texto. El audio podría no tener voz inteligible."
+msgstr ""
+"Whisper returned no text. The audio may not contain intelligible speech."
+
+msgid "Ya enviaste esta revisión."
+msgstr "You have already submitted this review."
+
+msgid "Ya estaba matriculado."
+msgstr "Already enrolled."
+
+msgid "Ya estás inscrito en este curso."
+msgstr "You are already enrolled in this course."
+
+msgid "Ya no tienes más intentos disponibles."
+msgstr "You have no more attempts available."
+
+msgid "Ya tienes comentarios que pueden ayudarte a mejorar."
+msgstr "You already have comments that can help you improve."
+
+msgid ""
+"Ya tienes tu curso listo. Te dejamos una ruta rápida para comenzar con "
+"claridad."
+msgstr "Your course is ready. Here's a quick path to get started clearly."
+
+msgid "YouTube"
+msgstr "YouTube"
+
+msgid "YouTube Captions"
+msgstr "YouTube Captions"
+
+msgid "YouTube no devolvió contenido para el video."
+msgstr "YouTube returned no content for the video."
+
+msgid ""
+"YouTube: se detecta automáticamente. Para otras fuentes puedes subirla "
+"manualmente."
+msgstr ""
+"YouTube: detected automatically. For other sources you can upload it "
+"manually."
+
+msgid "alta"
+msgstr "high"
+
+msgid "avanzado"
+msgstr "advanced"
+
+msgid "baja"
+msgstr "low"
+
+msgid "cercano y empático"
+msgstr "warm and empathetic"
+
+msgid "crudo %s%%"
+msgstr "raw %s%%"
+
+msgid "de %d inscritos"
+msgstr "of %d enrolled"
+
+msgid ""
+"en esta pantalla puedes abrir el panel flotante del asistente docente para "
+"investigar, planificar o redactar sin salir del hub."
+msgstr ""
+"on this screen you can open the floating teaching assistant panel to "
+"research, plan, or draft without leaving the hub."
+
+msgid "estudiantes con entregas pendientes"
+msgstr "students with pending submissions"
+
+msgid "estudiantes destacados"
+msgstr "outstanding students"
+
+msgid "estudiantes en riesgo"
+msgstr "students at risk"
+
+msgid "evento"
+msgstr "event"
+
+msgid "formal"
+msgstr "formal"
+
+msgid "intermedio"
+msgstr "intermediate"
+
+msgid "lectura"
+msgstr "reading"
+
+msgid "media"
+msgstr "medium"
+
+msgid "mensaje(s)"
+msgstr "message(s)"
+
+msgid "mixta"
+msgstr "mixed"
+
+msgid "mixto"
+msgstr "mixed"
+
+msgid "motivador y profesional"
+msgstr "motivating and professional"
+
+msgid "o haz clic para seleccionar en la biblioteca"
+msgstr "or click to select from the library"
+
+msgid "principiante"
+msgstr "beginner"
+
+msgid "sin leer"
+msgstr "unread"
+
+msgid "sobreescribe la rúbrica"
+msgstr "overwrites the rubric"
+
+msgid "todos los estudiantes"
+msgstr "all students"
+
+msgid "umbral %s%%"
+msgstr "threshold %s%%"
+
+msgid "urgente pero respetuoso"
+msgstr "urgent but respectful"
+
+msgid ""
+"usa el panel flotante para redactar mensajes, resumir feedback o preparar "
+"comunicaciones académicas."
+msgstr ""
+"use the floating panel to draft messages, summarize feedback, or prepare "
+"academic communications."
+
+msgid "usos"
+msgstr "uses"
+
+msgid ""
+"¡Hola! Soy tu asistente de enseñanza. Puedo ayudarte a planificar cursos, "
+"investigar temas, mejorar tus lecciones, crear presentaciones, rúbricas y "
+"evaluaciones. ¿Por dónde empezamos?"
+msgstr ""
+"Hello! I'm your teaching assistant. I can help you plan courses, research "
+"topics, improve your lessons, create presentations, rubrics, and "
+"assessments. Where shall we start?"
+
+msgid "¿Borrar el historial de conversación?"
+msgstr "Clear conversation history?"
+
+msgid "¿Eliminar al usuario \"%s\"? Esta acción no se puede deshacer."
+msgstr "Delete user \"%s\"? This action cannot be undone."
+
+msgid "¿En qué quieres enfocarte? (opcional)"
+msgstr "What do you want to focus on? (optional)"
+
+msgid "¿Necesito experiencia previa?|No, el curso parte desde cero."
+msgstr "Do I need prior experience?|No, the course starts from scratch."
+
+msgid "¿Olvidaste tu contraseña?"
+msgstr "Forgot your password?"
+
+msgid "¿Quitar la matrícula de este estudiante?"
+msgstr "Remove this student's enrollment?"
+
+msgid "¿Revocar esta invitación?"
+msgstr "Revoke this invitation?"
+
+msgid "Órdenes"
+msgstr "Orders"
+
+msgid "Última actividad: %s"
+msgstr "Last activity: %s"
+
+msgid "—"
+msgstr "—"
+
+msgid ""
+"⚠️ Configura una API key en <a href=\"%s\">Configuración de IA</a> para "
+"activar el asistente."
+msgstr ""
+"⚠️ Configure an API key in <a href=\"%s\">AI Settings</a> to activate the "
+"assistant."
+
+msgid "✓ Copiado"
+msgstr "✓ Copied"
+
+msgid "✓ Transcripción lista · %s palabras."
+msgstr "✓ Transcription ready · %s words."
+
+msgid ""
+"Tip: abre SpeedGrade desde cada fila para revisar y calificar sin salir del "
+"flujo."
+msgstr ""
+"Tip: open SpeedGrade from each row to review and grade without leaving the "
+"workflow."
+
+msgid "Tip 1"
+msgstr "Tip 1"
+
+msgid "Tip 2"
+msgstr "Tip 2"
+
+msgid "Tip 3"
+msgstr "Tip 3"

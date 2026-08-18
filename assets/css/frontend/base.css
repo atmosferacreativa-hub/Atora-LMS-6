@@ -1,0 +1,113 @@
+/**
+ * ATORA-LMS — Base + shared components
+ */
+
+/* 2. Base reset (scoped) */
+.atora-archive-courses *,
+.atora-lesson-wrap *,
+.cp-wrap * {
+	box-sizing: border-box;
+}
+
+/* 3. Shared components */
+.atora-container {
+	max-width: 1200px;
+	margin: 0 auto;
+	padding: 0 24px;
+}
+
+/* Focus visible — keyboard navigation indicator */
+:focus-visible {
+	outline: 2px solid var(--ac-brand);
+	outline-offset: 3px;
+	border-radius: var(--ac-radius-xs);
+}
+:focus:not(:focus-visible) {
+	outline: none;
+}
+
+/* Buttons */
+.atora-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	padding: 10px 22px;
+	font-size: 14px;
+	font-weight: 600;
+	line-height: 1;
+	border-radius: var(--ac-radius-sm);
+	text-decoration: none;
+	border: 2px solid transparent;
+	cursor: pointer;
+	transition: all var(--ac-t) var(--ac-ease);
+	white-space: nowrap;
+}
+.atora-btn-primary {
+	background: var(--ac-brand);
+	color: var(--ac-white);
+	border-color: var(--ac-brand);
+}
+.atora-btn-primary:hover {
+	background: var(--ac-brand-dk);
+	border-color: var(--ac-brand-dk);
+	color: var(--ac-white);
+	transform: translateY(-1px);
+	box-shadow: 0 4px 14px rgba(67,83,255,.38);
+}
+.atora-btn-outline {
+	background: transparent;
+	color: var(--ac-gray-900);
+	border-color: var(--ac-gray-300);
+}
+.atora-btn-outline:hover {
+	border-color: var(--ac-gray-900);
+	color: var(--ac-gray-900);
+	background: var(--ac-gray-50);
+}
+.atora-btn-sm { padding: 7px 14px; font-size: 13px; }
+.atora-btn-lg { padding: 14px 32px; font-size: 16px; border-radius: var(--ac-radius); }
+
+/* Badges */
+.atora-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 3px 10px;
+	border-radius: 99px;
+	font-size: 11px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: .05em;
+	line-height: 1.4;
+}
+.atora-badge-brand  { background: var(--ac-brand-lt); color: var(--ac-brand); }
+.atora-badge-green  { background: var(--ac-badge-green-bg, #dcfce7); color: var(--ac-badge-green-txt, #166534); }
+.atora-badge-amber  { background: var(--ac-badge-amber-bg, #fef9c3); color: var(--ac-badge-amber-txt, #854d0e); }
+.atora-badge-gray   { background: var(--ac-gray-100); color: var(--ac-gray-700); }
+.atora-badge-red    { background: var(--ac-badge-red-bg, #fee2e2); color: var(--ac-badge-red-txt, #991b1b); }
+
+/* Progress bar */
+.atora-progress {
+	height: 6px;
+	background: var(--ac-gray-100);
+	border-radius: 99px;
+	overflow: hidden;
+}
+.atora-progress-fill {
+	height: 100%;
+	background: var(--ac-brand);
+	border-radius: 99px;
+	transition: width .6s ease;
+}
+.atora-progress-fill.is-complete { background: var(--ac-green); }
+
+/* Gate */
+.atora-gate {
+	padding: 56px 32px;
+	background: var(--ac-gray-50);
+	border: 1px solid var(--ac-gray-200);
+	border-radius: var(--ac-radius-lg);
+	text-align: center;
+}
+.atora-gate p { margin: 0 0 20px; font-size: 16px; color: var(--ac-gray-700); }

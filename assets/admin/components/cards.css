@@ -1,0 +1,99 @@
+.atora-card {
+  background: var(--atora-card);
+  border: 1px solid var(--atora-border);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.atora-card + .atora-card { margin-top: 0; }
+
+.atora-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.atora-card__title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--atora-text);
+  margin: 0;
+}
+
+.atora-card__actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.atora-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.atora-notice {
+  border-left: 4px solid var(--atora-primary);
+  background: rgba(63, 152, 238, 0.08);
+  color: var(--atora-text);
+  padding: 10px 12px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+}
+
+.atora-notice.is-warning { border-color: var(--atora-warning); background: rgba(243, 179, 46, 0.08); }
+.atora-notice.is-danger  { border-color: var(--atora-danger);  background: rgba(245, 57, 49, 0.08);  }
+.atora-notice.is-success { border-color: #34a85a;              background: rgba(52, 168, 90, 0.08);  }
+
+.atora-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--atora-border);
+  margin-bottom: 14px;
+}
+
+.atora-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--atora-text);
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.atora-stats-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.atora-stat-block {
+  flex: 1 1 100px;
+  background: var(--atora-bg);
+  border: 1px solid var(--atora-border);
+  border-radius: 8px;
+  padding: 12px;
+  text-align: center;
+}
+
+.atora-stat-block__value {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--atora-primary);
+  display: block;
+}
+
+.atora-stat-block__label {
+  font-size: 11px;
+  color: var(--atora-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}

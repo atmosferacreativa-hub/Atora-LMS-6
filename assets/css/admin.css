@@ -1,0 +1,1526 @@
+/**
+ * ATORA-LMS — Admin Design System
+ * Dark-mode-safe custom properties for every admin component.
+ * Registered via CLMS_Loader and enqueued on all ATORA admin pages.
+ */
+
+/* ═══════════════════════════════════════════════════
+   1. ADMIN TOKEN LAYER (light defaults)
+   ═══════════════════════════════════════════════════ */
+:root {
+	/* surfaces */
+	--clms-bg:          #fff;
+	--clms-bg-soft:     #f9fafb;
+	--clms-bg-raised:   #f0f0f1;
+
+	/* borders */
+	--clms-border:      #dcdcde;
+	--clms-border-soft: #e5e7eb;
+
+	/* text */
+	--clms-ink:         #1d2327;
+	--clms-ink-2:       #374151;
+	--clms-muted:       #6b7280;
+	--clms-muted-2:     #646970;
+
+	/* brand / accent */
+	--clms-accent:      #4f46e5;
+	--clms-accent-dk:   #3730a3;
+	--clms-accent-lt:   #eef2ff;
+
+	/* status palettes */
+	--clms-ok-bg:       #f0fdf4;
+	--clms-ok-border:   #bbf7d0;
+	--clms-ok-ink:      #166534;
+
+	--clms-err-bg:      #fef2f2;
+	--clms-err-border:  #fecaca;
+	--clms-err-ink:     #991b1b;
+
+	--clms-warn-bg:     #fefce8;
+	--clms-warn-border: #fef08a;
+	--clms-warn-ink:    #854d0e;
+
+	/* status badge colours */
+	--clms-badge-gray-bg:   #f3f4f6;
+	--clms-badge-gray-ink:  #6b7280;
+	--clms-badge-green-bg:  #dcfce7;
+	--clms-badge-green-ink: #166534;
+	--clms-badge-yellow-bg: #fef9c3;
+	--clms-badge-yellow-ink:#854d0e;
+	--clms-badge-red-bg:    #fee2e2;
+	--clms-badge-red-ink:   #991b1b;
+
+	/* shadows */
+	--clms-shadow-xs: 0 1px 3px rgba(0,0,0,.06);
+}
+
+/* ═══════════════════════════════════════════════════
+   2. DARK-MODE OVERRIDES
+   Both @media (OS preference) and explicit body-class
+   from themes that add .dark-mode / data-theme="dark"
+   ═══════════════════════════════════════════════════ */
+@media (prefers-color-scheme: dark) {
+	:root {
+		--clms-bg:          #1c1c1f;
+		--clms-bg-soft:     #26262a;
+		--clms-bg-raised:   #2e2e34;
+		--clms-border:      #38383e;
+		--clms-border-soft: #2e2e34;
+		--clms-ink:         #f2f2f4;
+		--clms-ink-2:       #d4d4db;
+		--clms-muted:       #a0a0a8;
+		--clms-muted-2:     #8a8a94;
+		--clms-accent-lt:   rgba(79,70,229,.18);
+		--clms-ok-bg:       #052e16;
+		--clms-ok-border:   #166534;
+		--clms-ok-ink:      #4ade80;
+		--clms-err-bg:      #2d0404;
+		--clms-err-border:  #7f1d1d;
+		--clms-err-ink:     #f87171;
+		--clms-warn-bg:     #1c1400;
+		--clms-warn-border: #713f12;
+		--clms-warn-ink:    #fde047;
+		--clms-badge-gray-bg:   #26262a;
+		--clms-badge-gray-ink:  #a0a0a8;
+		--clms-badge-green-bg:  #052e16;
+		--clms-badge-green-ink: #4ade80;
+		--clms-badge-yellow-bg: #1c1400;
+		--clms-badge-yellow-ink:#fde047;
+		--clms-badge-red-bg:    #2d0404;
+		--clms-badge-red-ink:   #f87171;
+		--clms-shadow-xs:   0 1px 3px rgba(0,0,0,.5);
+	}
+}
+
+body.dark-mode,
+body.dark-theme,
+body.is-dark,
+body[data-theme="dark"],
+body[data-scheme="dark"] {
+	--clms-bg:          #1c1c1f;
+	--clms-bg-soft:     #26262a;
+	--clms-bg-raised:   #2e2e34;
+	--clms-border:      #38383e;
+	--clms-border-soft: #2e2e34;
+	--clms-ink:         #f2f2f4;
+	--clms-ink-2:       #d4d4db;
+	--clms-muted:       #a0a0a8;
+	--clms-muted-2:     #8a8a94;
+	--clms-accent-lt:   rgba(79,70,229,.18);
+	--clms-ok-bg:       #052e16;
+	--clms-ok-border:   #166534;
+	--clms-ok-ink:      #4ade80;
+	--clms-err-bg:      #2d0404;
+	--clms-err-border:  #7f1d1d;
+	--clms-err-ink:     #f87171;
+	--clms-warn-bg:     #1c1400;
+	--clms-warn-border: #713f12;
+	--clms-warn-ink:    #fde047;
+	--clms-badge-gray-bg:   #26262a;
+	--clms-badge-gray-ink:  #a0a0a8;
+	--clms-badge-green-bg:  #052e16;
+	--clms-badge-green-ink: #4ade80;
+	--clms-badge-yellow-bg: #1c1400;
+	--clms-badge-yellow-ink:#fde047;
+	--clms-badge-red-bg:    #2d0404;
+	--clms-badge-red-ink:   #f87171;
+	--clms-shadow-xs:   0 1px 3px rgba(0,0,0,.5);
+}
+
+/* ═══════════════════════════════════════════════════
+   3. METABOX — Course / Enrollment tabs
+   ═══════════════════════════════════════════════════ */
+.clms-ac-tabs { border-bottom: 1px solid var(--clms-border); margin-bottom: 16px; padding: 0; list-style: none; display: flex; gap: 2px; }
+.clms-ac-tabs li button {
+	padding: 7px 14px;
+	border: none;
+	background: none;
+	cursor: pointer;
+	font-size: 13px;
+	font-weight: 500;
+	color: var(--clms-muted);
+	border-bottom: 2px solid transparent;
+	margin-bottom: -2px;
+	transition: all .15s;
+}
+.clms-ac-tabs li button.active,
+.clms-ac-tabs li button:hover {
+	color: var(--clms-accent);
+	border-bottom-color: var(--clms-accent);
+}
+
+.clms-ac-tab-content { display: none; }
+.clms-ac-tab-content.active { display: block; }
+
+/* ═══════════════════════════════════════════════════
+   4. METABOX — Shared buttons
+   ═══════════════════════════════════════════════════ */
+.clms-btn-blue  { background: var(--clms-accent);  color: #fff; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+.clms-btn-blue:hover  { background: var(--clms-accent-dk); }
+.clms-btn-green { background: #16a34a; color: #fff; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+.clms-btn-green:hover { background: #15803d; }
+.clms-btn-red   { background: none; border: 1px solid #dc2626; color: #dc2626; padding: 4px 10px; font-size: 12px; border-radius: 4px; cursor: pointer; }
+.clms-btn-red:hover   { background: #dc2626; color: #fff; }
+.clms-btn-gray  { background: var(--clms-bg-raised); color: var(--clms-ink-2); border: 1px solid var(--clms-border); padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+
+/* ═══════════════════════════════════════════════════
+   4B. METABOX — Premium shell for Program/Course/Lesson
+   ═══════════════════════════════════════════════════ */
+body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+	:is(
+		#clms_course_meta,
+		#clms_course_commercial,
+		#clms_course_academic,
+		#clms_course_curriculum_preview,
+		#clms_course_drip_timeline,
+		#clms_course_teachers,
+		#clms_course_enrollment,
+		#clms_program_meta,
+		#clms_program_commercial,
+		#clms_program_curriculum_preview,
+		#clms_program_teachers,
+		#clms_program_enrollment,
+		#clms_lesson_relation,
+		#clms_lesson_visual,
+		#clms_lesson_resources
+	).postbox {
+	--clms-mb-accent: #475569;
+	--clms-mb-accent-dk: #334155;
+	--clms-mb-soft: #f8fafc;
+	--clms-mb-border: #cbd5e1;
+	--clms-mb-focus: rgba(71, 85, 105, 0.24);
+	border: 1px solid var(--clms-mb-border);
+	border-radius: 14px;
+	overflow: hidden;
+	background: var(--clms-bg, #fff);
+	box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+	:is(
+		#clms_course_academic,
+		#clms_course_curriculum_preview,
+		#clms_course_drip_timeline,
+		#clms_program_meta,
+		#clms_program_curriculum_preview,
+		#clms_lesson_relation,
+		#clms_lesson_visual,
+		#clms_lesson_resources
+	).postbox {
+	--clms-mb-accent: #2563eb;
+	--clms-mb-accent-dk: #1e40af;
+	--clms-mb-soft: #eff6ff;
+	--clms-mb-border: #bfdbfe;
+	--clms-mb-focus: rgba(37, 99, 235, 0.26);
+}
+
+body:is(.post-type-lm_course, .post-type-lm_program)
+	:is(#clms_course_commercial, #clms_program_commercial).postbox {
+	--clms-mb-accent: #d97706;
+	--clms-mb-accent-dk: #b45309;
+	--clms-mb-soft: #fffbeb;
+	--clms-mb-border: #fcd34d;
+	--clms-mb-focus: rgba(217, 119, 6, 0.25);
+}
+
+body:is(.post-type-lm_course, .post-type-lm_program)
+	:is(#clms_course_enrollment, #clms_program_enrollment).postbox {
+	--clms-mb-accent: #0f766e;
+	--clms-mb-accent-dk: #115e59;
+	--clms-mb-soft: #f0fdfa;
+	--clms-mb-border: #99f6e4;
+	--clms-mb-focus: rgba(15, 118, 110, 0.22);
+}
+
+body:is(.post-type-lm_course, .post-type-lm_program)
+	:is(#clms_course_teachers, #clms_program_teachers).postbox {
+	--clms-mb-accent: #7c3aed;
+	--clms-mb-accent-dk: #5b21b6;
+	--clms-mb-soft: #f5f3ff;
+	--clms-mb-border: #ddd6fe;
+	--clms-mb-focus: rgba(124, 58, 237, 0.22);
+}
+
+body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+	:is(
+		#clms_course_meta,
+		#clms_course_commercial,
+		#clms_course_academic,
+		#clms_course_curriculum_preview,
+		#clms_course_drip_timeline,
+		#clms_course_teachers,
+		#clms_course_enrollment,
+		#clms_program_meta,
+		#clms_program_commercial,
+		#clms_program_curriculum_preview,
+		#clms_program_teachers,
+		#clms_program_enrollment,
+		#clms_lesson_relation,
+		#clms_lesson_visual,
+		#clms_lesson_resources
+	) .postbox-header {
+	background: linear-gradient(140deg, var(--clms-mb-soft) 0%, var(--clms-bg, #fff) 88%);
+	border-bottom: 1px solid var(--clms-mb-border);
+}
+
+body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+	:is(
+		#clms_course_meta,
+		#clms_course_commercial,
+		#clms_course_academic,
+		#clms_course_curriculum_preview,
+		#clms_course_drip_timeline,
+		#clms_course_teachers,
+		#clms_course_enrollment,
+		#clms_program_meta,
+		#clms_program_commercial,
+		#clms_program_curriculum_preview,
+		#clms_program_teachers,
+		#clms_program_enrollment,
+		#clms_lesson_relation,
+		#clms_lesson_visual,
+		#clms_lesson_resources
+	) .postbox-header h2 {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	color: var(--clms-mb-accent-dk);
+	font-weight: 800;
+	letter-spacing: 0.01em;
+}
+
+body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+	:is(
+		#clms_course_meta,
+		#clms_course_commercial,
+		#clms_course_academic,
+		#clms_course_curriculum_preview,
+		#clms_course_drip_timeline,
+		#clms_course_teachers,
+		#clms_course_enrollment,
+		#clms_program_meta,
+		#clms_program_commercial,
+		#clms_program_curriculum_preview,
+		#clms_program_teachers,
+		#clms_program_enrollment,
+		#clms_lesson_relation,
+		#clms_lesson_visual,
+		#clms_lesson_resources
+	) .postbox-header h2:after {
+	display: inline-flex;
+	align-items: center;
+	padding: 2px 9px;
+	border-radius: 999px;
+	font-size: 10px;
+	font-weight: 800;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--clms-mb-accent-dk);
+	background: var(--clms-mb-soft);
+	border: 1px solid var(--clms-mb-border);
+}
+
+body.post-type-lm_course :is(#clms_course_meta, #clms_course_curriculum_preview, #clms_course_drip_timeline) .postbox-header h2:after,
+body.post-type-lm_program #clms_program_curriculum_preview .postbox-header h2:after { content: "Base"; }
+body.post-type-lm_course #clms_course_academic .postbox-header h2:after,
+body.post-type-lm_program #clms_program_meta .postbox-header h2:after,
+body.post-type-lm_lesson :is(#clms_lesson_relation, #clms_lesson_visual, #clms_lesson_resources) .postbox-header h2:after { content: "Academico"; }
+body.post-type-lm_course #clms_course_commercial .postbox-header h2:after,
+body.post-type-lm_program #clms_program_commercial .postbox-header h2:after { content: "Comercial"; }
+body.post-type-lm_course #clms_course_enrollment .postbox-header h2:after,
+body.post-type-lm_program #clms_program_enrollment .postbox-header h2:after { content: "Operacion"; }
+body.post-type-lm_course #clms_course_teachers .postbox-header h2:after,
+body.post-type-lm_program #clms_program_teachers .postbox-header h2:after { content: "Equipo"; }
+
+body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+	:is(
+		#clms_course_meta,
+		#clms_course_commercial,
+		#clms_course_academic,
+		#clms_course_curriculum_preview,
+		#clms_course_drip_timeline,
+		#clms_course_teachers,
+		#clms_course_enrollment,
+		#clms_program_meta,
+		#clms_program_commercial,
+		#clms_program_curriculum_preview,
+		#clms_program_teachers,
+		#clms_program_enrollment,
+		#clms_lesson_relation,
+		#clms_lesson_visual,
+		#clms_lesson_resources
+	) .postbox-header .handlediv .toggle-indicator:before {
+	color: var(--clms-mb-accent-dk);
+}
+
+body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+	:is(
+		#clms_course_meta,
+		#clms_course_commercial,
+		#clms_course_academic,
+		#clms_course_curriculum_preview,
+		#clms_course_drip_timeline,
+		#clms_course_teachers,
+		#clms_course_enrollment,
+		#clms_program_meta,
+		#clms_program_commercial,
+		#clms_program_curriculum_preview,
+		#clms_program_teachers,
+		#clms_program_enrollment,
+		#clms_lesson_relation,
+		#clms_lesson_visual,
+		#clms_lesson_resources
+	) .inside {
+	margin: 0;
+	padding: 16px;
+	background: linear-gradient(180deg, #fff 0%, var(--clms-bg-soft, #f9fafb) 100%);
+}
+
+body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+	:is(
+		#clms_course_meta,
+		#clms_course_commercial,
+		#clms_course_academic,
+		#clms_course_curriculum_preview,
+		#clms_course_drip_timeline,
+		#clms_course_teachers,
+		#clms_course_enrollment,
+		#clms_program_meta,
+		#clms_program_commercial,
+		#clms_program_curriculum_preview,
+		#clms_program_teachers,
+		#clms_program_enrollment,
+		#clms_lesson_relation,
+		#clms_lesson_visual,
+		#clms_lesson_resources
+	) .inside p { margin: 0 0 12px; }
+
+body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+	:is(
+		#clms_course_meta,
+		#clms_course_commercial,
+		#clms_course_academic,
+		#clms_course_teachers,
+		#clms_course_enrollment,
+		#clms_program_meta,
+		#clms_program_commercial,
+		#clms_program_teachers,
+		#clms_program_enrollment,
+		#clms_lesson_relation
+	) :is(input[type="text"], input[type="number"], input[type="url"], input[type="email"], input[type="file"], select, textarea) {
+	border: 1px solid var(--clms-border, #dcdcde);
+	border-radius: 10px;
+	padding: 8px 10px;
+	min-height: 38px;
+	background: var(--clms-bg, #fff);
+	color: var(--clms-ink, #1d2327);
+	transition: border-color 0.14s ease, box-shadow 0.14s ease, background 0.14s ease;
+}
+
+body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+	:is(
+		#clms_course_meta,
+		#clms_course_commercial,
+		#clms_course_academic,
+		#clms_course_teachers,
+		#clms_course_enrollment,
+		#clms_program_meta,
+		#clms_program_commercial,
+		#clms_program_teachers,
+		#clms_program_enrollment,
+		#clms_lesson_relation
+	) :is(input[type="text"], input[type="number"], input[type="url"], input[type="email"], input[type="file"], select, textarea):focus {
+	border-color: var(--clms-mb-accent);
+	box-shadow: 0 0 0 2px var(--clms-mb-focus);
+	outline: none;
+}
+
+body:is(.post-type-lm_course, .post-type-lm_program)
+	:is(#clms_course_meta, #clms_course_commercial, #clms_course_academic, #clms_program_meta, #clms_program_commercial) details {
+	background: var(--clms-bg, #fff);
+	border: 1px solid var(--clms-border-soft, #e5e7eb);
+	border-radius: 12px;
+	padding: 10px 12px;
+}
+body:is(.post-type-lm_course, .post-type-lm_program)
+	:is(#clms_course_meta, #clms_course_commercial, #clms_course_academic, #clms_program_meta, #clms_program_commercial) details[open] {
+	border-color: var(--clms-mb-border);
+	background: linear-gradient(180deg, var(--clms-mb-soft), #fff);
+}
+body:is(.post-type-lm_course, .post-type-lm_program)
+	:is(#clms_course_meta, #clms_course_commercial, #clms_course_academic, #clms_program_meta, #clms_program_commercial) summary {
+	cursor: pointer;
+	font-weight: 700;
+	color: var(--clms-mb-accent-dk);
+}
+
+body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+	:is(
+		#clms_course_meta,
+		#clms_course_commercial,
+		#clms_course_academic,
+		#clms_course_teachers,
+		#clms_course_enrollment,
+		#clms_program_meta,
+		#clms_program_commercial,
+		#clms_program_teachers,
+		#clms_program_enrollment,
+		#clms_lesson_relation
+	) .description {
+	display: block;
+	margin-top: 5px;
+	line-height: 1.45;
+	font-size: 12px;
+	color: var(--clms-muted, #6b7280);
+}
+
+body.post-type-lm_course #clms_course_commercial .clms-gallery-drop,
+body.post-type-lm_program #clms_program_commercial .clms-gallery-drop {
+	border-color: var(--clms-mb-border);
+	background: linear-gradient(180deg, var(--clms-mb-soft), #fff);
+}
+body.post-type-lm_course #clms_course_commercial .clms-gallery-drop.is-dragover,
+body.post-type-lm_program #clms_program_commercial .clms-gallery-drop.is-dragover {
+	border-color: var(--clms-mb-accent);
+	background: var(--clms-mb-soft);
+}
+
+body:is(.post-type-lm_course, .post-type-lm_program)
+	:is(#clms_course_enrollment, #clms_program_enrollment) .clms-ac-tabs,
+body.post-type-lm_program #clms-program-enrollment-box .clms-ac-tabs {
+	border: 1px solid var(--clms-mb-border);
+	border-radius: 12px;
+	padding: 6px;
+	background: var(--clms-mb-soft);
+	gap: 6px;
+	margin: 0 0 14px;
+}
+body:is(.post-type-lm_course, .post-type-lm_program)
+	:is(#clms_course_enrollment, #clms_program_enrollment) .clms-ac-tabs li button,
+body.post-type-lm_program #clms-program-enrollment-box .clms-ac-tabs li button {
+	border-radius: 9px;
+	border-bottom: 0;
+	padding: 8px 12px;
+	margin-bottom: 0;
+	color: var(--clms-mb-accent-dk);
+}
+body:is(.post-type-lm_course, .post-type-lm_program)
+	:is(#clms_course_enrollment, #clms_program_enrollment) .clms-ac-tabs li button.active,
+body:is(.post-type-lm_course, .post-type-lm_program)
+	:is(#clms_course_enrollment, #clms_program_enrollment) .clms-ac-tabs li button:hover,
+body.post-type-lm_program #clms-program-enrollment-box .clms-ac-tabs li button.active,
+body.post-type-lm_program #clms-program-enrollment-box .clms-ac-tabs li button:hover {
+	background: #fff;
+	box-shadow: inset 0 0 0 1px var(--clms-mb-border);
+}
+
+body:is(.post-type-lm_course, .post-type-lm_program)
+	:is(#clms_course_enrollment, #clms_program_enrollment, #clms_course_commercial, #clms_program_commercial) :is(.clms-btn, .button) {
+	border-radius: 10px;
+	min-height: 34px;
+	padding: 6px 14px;
+	font-weight: 700;
+	transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.15s ease;
+}
+body:is(.post-type-lm_course, .post-type-lm_program)
+	:is(#clms_course_enrollment, #clms_program_enrollment, #clms_course_commercial, #clms_program_commercial) :is(.clms-btn, .button):hover {
+	transform: translateY(-1px);
+}
+body:is(.post-type-lm_course, .post-type-lm_program)
+	:is(#clms_course_enrollment, #clms_program_enrollment, #clms_course_commercial, #clms_program_commercial) :is(.clms-btn-blue, .button-primary) {
+	background: var(--clms-mb-accent);
+	border-color: var(--clms-mb-accent);
+	color: #fff;
+}
+body:is(.post-type-lm_course, .post-type-lm_program)
+	:is(#clms_course_enrollment, #clms_program_enrollment, #clms_course_commercial, #clms_program_commercial) :is(.clms-btn-blue, .button-primary):hover {
+	background: var(--clms-mb-accent-dk);
+	border-color: var(--clms-mb-accent-dk);
+	color: #fff;
+}
+
+@media (max-width: 782px) {
+	body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+		:is(
+			#clms_course_meta,
+			#clms_course_commercial,
+			#clms_course_academic,
+			#clms_course_curriculum_preview,
+			#clms_course_drip_timeline,
+			#clms_course_teachers,
+			#clms_course_enrollment,
+			#clms_program_meta,
+			#clms_program_commercial,
+			#clms_program_curriculum_preview,
+			#clms_program_teachers,
+			#clms_program_enrollment,
+			#clms_lesson_relation,
+			#clms_lesson_visual,
+			#clms_lesson_resources
+		) .inside {
+		padding: 12px;
+	}
+
+	body:is(.post-type-lm_course, .post-type-lm_program)
+		:is(#clms_course_enrollment, #clms_program_enrollment) .clms-row {
+		gap: 10px;
+	}
+	body:is(.post-type-lm_course, .post-type-lm_program)
+		:is(#clms_course_enrollment, #clms_program_enrollment) .clms-row :is(input[type="text"], input[type="email"], input[type="file"], select) {
+		min-width: 100%;
+	}
+
+	body:is(.post-type-lm_course, .post-type-lm_program)
+		:is(#clms_course_enrollment, #clms_program_enrollment) .clms-ac-tabs,
+	body.post-type-lm_program #clms-program-enrollment-box .clms-ac-tabs {
+		overflow-x: auto;
+		overflow-y: hidden;
+		flex-wrap: nowrap;
+	}
+}
+/* ═══════════════════════════════════════════════════
+   5. METABOX — Status messages
+   ═══════════════════════════════════════════════════ */
+.clms-msg {
+	padding: 8px 12px;
+	border-radius: 6px;
+	font-size: 13px;
+	margin: 8px 0;
+	border: 1px solid transparent;
+}
+.clms-msg.ok  { background: var(--clms-ok-bg);  color: var(--clms-ok-ink);  border-color: var(--clms-ok-border); }
+.clms-msg.err { background: var(--clms-err-bg); color: var(--clms-err-ink); border-color: var(--clms-err-border); }
+
+/* ═══════════════════════════════════════════════════
+   6. METABOX — Invitation / access-link list
+   ═══════════════════════════════════════════════════ */
+.clms-invite-list { list-style: none; margin: 0; padding: 0; }
+.clms-invite-list li {
+	background: var(--clms-bg-soft);
+	border: 1px solid var(--clms-border-soft);
+	border-radius: 6px;
+	padding: 8px 12px;
+	margin-bottom: 6px;
+	font-size: 12px;
+	color: var(--clms-ink);
+}
+.clms-invite-list li .token-url {
+	font-family: monospace;
+	word-break: break-all;
+	color: var(--clms-accent);
+	font-size: 11px;
+}
+
+.clms-link-box {
+	background: var(--clms-bg-soft);
+	border: 1px solid var(--clms-border-soft);
+	border-radius: 6px;
+	padding: 10px 14px;
+	margin: 10px 0;
+	font-size: 13px;
+	color: var(--clms-ink);
+}
+.clms-link-box a { color: var(--clms-accent); word-break: break-all; }
+
+/* ═══════════════════════════════════════════════════
+   7. METABOX — Badges
+   ═══════════════════════════════════════════════════ */
+.clms-badge {
+	display: inline-flex; align-items: center;
+	padding: 2px 8px; border-radius: 999px;
+	font-size: 11px; font-weight: 700;
+}
+.clms-badge-green  { background: var(--clms-badge-green-bg);  color: var(--clms-badge-green-ink); }
+.clms-badge-yellow { background: var(--clms-badge-yellow-bg); color: var(--clms-badge-yellow-ink); }
+.clms-badge-gray   { background: var(--clms-badge-gray-bg);   color: var(--clms-badge-gray-ink); }
+.clms-badge-red    { background: var(--clms-badge-red-bg);    color: var(--clms-badge-red-ink); }
+
+/* ═══════════════════════════════════════════════════
+   8. METABOX — Course outline (program builder)
+   ═══════════════════════════════════════════════════ */
+.clms-course-outline-group {
+	border: 1px solid var(--clms-border);
+	border-radius: 8px;
+	background: var(--clms-bg);
+	padding: 10px;
+}
+.clms-course-outline-title   { font-weight: 700; margin: 0 0 8px; font-size: 12px; color: var(--clms-ink); }
+.clms-course-outline-empty   { margin: 0; color: var(--clms-muted); }
+.clms-course-outline-order {
+	display: inline-flex; min-width: 24px; justify-content: center;
+	border-radius: 999px; background: var(--clms-bg-raised);
+	color: var(--clms-ink); font-size: 11px; padding: 2px 6px;
+}
+
+/* ═══════════════════════════════════════════════════
+   9. METABOX — Lesson (resource, AI status, video card)
+   ═══════════════════════════════════════════════════ */
+.clms-help         { font-size: 11px; color: var(--clms-muted-2); margin: 4px 0 0; display: block; }
+.clms-resource-row { border: 1px solid var(--clms-border); border-radius: 8px; padding: 14px; background: var(--clms-bg-soft); }
+.clms-resource-preview img {
+	width: 72px; height: 72px; object-fit: cover;
+	border-radius: 6px; border: 1px solid var(--clms-border);
+	background: var(--clms-bg); flex-shrink: 0;
+}
+.clms-ai-status {
+	padding: 10px; border: 1px solid var(--clms-border);
+	border-radius: 6px; background: var(--clms-bg); margin: 10px 0;
+}
+.clms-video-card summary {
+	padding: 10px 14px; cursor: pointer; font-weight: 700; font-size: 13px;
+	list-style: none; background: var(--clms-bg-raised);
+	display: flex; justify-content: space-between; align-items: center;
+	color: var(--clms-ink);
+}
+.clms-video-card-body { padding: 12px 14px; background: var(--clms-bg-soft); }
+.clms-video-thumb-wrap img {
+	width: 140px; height: 79px; object-fit: cover;
+	border-radius: 4px; border: 1px solid var(--clms-border);
+	background: #000; flex-shrink: 0;
+}
+
+/* Transcription badge variants */
+.clms-tr-badge--not_requested  { background: var(--clms-bg-raised);      color: var(--clms-muted-2); }
+.clms-tr-badge--pending,
+.clms-tr-badge--processing      { background: var(--clms-warn-bg);         color: var(--clms-warn-ink); }
+.clms-tr-badge--completed       { background: var(--clms-badge-green-bg);  color: var(--clms-badge-green-ink); }
+.clms-tr-badge--failed          { background: var(--clms-badge-red-bg);    color: var(--clms-badge-red-ink); }
+
+/* Transcription preview block */
+.clms-tr-preview-block {
+	margin: 8px 0 0; font-size: 12px; line-height: 1.6;
+	color: var(--clms-ink); max-height: 120px; overflow-y: auto;
+	padding: 8px; background: var(--clms-bg);
+	border: 1px solid var(--clms-border); border-radius: 4px;
+}
+
+/* AI generate msg */
+#clms-ai-generate-msg { margin-left: 10px; color: var(--clms-muted); font-style: italic; }
+
+/* ═══════════════════════════════════════════════════
+   10. CSV result pre
+   ═══════════════════════════════════════════════════ */
+#clms-csv-result {
+	font-size: 12px;
+	background: var(--clms-bg-soft);
+	color: var(--clms-ink);
+	padding: 8px;
+	border-radius: 4px;
+	display: none;
+	max-height: 150px;
+	overflow: auto;
+	border: 1px solid var(--clms-border);
+}
+
+/* ═══════════════════════════════════════════════════
+   11. DASHBOARD  (.clms-sd)
+   ═══════════════════════════════════════════════════ */
+.clms-sd {
+	--sd-card:       var(--clms-bg);
+	--sd-ink:        var(--clms-ink);
+	--sd-ink-2:      var(--clms-ink-2);
+	--sd-muted:      var(--clms-muted);
+	--sd-border:     var(--clms-border-soft);
+	--sd-success:    var(--clms-badge-green-ink);
+	--sd-success-bg: var(--clms-badge-green-bg);
+	--sd-warn:       var(--clms-badge-yellow-ink);
+	--sd-warn-bg:    var(--clms-badge-yellow-bg);
+	--sd-info:       #60a5fa;
+	--sd-info-bg:    rgba(96,165,250,.14);
+}
+
+/* Secondary button in dashboard — must stay legible on dark surfaces */
+.clms-sd-btn--secondary {
+	background: var(--clms-bg);
+	border-color: var(--clms-border-soft);
+	color: var(--clms-ink);
+}
+.clms-sd-btn--secondary:hover {
+	background: var(--clms-bg-raised);
+	color: var(--clms-ink);
+}
+
+/* "Next step" card with the gradient */
+.clms-sd-card--next {
+	border-color: rgba(99,102,241,.25);
+	background: linear-gradient(135deg, var(--clms-bg) 0%, var(--clms-accent-lt) 100%);
+}
+
+/* Stat card & list-card white backgrounds */
+.clms-sd-stat,
+.clms-sd-module,
+.clms-sd-course,
+.clms-sd-list-card,
+.clms-sd-mini,
+.clms-sd-details { background: var(--clms-bg); border-color: var(--clms-border-soft); }
+
+.clms-sd-profile,
+.clms-sd-eval { background: var(--clms-bg-soft); border-color: var(--clms-border-soft); }
+
+.clms-sd-eyebrow { background: var(--clms-accent-lt); color: var(--clms-accent); }
+
+.clms-sd-badge           { background: var(--clms-bg-raised); color: var(--clms-ink); }
+.clms-sd-badge.is-warning{ background: var(--clms-warn-bg);   color: var(--clms-warn-ink); }
+.clms-sd-badge.is-success{ background: var(--clms-ok-bg);     color: var(--clms-ok-ink); }
+.clms-sd-badge.is-info   { background: rgba(96,165,250,.14);  color: #60a5fa; }
+.clms-sd-badge.is-muted  { background: var(--clms-bg-soft);   color: var(--clms-muted); }
+
+.clms-sd-chip { background: var(--clms-accent-lt); color: var(--clms-accent); }
+
+.clms-sd-progress { background: var(--clms-bg-raised); }
+
+/* ═══════════════════════════════════════════════════
+   12. SETTINGS PAGE
+   ═══════════════════════════════════════════════════ */
+.wrap .notice { color: var(--clms-ink); }
+.clms-settings-section { color: var(--clms-ink); }
+
+/* ═══════════════════════════════════════════════════
+   13. ENROLLMENT MANAGER — frontend redemption pages
+   (rendered via get_header/get_footer, so inherits theme,
+    but we provide safe fallbacks via the custom props)
+   ═══════════════════════════════════════════════════ */
+.clms-join-page {
+	max-width: 480px;
+	margin: 60px auto;
+	padding: 32px;
+	border: 1px solid var(--clms-border);
+	border-radius: 12px;
+	background: var(--clms-bg);
+	color: var(--clms-ink);
+	box-shadow: var(--clms-shadow-xs);
+}
+.clms-join-page h2 { margin: 0 0 16px; color: var(--clms-ink); }
+.clms-join-page p  { color: var(--clms-ink-2); }
+.clms-join-page .clms-join-success { color: var(--clms-ok-ink); }
+.clms-join-page .clms-join-error   { color: var(--clms-err-ink); }
+
+.clms-join-label { display: block; margin-bottom: 4px; font-size: 13px; font-weight: 600; color: var(--clms-ink-2); }
+.clms-join-input {
+	width: 100%; padding: 9px 12px; border-radius: 6px;
+	border: 1px solid var(--clms-border); font-size: 14px;
+	background: var(--clms-bg); color: var(--clms-ink);
+}
+.clms-join-btn {
+	display: inline-flex; align-items: center; justify-content: center;
+	padding: 10px 22px; border-radius: 6px; font-size: 14px; font-weight: 600;
+	background: var(--clms-accent); color: #fff; border: none; cursor: pointer;
+}
+.clms-join-btn:hover { background: var(--clms-accent-dk); }
+
+/* ═══════════════════════════════════════════════════
+   ESCRITORIO — Grid de widgets
+   ═══════════════════════════════════════════════════ */
+
+.atora-escritorio { max-width: 1200px; margin: 20px auto; }
+.atora-escritorio-header { margin-bottom: 24px; }
+.atora-escritorio-header h1 { font-size: 22px; font-weight: 700; margin: 0 0 4px; color: var(--clms-ink); }
+.atora-escritorio-role { font-size: 13px; color: var(--clms-muted); margin: 0; }
+
+.atora-escritorio-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 16px;
+}
+
+/* Widget card */
+.atora-widget {
+	background: var(--clms-bg);
+	border: 1px solid var(--clms-border);
+	border-radius: 10px;
+	padding: 20px;
+	min-height: 160px;
+	box-sizing: border-box;
+}
+.atora-widget[data-colspan="2"] {
+	grid-column: span 2;
+}
+.atora-widget-head {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 14px;
+}
+.atora-widget-head h3 {
+	font-size: 14px;
+	font-weight: 700;
+	margin: 0;
+	color: var(--clms-ink);
+	display: flex;
+	align-items: center;
+}
+.atora-widget-link {
+	font-size: 12px;
+	color: var(--clms-accent);
+	text-decoration: none;
+	white-space: nowrap;
+}
+.atora-widget-link:hover { text-decoration: underline; }
+
+/* Metric cards dentro de widgets */
+.atora-widget-metrics {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+	gap: 8px;
+}
+.atora-widget-metric {
+	background: var(--clms-bg-soft);
+	border-radius: 8px;
+	padding: 10px 12px;
+	text-align: center;
+}
+.atora-widget-metric strong {
+	display: block;
+	font-size: 20px;
+	font-weight: 700;
+	color: var(--clms-ink);
+	line-height: 1.2;
+}
+.atora-widget-metric span {
+	font-size: 11px;
+	color: var(--clms-muted);
+	text-transform: uppercase;
+	letter-spacing: 0.03em;
+}
+
+/* Lista de items en widgets */
+.atora-widget-list {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.atora-widget-list li {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 7px 0;
+	border-bottom: 1px solid var(--clms-border-soft);
+	font-size: 13px;
+	color: var(--clms-ink-2);
+	gap: 8px;
+}
+.atora-widget-list li:last-child { border-bottom: none; }
+
+/* Status pills del Escritorio */
+.atora-status-ok {
+	display: inline-flex; padding: 2px 8px; border-radius: 99px;
+	font-size: 11px; font-weight: 600;
+	background: var(--clms-ok-bg); color: var(--clms-ok-ink);
+}
+.atora-status-warn {
+	display: inline-flex; padding: 2px 8px; border-radius: 99px;
+	font-size: 11px; font-weight: 600;
+	background: var(--clms-warn-bg); color: var(--clms-warn-ink);
+}
+.atora-status-err {
+	display: inline-flex; padding: 2px 8px; border-radius: 99px;
+	font-size: 11px; font-weight: 600;
+	background: var(--clms-err-bg); color: var(--clms-err-ink);
+}
+
+/* Tool grid (widget IA) */
+.atora-tool-grid {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 8px;
+}
+.atora-tool-btn {
+	background: var(--clms-bg-soft);
+	border: 1px solid var(--clms-border-soft);
+	border-radius: 8px;
+	padding: 10px 8px;
+	font-size: 12px;
+	text-align: center;
+	cursor: pointer;
+	color: var(--clms-ink-2);
+	transition: background 0.15s, border-color 0.15s;
+	line-height: 1.3;
+}
+.atora-tool-btn:hover {
+	background: var(--clms-accent-lt);
+	border-color: var(--clms-accent);
+	color: var(--clms-accent-dk);
+}
+
+/* Responsive */
+@media (max-width: 782px) {
+	.atora-escritorio-grid { grid-template-columns: 1fr; }
+	.atora-widget[data-colspan="2"] { grid-column: span 1; }
+	.atora-tool-grid { grid-template-columns: repeat(2, 1fr); }
+	.atora-widget-metrics { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ═══════════════════════════════════════════════════
+   ATORA WP Dashboard Widgets (index.php)
+   ═══════════════════════════════════════════════════ */
+
+/* Wrapper base — reset del padding de .inside */
+.atora-wp-widget { font-size: 13px; line-height: 1.5; }
+
+/* ── Metric tiles ── */
+.atora-wp-metrics {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+	gap: 10px;
+	margin-bottom: 16px;
+}
+.atora-wp-metric {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	padding: 16px 10px 12px;
+	border-radius: 10px;
+	background: color-mix(in srgb, var(--m-color, #4f46e5) 9%, #fff);
+	border: 1px solid color-mix(in srgb, var(--m-color, #4f46e5) 18%, #e5e7eb);
+	text-decoration: none;
+	transition: transform .12s, box-shadow .12s;
+	gap: 5px;
+}
+.atora-wp-metric:hover {
+	transform: translateY(-2px);
+	box-shadow: 0 4px 14px color-mix(in srgb, var(--m-color, #4f46e5) 20%, transparent);
+	text-decoration: none;
+}
+.atora-wp-metric-num {
+	font-size: 28px;
+	font-weight: 800;
+	color: var(--m-color, #4f46e5);
+	line-height: 1;
+}
+.atora-wp-metric-lbl {
+	font-size: 10px;
+	font-weight: 700;
+	color: #64748b;
+	text-transform: uppercase;
+	letter-spacing: .05em;
+	text-align: center;
+}
+
+/* ── Chart section ── */
+.atora-wp-section { margin: 14px 0; }
+.atora-wp-section-title {
+	font-size: 10px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: .07em;
+	color: #94a3b8;
+	margin: 0 0 8px;
+}
+
+/* ── Trend sparklines ── */
+.atora-wp-trends {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+	gap: 12px;
+	margin: 14px 0;
+}
+.atora-wp-trend { display: flex; flex-direction: column; gap: 4px; }
+.atora-wp-trend-lbl {
+	font-size: 10px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: .05em;
+	color: #94a3b8;
+}
+
+/* ── Footer actions ── */
+.atora-wp-footer {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+	margin-top: 14px;
+	padding-top: 12px;
+	border-top: 1px solid #f1f5f9;
+}
+
+/* ── Submission / message list ── */
+.atora-wp-list { margin: 10px 0 0; padding: 0; list-style: none; }
+.atora-wp-list-item {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 8px 0;
+	border-bottom: 1px solid #f1f5f9;
+	gap: 8px;
+}
+.atora-wp-list-item:last-child { border-bottom: none; }
+.atora-wp-list-item.is-unread .atora-wp-list-main strong { color: #4f46e5; }
+.atora-wp-list-main {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+	min-width: 0;
+}
+.atora-wp-list-main strong {
+	font-size: 13px;
+	color: #1d2327;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	display: block;
+}
+.atora-wp-list-main small { font-size: 11px; color: #94a3b8; display: block; }
+.atora-wp-btn-rev { flex-shrink: 0; }
+
+/* ── Evaluation widget ── */
+.atora-wp-eval-head {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	margin-bottom: 12px;
+}
+.atora-wp-eval-donut { flex-shrink: 0; }
+.atora-wp-eval-donut-lbl {
+	font-size: 9px;
+	text-align: center;
+	color: #94a3b8;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: .05em;
+	margin: 3px 0 0;
+}
+.atora-wp-eval-counts { display: flex; flex-direction: column; gap: 8px; }
+.atora-wp-eval-count { display: flex; flex-direction: column; gap: 1px; font-size: 11px; font-weight: 600; }
+.atora-wp-eval-num { font-size: 30px; font-weight: 800; line-height: 1; }
+
+/* ── Messages widget head ── */
+.atora-wp-msg-head {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	margin-bottom: 12px;
+}
+.atora-wp-msg-badge {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 50px;
+	height: 50px;
+	border-radius: 50%;
+	font-size: 22px;
+	font-weight: 800;
+	flex-shrink: 0;
+}
+
+/* ── Notice & empty ── */
+.atora-wp-notice {
+	padding: 12px 14px;
+	background: #fef9c3;
+	border: 1px solid #fde68a;
+	border-radius: 8px;
+	margin-bottom: 12px;
+}
+.atora-wp-notice p { margin: 0 0 8px; font-size: 13px; }
+.atora-wp-empty { color: #94a3b8; font-size: 13px; margin: 8px 0 0; }
+
+/* ── Operaciones y visibilidad (admin UX) ── */
+.clms-dashboard-grid{
+	display:grid;
+	grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+	gap:12px;
+	margin:0;
+}
+.clms-admin-card{
+	background:#fff;
+	border:1px solid #dcdcde;
+	border-radius:10px;
+	padding:14px;
+}
+.clms-action-card{
+	display:flex;
+	flex-direction:column;
+	gap:10px;
+	border-left:4px solid #cbd5e1;
+}
+.clms-action-card--academic{border-left-color:#2563eb}
+.clms-action-card--certification{border-left-color:#7c3aed}
+.clms-action-card--students{border-left-color:#0891b2}
+.clms-action-card--ai{border-left-color:#0d9488}
+.clms-action-card--commerce{border-left-color:#ea580c}
+.clms-action-card--system{border-left-color:#475569}
+.clms-action-card--critical{border-left-color:#dc2626}
+.clms-action-card__head{
+	display:flex;
+	align-items:center;
+	justify-content:space-between;
+	gap:8px;
+}
+.clms-action-card__head .dashicons{
+	color:#334155;
+	font-size:18px;
+	width:18px;
+	height:18px;
+}
+.clms-action-card h4{
+	margin:0;
+	font-size:14px;
+	line-height:1.35;
+	color:#0f172a;
+}
+.clms-action-card__desc{
+	margin:0;
+	font-size:12px;
+	color:#475569;
+}
+.clms-action-card__status{
+	margin:0;
+	font-size:12px;
+	color:#1e293b;
+	font-weight:600;
+}
+.clms-status-pill{
+	display:inline-flex;
+	align-items:center;
+	padding:2px 8px;
+	border-radius:999px;
+	font-size:10px;
+	font-weight:700;
+	letter-spacing:.03em;
+}
+.clms-priority-critical{background:#fee2e2;color:#991b1b}
+.clms-priority-high{background:#fef3c7;color:#92400e}
+.clms-priority-medium{background:#dbeafe;color:#1d4ed8}
+.clms-priority-low{background:#e2e8f0;color:#334155}
+.clms-empty-state{
+	padding:14px;
+	border:1px dashed #cbd5e1;
+	border-radius:10px;
+	background:#f8fafc;
+}
+.clms-empty-state__title{
+	margin:0 0 6px;
+	font-weight:700;
+	color:#0f172a;
+}
+.clms-empty-state__text{
+	margin:0 0 12px;
+	color:#475569;
+	font-size:13px;
+}
+.clms-students-summary{
+	display:grid;
+	grid-template-columns:1fr;
+	gap:10px;
+}
+.clms-student-row{
+	padding:12px;
+	border:1px solid #e2e8f0;
+	border-radius:10px;
+	background:#fff;
+}
+.clms-student-row__head{
+	display:flex;
+	align-items:center;
+	justify-content:space-between;
+	gap:8px;
+	margin-bottom:4px;
+}
+.clms-student-row__head h4{
+	margin:0;
+	font-size:14px;
+	color:#0f172a;
+}
+.clms-student-row__meta{
+	margin:0;
+	font-size:12px;
+	color:#64748b;
+}
+.clms-student-row__stats{
+	display:flex;
+	flex-wrap:wrap;
+	gap:8px;
+	margin:8px 0;
+}
+.clms-student-row__stats span{
+	font-size:11px;
+	padding:3px 8px;
+	border-radius:999px;
+	background:#f1f5f9;
+	color:#334155;
+}
+.clms-student-row__actions{
+	display:flex;
+	gap:8px;
+	flex-wrap:wrap;
+	margin-top:10px;
+}
+.clms-status-pill--risk-high{background:#fee2e2;color:#991b1b}
+.clms-status-pill--risk-medium{background:#fef3c7;color:#92400e}
+.clms-status-pill--risk-low{background:#dbeafe;color:#1d4ed8}
+.clms-status-pill--risk-normal{background:#dcfce7;color:#166534}
+.clms-status-pill--risk-unknown{background:#e2e8f0;color:#334155}
+
+/* ── Dark mode (WP admin dark theme) ── */
+@media (prefers-color-scheme: dark) {
+	.atora-wp-metric {
+		background: color-mix(in srgb, var(--m-color, #4f46e5) 14%, #1c1c1f);
+		border-color: color-mix(in srgb, var(--m-color, #4f46e5) 28%, #38383e);
+	}
+	.atora-wp-footer, .atora-wp-list-item { border-color: #2e2e34; }
+	.atora-wp-list-main strong { color: #f2f2f4; }
+	.atora-wp-metric-lbl, .atora-wp-trend-lbl, .atora-wp-section-title { color: #8a8a94; }
+	.clms-admin-card,
+	.clms-student-row{background:#1f2937;border-color:#374151}
+	.clms-action-card h4,
+	.clms-empty-state__title,
+	.clms-student-row__head h4{color:#f8fafc}
+	.clms-action-card__desc,
+	.clms-empty-state__text,
+	.clms-student-row__meta{color:#cbd5e1}
+	.clms-student-row__stats span{background:#334155;color:#e2e8f0}
+	.clms-empty-state{background:#0f172a;border-color:#334155}
+}
+body.dark-mode .atora-wp-metric,
+body.dark-theme .atora-wp-metric,
+body[data-theme="dark"] .atora-wp-metric {
+	background: color-mix(in srgb, var(--m-color, #4f46e5) 14%, #1c1c1f);
+	border-color: color-mix(in srgb, var(--m-color, #4f46e5) 28%, #38383e);
+}
+
+/* ── Responsive (sidebar WP en pantallas pequeñas) ── */
+@media (max-width: 782px) {
+	.atora-wp-metrics { grid-template-columns: repeat(2, 1fr); }
+	.atora-wp-eval-head { flex-direction: column; align-items: flex-start; }
+	.atora-wp-trends { grid-template-columns: 1fr; }
+	.clms-dashboard-grid{grid-template-columns:1fr}
+}
+
+/* ═══════════════════════════════════════════════════
+   15. METABOX — UX Enhancement Layer
+   Transiciones suaves, franja de acento, focus-within,
+   estado colapsado, tipografía de etiquetas, select
+   personalizado, scrollbar de listas, helpers visuales.
+   ═══════════════════════════════════════════════════ */
+
+/* ── 15a. Transición suave en todos los postboxes LMS ─────────────── */
+body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+	[id^="clms_"].postbox {
+	transition:
+		border-color      0.18s ease,
+		border-left-color 0.18s ease,
+		box-shadow        0.20s ease,
+		opacity           0.15s ease;
+}
+
+/* ── 15b. Franja de acento izquierda (refuerza el código de color) ── */
+/* Usa !important para superar la especificidad del bloque 4B (ID selector) */
+body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+	[id^="clms_"]:not(#clms_lesson_evaluation).postbox {
+	border-left-width: 4px !important;
+}
+
+/* ── 15c. Focus-within — anillo de enfoque en el metabox activo ───── */
+body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+	[id^="clms_"].postbox:focus-within:not(.closed) {
+	box-shadow:
+		0 0 0 3px var(--clms-mb-focus, rgba(37, 99, 235, 0.16)),
+		0 6px 20px rgba(15, 23, 42, 0.10),
+		0 20px 40px rgba(15, 23, 42, 0.07) !important;
+	border-color: var(--clms-mb-accent) !important;
+}
+
+/* ── 15d. Estado colapsado — reduce el peso visual ─────────────────── */
+body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+	[id^="clms_"].postbox.closed {
+	box-shadow: none !important;
+	border-color: var(--clms-border-soft) !important;
+	border-left-color: var(--clms-border, #dcdcde) !important;
+	opacity: 0.80;
+}
+
+/* Restaura opacidad y acento al pasar el cursor sobre un box colapsado */
+body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+	[id^="clms_"].postbox.closed:hover {
+	opacity: 1;
+	border-color: var(--clms-mb-accent) !important;
+	border-left-color: var(--clms-mb-accent) !important;
+}
+
+/* ── 15e. Tipografía de etiquetas — estilo kicker uppercase ─────────── */
+body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+	[id^="clms_"] .inside > p > label {
+	display: block;
+	font-size: 11px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.065em;
+	color: var(--clms-muted-2, #646970);
+	margin-bottom: 5px;
+}
+
+/* El <strong> dentro de label hereda el estilo de kicker */
+body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+	[id^="clms_"] .inside > p > label > strong {
+	font-size: inherit;
+	font-weight: inherit;
+	color: inherit;
+	text-transform: inherit;
+	letter-spacing: inherit;
+}
+
+/* ── 15f. Divisores HR dentro del contenido ─────────────────────────── */
+body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+	[id^="clms_"] .inside hr {
+	border: none;
+	border-top: 1px solid var(--clms-mb-border, var(--clms-border-soft));
+	margin: 18px 0;
+	opacity: 0.5;
+}
+
+/* ── 15g. Select con flecha personalizada ───────────────────────────── */
+body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+	[id^="clms_"] .inside select {
+	-webkit-appearance: none;
+	appearance: none;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+	background-repeat: no-repeat;
+	background-position: right 10px center;
+	padding-right: 30px !important;
+	cursor: pointer;
+}
+
+/* ── 15h. Textarea — resize visual + alto mínimo consistente ────────── */
+body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+	[id^="clms_"] .inside textarea {
+	resize: vertical;
+	min-height: 80px;
+	line-height: 1.5;
+}
+
+/* ── 15i. Inputs numéricos — ocultar spinners nativos ───────────────── */
+body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+	[id^="clms_"] .inside input[type="number"]::-webkit-inner-spin-button,
+body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+	[id^="clms_"] .inside input[type="number"]::-webkit-outer-spin-button {
+	-webkit-appearance: none;
+	margin: 0;
+}
+body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+	[id^="clms_"] .inside input[type="number"] {
+	-moz-appearance: textfield;
+	appearance: textfield;
+}
+
+/* ── 15j. Lista de matriculados — scroll con barra estilizada ────────── */
+.clms-student-list {
+	max-height: 340px;
+	overflow-y: auto;
+	scrollbar-width: thin;
+	scrollbar-color: var(--clms-border, #dcdcde) transparent;
+}
+.clms-student-list::-webkit-scrollbar       { width: 5px; }
+.clms-student-list::-webkit-scrollbar-track { background: transparent; }
+.clms-student-list::-webkit-scrollbar-thumb {
+	background: var(--clms-mb-border, #e5e7eb);
+	border-radius: 99px;
+}
+
+/* ── 15k. .clms-section-title — global, compartida con lección ─────── */
+.clms-section-title {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	font-size: 10px;
+	font-weight: 800;
+	text-transform: uppercase;
+	letter-spacing: 0.09em;
+	color: var(--clms-muted-2, #646970);
+	margin: 20px 0 10px;
+	padding-top: 16px;
+	border-top: 1px solid var(--clms-border-soft, #e5e7eb);
+}
+.clms-section-title:first-child {
+	margin-top: 0;
+	padding-top: 0;
+	border-top: none;
+}
+/* Punto decorativo de acento antes del título */
+.clms-section-title::before {
+	content: '';
+	display: inline-block;
+	width: 5px;
+	height: 5px;
+	border-radius: 50%;
+	background: var(--clms-mb-accent, var(--clms-accent, #4f46e5));
+	flex-shrink: 0;
+}
+
+/* ── 15l. Botones dentro de .inside — elevación al hover ─────────────── */
+body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+	[id^="clms_"] .inside .button,
+body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+	[id^="clms_"] .inside .clms-btn {
+	border-radius: 8px;
+	transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+	[id^="clms_"] .inside .button:hover,
+body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+	[id^="clms_"] .inside .clms-btn:hover {
+	transform: translateY(-1px);
+	box-shadow: 0 3px 10px rgba(0, 0, 0, 0.10);
+}
+body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+	[id^="clms_"] .inside .button:active,
+body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+	[id^="clms_"] .inside .clms-btn:active {
+	transform: translateY(0);
+	box-shadow: none;
+}
+
+/* ── 15m. Postbox header — cursor grab ──────────────────────────────── */
+body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+	[id^="clms_"] .postbox-header {
+	cursor: grab;
+	user-select: none;
+}
+body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+	[id^="clms_"] .postbox-header:active {
+	cursor: grabbing;
+}
+/* El botón toggle no debe heredar grab */
+body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+	[id^="clms_"] .postbox-header .handlediv {
+	cursor: pointer;
+}
+
+/* ── 15n. .clms-msg — mensajes con bordes redondeados ───────────────── */
+body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+	[id^="clms_"] .clms-msg {
+	border-radius: 10px;
+	padding: 10px 14px;
+	font-size: 13px;
+}
+
+/* ── 15o. Checkbox y radio — espaciado y alineación ──────────────────── */
+body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+	[id^="clms_"] .inside label > input[type="checkbox"],
+body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+	[id^="clms_"] .inside label > input[type="radio"] {
+	margin-top: 0;
+	vertical-align: middle;
+	margin-right: 5px;
+	cursor: pointer;
+}
+
+/* ── 15p. Responsive ─────────────────────────────────────────────────── */
+@media (max-width: 782px) {
+	body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+		[id^="clms_"] .inside > p {
+		margin-bottom: 14px;
+	}
+
+	body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+		[id^="clms_"] .inside select {
+		width: 100%;
+	}
+
+	/* En móvil la franja izquierda se convierte en borde superior */
+	body:is(.post-type-lm_course, .post-type-lm_program, .post-type-lm_lesson)
+		[id^="clms_"]:not(#clms_lesson_evaluation).postbox {
+		border-left-width: 1px !important;
+		border-top-width: 4px !important;
+	}
+}

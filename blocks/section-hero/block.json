@@ -1,0 +1,66 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "atora-lms/section-hero",
+  "version": "1.0.0",
+  "title": "ATORA Premium: Hero",
+  "category": "atora-lms",
+  "icon": "cover-image",
+  "description": "Cabecera principal del curso con imagen destacada, título, subtítulo y CTA. Renderizado por el engine de ATORA.",
+  "keywords": ["hero", "curso", "cabecera", "portada", "atora"],
+  "textdomain": "atora-lms",
+  "attributes": {
+    "eyebrow": {
+      "type": "string",
+      "default": "ATORA Premium"
+    },
+    "title": {
+      "type": "string",
+      "default": "Una narrativa premium merece una primera pantalla más precisa."
+    },
+    "subtitle": {
+      "type": "string",
+      "default": "Diseña con una jerarquía clara, una promesa fuerte y una CTA que sí invite a avanzar."
+    },
+    "align": {
+      "type": "string",
+      "default": "left"
+    },
+    "media_type": {
+      "type": "string",
+      "default": "image"
+    },
+    "media_url": {
+      "type": "string",
+      "default": ""
+    },
+    "image_shape": {
+      "type": "string",
+      "default": "rounded"
+    },
+    "primary_label": {
+      "type": "string",
+      "default": "CTA principal"
+    },
+    "primary_url": {
+      "type": "string",
+      "default": "#"
+    },
+    "secondary_label": {
+      "type": "string",
+      "default": "CTA secundaria"
+    },
+    "secondary_url": {
+      "type": "string",
+      "default": "#"
+    }
+  },
+  "usesContext": ["postId", "postType"],
+  "supports": {
+    "html": false,
+    "inserter": false,
+    "multiple": false,
+    "reusable": false,
+    "lock": false
+  }
+}

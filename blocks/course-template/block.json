@@ -1,0 +1,26 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "atora-lms/course-template",
+  "version": "1.0.0",
+  "title": "ATORA Premium: Template completo",
+  "category": "atora-lms",
+  "icon": "layout",
+  "description": "Renderiza todas las secciones activas del curso en el orden definido por el schema. Equivalente al template PHP single-course-commercial.php embebido en Gutenberg.",
+  "keywords": ["template", "curso", "secciones", "layout", "atora"],
+  "textdomain": "atora-lms",
+  "attributes": {
+    "eyebrow": {
+      "type": "string",
+      "default": "ATORA Premium"
+    }
+  },
+  "usesContext": ["postId", "postType"],
+  "supports": {
+    "html": false,
+    "inserter": false,
+    "multiple": false,
+    "reusable": false,
+    "lock": false
+  }
+}

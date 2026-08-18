@@ -1,0 +1,13 @@
+.atora-email-builder { display:grid; grid-template-columns:200px 1fr 340px; gap:0; border:1px solid #dbe1ea; border-radius:10px; overflow:hidden; min-height:520px; }
+.atora-email-builder__sidebar { border-right:1px solid #dbe1ea; padding:1rem; background:#f8fafc; }
+.atora-email-builder__center { padding:1.25rem; }
+.atora-email-builder__preview { border-left:1px solid #dbe1ea; background:#f8fafc; padding:1rem; overflow:auto; }
+.atora-email-block-btn { display:flex; align-items:center; gap:6px; padding:6px 10px; border:1px solid #dbe1ea; border-radius:6px; background:#fff; cursor:pointer; font-size:12px; margin-bottom:6px; width:100%; }
+.atora-email-var-chip { display:inline-block; padding:2px 8px; background:#dbeafe; color:#1d4ed8; border-radius:4px; font-size:11px; cursor:pointer; margin:2px; font-family:monospace; }
+.atora-email-canvas { min-height:200px; }
+.atora-email-canvas__block { border:1px solid transparent; border-radius:6px; padding:8px; margin-bottom:6px; position:relative; cursor:pointer; }
+.atora-email-canvas__block:hover,
+.atora-email-canvas__block.is-selected { border-color:#93c5fd; background:#eff6ff; }
+.atora-email-preview-frame { background:#fff; border-radius:8px; overflow:hidden; font-family:Arial,sans-serif; font-size:14px; }
+.atora-email-preview-header { background:linear-gradient(135deg,#0f4fa8,#0ea5e9); color:#fff; padding:16px 20px; }
+.atora-email-preview-body { padding:20px; }

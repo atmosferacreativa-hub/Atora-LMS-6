@@ -1,0 +1,1105 @@
+<?php
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+/**
+ * CLMS_Peer_Review
+ *
+ * Canvas-style peer assessment module.
+ *
+ * Workflow:
+ *  1. Teacher enables peer review on a lesson (meta _clms_peer_review_enabled = 1).
+ *  2. Teacher (or REST API) calls assign_for_lesson() after the submission deadline.
+ *  3. Each reviewer sees pending assignments in [clms_peer_review_inbox] shortcode.
+ *  4. Reviewer fills out the rubric and submits via AJAX (clms_pr_submit).
+ *  5. Once all peer reviews for a submission are completed, aggregate_grades() is called
+ *     and the student's grade is updated.
+ *
+ * CPT: clms_peer_review
+ *  Meta keys:
+ *   _clms_pr_lesson_id      — lesson being reviewed
+ *   _clms_pr_submission_id  — clms_submission post ID
+ *   _clms_pr_reviewee_id    — student whose work is being reviewed
+ *   _clms_pr_reviewer_id    — student who must do the review
+ *   _clms_pr_status         — pending | completed
+ *   _clms_pr_scores         — array of criterion => points
+ *   _clms_pr_comment        — free-text overall comment
+ *   _clms_pr_submitted_at   — Y-m-d H:i:s UTC
+ */
+class CLMS_Peer_Review {
+
+	public function __construct() {
+		add_action( 'init',              array( $this, 'register_cpt' ) );
+		add_action( 'wp_ajax_clms_pr_submit', array( $this, 'ajax_submit' ) );
+		add_action( 'wp_ajax_clms_pr_training_complete', array( $this, 'ajax_complete_training' ) );
+		add_shortcode( 'clms_peer_review_inbox', array( $this, 'render_inbox' ) );
+		add_shortcode( 'clms_peer_review_training', array( $this, 'render_training_module' ) );
+		add_action( 'clms_peer_review_completed', array( $this, 'maybe_aggregate' ), 10, 2 );
+		add_action( 'clms_peer_review_completed', array( $this, 'capture_review_quality' ), 20, 2 );
+	}
+
+	/* ----------------------------------------------------------------
+	 * CPT
+	 * -------------------------------------------------------------- */
+
+	public function register_cpt() {
+		// clms_rubric is registered by CLMS_Rubric (base module) — do not duplicate.
+		register_post_type( 'clms_peer_review', array(
+			'labels'              => array(
+				'name'          => __( 'Revisiones entre pares', 'atora-lms' ),
+				'singular_name' => __( 'Revisión entre pares', 'atora-lms' ),
+			),
+			'public'              => false,
+			'show_ui'             => false,
+			'show_in_rest'        => false,
+			'supports'            => array( 'custom-fields' ),
+			'capability_type'     => 'post',
+			'map_meta_cap'        => true,
+		) );
+	}
+
+	/* ----------------------------------------------------------------
+	 * ASSIGNMENT ENGINE
+	 * -------------------------------------------------------------- */
+
+	/**
+	 * Distributes submissions of a lesson to peer reviewers.
+	 *
+	 * @param int $lesson_id
+	 * @param int $reviews_per_student Number of peers each student reviews (default 2).
+	 * @return array|WP_Error  { assigned => int, skipped => int }
+	 */
+	public static function assign_for_lesson( $lesson_id, $reviews_per_student = 2 ) {
+		$lesson_id = absint( $lesson_id );
+
+		if ( ! (bool) get_post_meta( $lesson_id, '_clms_peer_review_enabled', true ) ) {
+			return new WP_Error( 'not_enabled', __( 'La revisión entre pares no está habilitada para esta lección.', 'atora-lms' ) );
+		}
+
+		// Get all submissions for this lesson.
+		$submissions = get_posts( array(
+			'post_type'      => 'clms_submission',
+			'post_status'    => array( 'publish', 'pending' ),
+			'posts_per_page' => -1,
+			'meta_query'     => array(
+				array(
+					'key'   => '_clms_submission_lesson_id',
+					'value' => $lesson_id,
+					'type'  => 'NUMERIC',
+				),
+			),
+		) );
+
+		if ( count( $submissions ) < 2 ) {
+			return new WP_Error( 'insufficient_submissions', __( 'Se necesitan al menos 2 entregas para asignar revisiones.', 'atora-lms' ) );
+		}
+
+		// Build map: student_id => submission_id.
+		$student_map = array();
+		foreach ( $submissions as $sub ) {
+			$sid = absint( get_post_meta( $sub->ID, '_clms_submission_user_id', true ) );
+			if ( $sid ) {
+				$student_map[ $sid ] = $sub->ID;
+			}
+		}
+
+		$student_ids = array_keys( $student_map );
+		$n           = count( $student_ids );
+		$assigned    = 0;
+		$skipped     = 0;
+
+		// Fisher-Yates shuffle for fairness.
+		for ( $i = $n - 1; $i > 0; $i-- ) {
+			$j                        = wp_rand( 0, $i );
+			$tmp                      = $student_ids[ $i ];
+			$student_ids[ $i ]        = $student_ids[ $j ];
+			$student_ids[ $j ]        = $tmp;
+		}
+
+		foreach ( $student_ids as $idx => $reviewer_id ) {
+			$count = 0;
+			for ( $k = 1; $k <= $n - 1 && $count < $reviews_per_student; $k++ ) {
+				$reviewee_id   = $student_ids[ ( $idx + $k ) % $n ];
+				$submission_id = $student_map[ $reviewee_id ];
+
+				// Skip if already assigned.
+				$exists = get_posts( array(
+					'post_type'      => 'clms_peer_review',
+					'posts_per_page' => 1,
+					'fields'         => 'ids',
+					'meta_query'     => array(
+						array( 'key' => '_clms_pr_lesson_id',     'value' => $lesson_id,     'type' => 'NUMERIC' ),
+						array( 'key' => '_clms_pr_reviewer_id',   'value' => $reviewer_id,   'type' => 'NUMERIC' ),
+						array( 'key' => '_clms_pr_submission_id', 'value' => $submission_id, 'type' => 'NUMERIC' ),
+					),
+				) );
+
+				if ( $exists ) {
+					++$skipped;
+					continue;
+				}
+
+				$pr_id = wp_insert_post( array(
+					'post_type'   => 'clms_peer_review',
+					'post_status' => 'draft',
+					'post_title'  => "PR: Lesson {$lesson_id} / Reviewer {$reviewer_id}",
+					'post_author' => $reviewer_id,
+				) );
+
+				if ( ! is_wp_error( $pr_id ) ) {
+					update_post_meta( $pr_id, '_clms_pr_lesson_id',     $lesson_id );
+					update_post_meta( $pr_id, '_clms_pr_submission_id', $submission_id );
+					update_post_meta( $pr_id, '_clms_pr_reviewee_id',   $reviewee_id );
+					update_post_meta( $pr_id, '_clms_pr_reviewer_id',   $reviewer_id );
+					update_post_meta( $pr_id, '_clms_pr_status',        'pending' );
+					++$assigned;
+					++$count;
+				}
+			}
+		}
+
+		return array( 'assigned' => $assigned, 'skipped' => $skipped );
+	}
+
+	/* ----------------------------------------------------------------
+	 * AJAX SUBMIT
+	 * -------------------------------------------------------------- */
+
+	public function ajax_submit() {
+		check_ajax_referer( 'clms_pr_nonce', 'nonce' );
+
+		$reviewer_id   = get_current_user_id();
+		$assignment_id = absint( $_POST['assignment_id'] ?? 0 );
+
+		if ( ! $reviewer_id || ! $assignment_id ) {
+			wp_send_json_error( array( 'message' => __( 'Solicitud inválida.', 'atora-lms' ) ), 400 );
+		}
+
+		$assignment = get_post( $assignment_id );
+		if ( ! $assignment || 'clms_peer_review' !== $assignment->post_type ) {
+			wp_send_json_error( array( 'message' => __( 'Asignación no encontrada.', 'atora-lms' ) ), 404 );
+		}
+
+		if ( absint( get_post_meta( $assignment_id, '_clms_pr_reviewer_id', true ) ) !== $reviewer_id ) {
+			wp_send_json_error( array( 'message' => __( 'No tienes permiso para esta revisión.', 'atora-lms' ) ), 403 );
+		}
+
+		if ( 'completed' === get_post_meta( $assignment_id, '_clms_pr_status', true ) ) {
+			wp_send_json_error( array( 'message' => __( 'Ya enviaste esta revisión.', 'atora-lms' ) ), 409 );
+		}
+
+		$lesson_id = absint( get_post_meta( $assignment_id, '_clms_pr_lesson_id', true ) );
+		if ( self::is_training_required_for_lesson( $lesson_id ) && ! self::is_reviewer_trained( $reviewer_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'Debes completar el entrenamiento de revisión antes de enviar evaluaciones entre pares.', 'atora-lms' ) ), 403 );
+		}
+
+		$raw_scores = isset( $_POST['scores'] ) && is_array( $_POST['scores'] ) ? wp_unslash( $_POST['scores'] ) : array();
+		$scores     = self::validate_scores_for_assignment( $assignment_id, $raw_scores );
+
+		if ( is_wp_error( $scores ) ) {
+			wp_send_json_error( array( 'message' => $scores->get_error_message() ), 400 );
+		}
+
+		$comment = isset( $_POST['comment'] ) ? sanitize_textarea_field( wp_unslash( $_POST['comment'] ) ) : '';
+
+		update_post_meta( $assignment_id, '_clms_pr_scores',       $scores );
+		update_post_meta( $assignment_id, '_clms_pr_comment',      $comment );
+		update_post_meta( $assignment_id, '_clms_pr_status',       'completed' );
+		update_post_meta( $assignment_id, '_clms_pr_submitted_at', gmdate( 'Y-m-d H:i:s' ) );
+		wp_update_post( array( 'ID' => $assignment_id, 'post_status' => 'publish' ) );
+
+		$submission_id = absint( get_post_meta( $assignment_id, '_clms_pr_submission_id', true ) );
+		do_action( 'clms_peer_review_completed', $assignment_id, $submission_id );
+
+		wp_send_json_success( array( 'message' => __( 'Revisión enviada correctamente.', 'atora-lms' ) ) );
+	}
+
+	/**
+	 * Marca entrenamiento de revisor como completado.
+	 *
+	 * @return void
+	 */
+	public function ajax_complete_training() {
+		check_ajax_referer( 'clms_pr_training_nonce', 'nonce' );
+
+		$user_id = get_current_user_id();
+		if ( ! $user_id ) {
+			wp_send_json_error( array( 'message' => __( 'Debes iniciar sesión para completar el entrenamiento.', 'atora-lms' ) ), 403 );
+		}
+
+		$status = self::mark_reviewer_training_completed( $user_id );
+
+		wp_send_json_success(
+			array(
+				'message' => __( 'Entrenamiento completado. Ya puedes enviar revisiones.', 'atora-lms' ),
+				'status'  => $status,
+			)
+		);
+	}
+
+	/**
+	 * Valida y normaliza puntajes recibidos para una asignación.
+	 *
+	 * @param int   $assignment_id Asignación.
+	 * @param array $raw_scores    Puntajes sin procesar.
+	 * @return array|WP_Error
+	 */
+	public static function validate_scores_for_assignment( $assignment_id, $raw_scores ) {
+		$assignment_id = absint( $assignment_id );
+		$raw_scores    = is_array( $raw_scores ) ? $raw_scores : array();
+
+		if ( ! $assignment_id ) {
+			return new WP_Error( 'invalid_assignment', __( 'Asignación inválida.', 'atora-lms' ) );
+		}
+
+		$lesson_id = absint( get_post_meta( $assignment_id, '_clms_pr_lesson_id', true ) );
+		$rubric_id = $lesson_id ? absint( get_post_meta( $lesson_id, '_clms_rubric_id', true ) ) : 0;
+
+		if ( $rubric_id && class_exists( 'CLMS_Rubric' ) ) {
+			$criteria = CLMS_Rubric::get_criteria( $rubric_id );
+			$scores   = array();
+
+			foreach ( $criteria as $index => $criterion ) {
+				$key       = (string) $index;
+				$score_raw = isset( $raw_scores[ $key ] ) ? trim( (string) $raw_scores[ $key ] ) : '';
+				$max       = isset( $criterion['max_points'] ) ? absint( $criterion['max_points'] ) : 0;
+
+				if ( '' === $score_raw || ! is_numeric( $score_raw ) ) {
+					return new WP_Error( 'invalid_score', __( 'Debes completar todos los criterios de la rúbrica.', 'atora-lms' ) );
+				}
+
+				$score = (int) round( (float) $score_raw );
+
+				if ( $score < 0 || $score > $max ) {
+					return new WP_Error( 'invalid_score_range', __( 'Uno de los puntajes excede el máximo permitido por la rúbrica.', 'atora-lms' ) );
+				}
+
+				$scores[ sanitize_key( $key ) ] = $score;
+			}
+
+			foreach ( array_keys( $raw_scores ) as $raw_key ) {
+				if ( ! array_key_exists( (string) $raw_key, $scores ) ) {
+					return new WP_Error( 'unexpected_score_key', __( 'Se detectaron criterios inválidos en la revisión.', 'atora-lms' ) );
+				}
+			}
+
+			return $scores;
+		}
+
+		$scores = array();
+
+		foreach ( $raw_scores as $key => $value ) {
+			$score_raw = trim( (string) $value );
+
+			if ( '' === $score_raw || ! is_numeric( $score_raw ) ) {
+				return new WP_Error( 'invalid_score', __( 'Todos los puntajes deben ser numéricos.', 'atora-lms' ) );
+			}
+
+			$score = (int) round( (float) $score_raw );
+
+			if ( $score < 0 || $score > 100 ) {
+				return new WP_Error( 'invalid_score_range', __( 'Los puntajes deben estar entre 0 y 100.', 'atora-lms' ) );
+			}
+
+			$scores[ sanitize_key( (string) $key ) ] = $score;
+		}
+
+		return $scores;
+	}
+
+	/* ----------------------------------------------------------------
+	 * GRADE AGGREGATION
+	 * -------------------------------------------------------------- */
+
+	/**
+	 * Called after each peer review is submitted.
+	 * If all assigned reviewers have completed their review, calculate the aggregate grade.
+	 */
+	public function maybe_aggregate( $assignment_id, $submission_id ) {
+		if ( ! $submission_id ) {
+			return;
+		}
+
+		$lesson_id = absint( get_post_meta( $assignment_id, '_clms_pr_lesson_id', true ) );
+
+		// Get all peer review assignments for this submission.
+		$all = get_posts( array(
+			'post_type'      => 'clms_peer_review',
+			'post_status'    => array( 'publish', 'draft' ),
+			'posts_per_page' => -1,
+			'fields'         => 'ids',
+			'meta_query'     => array(
+				array( 'key' => '_clms_pr_submission_id', 'value' => $submission_id, 'type' => 'NUMERIC' ),
+			),
+		) );
+
+		if ( empty( $all ) ) {
+			return;
+		}
+
+		$completed    = 0;
+		$total_scores = array();
+
+		foreach ( $all as $pr_id ) {
+			if ( 'completed' !== get_post_meta( $pr_id, '_clms_pr_status', true ) ) {
+				continue;
+			}
+			++$completed;
+			$scores = (array) get_post_meta( $pr_id, '_clms_pr_scores', true );
+			foreach ( $scores as $criterion => $points ) {
+				if ( ! isset( $total_scores[ $criterion ] ) ) {
+					$total_scores[ $criterion ] = array();
+				}
+				$total_scores[ $criterion ][] = absint( $points );
+			}
+		}
+
+		if ( $completed < count( $all ) ) {
+			// Not all reviewers done yet.
+			return;
+		}
+
+		// Average each criterion.
+		$avg_scores = array();
+		$grand_total = 0;
+		foreach ( $total_scores as $criterion => $values ) {
+			$avg                     = array_sum( $values ) / count( $values );
+			$avg_scores[ $criterion ] = round( $avg, 1 );
+			$grand_total             += $avg;
+		}
+
+		$rubric_id = absint( get_post_meta( $lesson_id, '_clms_rubric_id', true ) );
+		$max_score = 100;
+
+		if ( $rubric_id && class_exists( 'CLMS_Rubric' ) ) {
+			$derived = CLMS_Rubric::get_total_points( $rubric_id );
+			if ( $derived > 0 ) {
+				$max_score = $derived;
+			}
+		}
+
+		$peer_grade = $max_score > 0 ? min( 100, round( ( $grand_total / $max_score ) * 100 ) ) : 0;
+
+		// Merge with any teacher grade (teacher grade takes priority if set).
+		$teacher_grade = absint( get_post_meta( $submission_id, '_clms_submission_grade', true ) );
+		$final_grade   = $teacher_grade > 0 ? round( ( $teacher_grade * 0.6 ) + ( $peer_grade * 0.4 ) ) : $peer_grade;
+
+		update_post_meta( $submission_id, '_clms_peer_grade',     $peer_grade );
+		update_post_meta( $submission_id, '_clms_peer_scores',    $avg_scores );
+		update_post_meta( $submission_id, '_clms_peer_grade_at',  gmdate( 'Y-m-d H:i:s' ) );
+		update_post_meta( $submission_id, '_clms_final_grade',    $final_grade );
+
+		// Notify the reviewee.
+		$reviewee_id = absint( get_post_meta( $submission_id, '_clms_submission_user_id', true ) );
+		if ( $reviewee_id ) {
+			$this->notify_reviewee( $reviewee_id, $lesson_id, $peer_grade );
+		}
+
+		do_action( 'clms_peer_grades_aggregated', $submission_id, $peer_grade, $avg_scores );
+	}
+
+	/**
+	 * Captura calidad de una revisión al completarse.
+	 *
+	 * @param int $assignment_id Asignación.
+	 * @param int $submission_id Entrega revisada.
+	 * @return void
+	 */
+	public function capture_review_quality( $assignment_id, $submission_id ) {
+		$assignment_id = absint( $assignment_id );
+		$submission_id = absint( $submission_id );
+
+		if ( ! $assignment_id || 'completed' !== get_post_meta( $assignment_id, '_clms_pr_status', true ) ) {
+			return;
+		}
+
+		$already_scored = get_post_meta( $assignment_id, '_clms_pr_quality_scored_at', true );
+		if ( ! empty( $already_scored ) ) {
+			return;
+		}
+
+		$scores  = (array) get_post_meta( $assignment_id, '_clms_pr_scores', true );
+		$comment = (string) get_post_meta( $assignment_id, '_clms_pr_comment', true );
+		$quality = self::calculate_quality_score( $assignment_id, $scores, $comment );
+
+		update_post_meta( $assignment_id, '_clms_pr_quality_score', absint( $quality['score'] ) );
+		update_post_meta( $assignment_id, '_clms_pr_quality_status', sanitize_key( (string) $quality['status'] ) );
+		update_post_meta( $assignment_id, '_clms_pr_quality_flags', (array) $quality['flags'] );
+		update_post_meta( $assignment_id, '_clms_pr_quality_scored_at', gmdate( 'Y-m-d H:i:s' ) );
+
+		$reviewer_id = absint( get_post_meta( $assignment_id, '_clms_pr_reviewer_id', true ) );
+		do_action(
+			'clms_peer_review_quality_scored',
+			$assignment_id,
+			array(
+				'score'         => absint( $quality['score'] ),
+				'status'        => sanitize_key( (string) $quality['status'] ),
+				'flags'         => (array) $quality['flags'],
+				'reviewer_id'   => $reviewer_id,
+				'submission_id' => $submission_id,
+			),
+			$submission_id
+		);
+	}
+
+	protected function notify_reviewee( $user_id, $lesson_id, $grade ) {
+		$user    = get_userdata( $user_id );
+		$lesson  = get_post( $lesson_id );
+
+		if ( ! $user || ! $lesson ) {
+			return;
+		}
+
+		$lesson_title = $lesson->post_title;
+		$subject      = sprintf(
+			/* translators: %s: lesson title */
+			__( 'Revisión entre pares completada: %s', 'atora-lms' ),
+			$lesson_title
+		);
+
+		$message  = '<p>' . sprintf(
+			/* translators: %s: user display name */
+			esc_html__( 'Hola %s,', 'atora-lms' ),
+			esc_html( $user->display_name )
+		) . '</p>';
+		$message .= '<p>' . sprintf(
+			/* translators: %s: lesson title */
+			esc_html__( 'Tus compañeros han completado la revisión de tu entrega en %s.', 'atora-lms' ),
+			'<strong>' . esc_html( $lesson_title ) . '</strong>'
+		) . '</p>';
+		$message .= '<p>' . sprintf(
+			/* translators: %d: peer review average grade */
+			esc_html__( 'Calificación promedio de revisión entre pares: %d/100.', 'atora-lms' ),
+			absint( $grade )
+		) . '</p>';
+		$message .= '<p>' . esc_html__( 'Puedes ver el detalle en tu perfil.', 'atora-lms' ) . '</p>';
+
+		CLMS_Email::send(
+			$user->user_email,
+			$subject,
+			$message,
+			array(
+				'headline' => sprintf(
+					/* translators: %s: lesson title */
+					__( 'Revisión entre pares completada: %s', 'atora-lms' ),
+					$lesson_title
+				),
+			)
+		);
+	}
+
+	/* ----------------------------------------------------------------
+	 * SHORTCODE: [clms_peer_review_inbox]
+	 * -------------------------------------------------------------- */
+
+	public function render_inbox( $atts ) {
+		unset( $atts );
+		if ( ! is_user_logged_in() ) {
+			return '<p class="atora-notice">' . esc_html__( 'Debes iniciar sesión para ver tus revisiones.', 'atora-lms' ) . '</p>';
+		}
+
+		$reviewer_id = get_current_user_id();
+
+		$assignments = get_posts( array(
+			'post_type'      => 'clms_peer_review',
+			'post_status'    => array( 'publish', 'draft' ),
+			'posts_per_page' => 50,
+			'orderby'        => 'date',
+			'order'          => 'DESC',
+			'meta_query'     => array(
+				array(
+					'key'   => '_clms_pr_reviewer_id',
+					'value' => $reviewer_id,
+					'type'  => 'NUMERIC',
+				),
+			),
+		) );
+
+		ob_start();
+
+		// Enqueue nonce for AJAX.
+		wp_enqueue_script( 'clms-peer-review', ATORA_LMS_URL . 'assets/js/peer-review.js', array( 'jquery' ), ATORA_LMS_VERSION, true );
+		wp_localize_script( 'clms-peer-review', 'clmsPR', array(
+			'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+			'nonce'   => wp_create_nonce( 'clms_pr_nonce' ),
+			'trainingNonce' => wp_create_nonce( 'clms_pr_training_nonce' ),
+			'i18n'    => array(
+				'sending'            => __( 'Enviando…', 'atora-lms' ),
+				'review_sent_success'=> __( '✔ Revisión enviada correctamente.', 'atora-lms' ),
+				'completed'          => __( 'Completada', 'atora-lms' ),
+				'send_error'         => __( 'Error al enviar.', 'atora-lms' ),
+				'network_error_retry'=> __( 'Error de red. Intenta de nuevo.', 'atora-lms' ),
+				'send_review'        => __( 'Enviar revisión', 'atora-lms' ),
+				'complete_training'  => __( 'Completar entrenamiento', 'atora-lms' ),
+				'training_done'      => __( 'Entrenamiento completado', 'atora-lms' ),
+				'training_error'     => __( 'No se pudo completar el entrenamiento.', 'atora-lms' ),
+			),
+		) );
+
+		echo '<div class="clms-pr-inbox">';
+		echo '<h2 class="clms-pr-inbox__title">' . esc_html__( 'Mis revisiones asignadas', 'atora-lms' ) . '</h2>';
+
+		$training_status = self::get_reviewer_training_status( $reviewer_id );
+		if ( empty( $training_status['completed'] ) ) {
+			echo $this->render_training_notice_card();
+		}
+
+		if ( empty( $assignments ) ) {
+			echo '<p class="clms-pr-inbox__empty">' . esc_html__( 'No tienes revisiones asignadas por el momento.', 'atora-lms' ) . '</p>';
+		} else {
+			$pending   = array_filter( $assignments, fn( $a ) => 'completed' !== get_post_meta( $a->ID, '_clms_pr_status', true ) );
+			$completed = array_filter( $assignments, fn( $a ) => 'completed' === get_post_meta( $a->ID, '_clms_pr_status', true ) );
+
+			if ( ! empty( $pending ) ) {
+				echo '<h3 class="clms-pr-inbox__section-title">' . sprintf( esc_html__( 'Pendientes (%d)', 'atora-lms' ), count( $pending ) ) . '</h3>';
+				echo '<div class="clms-pr-cards">';
+				foreach ( $pending as $a ) {
+					echo $this->render_assignment_card( $a, false );
+				}
+				echo '</div>';
+			}
+
+			if ( ! empty( $completed ) ) {
+				echo '<h3 class="clms-pr-inbox__section-title clms-pr-inbox__section-title--done">' . sprintf( esc_html__( 'Completadas (%d)', 'atora-lms' ), count( $completed ) ) . '</h3>';
+				echo '<div class="clms-pr-cards">';
+				foreach ( $completed as $a ) {
+					echo $this->render_assignment_card( $a, true );
+				}
+				echo '</div>';
+			}
+		}
+
+		echo '</div>';
+
+		$this->render_inline_styles();
+
+		return ob_get_clean();
+	}
+
+	/**
+	 * Shortcode para renderizar módulo de entrenamiento independiente.
+	 *
+	 * @param array $atts Atributos.
+	 * @return string
+	 */
+	public function render_training_module( $atts ) {
+		unset( $atts );
+		if ( ! is_user_logged_in() ) {
+			return '<p class="atora-notice">' . esc_html__( 'Debes iniciar sesión para acceder al entrenamiento.', 'atora-lms' ) . '</p>';
+		}
+
+		ob_start();
+		echo '<div class="clms-pr-inbox">';
+		echo '<h2 class="clms-pr-inbox__title">' . esc_html__( 'Entrenamiento para revisión entre pares', 'atora-lms' ) . '</h2>';
+		echo $this->render_training_notice_card();
+		echo '</div>';
+		$this->render_inline_styles();
+		return ob_get_clean();
+	}
+
+	/**
+	 * Tarjeta visual de entrenamiento para revisión entre pares.
+	 *
+	 * @return string
+	 */
+	protected function render_training_notice_card() {
+		ob_start();
+		?>
+		<div class="clms-pr-training" data-clms-pr-training-card="1">
+			<h3 class="clms-pr-training__title"><?php esc_html_e( 'Antes de revisar: entrenamiento rápido', 'atora-lms' ); ?></h3>
+			<p class="clms-pr-training__text"><?php esc_html_e( 'Una revisión útil es clara, respetuosa y conectada a la rúbrica. Completa este checklist antes de enviar evaluaciones.', 'atora-lms' ); ?></p>
+			<ul class="clms-pr-training__list">
+				<li><?php esc_html_e( 'Reviso cada criterio de la rúbrica y justifico mis puntajes.', 'atora-lms' ); ?></li>
+				<li><?php esc_html_e( 'Incluyo al menos una fortaleza y un aspecto a mejorar.', 'atora-lms' ); ?></li>
+				<li><?php esc_html_e( 'Propongo una acción concreta para la siguiente entrega.', 'atora-lms' ); ?></li>
+				<li><?php esc_html_e( 'Evito comentarios ambiguos o descalificadores.', 'atora-lms' ); ?></li>
+			</ul>
+			<div class="clms-pr-training__actions">
+				<button type="button" class="atora-btn atora-btn-secondary clms-pr-training-btn"><?php esc_html_e( 'Completar entrenamiento', 'atora-lms' ); ?></button>
+				<span class="clms-pr-training__msg" aria-live="polite"></span>
+			</div>
+		</div>
+		<?php
+		return ob_get_clean();
+	}
+
+	/**
+	 * Indica si lección exige entrenamiento para revisar.
+	 *
+	 * @param int $lesson_id Lección.
+	 * @return bool
+	 */
+	public static function is_training_required_for_lesson( $lesson_id ) {
+		$lesson_id = absint( $lesson_id );
+		if ( ! $lesson_id ) {
+			return false;
+		}
+
+		$required = get_post_meta( $lesson_id, '_clms_peer_review_training_required', true );
+		return in_array( (string) $required, array( '1', 'yes', 'true' ), true );
+	}
+
+	/**
+	 * Estado de entrenamiento del revisor.
+	 *
+	 * @param int $user_id Usuario.
+	 * @return array<string,mixed>
+	 */
+	public static function get_reviewer_training_status( $user_id ) {
+		$user_id = absint( $user_id );
+		$status  = get_user_meta( $user_id, '_clms_peer_reviewer_training', true );
+		$status  = is_array( $status ) ? $status : array();
+
+		return array(
+			'completed'    => ! empty( $status['completed'] ),
+			'completed_at' => isset( $status['completed_at'] ) ? sanitize_text_field( (string) $status['completed_at'] ) : '',
+			'version'      => isset( $status['version'] ) ? absint( $status['version'] ) : 1,
+		);
+	}
+
+	/**
+	 * Determina si el revisor completó entrenamiento.
+	 *
+	 * @param int $user_id Usuario.
+	 * @return bool
+	 */
+	public static function is_reviewer_trained( $user_id ) {
+		$status = self::get_reviewer_training_status( $user_id );
+		return ! empty( $status['completed'] );
+	}
+
+	/**
+	 * Marca entrenamiento como completado.
+	 *
+	 * @param int $user_id Usuario.
+	 * @return array<string,mixed>
+	 */
+	public static function mark_reviewer_training_completed( $user_id ) {
+		$user_id = absint( $user_id );
+		$status  = array(
+			'completed'    => true,
+			'completed_at' => gmdate( 'Y-m-d H:i:s' ),
+			'version'      => 1,
+		);
+
+		update_user_meta( $user_id, '_clms_peer_reviewer_training', $status );
+		do_action( 'clms_peer_reviewer_training_completed', $user_id, $status );
+
+		return $status;
+	}
+
+	/**
+	 * Calcula calidad de revisión entre pares.
+	 *
+	 * @param int   $assignment_id Asignación.
+	 * @param array $scores        Puntajes enviados.
+	 * @param string $comment      Comentario global.
+	 * @return array<string,mixed>
+	 */
+	public static function calculate_quality_score( $assignment_id, $scores = array(), $comment = '' ) {
+		$assignment_id = absint( $assignment_id );
+		$scores        = is_array( $scores ) ? $scores : array();
+		$comment       = sanitize_textarea_field( (string) $comment );
+
+		$quality = array(
+			'score'  => 0,
+			'status' => 'low',
+			'flags'  => array(),
+		);
+
+		if ( ! $assignment_id ) {
+			return $quality;
+		}
+
+		$coverage_score = ! empty( $scores ) ? 40 : 0;
+		$comment_length = function_exists( 'mb_strlen' ) ? mb_strlen( trim( $comment ) ) : strlen( trim( $comment ) );
+		$depth_score    = 0;
+		if ( $comment_length >= 180 ) {
+			$depth_score = 35;
+		} elseif ( $comment_length >= 90 ) {
+			$depth_score = 24;
+		} elseif ( $comment_length >= 40 ) {
+			$depth_score = 14;
+		}
+
+		$timeliness_score = 0;
+		$lesson_id        = absint( get_post_meta( $assignment_id, '_clms_pr_lesson_id', true ) );
+		$submitted_at_raw = (string) get_post_meta( $assignment_id, '_clms_pr_submitted_at', true );
+		$submitted_ts     = $submitted_at_raw ? strtotime( $submitted_at_raw ) : 0;
+		$due_date         = $lesson_id ? (string) CLMS_Helper::get_post_meta_first( $lesson_id, array( 'lm_due_date', '_clms_due_date' ), '' ) : '';
+		$due_time         = $lesson_id ? (string) CLMS_Helper::get_post_meta_first( $lesson_id, array( 'lm_due_time', '_clms_due_time' ), '' ) : '';
+		$due_ts           = '' !== trim( $due_date ) ? strtotime( trim( $due_date . ' ' . $due_time ) ) : 0;
+
+		if ( $submitted_ts ) {
+			if ( ! $due_ts || $submitted_ts <= $due_ts ) {
+				$timeliness_score = 25;
+			} else {
+				$timeliness_score = 10;
+				$quality['flags'][] = __( 'Revisión entregada fuera de plazo.', 'atora-lms' );
+			}
+		}
+
+		if ( empty( $scores ) ) {
+			$quality['flags'][] = __( 'La revisión no incluyó puntajes por criterio.', 'atora-lms' );
+		}
+		if ( $comment_length < 40 ) {
+			$quality['flags'][] = __( 'El comentario es demasiado breve para orientar mejoras.', 'atora-lms' );
+		}
+
+		$total = max( 0, min( 100, $coverage_score + $depth_score + $timeliness_score ) );
+		$status = 'low';
+		if ( $total >= 85 ) {
+			$status = 'high';
+		} elseif ( $total >= 60 ) {
+			$status = 'medium';
+		}
+
+		$quality['score']  = $total;
+		$quality['status'] = $status;
+		$quality['flags']  = array_values( array_unique( array_map( 'sanitize_text_field', (array) $quality['flags'] ) ) );
+
+		return $quality;
+	}
+
+	/**
+	 * Resumen de revisiones del usuario.
+	 *
+	 * @param int $reviewer_id Revisor.
+	 * @return array<string,mixed>
+	 */
+	public static function get_reviewer_summary( $reviewer_id ) {
+		$reviewer_id = absint( $reviewer_id );
+		if ( ! $reviewer_id ) {
+			return array(
+				'pending'      => 0,
+				'completed'    => 0,
+				'avg_quality'  => 0,
+				'training'     => self::get_reviewer_training_status( 0 ),
+			);
+		}
+
+		$assignments = get_posts(
+			array(
+				'post_type'      => 'clms_peer_review',
+				'post_status'    => array( 'publish', 'draft' ),
+				'posts_per_page' => 200,
+				'fields'         => 'ids',
+				'meta_query'     => array(
+					array(
+						'key'   => '_clms_pr_reviewer_id',
+						'value' => $reviewer_id,
+						'type'  => 'NUMERIC',
+					),
+				),
+			)
+		);
+
+		$pending = 0;
+		$done    = 0;
+		$quality_scores = array();
+		foreach ( $assignments as $assignment_id ) {
+			$status = (string) get_post_meta( $assignment_id, '_clms_pr_status', true );
+			if ( 'completed' === $status ) {
+				++$done;
+				$quality = get_post_meta( $assignment_id, '_clms_pr_quality_score', true );
+				if ( is_numeric( $quality ) ) {
+					$quality_scores[] = (float) $quality;
+				}
+			} else {
+				++$pending;
+			}
+		}
+
+		$avg_quality = ! empty( $quality_scores ) ? round( array_sum( $quality_scores ) / count( $quality_scores ), 1 ) : 0;
+
+		return array(
+			'pending'     => $pending,
+			'completed'   => $done,
+			'avg_quality' => $avg_quality,
+			'training'    => self::get_reviewer_training_status( $reviewer_id ),
+		);
+	}
+
+	/**
+	 * Analítica inicial de efectividad de peer review.
+	 *
+	 * @param array $args Argumentos.
+	 * @return array<string,mixed>
+	 */
+	public static function get_effectiveness_analytics( $args = array() ) {
+		$args = is_array( $args ) ? $args : array();
+		$limit = max( 1, min( 500, absint( $args['limit'] ?? 200 ) ) );
+
+		$posts = get_posts(
+			array(
+				'post_type'      => 'clms_peer_review',
+				'post_status'    => array( 'publish', 'draft' ),
+				'posts_per_page' => $limit,
+				'fields'         => 'ids',
+				'orderby'        => 'date',
+				'order'          => 'DESC',
+			)
+		);
+
+		$reviewer_counts = array();
+		$quality_by_reviewer = array();
+		$late_reviews = 0;
+		$useful_reviews = 0;
+		$by_lesson_quality = array();
+
+		foreach ( $posts as $assignment_id ) {
+			$reviewer_id = absint( get_post_meta( $assignment_id, '_clms_pr_reviewer_id', true ) );
+			$lesson_id   = absint( get_post_meta( $assignment_id, '_clms_pr_lesson_id', true ) );
+			$status      = sanitize_key( (string) get_post_meta( $assignment_id, '_clms_pr_status', true ) );
+
+			if ( ! $reviewer_id || 'completed' !== $status ) {
+				continue;
+			}
+
+			if ( ! isset( $reviewer_counts[ $reviewer_id ] ) ) {
+				$reviewer_counts[ $reviewer_id ] = 0;
+			}
+			++$reviewer_counts[ $reviewer_id ];
+
+			$quality_score = get_post_meta( $assignment_id, '_clms_pr_quality_score', true );
+			if ( is_numeric( $quality_score ) ) {
+				if ( ! isset( $quality_by_reviewer[ $reviewer_id ] ) ) {
+					$quality_by_reviewer[ $reviewer_id ] = array();
+				}
+				$quality_by_reviewer[ $reviewer_id ][] = (float) $quality_score;
+
+				if ( ! isset( $by_lesson_quality[ $lesson_id ] ) ) {
+					$by_lesson_quality[ $lesson_id ] = array();
+				}
+				$by_lesson_quality[ $lesson_id ][] = (float) $quality_score;
+			}
+
+			$flags = (array) get_post_meta( $assignment_id, '_clms_pr_quality_flags', true );
+			$joined_flags = strtolower( implode( ' ', array_map( 'sanitize_text_field', $flags ) ) );
+			if ( false !== strpos( $joined_flags, 'fuera de plazo' ) ) {
+				++$late_reviews;
+			}
+
+			if ( '1' === (string) get_post_meta( $assignment_id, '_clms_pr_marked_useful', true ) ) {
+				++$useful_reviews;
+			}
+		}
+
+		arsort( $reviewer_counts );
+		$top_active = array();
+		foreach ( array_slice( $reviewer_counts, 0, 5, true ) as $reviewer_id => $count ) {
+			$user = get_userdata( absint( $reviewer_id ) );
+			$top_active[] = array(
+				'reviewer_id'   => absint( $reviewer_id ),
+				'reviewer_name' => $user ? sanitize_text_field( $user->display_name ) : __( 'Revisor', 'atora-lms' ),
+				'reviews'       => absint( $count ),
+				'avg_quality'   => ! empty( $quality_by_reviewer[ $reviewer_id ] ) ? round( array_sum( $quality_by_reviewer[ $reviewer_id ] ) / count( $quality_by_reviewer[ $reviewer_id ] ), 1 ) : 0,
+			);
+		}
+
+		$lessons = array();
+		foreach ( $by_lesson_quality as $lesson_id => $scores ) {
+			$lesson = get_post( $lesson_id );
+			$lessons[] = array(
+				'lesson_id'    => absint( $lesson_id ),
+				'lesson_title' => $lesson ? sanitize_text_field( $lesson->post_title ) : __( 'Actividad', 'atora-lms' ),
+				'avg_quality'  => round( array_sum( $scores ) / count( $scores ), 1 ),
+				'reviews'      => count( $scores ),
+			);
+		}
+
+		usort(
+			$lessons,
+			static function ( $a, $b ) {
+				return (float) $b['avg_quality'] <=> (float) $a['avg_quality'];
+			}
+		);
+
+		return array(
+			'total_completed'   => array_sum( $reviewer_counts ),
+			'late_reviews'      => $late_reviews,
+			'useful_reviews'    => $useful_reviews,
+			'top_reviewers'     => $top_active,
+			'lesson_quality'    => array_slice( $lessons, 0, 8 ),
+		);
+	}
+
+	protected function render_assignment_card( WP_Post $assignment, $readonly ) {
+		$lesson_id     = absint( get_post_meta( $assignment->ID, '_clms_pr_lesson_id',     true ) );
+		$submission_id = absint( get_post_meta( $assignment->ID, '_clms_pr_submission_id', true ) );
+		$rubric_id     = absint( get_post_meta( $lesson_id, '_clms_rubric_id', true ) );
+		$lesson        = get_post( $lesson_id );
+		$submission    = get_post( $submission_id );
+		$lesson_title  = $lesson ? esc_html( $lesson->post_title ) : sprintf(
+			/* translators: %d: lesson id */
+			esc_html__( 'Lección #%d', 'atora-lms' ),
+			$lesson_id
+		);
+		$sub_content   = $submission ? wp_kses_post( $submission->post_content ) : '';
+		$status_label  = $readonly ? __( 'Completada', 'atora-lms' ) : __( 'Pendiente', 'atora-lms' );
+		$status_class  = $readonly ? 'is-done' : 'is-pending';
+
+		ob_start();
+		?>
+		<div class="clms-pr-card <?php echo esc_attr( $status_class ); ?>" id="clms-pr-card-<?php echo esc_attr( $assignment->ID ); ?>">
+			<div class="clms-pr-card__header">
+				<span class="clms-pr-card__lesson"><?php echo $lesson_title; ?></span>
+				<span class="clms-pr-card__badge <?php echo esc_attr( $status_class ); ?>"><?php echo esc_html( $status_label ); ?></span>
+			</div>
+
+			<?php if ( $sub_content ) : ?>
+			<div class="clms-pr-card__submission">
+				<strong><?php esc_html_e( 'Entrega del estudiante:', 'atora-lms' ); ?></strong>
+				<div class="clms-pr-card__submission-body"><?php echo $sub_content; ?></div>
+			</div>
+			<?php endif; ?>
+
+			<?php if ( ! $readonly ) : ?>
+			<form class="clms-pr-form" data-assignment="<?php echo esc_attr( $assignment->ID ); ?>">
+
+				<?php if ( $rubric_id ) : ?>
+					<?php
+					$criteria  = class_exists( 'CLMS_Rubric' ) ? CLMS_Rubric::get_criteria( $rubric_id ) : (array) get_post_meta( $rubric_id, '_clms_rubric_criteria', true );
+					$max_score = class_exists( 'CLMS_Rubric' ) ? CLMS_Rubric::get_total_points( $rubric_id ) : 100;
+					if ( ! $max_score ) { $max_score = 100; }
+					?>
+					<p class="clms-pr-form__rubric-note"><?php echo esc_html( sprintf( __( 'Califica cada criterio según la rúbrica (máx. %d pts. total).', 'atora-lms' ), $max_score ) ); ?></p>
+					<?php foreach ( $criteria as $idx => $criterion ) :
+						$ckey = sanitize_key( $criterion['name'] );
+						$max  = absint( $criterion['max_points'] );
+					?>
+					<div class="clms-pr-criterion">
+						<label class="clms-pr-criterion__label">
+							<?php echo esc_html( $criterion['name'] ); ?>
+							<span class="clms-pr-criterion__max"><?php echo esc_html( sprintf( __( '(máx. %d pts.)', 'atora-lms' ), $max ) ); ?></span>
+						</label>
+						<?php if ( ! empty( $criterion['description'] ) ) : ?>
+						<p class="clms-pr-criterion__desc"><?php echo esc_html( $criterion['description'] ); ?></p>
+						<?php endif; ?>
+						<?php if ( ! empty( $criterion['levels'] ) ) : ?>
+						<div class="clms-pr-levels">
+							<?php foreach ( $criterion['levels'] as $level ) : ?>
+							<label class="clms-pr-level">
+								<input type="radio" name="scores[<?php echo esc_attr( $ckey ); ?>]" value="<?php echo esc_attr( $level['points'] ); ?>" required>
+								<span class="clms-pr-level__label"><?php echo esc_html( $level['label'] ); ?></span>
+								<span class="clms-pr-level__pts"><?php echo esc_html( sprintf( __( '%d pts.', 'atora-lms' ), absint( $level['points'] ) ) ); ?></span>
+								<?php if ( ! empty( $level['description'] ) ) : ?>
+								<span class="clms-pr-level__desc"><?php echo esc_html( $level['description'] ); ?></span>
+								<?php endif; ?>
+							</label>
+							<?php endforeach; ?>
+						</div>
+						<?php else : ?>
+						<input type="number" name="scores[<?php echo esc_attr( $ckey ); ?>]" min="0" max="<?php echo esc_attr( $max ); ?>" placeholder="0–<?php echo esc_attr( $max ); ?>" class="clms-pr-score-input" required>
+						<?php endif; ?>
+					</div>
+					<?php endforeach; ?>
+				<?php else : ?>
+					<div class="clms-pr-criterion">
+						<label class="clms-pr-criterion__label"><?php esc_html_e( 'Calificación (0–100)', 'atora-lms' ); ?></label>
+						<input type="number" name="scores[overall]" min="0" max="100" placeholder="0–100" class="clms-pr-score-input" required>
+					</div>
+				<?php endif; ?>
+
+				<div class="clms-pr-form__comment">
+					<label for="clms-pr-comment-<?php echo esc_attr( $assignment->ID ); ?>" class="clms-pr-form__comment-label"><?php esc_html_e( 'Comentario general (opcional)', 'atora-lms' ); ?></label>
+					<textarea id="clms-pr-comment-<?php echo esc_attr( $assignment->ID ); ?>" name="comment" rows="4" class="clms-pr-comment" placeholder="<?php echo esc_attr__( 'Escribe aquí tus observaciones...', 'atora-lms' ); ?>"></textarea>
+				</div>
+
+				<div class="clms-pr-form__actions">
+					<button type="submit" class="atora-btn atora-btn-primary clms-pr-submit-btn">
+						<?php esc_html_e( 'Enviar revisión', 'atora-lms' ); ?>
+					</button>
+					<span class="clms-pr-form__msg" aria-live="polite"></span>
+				</div>
+			</form>
+			<?php else :
+				$saved_scores  = (array) get_post_meta( $assignment->ID, '_clms_pr_scores',  true );
+				$saved_comment = get_post_meta( $assignment->ID, '_clms_pr_comment', true );
+				$submitted_at  = get_post_meta( $assignment->ID, '_clms_pr_submitted_at', true );
+			?>
+			<div class="clms-pr-result">
+				<p class="clms-pr-result__date"><?php echo esc_html( sprintf( __( 'Enviada el %s', 'atora-lms' ), date_i18n( 'd/m/Y H:i', strtotime( $submitted_at ) ) ) ); ?></p>
+				<?php if ( ! empty( $saved_scores ) ) : ?>
+				<ul class="clms-pr-result__scores">
+					<?php foreach ( $saved_scores as $crit => $pts ) : ?>
+					<li><strong><?php echo esc_html( $crit ); ?>:</strong> <?php echo esc_html( $pts ); ?> pts.</li>
+					<?php endforeach; ?>
+				</ul>
+				<?php endif; ?>
+				<?php if ( $saved_comment ) : ?>
+				<blockquote class="clms-pr-result__comment"><?php echo esc_html( $saved_comment ); ?></blockquote>
+				<?php endif; ?>
+			</div>
+			<?php endif; ?>
+		</div>
+		<?php
+		return ob_get_clean();
+	}
+
+	protected function render_inline_styles() {
+		static $printed = false;
+		if ( $printed ) {
+			return;
+		}
+		$printed = true;
+		?>
+		<style>
+		.clms-pr-inbox { max-width: 860px; margin: 0 auto; font-family: inherit; }
+		.clms-pr-inbox__title { font-size: 1.5rem; font-weight: 700; margin-bottom: 1.5rem; }
+		.clms-pr-inbox__section-title { font-size: 1.1rem; font-weight: 600; margin: 2rem 0 1rem; color: #374151; }
+		.clms-pr-inbox__section-title--done { color: #6b7280; }
+		.clms-pr-inbox__empty { color: #6b7280; }
+
+		.clms-pr-cards { display: flex; flex-direction: column; gap: 1.5rem; }
+
+		.clms-pr-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+		.clms-pr-card.is-done { opacity: .75; }
+		.clms-pr-card__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+		.clms-pr-card__lesson { font-weight: 600; font-size: 1rem; }
+		.clms-pr-card__badge { font-size: .75rem; font-weight: 600; padding: .25em .75em; border-radius: 99px; }
+		.clms-pr-card__badge.is-pending { background: #fef3c7; color: #92400e; }
+		.clms-pr-card__badge.is-done { background: #d1fae5; color: #065f46; }
+
+		.clms-pr-card__submission { background: #f9fafb; border-left: 4px solid #e5e7eb; padding: 1rem; border-radius: 0 8px 8px 0; margin-bottom: 1.25rem; font-size: .9rem; }
+		.clms-pr-card__submission-body { margin-top: .5rem; max-height: 200px; overflow-y: auto; }
+
+		.clms-pr-criterion { margin-bottom: 1.25rem; }
+		.clms-pr-criterion__label { font-weight: 600; display: block; margin-bottom: .35rem; }
+		.clms-pr-criterion__max { font-weight: 400; color: #6b7280; font-size: .85em; }
+		.clms-pr-criterion__desc { font-size: .85rem; color: #6b7280; margin-bottom: .5rem; }
+
+		.clms-pr-levels { display: flex; flex-direction: column; gap: .5rem; }
+		.clms-pr-level { display: grid; grid-template-columns: auto 1fr auto; align-items: start; gap: .5rem; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: .75rem 1rem; cursor: pointer; transition: border-color .15s; }
+		.clms-pr-level:has(input:checked) { border-color: #4353ff; background: #eef0ff; }
+		.clms-pr-level input[type="radio"] { margin-top: .15rem; }
+		.clms-pr-level__label { font-weight: 600; font-size: .9rem; }
+		.clms-pr-level__pts { font-weight: 700; color: #4353ff; font-size: .9rem; white-space: nowrap; }
+		.clms-pr-level__desc { font-size: .8rem; color: #6b7280; grid-column: 2; }
+
+		.clms-pr-score-input { width: 100%; padding: .5rem .75rem; border: 1px solid #d1d5db; border-radius: 8px; font-size: 1rem; }
+		.clms-pr-form__comment { margin-top: 1rem; }
+		.clms-pr-form__comment-label { font-weight: 600; display: block; margin-bottom: .35rem; }
+		.clms-pr-comment { width: 100%; padding: .75rem; border: 1px solid #d1d5db; border-radius: 8px; font-size: .9rem; resize: vertical; }
+		.clms-pr-form__actions { display: flex; align-items: center; gap: 1rem; margin-top: 1.25rem; }
+		.clms-pr-form__msg { font-size: .9rem; color: #065f46; }
+		.clms-pr-form__msg.is-error { color: #991b1b; }
+		.clms-pr-form__rubric-note { font-size: .85rem; color: #6b7280; margin-bottom: 1rem; }
+
+		.clms-pr-result__date { font-size: .85rem; color: #6b7280; margin-bottom: .75rem; }
+		.clms-pr-result__scores { list-style: none; margin: 0 0 .75rem; padding: 0; display: flex; flex-wrap: wrap; gap: .5rem; }
+		.clms-pr-result__scores li { background: #f3f4f6; padding: .3em .75em; border-radius: 99px; font-size: .85rem; }
+		.clms-pr-result__comment { border-left: 3px solid #d1d5db; padding-left: .75rem; color: #374151; font-style: italic; margin: 0; }
+		.clms-pr-training { border: 1px solid #dbeafe; background: #eff6ff; border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1.25rem; }
+		.clms-pr-training__title { margin: 0 0 .5rem; font-size: 1rem; color: #1e3a8a; }
+		.clms-pr-training__text { margin: 0 0 .75rem; color: #1f2937; font-size: .9rem; }
+		.clms-pr-training__list { margin: 0 0 .75rem 1rem; padding: 0; color: #1f2937; font-size: .88rem; }
+		.clms-pr-training__actions { display: flex; align-items: center; gap: .75rem; }
+		.clms-pr-training__msg { font-size: .85rem; color: #065f46; }
+		.clms-pr-training__msg.is-error { color: #991b1b; }
+		</style>
+		<?php
+	}
+}

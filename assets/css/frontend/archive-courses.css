@@ -1,0 +1,194 @@
+/**
+ * ATORA-LMS — Archive courses
+ */
+
+.atora-archive-courses { padding-bottom: 80px; }
+
+/* Hero */
+.atora-archive-hero {
+	padding: 64px 0 52px;
+	margin-bottom: 48px;
+	border-bottom: 1px solid var(--ac-gray-200);
+}
+.atora-archive-hero__kicker {
+	font-size: 12px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: .1em;
+	color: var(--ac-brand);
+	margin: 0 0 10px;
+}
+.atora-archive-hero__title {
+	font-size: clamp(28px, 4vw, 48px);
+	font-weight: 800;
+	line-height: 1.15;
+	margin: 0 0 12px;
+	color: var(--ac-gray-900);
+}
+.atora-archive-hero__sub {
+	margin: 0;
+	font-size: 17px;
+	color: var(--ac-gray-500);
+	max-width: 560px;
+}
+
+/* Course grid */
+.atora-courses-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+	gap: 28px;
+}
+
+/* Course card */
+.atora-course-card {
+	background: var(--ac-white);
+	border: 1px solid var(--ac-gray-200);
+	border-radius: var(--ac-radius-lg);
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+	transition:
+		box-shadow var(--ac-t) var(--ac-ease),
+		transform  var(--ac-t) var(--ac-ease);
+}
+.atora-course-card:hover {
+	box-shadow: var(--ac-shadow-md);
+	transform: translateY(-3px);
+}
+
+/* Thumbnail */
+.atora-course-card__thumb {
+	aspect-ratio: 16 / 9;
+	overflow: hidden;
+	background: var(--ac-gray-100);
+	position: relative;
+	flex-shrink: 0;
+}
+.atora-course-card__thumb img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+	transition: transform .4s ease;
+}
+.atora-course-card:hover .atora-course-card__thumb img { transform: scale(1.04); }
+.atora-course-card__thumb-placeholder {
+	width: 100%;
+	height: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 48px;
+	background: linear-gradient(135deg, var(--ac-brand-lt) 0%, #dde0ff 100%);
+}
+
+/* Badges overlay on thumb */
+.atora-course-card__badges {
+	position: absolute;
+	top: 12px;
+	left: 12px;
+	display: flex;
+	gap: 6px;
+	z-index: 1;
+}
+
+/* Card body */
+.atora-course-card__body {
+	padding: 20px 20px 0;
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+.atora-course-card__title {
+	margin: 0;
+	font-size: 17px;
+	font-weight: 700;
+	line-height: 1.3;
+	color: var(--ac-gray-900);
+}
+.atora-course-card__title a {
+	text-decoration: none;
+	color: inherit;
+}
+.atora-course-card__title a:hover { color: var(--ac-brand); }
+.atora-course-card__excerpt {
+	margin: 0;
+	font-size: 14px;
+	color: var(--ac-gray-500);
+	line-height: 1.6;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+/* Meta row */
+.atora-course-card__meta {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	font-size: 12px;
+	color: var(--ac-gray-500);
+	flex-wrap: wrap;
+	margin-top: auto;
+	padding-top: 4px;
+}
+.atora-course-card__meta-item {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	font-weight: 500;
+}
+
+/* Progress (enrolled) */
+.atora-course-card__progress-wrap { padding-top: 2px; }
+.atora-course-card__progress-label {
+	display: flex;
+	justify-content: space-between;
+	font-size: 11px;
+	color: var(--ac-gray-500);
+	margin-bottom: 5px;
+	font-weight: 600;
+}
+
+/* Card footer */
+.atora-course-card__footer {
+	padding: 16px 20px 20px;
+}
+
+/* Empty state */
+.atora-courses-empty {
+	grid-column: 1 / -1;
+	text-align: center;
+	padding: 80px 20px;
+	color: var(--ac-gray-500);
+}
+.atora-courses-empty__icon { font-size: 48px; margin-bottom: 16px; }
+.atora-courses-empty p { margin: 0; font-size: 16px; }
+
+/* Pagination */
+.atora-pagination {
+	margin-top: 48px;
+	display: flex;
+	justify-content: center;
+	gap: 4px;
+}
+.atora-pagination .page-numbers {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 36px;
+	height: 36px;
+	padding: 0 8px;
+	border-radius: var(--ac-radius-sm);
+	font-size: 14px;
+	font-weight: 600;
+	text-decoration: none;
+	color: var(--ac-gray-700);
+	background: transparent;
+	transition: all var(--ac-t) var(--ac-ease);
+}
+.atora-pagination .page-numbers:hover { background: var(--ac-brand-lt); color: var(--ac-brand); }
+.atora-pagination .page-numbers.current { background: var(--ac-brand); color: var(--ac-white); }
+.atora-pagination .page-numbers.dots { pointer-events: none; }

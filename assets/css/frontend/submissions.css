@@ -1,0 +1,55 @@
+/**
+ * ATORA-LMS — Submissions
+ */
+
+/* Submission upload */
+.clms-submission-field{display:grid;gap:10px;margin-bottom:16px}
+.clms-submission-upload{display:grid;gap:10px;padding:14px;border:1px solid var(--ac-gray-200);border-radius:12px;background:var(--ac-white)}
+.clms-dropzone{display:grid;gap:4px;place-items:center;border:1px dashed var(--ac-gray-300);border-radius:12px;padding:18px;text-align:center;background:var(--ac-gray-50);cursor:pointer;transition:border-color .15s,background .15s}
+.clms-dropzone.is-dragover{border-color:var(--ac-brand);background:rgba(67,83,255,.08)}
+.clms-dropzone-title{font-weight:700;color:var(--ac-gray-900)}
+.clms-dropzone-sub{font-size:13px;color:var(--ac-gray-500)}
+.clms-submission-input-row input[type="file"]{width:100%}
+.clms-submission-file-list{display:grid;gap:6px}
+.clms-submission-file{display:flex;justify-content:space-between;gap:12px;font-size:13px;color:var(--ac-gray-700);background:var(--ac-gray-50);border-radius:8px;padding:8px 10px}
+.clms-submission-file-name{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.clms-submission-file-size{color:var(--ac-gray-500);font-size:12px;flex-shrink:0}
+.clms-submission-upload-status{font-size:12px;color:var(--ac-gray-600)}
+.clms-submission-upload-status.atora-status-error{color:#b91c1c}
+.clms-submission-hint{display:block;font-size:12px;color:var(--ac-gray-500)}
+
+/* Submission timeline */
+.clms-submission-timeline{
+	display:flex;
+	align-items:center;
+	gap:16px;
+	padding:12px 0 4px;
+	flex-wrap:wrap;
+}
+.clms-submission-step{
+	display:flex;
+	align-items:center;
+	gap:8px;
+	font-size:13px;
+	color:var(--ac-gray-500);
+}
+.clms-submission-dot{
+	width:10px;
+	height:10px;
+	border-radius:50%;
+	background:var(--ac-gray-300);
+	box-shadow:0 0 0 4px rgba(67,83,255,.08);
+}
+.clms-submission-step.is-active .clms-submission-dot,
+.clms-submission-step.is-done .clms-submission-dot{
+	background:var(--ac-brand);
+	box-shadow:0 0 0 4px rgba(67,83,255,.18);
+}
+.clms-submission-step.is-active .clms-submission-label,
+.clms-submission-step.is-done .clms-submission-label{
+	color:var(--ac-gray-900);
+	font-weight:600;
+}
+@media (max-width:640px){
+	.clms-submission-timeline{flex-direction:column;align-items:flex-start}
+}

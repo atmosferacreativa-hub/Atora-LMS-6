@@ -1,0 +1,270 @@
+.atora-shortcode-block-editor {
+	display: grid;
+	gap: 10px;
+	padding: 0;
+	border: 1px solid #e2e8f0;
+	border-radius: 8px;
+	background: #fff;
+	color: #111827;
+	overflow: hidden;
+	box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
+}
+
+.atora-shortcode-block-editor *,
+.atora-shortcode-block-editor *::before,
+.atora-shortcode-block-editor *::after {
+	box-sizing: border-box;
+	letter-spacing: 0;
+}
+
+.atora-shortcode-block-editor__toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 10px;
+	border-bottom: 1px solid #e2e8f0;
+	background: #f8fafc;
+}
+
+.atora-shortcode-block-editor__eyebrow {
+	display: inline-flex;
+	align-items: center;
+	min-height: 20px;
+	padding: 2px 7px;
+	border-radius: 999px;
+	background: #1769f6;
+	color: #fff;
+	font-size: 10px;
+	font-weight: 800;
+	line-height: 1;
+	text-transform: uppercase;
+}
+
+.atora-shortcode-block-editor__title {
+	margin: 0;
+	color: #334155;
+	font-size: 12px;
+	font-weight: 700;
+	line-height: 1.2;
+}
+
+.atora-shortcode-block-editor__code {
+	display: block;
+	width: 100%;
+	padding: 12px;
+	overflow-wrap: anywhere;
+	white-space: normal;
+	border: 1px solid #e5e7eb;
+	border-radius: 8px;
+	background: #f8fafc;
+	color: #111827;
+	font-size: 12px;
+	line-height: 1.5;
+}
+
+.atora-shortcode-block-editor__preview {
+	padding: 0;
+	background: #fff;
+}
+
+.atora-shortcode-block-editor__preview .components-placeholder {
+	min-height: 80px;
+	margin: 0;
+	border: 0;
+	box-shadow: none;
+}
+
+.atora-shortcode-block-editor__preview-empty {
+	margin: 0;
+	color: #64748b;
+	font-size: 13px;
+	line-height: 1.5;
+}
+
+.atora-shortcode-block-editor__preview .clms-ui {
+	font-family: "Instrument Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+	color: #111827;
+}
+
+.atora-shortcode-block-editor__preview .clms-course-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+	gap: 14px;
+	align-items: stretch;
+}
+
+.atora-shortcode-block-editor__preview .clms-course-grid.clms-grid-cols-1 {
+	grid-template-columns: minmax(0, 1fr);
+}
+
+.atora-shortcode-block-editor__preview .clms-course-grid.clms-grid-cols-2 {
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.atora-shortcode-block-editor__preview .clms-course-grid.clms-grid-cols-3,
+.atora-shortcode-block-editor__preview .clms-course-grid.clms-grid-cols-4,
+.atora-shortcode-block-editor__preview .clms-course-grid.clms-grid-cols-5,
+.atora-shortcode-block-editor__preview .clms-course-grid.clms-grid-cols-6 {
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.atora-shortcode-block-editor__preview .clms-course-card {
+	display: flex;
+	flex-direction: column;
+	min-height: 100%;
+	overflow: hidden;
+	border: 1px solid #e5e7eb;
+	border-radius: 8px;
+	background: #fff;
+	box-shadow: 0 12px 28px rgba(15, 23, 42, .06);
+}
+
+.atora-shortcode-block-editor__preview .clms-course-card-thumb {
+	position: relative;
+	display: block;
+	aspect-ratio: 16 / 10;
+	overflow: hidden;
+	background: #f8fafc;
+}
+
+.atora-shortcode-block-editor__preview .clms-course-card-thumb img,
+.atora-shortcode-block-editor__preview .clms-course-card-thumb-img {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.atora-shortcode-block-editor__preview .clms-course-card-thumb-placeholder {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 100%;
+	color: #64748b;
+	font-size: 12px;
+	text-transform: uppercase;
+}
+
+.atora-shortcode-block-editor__preview .clms-course-card-status,
+.atora-shortcode-block-editor__preview .clms-course-card-level {
+	display: inline-flex;
+	width: fit-content;
+	padding: 5px 8px;
+	border-radius: 999px;
+	background: #eef2ff;
+	color: #3730a3;
+	font-size: 11px;
+	font-weight: 700;
+	line-height: 1;
+}
+
+.atora-shortcode-block-editor__preview .clms-course-card-status {
+	position: absolute;
+	top: 10px;
+	left: 10px;
+	background: #111827;
+	color: #fff;
+}
+
+.atora-shortcode-block-editor__preview .clms-course-card-body {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	gap: 12px;
+	padding: 16px;
+}
+
+.atora-shortcode-block-editor__preview .clms-course-card-top {
+	display: grid;
+	gap: 7px;
+}
+
+.atora-shortcode-block-editor__preview .clms-course-card-title {
+	margin: 0;
+	font-size: 18px;
+	line-height: 1.2;
+}
+
+.atora-shortcode-block-editor__preview .clms-course-card-title a {
+	color: inherit;
+	text-decoration: none;
+}
+
+.atora-shortcode-block-editor__preview .clms-course-card-subtitle,
+.atora-shortcode-block-editor__preview .clms-course-card-excerpt {
+	margin: 0;
+	color: #4b5563;
+	font-size: 13px;
+	line-height: 1.5;
+}
+
+.atora-shortcode-block-editor__preview .clms-course-card-subtitle {
+	color: #374151;
+	font-weight: 700;
+}
+
+.atora-shortcode-block-editor__preview .clms-course-card-meta {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+	gap: 8px;
+	margin-top: auto;
+	padding: 10px;
+	border-radius: 8px;
+	background: #f8fafc;
+	color: #4b5563;
+	font-size: 12px;
+}
+
+.atora-shortcode-block-editor__preview .clms-course-card-meta-label {
+	display: block;
+	color: #64748b;
+	font-size: 11px;
+}
+
+.atora-shortcode-block-editor__preview .clms-course-card-actions,
+.atora-shortcode-block-editor__preview .clms-course-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-top: auto;
+}
+
+.atora-shortcode-block-editor__preview .clms-course-card-btn,
+.atora-shortcode-block-editor__preview .clms-course-link,
+.atora-shortcode-block-editor__preview .clms-course-enroll-btn,
+.atora-shortcode-block-editor__preview .clms-course-continue-btn,
+.atora-shortcode-block-editor__preview .clms-course-login-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 9px 12px;
+	border: 1px solid #111827;
+	border-radius: 999px;
+	background: #111827;
+	color: #fff;
+	font-size: 12px;
+	font-weight: 700;
+	line-height: 1.15;
+	text-decoration: none;
+}
+
+.atora-shortcode-block-editor__preview .clms-course-card-btn-ghost,
+.atora-shortcode-block-editor__preview .clms-course-link {
+	background: transparent;
+	color: #111827;
+}
+
+.clms-shortcode-block__missing {
+	padding: 12px 14px;
+	border: 1px solid #fbbf24;
+	border-radius: 8px;
+	background: #fffbeb;
+	color: #92400e;
+}
+
+@media (max-width: 782px) {
+	.atora-shortcode-block-editor__toolbar {
+		align-items: flex-start;
+	}
+}

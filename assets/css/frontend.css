@@ -1,0 +1,17 @@
+/**
+ * ATORA-LMS — Frontend Styles (aggregated)
+ *
+ * This file imports the modular frontend stylesheets.
+ * Keep the import order aligned with the cascade.
+ */
+@import url("frontend/tokens.css");
+@import url("frontend/base.css");
+@import url("frontend/archive-courses.css");
+@import url("frontend/course-overview.css");
+@import url("frontend/course-player.css");
+@import url("frontend/single-lesson.css");
+@import url("frontend/responsive.css");
+@import url("frontend/submissions.css");
+@import url("frontend/teachers.css");
+@import url("frontend/dark-mode.css");
+@import url("frontend/misc.css");

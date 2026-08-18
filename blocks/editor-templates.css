@@ -1,0 +1,173 @@
+.atora-editor-templates-tab.is-active,
+.atora-editor-templates-tab[aria-selected="true"] {
+	box-shadow: inset 0 -2px #1769f6;
+	color: #111827;
+}
+
+.atora-editor-templates-panel {
+	padding: 16px 16px 28px;
+	overflow-y: auto;
+}
+
+.atora-editor-templates-panel--compact {
+	padding: 0;
+	overflow: visible;
+}
+
+.atora-editor-templates-search {
+	width: 100%;
+	min-height: 44px;
+	margin: 8px 0 18px;
+	padding: 10px 12px;
+	border: 1px solid #949494;
+	border-radius: 4px;
+	font-size: 15px;
+}
+
+.atora-editor-templates-help {
+	margin: -8px 0 14px;
+	color: #64748b;
+	font-size: 12px;
+	line-height: 1.45;
+}
+
+.atora-editor-templates-empty {
+	margin: 16px 0;
+	color: #757575;
+}
+
+.atora-editor-templates-group-title {
+	margin: 20px 0 10px;
+	color: #757575;
+	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: 0;
+	text-transform: uppercase;
+}
+
+.atora-editor-templates-grid {
+	display: grid;
+	gap: 12px;
+}
+
+.atora-editor-templates-panel--compact .atora-editor-templates-grid {
+	gap: 10px;
+}
+
+.atora-editor-template-card {
+	display: grid;
+	gap: 8px;
+	padding: 12px;
+	border: 1px solid #ddd;
+	border-radius: 8px;
+	background: #fff;
+	color: #1e1e1e;
+}
+
+.atora-editor-template-card--dark {
+	background: #111;
+	color: #f7f3ec;
+	border-color: #333;
+}
+
+.atora-editor-template-card--blue {
+	background: #eef4ff;
+	border-color: #cfe0ff;
+}
+
+.atora-editor-template-card__preview {
+	display: grid;
+	gap: 6px;
+	min-height: 82px;
+	padding: 10px;
+	border-radius: 6px;
+	background: #f0ebe2;
+}
+
+.atora-editor-template-card--dark .atora-editor-template-card__preview {
+	background: #252525;
+}
+
+.atora-editor-template-card--blue .atora-editor-template-card__preview {
+	background: #1769f6;
+}
+
+.atora-editor-template-card__preview span {
+	display: block;
+	height: 10px;
+	border-radius: 99px;
+	background: rgba(13, 13, 11, 0.18);
+}
+
+.atora-editor-template-card__preview span:first-child {
+	width: 42%;
+}
+
+.atora-editor-template-card__preview span:nth-child(2) {
+	width: 78%;
+	height: 22px;
+}
+
+.atora-editor-template-card__preview span:nth-child(3) {
+	width: 62%;
+}
+
+.atora-editor-template-card--dark .atora-editor-template-card__preview span,
+.atora-editor-template-card--blue .atora-editor-template-card__preview span {
+	background: rgba(255, 255, 255, 0.42);
+}
+
+.atora-editor-template-card__type {
+	color: #1769f6;
+	font-size: 11px;
+	font-weight: 800;
+	text-transform: uppercase;
+}
+
+.atora-editor-template-card--dark .atora-editor-template-card__type {
+	color: #f4b21b;
+}
+
+.atora-editor-template-card h4 {
+	margin: 0;
+	font-size: 15px;
+	line-height: 1.2;
+}
+
+.atora-editor-template-card p {
+	margin: 0;
+	color: #757575;
+	font-size: 13px;
+	line-height: 1.45;
+}
+
+.atora-editor-template-card--dark p {
+	color: rgba(247, 243, 236, 0.74);
+}
+
+.atora-editor-template-card__actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-top: 4px;
+}
+
+.atora-editor-template-card__actions .components-button {
+	min-height: 34px;
+}
+
+.atora-editor-templates-settings-panel .components-panel__body {
+	padding-bottom: 16px;
+}
+
+.atora-editor-templates-panel--compact .atora-editor-template-card {
+	padding: 10px;
+}
+
+.atora-editor-templates-panel--compact .atora-editor-template-card h4 {
+	font-size: 14px;
+}
+
+.atora-editor-templates-panel--compact .atora-editor-template-card p {
+	font-size: 12px;
+}

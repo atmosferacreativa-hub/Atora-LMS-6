@@ -1,0 +1,510 @@
+/**
+ * ATORA-LMS — Template Builder Panel
+ *
+ * Diseño del metabox "Diseño de página" en el editor de cursos, programas y lecciones.
+ * Usa los tokens del design-system de admin.css (--clms-*) donde están disponibles.
+ * Compatible con el modo oscuro del panel de WordPress.
+ *
+ * Prefijo de clase: .atora-uib-*
+ */
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   TOKENS LOCALES (fallbacks si admin.css no cargó)
+   ═══════════════════════════════════════════════════════════════════════════════ */
+.atora-uib-wrap {
+	--uib-ink:         var(--clms-ink,    #1d2327);
+	--uib-muted:       var(--clms-muted,  #50575e);
+	--uib-subtle:      var(--clms-subtle, #646970);
+	--uib-surface:     var(--clms-surface,#f9f9f9);
+	--uib-border:      var(--clms-border, #dcdcde);
+	--uib-accent:      var(--clms-accent, #2271b1);
+	--uib-accent-h:    var(--clms-accent-hover, #135e96);
+	--uib-accent-soft: #e8f0fe;
+	--uib-radius:      5px;
+	--uib-transition:  0.13s ease;
+	box-sizing: border-box;
+	font-size: 13px;
+}
+
+.atora-uib-wrap * {
+	box-sizing: border-box;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   TABS
+   ═══════════════════════════════════════════════════════════════════════════════ */
+.atora-uib-tabs {
+	display: flex;
+	gap: 0;
+	border-bottom: 1px solid var(--uib-border);
+	margin-bottom: 14px;
+}
+
+.atora-uib-tab {
+	padding: 7px 16px;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--uib-muted);
+	cursor: pointer;
+	border: none;
+	background: none;
+	border-bottom: 2px solid transparent;
+	margin-bottom: -1px;
+	transition: color var(--uib-transition), border-color var(--uib-transition);
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.atora-uib-tab.is-active {
+	color: var(--uib-accent);
+	border-bottom-color: var(--uib-accent);
+}
+
+.atora-uib-tab:hover:not(.is-active) {
+	color: var(--uib-accent-h);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   PANELS
+   ═══════════════════════════════════════════════════════════════════════════════ */
+.atora-uib-panel {
+	display: none;
+}
+
+.atora-uib-panel.is-active {
+	display: block;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   DESCRIPTION
+   ═══════════════════════════════════════════════════════════════════════════════ */
+.atora-uib-desc {
+	font-size: 12px;
+	color: var(--uib-subtle);
+	margin: 0 0 10px;
+	line-height: 1.5;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   TEMPLATE GALLERY
+   ═══════════════════════════════════════════════════════════════════════════════ */
+.atora-uib-template-hub {
+	margin: 0 0 16px;
+	padding: 14px;
+	background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+	border: 1px solid var(--uib-border);
+	border-radius: 12px;
+	box-shadow: 0 8px 20px rgba(15,23,42,.05);
+}
+
+.atora-uib-template-hub__head {
+	margin: 0 0 12px;
+}
+
+.atora-uib-template-hub__eyebrow {
+	margin: 0 0 4px;
+	font-size: 11px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: .14em;
+	color: var(--uib-accent);
+}
+
+.atora-uib-template-hub__copy,
+.atora-uib-template-hub__foot {
+	margin: 0;
+	font-size: 12px;
+	line-height: 1.55;
+	color: var(--uib-subtle);
+}
+
+.atora-uib-template-hub__foot {
+	margin-top: 10px;
+}
+
+.atora-uib-template-gallery {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+	gap: 12px;
+}
+
+.atora-uib-template-card {
+	position: relative;
+	display: grid;
+	gap: 8px;
+	padding: 14px;
+	border: 1px solid var(--uib-border);
+	border-radius: 14px;
+	background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+	box-shadow: 0 4px 12px rgba(15,23,42,.04);
+	cursor: pointer;
+	transition: transform var(--uib-transition), box-shadow var(--uib-transition), border-color var(--uib-transition), background var(--uib-transition);
+	min-height: 172px;
+}
+
+.atora-uib-template-card::after {
+	content: '';
+	position: absolute;
+	top: 14px;
+	right: 14px;
+	width: 14px;
+	height: 14px;
+	border-radius: 999px;
+	border: 2px solid rgba(148,163,184,.7);
+	background: #ffffff;
+	box-shadow: 0 0 0 0 rgba(34,113,177,0);
+	transition: background var(--uib-transition), border-color var(--uib-transition), box-shadow var(--uib-transition);
+}
+
+.atora-uib-template-card:hover {
+	transform: translateY(-1px);
+	border-color: rgba(34,113,177,.42);
+	box-shadow: 0 14px 28px rgba(15,23,42,.08);
+}
+
+.atora-uib-template-card.is-active {
+	border-color: var(--uib-accent);
+	background: linear-gradient(180deg, rgba(34,113,177,.08) 0%, #ffffff 100%);
+	box-shadow: 0 14px 30px rgba(34,113,177,.14);
+}
+
+.atora-uib-template-card.is-active::after {
+	border-color: var(--uib-accent);
+	background: var(--uib-accent);
+	box-shadow: 0 0 0 4px rgba(34,113,177,.14);
+}
+
+.atora-uib-template-card:focus-within {
+	outline: 2px solid rgba(34,113,177,.28);
+	outline-offset: 2px;
+}
+
+.atora-uib-template-card__input {
+	position: absolute;
+	opacity: 0;
+	pointer-events: none;
+}
+
+.atora-uib-template-card__eyebrow {
+	font-size: 11px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: .12em;
+	color: var(--uib-accent);
+}
+
+.atora-uib-template-card__title {
+	font-size: 15px;
+	font-weight: 700;
+	color: var(--uib-ink);
+	line-height: 1.35;
+}
+
+.atora-uib-template-card__desc {
+	font-size: 12px;
+	line-height: 1.55;
+	color: var(--uib-muted);
+	min-height: 58px;
+}
+
+.atora-uib-template-card__meta {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+	font-size: 11px;
+	color: var(--uib-subtle);
+}
+
+.atora-uib-template-card__meta strong {
+	font-size: 12px;
+	color: var(--uib-ink);
+}
+
+.atora-uib-template-card__theme {
+	padding: 2px 8px;
+	border-radius: 999px;
+	background: var(--uib-accent-soft);
+	color: var(--uib-accent-h);
+	font-weight: 600;
+}
+
+.atora-uib-template-card__chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+.atora-uib-template-pill {
+	display: inline-flex;
+	align-items: center;
+	padding: 4px 8px;
+	border-radius: 999px;
+	font-size: 11px;
+	font-weight: 600;
+	background: #f1f5f9;
+	color: var(--uib-muted);
+	border: 1px solid rgba(148,163,184,.45);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   SORTABLE LIST
+   ═══════════════════════════════════════════════════════════════════════════════ */
+.atora-uib-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: grid;
+	gap: 4px;
+	min-height: 20px;
+}
+
+.atora-uib-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 7px 10px;
+	background: #fff;
+	border: 1px solid var(--uib-border);
+	border-radius: var(--uib-radius);
+	cursor: default;
+	transition: background var(--uib-transition), opacity var(--uib-transition), border-color var(--uib-transition);
+}
+
+.atora-uib-item:hover {
+	border-color: #c3c4c7;
+}
+
+.atora-uib-item.is-disabled {
+	opacity: .45;
+	background: var(--uib-surface);
+}
+
+.atora-uib-item.sortable-ghost {
+	opacity: .3;
+	background: var(--uib-accent-soft);
+	border-color: var(--uib-accent);
+}
+
+.atora-uib-item.sortable-chosen {
+	box-shadow: 0 2px 8px rgba(0,0,0,.12);
+}
+
+.atora-uib-sortable-placeholder {
+	border: 1px dashed var(--uib-accent);
+	border-radius: var(--uib-radius);
+	background: var(--uib-accent-soft);
+	min-height: 40px;
+}
+
+/* ── Drag handle ── */
+.atora-uib-handle {
+	cursor: grab;
+	color: #a7aaad;
+	font-size: 16px;
+	line-height: 1;
+	user-select: none;
+	flex-shrink: 0;
+	padding: 2px 3px;
+	border-radius: 3px;
+	transition: color var(--uib-transition);
+}
+
+.atora-uib-handle:hover {
+	color: var(--uib-muted);
+}
+
+.atora-uib-handle:active {
+	cursor: grabbing;
+}
+
+/* ── Toggle checkbox ── */
+.atora-uib-toggle {
+	flex-shrink: 0;
+	margin: 0;
+	cursor: pointer;
+	accent-color: var(--uib-accent);
+	width: 15px;
+	height: 15px;
+}
+
+/* ── Label ── */
+.atora-uib-label {
+	font-size: 13px;
+	color: var(--uib-ink);
+	flex: 1;
+	cursor: pointer;
+	min-width: 0;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	line-height: 1.4;
+}
+
+.atora-uib-item.is-disabled .atora-uib-label {
+	color: var(--uib-muted);
+}
+
+/* ── Variant select ── */
+.atora-uib-variant-sel {
+	flex-shrink: 0;
+	font-size: 11px;
+	padding: 2px 5px;
+	border: 1px solid var(--uib-border);
+	border-radius: 3px;
+	background: #fff;
+	color: var(--uib-muted);
+	cursor: pointer;
+	max-width: 110px;
+}
+
+.atora-uib-variant-sel:disabled {
+	opacity: .5;
+	cursor: default;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   LIMITS BLOCK
+   ═══════════════════════════════════════════════════════════════════════════════ */
+.atora-uib-limits {
+	margin-top: 14px;
+	padding: 12px 14px;
+	background: var(--uib-surface);
+	border: 1px solid var(--uib-border);
+	border-radius: var(--uib-radius);
+}
+
+.atora-uib-limits-title {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--uib-ink);
+	margin: 0 0 10px;
+}
+
+.atora-uib-limits-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+	gap: 8px 16px;
+}
+
+.atora-uib-limit-label {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	font-size: 12px;
+	color: var(--uib-subtle);
+}
+
+.atora-uib-limit-input {
+	width: 80px !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   FOOTER TOOLBAR
+   ═══════════════════════════════════════════════════════════════════════════════ */
+.atora-uib-footer {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-top: 14px;
+	flex-wrap: wrap;
+	padding-top: 12px;
+	border-top: 1px solid var(--uib-border);
+}
+
+.atora-uib-footer-group {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	flex-shrink: 0;
+}
+
+.atora-uib-footer-label {
+	font-size: 12px;
+	color: var(--uib-subtle);
+	white-space: nowrap;
+}
+
+.atora-uib-footer-select {
+	font-size: 12px;
+	padding: 3px 6px;
+	border: 1px solid #8c8f94;
+	border-radius: 3px;
+	background: #fff;
+	color: var(--uib-ink);
+	cursor: pointer;
+	max-width: 150px;
+}
+
+.atora-uib-btn {
+	font-size: 12px !important;
+	padding: 3px 10px !important;
+	height: auto !important;
+	line-height: 1.5 !important;
+}
+
+.atora-uib-btn-danger {
+	color: #a00 !important;
+	border-color: #c9999a !important;
+}
+
+.atora-uib-btn-danger:hover {
+	color: #800 !important;
+	border-color: #a00 !important;
+	background: #fff5f5 !important;
+}
+
+/* ── Status badge ── */
+.atora-uib-badge {
+	font-size: 11px;
+	font-weight: 600;
+	padding: 2px 8px;
+	border-radius: 11px;
+	background: var(--uib-accent-soft);
+	color: var(--uib-accent);
+	flex-shrink: 0;
+	white-space: nowrap;
+}
+
+.atora-uib-badge.is-default {
+	background: #f0f0f1;
+	color: #787c82;
+}
+
+.atora-uib-spacer {
+	flex: 1;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   EMPTY / ERROR STATES
+   ═══════════════════════════════════════════════════════════════════════════════ */
+.atora-uib-empty {
+	padding: 20px 0;
+	text-align: center;
+	color: var(--uib-subtle);
+	font-size: 13px;
+	font-style: italic;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   RESPONSIVE ADJUSTMENTS
+   ═══════════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 782px) {
+	.atora-uib-limits-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.atora-uib-footer {
+		flex-direction: column;
+		align-items: flex-start;
+	}
+
+	.atora-uib-spacer {
+		display: none;
+	}
+
+	.atora-uib-variant-sel {
+		max-width: 90px;
+	}
+}

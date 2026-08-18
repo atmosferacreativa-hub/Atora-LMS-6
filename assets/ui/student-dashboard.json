@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "sections": [
+    { "id": "hero", "enabled": true },
+    { "id": "next_step", "enabled": true },
+    { "id": "progress", "enabled": true },
+    { "id": "alerts", "enabled": true },
+    { "id": "academic", "enabled": true },
+    { "id": "onboarding", "enabled": false },
+    { "id": "journey", "enabled": false },
+    { "id": "memory", "enabled": false }
+  ],
+  "limits": {
+    "course_cards": 3,
+    "pending_items": 6,
+    "feedback_items": 4,
+    "notification_items": 5,
+    "lesson_items": 5,
+    "alert_items": 2,
+    "journey_items": 4,
+    "assistant_actions": 5
+  }
+}

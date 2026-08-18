@@ -1,0 +1,16 @@
+{
+  "version": 2,
+  "preset": "default",
+  "theme": "light",
+  "variant": "default",
+  "props": {},
+  "sections": [
+    { "id": "teacher_hero",         "enabled": true,  "variant": "default", "props": {}, "visibility": "always", "roles": [], "style": {} },
+    { "id": "teacher_bio",          "enabled": true,  "variant": "default", "props": {}, "visibility": "always", "roles": [], "style": {} },
+    { "id": "teacher_achievements", "enabled": true,  "variant": "default", "props": {}, "visibility": "always", "roles": [], "style": {} },
+    { "id": "teacher_courses",      "enabled": true,  "variant": "default", "props": {}, "visibility": "always", "roles": [], "style": {} },
+    { "id": "teacher_stats",        "enabled": false, "variant": "default", "props": {}, "visibility": "always", "roles": [], "style": {} },
+    { "id": "teacher_extra",        "enabled": true,  "variant": "default", "props": {}, "visibility": "always", "roles": [], "style": {} }
+  ],
+  "limits": { "courses_limit": 6 }
+}

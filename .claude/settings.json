@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(zip -r atora-lms-6.0.9.zip atora-lms/ --exclude \"*.DS_Store\" --exclude \"__MACOSX/*\" -q)",
+      "WebFetch(domain:api-docs.deepseek.com)",
+      "WebFetch(domain:platform.deepseek.com)",
+      "Bash(zip -r atora-lms-6.0.9.zip atora-lms/ --exclude \"*.DS_Store\" --exclude \"*__MACOSX*\")",
+      "Bash(zip -r atora-lms-6.1.0.zip atora-lms/ --exclude \"atora-lms/.git/*\" --exclude \"atora-lms/.DS_Store\")",
+      "Bash(php -l includes/dashboard/trait-dashboard-render.php)",
+      "Bash(brew list *)",
+      "Bash(unzip -l \"/Users/imac/Desktop/Evolucion Atora 6.0/atora-lms-6.1.0.zip\")",
+      "Bash(unzip -l atora-lms-6.1.1.zip)",
+      "Bash(unzip -p atora-lms-6.1.1.zip atora-lms/atora_lms.php)",
+      "Bash(unzip -l atora-lms-6.1.2.zip)",
+      "Bash(unzip -p atora-lms-6.1.2.zip atora-lms/atora_lms.php)",
+      "Bash(unzip -l atora-lms-6.1.3.zip)",
+      "Bash(unzip -p atora-lms-6.1.3.zip atora-lms/atora_lms.php)",
+      "Bash(php -l /Users/imac/Desktop/atora-lms/atora_lms.php)",
+      "Bash(zip -r -X \"Evolucion Atora 6.0/atora-lms-6.2.0.zip\" atora-lms -x \"*.DS_Store\" -x \"*/.git/*\" -x \"*/node_modules/*\")",
+      "Bash(grep -rln \"6\\\\.2\\\\.0\" /Users/imac/Desktop/atora-lms --include=\"*.php\" --include=\"*.txt\" -maxdepth 2)",
+      "Bash(mv \"Evolucion Atora 6.0/atora-lms-6.2.0.zip\" \"Evolucion Atora 6.0/atora-lms-6.2.1.zip\")",
+      "Bash(rm -f \"Evolucion Atora 6.0/atora-lms-6.2.1.zip\")",
+      "Bash(zip -r -X \"Evolucion Atora 6.0/atora-lms-6.2.1.zip\" atora-lms -x \"*.DS_Store\" -x \"*/.git/*\" -x \"*/node_modules/*\")",
+      "Bash(git init *)",
+      "Bash(git commit -q -m ' *)",
+      "Bash(git branch *)",
+      "Bash(git checkout *)"
+    ]
+  }
+}

@@ -1,0 +1,34 @@
+.clms-td .clms-td-grid--mini {
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 16px;
+}
+
+.clms-td .clms-td-summary {
+	cursor: pointer;
+	font-weight: 700;
+	color: var(--td-ink);
+}
+
+.clms-td .clms-td-list-plain {
+	margin: 12px 0 0;
+	padding: 0;
+	list-style: none;
+	display: grid;
+	gap: 10px;
+}
+
+.clms-td .clms-td-list-plain li {
+	padding: 10px 12px;
+	border: 1px solid var(--td-border);
+	border-radius: 12px;
+	background: #fff;
+	display: grid;
+	gap: 4px;
+}
+
+@media (max-width: 960px) {
+	.clms-td .clms-td-grid--mini {
+		grid-template-columns: 1fr;
+	}
+}
+

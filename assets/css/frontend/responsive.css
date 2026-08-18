@@ -1,0 +1,68 @@
+/**
+ * ATORA-LMS — Responsive adjustments
+ */
+
+@media (max-width: 960px) {
+	.cp-layout { grid-template-columns: 1fr; }
+	.cp-sidebar { position: static; order: -1; }
+	.cp-outline-list { max-height: 260px; }
+
+	.atora-lesson-layout.has-sidebar { grid-template-columns: 1fr; }
+	.atora-lesson-sidebar { position: static; order: -1; }
+	.clms-course-outline { max-height: 280px; }
+}
+
+@media (max-width: 640px) {
+	/* Touch targets — WCAG 2.1 minimum 44×44 px */
+	.atora-btn,
+	.clms-btn,
+	.clms-td-btn,
+	.clms-sd-btn,
+	.clms-sp-submit-btn,
+	.clms-sp-edit-bio-btn,
+	.atora-lesson-nav a,
+	.cp-btn {
+		min-height: 44px;
+		min-width: 44px;
+	}
+
+	.atora-container,
+	.cp-wrap,
+	.atora-lesson-wrap { padding-left: 16px; padding-right: 16px; }
+
+	.atora-courses-grid { grid-template-columns: 1fr; gap: 16px; }
+	.atora-archive-hero { padding: 40px 0 32px; }
+
+	.atora-resources-list { grid-template-columns: 1fr; }
+
+	.atora-lesson-nav { flex-direction: column; }
+	.atora-lesson-nav a { max-width: 100%; }
+	.atora-lesson-nav-next { text-align: left; margin-left: 0; }
+
+	.cp-hero { padding: 32px 0 28px; margin-bottom: 32px; }
+	.cp-hero-meta { flex-direction: column; align-items: flex-start; gap: 14px; }
+	.cp-hero-progress { width: 100%; }
+	.cp-hero-progress-bar { width: 100%; flex: 1 1 auto; }
+	.cp-hero-actions { flex-direction: column; align-items: stretch; }
+	.cp-btn { width: 100%; }
+	.cp-outline-box { border-radius: 18px; }
+	.cp-outline-list { max-height: 45vh; }
+	.cp-outline-item { padding: 12px 14px; }
+	.cp-lesson-section { padding: 32px 0; }
+	.cp-lesson-subtitle,
+	.cp-lesson-content,
+	.atora-lesson-subtitle,
+	.atora-lesson-content,
+	.atora-video-description { font-size: 15px; line-height: 1.7; }
+	.atora-lesson-breadcrumb { margin-bottom: 16px; }
+	.atora-lesson-header { margin-bottom: 24px; }
+	.atora-lesson-actions { flex-direction: column; align-items: stretch; }
+	.atora-lesson-actions .atora-btn { width: 100%; }
+	.atora-lesson-gate { padding: 32px 18px; }
+	.atora-lesson-cover,
+	.atora-lesson-video { margin-bottom: 20px; }
+	.atora-resources-list { grid-template-columns: 1fr; }
+	.atora-lesson-next { flex-direction: column; align-items: flex-start; }
+	.clms-course-sidebar-head { padding: 16px; }
+	.clms-course-outline-item { padding: 12px 16px; }
+}

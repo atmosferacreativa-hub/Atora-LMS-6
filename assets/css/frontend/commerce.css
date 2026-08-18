@@ -1,0 +1,166 @@
+/**
+ * ATORA LMS — Estilos del bloque de compra [atora_product_purchase_box]
+ *
+ * Los tokens --atora-btn-bg y --atora-btn-bg-hover se definen aquí con el
+ * color por defecto de ATORA. CLMS_Commerce_Shortcodes::enqueue_styles()
+ * los sobreescribe en línea con el primary_color guardado en los ajustes
+ * de academia, garantizando coherencia con el branding configurado.
+ */
+
+:root {
+	--atora-btn-bg:       #6366f1;
+	--atora-btn-bg-hover: #4f46e5;
+}
+
+/* ── Contenedor principal ─────────────────────────────────────────────────── */
+
+.atora-purchase-box {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+	padding: 24px;
+	background: #ffffff;
+	border: 1px solid #e5e7eb;
+	border-radius: 10px;
+	box-shadow: 0 1px 4px rgba(0, 0, 0, .06);
+}
+
+/* ── Precio ───────────────────────────────────────────────────────────────── */
+
+.atora-purchase-box__price {
+	font-size: 1.5rem;
+	font-weight: 700;
+	color: #1a202c;
+	line-height: 1.2;
+}
+
+.atora-purchase-box__price .price {
+	color: inherit;
+}
+
+.atora-purchase-box__price .woocommerce-Price-amount {
+	font-size: inherit;
+	font-weight: inherit;
+}
+
+/* ── Área del carrito ─────────────────────────────────────────────────────── */
+
+.atora-purchase-box__cart {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+/* ── Botón de compra ──────────────────────────────────────────────────────── */
+
+.atora-purchase-box .single_add_to_cart_button,
+.atora-purchase-box .button.alt {
+	display: inline-block;
+	width: 100%;
+	padding: 14px 28px;
+	background-color: var(--atora-btn-bg);
+	color: #ffffff;
+	border: none;
+	border-radius: 6px;
+	font-size: 16px;
+	font-weight: 600;
+	letter-spacing: .3px;
+	text-align: center;
+	cursor: pointer;
+	text-decoration: none;
+	transition: background-color .15s ease, transform .1s ease;
+	box-sizing: border-box;
+}
+
+.atora-purchase-box .single_add_to_cart_button:hover,
+.atora-purchase-box .button.alt:hover {
+	background-color: var(--atora-btn-bg-hover);
+	color: #ffffff;
+}
+
+.atora-purchase-box .single_add_to_cart_button:active {
+	transform: scale(.98);
+}
+
+.atora-purchase-box .single_add_to_cart_button.disabled,
+.atora-purchase-box .single_add_to_cart_button[disabled] {
+	opacity: .55;
+	cursor: not-allowed;
+}
+
+/* ── Variaciones (producto variable) ─────────────────────────────────────── */
+
+.atora-purchase-box .variations_form,
+.atora-purchase-box table.variations {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+.atora-purchase-box table.variations td,
+.atora-purchase-box table.variations th {
+	padding: 6px 0;
+	vertical-align: middle;
+}
+
+.atora-purchase-box table.variations label {
+	font-weight: 600;
+	font-size: 14px;
+	color: #374151;
+}
+
+.atora-purchase-box table.variations select {
+	width: 100%;
+	padding: 8px 10px;
+	border: 1px solid #d1d5db;
+	border-radius: 6px;
+	font-size: 14px;
+	background: #f9fafb;
+}
+
+/* ── Cantidad ─────────────────────────────────────────────────────────────── */
+
+.atora-purchase-box .quantity {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.atora-purchase-box .quantity input[type="number"] {
+	width: 60px;
+	padding: 8px;
+	border: 1px solid #d1d5db;
+	border-radius: 6px;
+	font-size: 15px;
+	text-align: center;
+}
+
+/* ── Aviso de error / no disponible ──────────────────────────────────────── */
+
+.atora-commerce-warning {
+	padding: 12px 16px;
+	background: #fef3c7;
+	border: 1px solid #fbbf24;
+	border-radius: 6px;
+	color: #92400e;
+	font-size: 14px;
+	margin: 0;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+
+@media (min-width: 640px) {
+	.atora-purchase-box {
+		flex-direction: row;
+		align-items: center;
+		flex-wrap: wrap;
+	}
+
+	.atora-purchase-box__price {
+		flex: 1 0 auto;
+	}
+
+	.atora-purchase-box__cart {
+		flex: 1 0 auto;
+		max-width: 280px;
+	}
+}

@@ -1,0 +1,42 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "atora-lms/section-cta",
+  "version": "1.0.0",
+  "title": "ATORA Premium: CTA",
+  "category": "atora-lms",
+  "icon": "megaphone",
+  "description": "Botón principal de inscripción o compra. Usa los datos de oferta del curso.",
+  "keywords": ["cta", "inscripción", "compra", "botón", "acción", "atora"],
+  "textdomain": "atora-lms",
+  "attributes": {
+    "eyebrow": {
+      "type": "string",
+      "default": "Cierre"
+    },
+    "title": {
+      "type": "string",
+      "default": "Convierte el interés en acción con una CTA elegante."
+    },
+    "align": {
+      "type": "string",
+      "default": "center"
+    },
+    "label": {
+      "type": "string",
+      "default": "Quiero empezar"
+    },
+    "url": {
+      "type": "string",
+      "default": "#"
+    }
+  },
+  "usesContext": ["postId", "postType"],
+  "supports": {
+    "html": false,
+    "inserter": false,
+    "multiple": false,
+    "reusable": false,
+    "lock": false
+  }
+}

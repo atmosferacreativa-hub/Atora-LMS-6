@@ -1,0 +1,25 @@
+{
+    "name": "atora/atora-lms",
+    "description": "ATORA LMS — WordPress plugin",
+    "type": "wordpress-plugin",
+    "license": "GPL-2.0-or-later",
+    "require-dev": {
+        "phpunit/phpunit": "^10.0",
+        "brain/monkey": "^2.6",
+        "mockery/mockery": "^1.6"
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "ATORA\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit --testdox",
+        "test-coverage": "phpunit --coverage-text"
+    },
+    "config": {
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true
+        }
+    }
+}

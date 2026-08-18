@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "preset": "default",
+  "theme": "light",
+  "variant": "default",
+  "props": {},
+  "sections": [
+    { "id": "hero",         "enabled": true, "variant": "default", "props": {}, "visibility": "always", "roles": [], "style": {} },
+    { "id": "video",        "enabled": true, "variant": "default", "props": {}, "visibility": "always", "roles": [], "style": {} },
+    { "id": "about",        "enabled": true, "variant": "default", "props": {}, "visibility": "always", "roles": [], "style": {} },
+    { "id": "academic",     "enabled": true, "variant": "default", "props": {}, "visibility": "always", "roles": [], "style": {} },
+    { "id": "instructor",   "enabled": true, "variant": "default", "props": {}, "visibility": "always", "roles": [], "style": {} },
+    { "id": "profiles",     "enabled": true, "variant": "default", "props": {}, "visibility": "always", "roles": [], "style": {} },
+    { "id": "curriculum",   "enabled": true, "variant": "default", "props": {}, "visibility": "always", "roles": [], "style": {} },
+    { "id": "gallery",      "enabled": true, "variant": "default", "props": {}, "visibility": "always", "roles": [], "style": {} },
+    { "id": "testimonials", "enabled": true, "variant": "default", "props": {}, "visibility": "always", "roles": [], "style": {} },
+    { "id": "faq",          "enabled": true, "variant": "default", "props": {}, "visibility": "always", "roles": [], "style": {} }
+  ],
+  "limits": {}
+}

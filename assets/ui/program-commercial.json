@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "preset": "default",
+  "theme": "light",
+  "variant": "default",
+  "props": {},
+  "sections": [
+    { "id": "hero",       "enabled": true, "variant": "default", "props": {}, "visibility": "always", "roles": [], "style": {} },
+    { "id": "summary",    "enabled": true, "variant": "default", "props": {}, "visibility": "always", "roles": [], "style": {} },
+    { "id": "academic",   "enabled": true, "variant": "default", "props": {}, "visibility": "always", "roles": [], "style": {} },
+    { "id": "instructor", "enabled": true, "variant": "default", "props": {}, "visibility": "always", "roles": [], "style": {} },
+    { "id": "modules",    "enabled": true, "variant": "default", "props": {}, "visibility": "always", "roles": [], "style": {} },
+    { "id": "cta",        "enabled": true, "variant": "default", "props": {}, "visibility": "always", "roles": [], "style": {} },
+    { "id": "crm_lead",   "enabled": true, "variant": "default", "props": {}, "visibility": "always", "roles": [], "style": {} },
+    { "id": "related",    "enabled": true, "variant": "default", "props": {}, "visibility": "always", "roles": [], "style": {} }
+  ],
+  "limits": {
+    "modules": 0,
+    "related_items": 6
+  }
+}

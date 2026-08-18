@@ -1,0 +1,130 @@
+/**
+ * ATORA-LMS — Dark mode
+ */
+
+/* Shared dark-token map */
+:root {
+	--ac-dm-surface:        #1c1c1f;
+	--ac-dm-surface-raised: #26262a;
+	--ac-dm-border:         #38383e;
+	--ac-dm-border-subtle:  #2e2e34;
+	--ac-dm-text-primary:   #f2f2f4;
+	--ac-dm-text-secondary: #a0a0a8;
+	--ac-dm-text-muted:     #6e6e78;
+	--ac-dm-brand-lt:       rgba(67,83,255,.16);
+	--ac-dm-badge-green-bg: #052e16;
+	--ac-dm-badge-green-txt:#4ade80;
+	--ac-dm-badge-amber-bg: #1c1400;
+	--ac-dm-badge-amber-txt:#fde047;
+	--ac-dm-badge-red-bg:   #2d0404;
+	--ac-dm-badge-red-txt:  #f87171;
+}
+
+/* OS dark mode */
+@media (prefers-color-scheme: dark) {
+	:root {
+		--ac-white:    var(--ac-dm-surface);
+		--ac-gray-50:  var(--ac-dm-surface);
+		--ac-gray-100: var(--ac-dm-surface-raised);
+		--ac-gray-200: var(--ac-dm-border);
+		--ac-gray-300: var(--ac-dm-border-subtle);
+		--ac-gray-400: var(--ac-dm-text-muted);
+		--ac-gray-500: var(--ac-dm-text-secondary);
+		--ac-gray-600: #c4c4cd;
+		--ac-gray-700: #d4d4db;
+		--ac-gray-800: #e4e4e9;
+		--ac-gray-900: var(--ac-dm-text-primary);
+		--ac-brand-lt: var(--ac-dm-brand-lt);
+		--ac-badge-green-bg:  var(--ac-dm-badge-green-bg);
+		--ac-badge-green-txt: var(--ac-dm-badge-green-txt);
+		--ac-badge-amber-bg:  var(--ac-dm-badge-amber-bg);
+		--ac-badge-amber-txt: var(--ac-dm-badge-amber-txt);
+		--ac-badge-red-bg:    var(--ac-dm-badge-red-bg);
+		--ac-badge-red-txt:   var(--ac-dm-badge-red-txt);
+		--ac-shadow-xs: 0 1px 2px rgba(0,0,0,.5);
+		--ac-shadow-sm: 0 1px 3px rgba(0,0,0,.55), 0 1px 2px rgba(0,0,0,.45);
+		--ac-shadow:    0 4px 8px rgba(0,0,0,.45), 0 2px 4px rgba(0,0,0,.35);
+		--ac-shadow-md: 0 10px 20px rgba(0,0,0,.5), 0 4px 8px rgba(0,0,0,.4);
+		--ac-shadow-lg: 0 20px 40px rgba(0,0,0,.6), 0 8px 16px rgba(0,0,0,.5);
+	}
+}
+
+/* Class-based dark mode */
+body.dark-mode,
+body.dark-theme,
+body.is-dark,
+body[data-scheme="dark"],
+body[data-theme="dark"] {
+	--ac-white:    var(--ac-dm-surface);
+	--ac-gray-50:  var(--ac-dm-surface);
+	--ac-gray-100: var(--ac-dm-surface-raised);
+	--ac-gray-200: var(--ac-dm-border);
+	--ac-gray-300: var(--ac-dm-border-subtle);
+	--ac-gray-400: var(--ac-dm-text-muted);
+	--ac-gray-500: var(--ac-dm-text-secondary);
+	--ac-gray-600: #c4c4cd;
+	--ac-gray-700: #d4d4db;
+	--ac-gray-800: #e4e4e9;
+	--ac-gray-900: var(--ac-dm-text-primary);
+	--ac-brand-lt: var(--ac-dm-brand-lt);
+	--ac-badge-green-bg:  var(--ac-dm-badge-green-bg);
+	--ac-badge-green-txt: var(--ac-dm-badge-green-txt);
+	--ac-badge-amber-bg:  var(--ac-dm-badge-amber-bg);
+	--ac-badge-amber-txt: var(--ac-dm-badge-amber-txt);
+	--ac-badge-red-bg:    var(--ac-dm-badge-red-bg);
+	--ac-badge-red-txt:   var(--ac-dm-badge-red-txt);
+	--ac-shadow-xs: 0 1px 2px rgba(0,0,0,.5);
+	--ac-shadow-sm: 0 1px 3px rgba(0,0,0,.55), 0 1px 2px rgba(0,0,0,.45);
+	--ac-shadow:    0 4px 8px rgba(0,0,0,.45), 0 2px 4px rgba(0,0,0,.35);
+	--ac-shadow-md: 0 10px 20px rgba(0,0,0,.5), 0 4px 8px rgba(0,0,0,.4);
+	--ac-shadow-lg: 0 20px 40px rgba(0,0,0,.6), 0 8px 16px rgba(0,0,0,.5);
+}
+
+/* Inert elements that should be fully transparent on any background */
+.cp-hero-title,
+.cp-hero-desc,
+.atora-lesson-title,
+.atora-archive-hero__title,
+.atora-archive-hero__sub,
+.atora-courses-empty {
+	color: inherit;
+}
+
+/* "Outline" secondary button: keep readable on dark surfaces */
+@media (prefers-color-scheme: dark) {
+	.atora-btn-outline {
+		color: var(--ac-gray-900);
+		border-color: var(--ac-gray-300);
+	}
+	.atora-btn-outline:hover {
+		background: var(--ac-gray-100);
+		border-color: var(--ac-gray-500);
+	}
+	.cp-btn-secondary {
+		background: var(--ac-gray-100);
+		color: var(--ac-gray-900);
+		border-color: var(--ac-gray-300);
+	}
+	.cp-btn-secondary:hover {
+		background: var(--ac-gray-200);
+		color: var(--ac-gray-900);
+	}
+}
+
+body.dark-mode .atora-btn-outline,
+body.dark-theme .atora-btn-outline,
+body.is-dark .atora-btn-outline,
+body[data-scheme="dark"] .atora-btn-outline,
+body[data-theme="dark"] .atora-btn-outline {
+	color: var(--ac-gray-900);
+	border-color: var(--ac-gray-300);
+}
+body.dark-mode .cp-btn-secondary,
+body.dark-theme .cp-btn-secondary,
+body.is-dark .cp-btn-secondary,
+body[data-scheme="dark"] .cp-btn-secondary,
+body[data-theme="dark"] .cp-btn-secondary {
+	background: var(--ac-gray-100);
+	color: var(--ac-gray-900);
+	border-color: var(--ac-gray-300);
+}

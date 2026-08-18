@@ -1,0 +1,44 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "atora-lms/section-instructor",
+  "version": "1.0.0",
+  "title": "ATORA Premium: Docentes",
+  "category": "atora-lms",
+  "icon": "groups",
+  "description": "Perfil del docente o equipo docente del curso.",
+  "keywords": ["instructor", "docente", "profesor", "equipo", "atora"],
+  "textdomain": "atora-lms",
+  "attributes": {
+    "eyebrow": {
+      "type": "string",
+      "default": "Docentes"
+    },
+    "title": {
+      "type": "string",
+      "default": "Muestra la autoridad detrás de la propuesta."
+    },
+    "align": {
+      "type": "string",
+      "default": "left"
+    },
+    "card_style": {
+      "type": "string",
+      "default": "rounded"
+    },
+    "items": {
+      "type": "array",
+      "default": [
+        { "name": "Docente principal", "role": "Especialista ATORA", "bio": "Autoridad visible, bio breve y enfoque premium.", "image_url": "" }
+      ]
+    }
+  },
+  "usesContext": ["postId", "postType"],
+  "supports": {
+    "html": false,
+    "inserter": false,
+    "multiple": false,
+    "reusable": false,
+    "lock": false
+  }
+}

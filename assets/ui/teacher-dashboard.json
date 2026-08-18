@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "sections": {
+    "hero": true,
+    "smart_panel": true,
+    "quick_access": true,
+    "inbox": true,
+    "courses": true,
+    "pulse": false,
+    "reviewed": false,
+    "recent_lessons": false,
+    "priority": false,
+    "incidents": false,
+    "summary": false,
+    "notifications": false
+  },
+  "limits": {
+    "inbox_items": 24,
+    "pending_items": 8,
+    "reviewed_items": 6,
+    "recent_lessons": 6,
+    "notifications": 4,
+    "course_cards": 6,
+    "priority_queue_items": 8,
+    "risk_students_items": 6,
+    "ai_pending_items": 6
+  }
+}

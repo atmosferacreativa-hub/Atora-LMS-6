@@ -1,0 +1,54 @@
+/**
+ * ATORA-LMS — Miscellaneous utilities
+ */
+
+/* Loading spinner (reusable) */
+.atora-spinner {
+	display: inline-block;
+	width: 20px;
+	height: 20px;
+	border: 2px solid var(--ac-gray-200);
+	border-top-color: var(--ac-brand);
+	border-radius: 50%;
+	animation: atora-spin .6s linear infinite;
+	vertical-align: middle;
+	flex-shrink: 0;
+}
+.atora-spinner--sm { width: 14px; height: 14px; border-width: 2px; }
+.atora-spinner--lg { width: 28px; height: 28px; border-width: 3px; }
+@keyframes atora-spin { to { transform: rotate(360deg); } }
+
+/* Hide spinner when not loading */
+[hidden] { display: none !important; }
+
+/* Empty states */
+.atora-empty-state {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	text-align: center;
+	padding: 48px 24px;
+	gap: 12px;
+	color: var(--ac-gray-500);
+}
+.atora-empty-state__icon {
+	width: 48px;
+	height: 48px;
+	color: var(--ac-gray-300);
+	margin-bottom: 4px;
+}
+.atora-empty-state__title {
+	font-size: 16px;
+	font-weight: 700;
+	color: var(--ac-gray-700);
+	margin: 0;
+}
+.atora-empty-state__text {
+	font-size: 14px;
+	color: var(--ac-gray-500);
+	margin: 0;
+	max-width: 360px;
+}
+.atora-empty-state__cta {
+	margin-top: 8px;
+}

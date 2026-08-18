@@ -1,0 +1,3240 @@
+# ATORA LMS – Français (France)
+# Copyright (C) 2026 ATORA LMS
+# This file is distributed under the same license as the ATORA LMS plugin.
+msgid ""
+msgstr ""
+"Project-Id-Version: ATORA LMS\n"
+"POT-Creation-Date: 2026-04-13\n"
+"PO-Revision-Date: 2026-04-13\n"
+"Language-Team: French\n"
+"Language: fr_FR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+"X-Generator: ATORA LMS i18n\n"
+
+msgid "%1$s - SpeedGrade"
+msgstr "%1$s - SpeedGrade"
+
+msgid "%1$s · %2$s pts totales"
+msgstr "%1$s · %2$s pts au total"
+
+msgid "%d lecciones prácticas"
+msgstr "%d leçons pratiques"
+
+msgid "%d módulos estructurados"
+msgstr "%d modules structurés"
+
+msgid "%d recursos"
+msgstr "%d ressources"
+
+msgid "%d%% completado"
+msgstr "%d%% complété"
+
+msgid "%s matriculado/a correctamente."
+msgstr "%s inscrit(e) avec succès."
+
+msgid "%s palabras"
+msgstr "%s mots"
+
+msgid "(hace %s días)"
+msgstr "(il y a %s jours)"
+
+msgid "(hace %s h)"
+msgstr "(il y a %s h)"
+
+msgid "+ %d lecciones más disponibles tras inscribirse."
+msgstr "+ %d leçons supplémentaires disponibles après inscription."
+
+msgid "AI Exams"
+msgstr "Examens IA"
+
+msgid "AI Quizzes"
+msgstr "Quiz IA"
+
+msgid "API key de OpenAI no configurada."
+msgstr "Clé API OpenAI non configurée."
+
+msgid "API key de Whisper no configurada."
+msgstr "Clé API Whisper non configurée."
+
+msgid "API key de Whisper/OpenAI no configurada."
+msgstr "Clé API Whisper/OpenAI non configurée."
+
+msgid "API keys, provider, and model are managed in <a href=\"%s\">Settings → APIs e IA</a>."
+msgstr "Les clés API, le fournisseur et le modèle sont gérés dans <a href=\"%s\">Paramètres → APIs et IA</a>."
+
+msgid "APIs e IA"
+msgstr "APIs et IA"
+
+msgid "ATORA"
+msgstr "ATORA"
+
+msgid "ATORA LMS requires PHP 8.1 or higher. You are running PHP %s."
+msgstr "ATORA LMS nécessite PHP 8.1 ou supérieur. Vous utilisez PHP %s."
+
+msgid "ATORA aún no ha verificado qué plantilla de lección está activa. Abre una lección en la vista pública para confirmar que se usa la plantilla del plugin."
+msgstr "ATORA n'a pas encore vérifié quel modèle de leçon est actif. Ouvrez une leçon en vue publique pour confirmer que le modèle du plugin est utilisé."
+
+msgid "Abandono"
+msgstr "Abandon"
+
+msgid "Abre una lección para guardar el banco de preguntas."
+msgstr "Ouvrez une leçon pour sauvegarder la banque de questions."
+
+msgid "Abre una lección para guardar la guía de estudio."
+msgstr "Ouvrez une leçon pour sauvegarder le guide d'étude."
+
+msgid "Abre una lección para guardar la presentación."
+msgstr "Ouvrez une leçon pour sauvegarder la présentation."
+
+msgid "Abre una lección para guardar las notas."
+msgstr "Ouvrez une leçon pour sauvegarder les notes."
+
+msgid "Abrir"
+msgstr "Ouvrir"
+
+msgid "Abrir analítica completa"
+msgstr "Ouvrir l'analyse complète"
+
+msgid "Abrir asistente IA"
+msgstr "Ouvrir l'assistant IA"
+
+msgid "Abrir listado"
+msgstr "Ouvrir la liste"
+
+msgid "Academia"
+msgstr "Académie"
+
+msgid "Académico"
+msgstr "Académique"
+
+msgid "Acceso comunicado"
+msgstr "Accès communiqué"
+
+msgid "Acceso denegado en capa REST."
+msgstr "Accès refusé dans la couche REST."
+
+msgid "Acceso requerido"
+msgstr "Accès requis"
+
+msgid "Acceso rápido al hub comercial."
+msgstr "Accès rapide au hub commercial."
+
+msgid "Acción"
+msgstr "Action"
+
+msgid "Acción desconocida."
+msgstr "Action inconnue."
+
+msgid "Acepta HTML: &lt;strong&gt;, &lt;em&gt;, &lt;a href=&quot;...&quot;&gt;, &lt;ul&gt;&lt;li&gt;, &lt;p&gt;."
+msgstr "Accepte le HTML : &lt;strong&gt;, &lt;em&gt;, &lt;a href=&quot;...&quot;&gt;, &lt;ul&gt;&lt;li&gt;, &lt;p&gt;."
+
+msgid "Activa"
+msgstr "Active"
+
+msgid "Activar logs de CLMS en %s"
+msgstr "Activer les journaux CLMS dans %s"
+
+msgid "Actividad"
+msgstr "Activité"
+
+msgid "Actividad comercial reciente"
+msgstr "Activité commerciale récente"
+
+msgid "Actividad pendiente"
+msgstr "Activité en attente"
+
+msgid "Actividades sin completar"
+msgstr "Activités incomplètes"
+
+msgid "Activo"
+msgstr "Actif"
+
+msgid "Activo · %s"
+msgstr "Actif · %s"
+
+msgid "Actualizada"
+msgstr "Mise à jour"
+
+msgid "Actualizadas"
+msgstr "Mises à jour"
+
+msgid "Actualizado"
+msgstr "Mis à jour"
+
+msgid "Actualizar nivel"
+msgstr "Mettre à jour le niveau"
+
+msgid "Administra diplomados y programas con pricing y cross-sell."
+msgstr "Gérez les diplômes et programmes avec tarification et vente croisée."
+
+msgid "Administrador"
+msgstr "Administrateur"
+
+msgid "Administras %1$d curso(s) con %2$d lección(es) activas."
+msgstr "Vous gérez %1$d cours avec %2$d leçon(s) active(s)."
+
+msgid "Agotada"
+msgstr "Épuisée"
+
+msgid "Ajustes centrales de academia, branding y APIs."
+msgstr "Paramètres centraux de l'académie, de l'identité visuelle et des APIs."
+
+msgid "Alumno"
+msgstr "Étudiant"
+
+msgid "Analizar grupo"
+msgstr "Analyser le groupe"
+
+msgid "Analítica"
+msgstr "Analytique"
+
+msgid "Anthropic devolvió respuesta vacía."
+msgstr "Anthropic a renvoyé une réponse vide."
+
+msgid "Anthropic devolvió una respuesta vacía."
+msgstr "Anthropic a renvoyé une réponse vide."
+
+msgid "Análisis del grupo"
+msgstr "Analyse du groupe"
+
+msgid "Aquí encuentras tus accesos rápidos, perfil y visibilidad de tu ruta de aprendizaje."
+msgstr "Vous trouverez ici vos accès rapides, votre profil et la visibilité de votre parcours d'apprentissage."
+
+msgid "Archivo"
+msgstr "Fichier"
+
+msgid "Archivo de audio no encontrado."
+msgstr "Fichier audio introuvable."
+
+msgid "Archivo de cursos"
+msgstr "Archive des cours"
+
+msgid "Archivo de docentes"
+msgstr "Archive des formateurs"
+
+msgid "Archivo de lecciones"
+msgstr "Archive des leçons"
+
+msgid "Archivo de programas"
+msgstr "Archive des programmes"
+
+msgid "Archivo del recurso"
+msgstr "Fichier de la ressource"
+
+msgid "Archivo demasiado grande."
+msgstr "Fichier trop volumineux."
+
+msgid "Archivo demasiado grande. Máximo %s."
+msgstr "Fichier trop volumineux. Maximum %s."
+
+msgid "Archivo guía AI"
+msgstr "Fichier guide IA"
+
+msgid "Archivo listo para importar."
+msgstr "Fichier prêt à importer."
+
+msgid "Archivo y curso requeridos."
+msgstr "Fichier et cours requis."
+
+msgid "Archivos listos para enviar (%d)."
+msgstr "Fichiers prêts à envoyer (%d)."
+
+msgid "Arrastra el archivo aquí"
+msgstr "Déposez le fichier ici"
+
+msgid "Arrastra el archivo guía aquí"
+msgstr "Déposez le fichier guide ici"
+
+msgid "Arrastra imágenes aquí"
+msgstr "Déposez des images ici"
+
+msgid "Asignación inválida."
+msgstr "Attribution invalide."
+
+msgid "Asignación no encontrada."
+msgstr "Attribution introuvable."
+
+msgid "Asignar foto"
+msgstr "Attribuer une photo"
+
+msgid "Asignar imagen destacada"
+msgstr "Attribuer une image mise en avant"
+
+msgid "Asistente"
+msgstr "Assistant"
+
+msgid "Asistente ATORA"
+msgstr "Assistant ATORA"
+
+msgid "Asistente IA"
+msgstr "Assistant IA"
+
+msgid "Asistente docente activo:"
+msgstr "Assistant pédagogique actif :"
+
+msgid "Asunto"
+msgstr "Sujet"
+
+msgid "Atributos de la lección"
+msgstr "Attributs de la leçon"
+
+msgid "Atributos del curso"
+msgstr "Attributs du cours"
+
+msgid "Atributos del docente"
+msgstr "Attributs du formateur"
+
+msgid "Atributos del programa"
+msgstr "Attributs du programme"
+
+msgid "Audio"
+msgstr "Audio"
+
+msgid "Automatización y presencia docente"
+msgstr "Automatisation et présence du formateur"
+
+msgid "Avance"
+msgstr "Progression"
+
+msgid "Avanzado"
+msgstr "Avancé"
+
+msgid "Aviso"
+msgstr "Avis"
+
+msgid "Aviso reciente"
+msgstr "Avis récent"
+
+msgid "Avisos pendientes"
+msgstr "Avis en attente"
+
+msgid "Añade una pequeña presentación sobre ti."
+msgstr "Ajoutez une courte présentation de vous-même."
+
+msgid "Añadir nueva"
+msgstr "Ajouter nouveau"
+
+msgid "Añadir nueva lección"
+msgstr "Ajouter une nouvelle leçon"
+
+msgid "Añadir nuevo"
+msgstr "Ajouter nouveau"
+
+msgid "Añadir nuevo curso"
+msgstr "Ajouter un nouveau cours"
+
+msgid "Añadir nuevo docente"
+msgstr "Ajouter un nouveau formateur"
+
+msgid "Añadir nuevo nivel"
+msgstr "Ajouter un nouveau niveau"
+
+msgid "Añadir nuevo programa"
+msgstr "Ajouter un nouveau programme"
+
+msgid "Añadir presentación"
+msgstr "Ajouter une présentation"
+
+msgid "Aún no cumples los requisitos para este certificado."
+msgstr "Vous ne remplissez pas encore les conditions pour ce certificat."
+
+msgid "Aún no has enviado esta tarea."
+msgstr "Vous n'avez pas encore soumis ce devoir."
+
+msgid "Aún no has respondido esta evaluación."
+msgstr "Vous n'avez pas encore répondu à cette évaluation."
+
+msgid "Bajo el umbral de desempeño"
+msgstr "En dessous du seuil de performance"
+
+msgid "Banco generado."
+msgstr "Banque générée."
+
+msgid "Bandeja ATORA"
+msgstr "Boîte de réception ATORA"
+
+msgid "Beneficios"
+msgstr "Avantages"
+
+msgid "Bloqueado"
+msgstr "Bloqué"
+
+msgid "Borrar historial"
+msgstr "Effacer l'historique"
+
+msgid "Bunny.net"
+msgstr "Bunny.net"
+
+msgid "Buscar cursos"
+msgstr "Rechercher des cours"
+
+msgid "Buscar docentes"
+msgstr "Rechercher des formateurs"
+
+msgid "Buscar lecciones"
+msgstr "Rechercher des leçons"
+
+msgid "Buscar niveles"
+msgstr "Rechercher des niveaux"
+
+msgid "Buscar programas"
+msgstr "Rechercher des programmes"
+
+msgid "CLMS_AI_Manager no está disponible para solicitudes IA."
+msgstr "CLMS_AI_Manager n'est pas disponible pour les requêtes IA."
+
+msgid "CLMS_AI_Manager no está disponible."
+msgstr "CLMS_AI_Manager n'est pas disponible."
+
+msgid "Caducada"
+msgstr "Expirée"
+
+msgid "Calificaciones"
+msgstr "Notes"
+
+msgid "Calificación y revisión"
+msgstr "Notation et révision"
+
+msgid "Calificada"
+msgstr "Notée"
+
+msgid "Calificadas"
+msgstr "Notées"
+
+msgid "Cambiar logo"
+msgstr "Changer le logo"
+
+msgid "Cargando…"
+msgstr "Chargement…"
+
+msgid "Centro de comunicación operativa para feedback, avisos, seguimiento académico y recomendaciones inteligentes."
+msgstr "Centre de communication opérationnelle pour le feedback, les avis, le suivi académique et les recommandations intelligentes."
+
+msgid "Centro de herramientas de IA para evaluación, asistencia y configuración académica."
+msgstr "Centre d'outils IA pour l'évaluation, l'assistance et la configuration académique."
+
+msgid "Centro operativo por rol para navegar programas, cursos, lecciones, evaluaciones, IA, comercio, analítica y mensajes."
+msgstr "Centre opérationnel par rôle pour naviguer dans les programmes, cours, leçons, évaluations, IA, commerce, analytique et messages."
+
+msgid "Cerrar sesión"
+msgstr "Se déconnecter"
+
+msgid "Certificado"
+msgstr "Certificat"
+
+msgid "Certificado al finalizar"
+msgstr "Certificat à la fin"
+
+msgid "Chunk demasiado grande (%s MB). Máx: %s MB."
+msgstr "Segment trop volumineux (%s Mo). Max : %s Mo."
+
+msgid "Cola operativa de revisión y feedback."
+msgstr "File opérationnelle de révision et de feedback."
+
+msgid "Colaborador"
+msgstr "Collaborateur"
+
+msgid "Comentarios por revisar"
+msgstr "Commentaires à réviser"
+
+msgid "Comenzar tu primera lección"
+msgstr "Commencer votre première leçon"
+
+msgid "Comercial"
+msgstr "Commercial"
+
+msgid "Comercio"
+msgstr "Commerce"
+
+msgid "Comercio en ATORA"
+msgstr "Commerce dans ATORA"
+
+msgid "Comercio, analítica y mensajes"
+msgstr "Commerce, analytique et messages"
+
+msgid "Compacta"
+msgstr "Compacte"
+
+msgid "Completa"
+msgstr "Complète"
+
+msgid "Completa esta actividad para continuar tu avance."
+msgstr "Complétez cette activité pour continuer votre progression."
+
+msgid "Completa estudiante, asunto y mensaje antes de enviar."
+msgstr "Renseignez l'étudiant, le sujet et le message avant d'envoyer."
+
+msgid "Completada"
+msgstr "Complétée"
+
+msgid "Completado"
+msgstr "Complété"
+
+msgid "Completar perfil"
+msgstr "Compléter le profil"
+
+msgid "Completar tu perfil"
+msgstr "Compléter votre profil"
+
+msgid "Completitud"
+msgstr "Complétude"
+
+msgid "Comprar curso"
+msgstr "Acheter le cours"
+
+msgid "Comprar programa"
+msgstr "Acheter le programme"
+
+msgid "Comunicación académica a través de feedback y revisión de entregas."
+msgstr "Communication académique via le feedback et la révision des soumissions."
+
+msgid "Con contraseña"
+msgstr "Avec mot de passe"
+
+msgid "Con fecha límite"
+msgstr "Avec date limite"
+
+msgid "Con registro"
+msgstr "Avec inscription"
+
+msgid "Conf.: %s%%"
+msgstr "Conf. : %s%%"
+
+msgid "Confianza"
+msgstr "Confiance"
+
+msgid "Configuraciones activas"
+msgstr "Configurations actives"
+
+msgid "Configuración"
+msgstr "Paramètres"
+
+msgid "Configuración IA"
+msgstr "Paramètres IA"
+
+msgid "Configuración de Atora"
+msgstr "Paramètres d'Atora"
+
+msgid "Configuración, exámenes IA y evaluación asistida."
+msgstr "Paramètres, examens IA et évaluation assistée."
+
+msgid "Conoce el contenido del curso"
+msgstr "Découvrez le contenu du cours"
+
+msgid "Consulta el progreso y las calificaciones por curso."
+msgstr "Consultez la progression et les notes par cours."
+
+msgid "Consulta vacía para embeddings."
+msgstr "Requête vide pour les embeddings."
+
+msgid "Contenido"
+msgstr "Contenu"
+
+msgid "Continuar ahora"
+msgstr "Continuer maintenant"
+
+msgid "Continúa para mantener el ritmo."
+msgstr "Continuez pour maintenir le rythme."
+
+msgid "Contraseña"
+msgstr "Mot de passe"
+
+msgid "Contraseña incorrecta."
+msgstr "Mot de passe incorrect."
+
+msgid "Control central"
+msgstr "Contrôle central"
+
+msgid "Control de acceso y matriculación"
+msgstr "Contrôle d'accès et inscription"
+
+msgid "Conversaciones"
+msgstr "Conversations"
+
+msgid "Conversiones"
+msgstr "Conversions"
+
+msgid "Conversiones y cross-sell"
+msgstr "Conversions et vente croisée"
+
+msgid "Conversiones y productos clave"
+msgstr "Conversions et produits clés"
+
+msgid "Conversiones, ventas y cross-sell"
+msgstr "Conversions, ventes et vente croisée"
+
+msgid "Copiado"
+msgstr "Copié"
+
+msgid "Copiado al portapapeles"
+msgstr "Copié dans le presse-papiers"
+
+msgid "Copiar"
+msgstr "Copier"
+
+msgid "Copiar al portapapeles"
+msgstr "Copier dans le presse-papiers"
+
+msgid "Copiar informe"
+msgstr "Copier le rapport"
+
+msgid "Could not delete quiz"
+msgstr "Impossible de supprimer le quiz"
+
+msgid "Crear presentación"
+msgstr "Créer une présentation"
+
+msgid "Crear rúbrica"
+msgstr "Créer une rubrique"
+
+msgid "Criterios y matrices de evaluación."
+msgstr "Critères et grilles d'évaluation."
+
+msgid "Cross-sell"
+msgstr "Vente croisée"
+
+msgid "Cruda: %s%%"
+msgstr "Brut : %s%%"
+
+msgid "Cuando avances en el curso, aquí verás patrones y recomendaciones útiles."
+msgstr "Au fur et à mesure de votre progression, vous verrez ici des modèles et des recommandations utiles."
+
+msgid "Cuando tengas lecciones activas, las verás aquí para continuar sin fricciones."
+msgstr "Lorsque vous aurez des leçons actives, vous les verrez ici pour continuer sans friction."
+
+msgid "Curso"
+msgstr "Cours"
+
+msgid "Curso inválido."
+msgstr "Cours invalide."
+
+msgid "Curso no encontrado."
+msgstr "Cours introuvable."
+
+msgid "Curso no válido."
+msgstr "Cours invalide."
+
+msgid "Curso requerido."
+msgstr "Cours requis."
+
+msgid "Curso:"
+msgstr "Cours :"
+
+msgid "Cursos"
+msgstr "Cours"
+
+msgid "Cursos activos"
+msgstr "Cours actifs"
+
+msgid "Cursos comerciales"
+msgstr "Cours commerciaux"
+
+msgid "Cursos, progreso y pendientes"
+msgstr "Cours, progression et en attente"
+
+msgid "Cuéntale algo a tus compañeros..."
+msgstr "Dites quelque chose à vos camarades..."
+
+msgid "Dashboard comercio"
+msgstr "Tableau de bord commercial"
+
+msgid "Datos inválidos."
+msgstr "Données invalides."
+
+msgid "Debes completar la compra antes de inscribirte en este curso."
+msgstr "Vous devez finaliser l'achat avant de vous inscrire à ce cours."
+
+msgid "Debes completar la compra antes de inscribirte en este programa."
+msgstr "Vous devez finaliser l'achat avant de vous inscrire à ce programme."
+
+msgid "Debes completar primero la lección anterior."
+msgstr "Vous devez d'abord compléter la leçon précédente."
+
+msgid "Debes completar todos los criterios de la rúbrica."
+msgstr "Vous devez compléter tous les critères de la rubrique."
+
+msgid "Debes estar inscrito en el curso para acceder a esta lección."
+msgstr "Vous devez être inscrit au cours pour accéder à cette leçon."
+
+msgid "Debes iniciar sesión para acceder a este recurso."
+msgstr "Vous devez être connecté pour accéder à cette ressource."
+
+msgid "Debes iniciar sesión para acceder a las lecciones."
+msgstr "Vous devez être connecté pour accéder aux leçons."
+
+msgid "Debes iniciar sesión para analizar texto."
+msgstr "Vous devez être connecté pour analyser du texte."
+
+msgid "Debes iniciar sesión para revisar entregas."
+msgstr "Vous devez être connecté pour réviser les soumissions."
+
+msgid "Debes iniciar sesión para transcribir audio."
+msgstr "Vous devez être connecté pour transcrire l'audio."
+
+msgid "Debes iniciar sesión primero."
+msgstr "Vous devez d'abord vous connecter."
+
+msgid "Debes iniciar sesión."
+msgstr "Vous devez être connecté."
+
+msgid "Demasiadas preguntas seguidas. Espera un momento."
+msgstr "Trop de questions d'affilée. Veuillez patienter un moment."
+
+msgid "Demasiadas solicitudes. Espera un momento antes de continuar."
+msgstr "Trop de requêtes. Veuillez patienter un moment avant de continuer."
+
+msgid "Desactivado"
+msgstr "Désactivé"
+
+msgid "Descripción"
+msgstr "Description"
+
+msgid "Descripción del video"
+msgstr "Description de la vidéo"
+
+msgid "Desde"
+msgstr "De"
+
+msgid "Desmatriculado."
+msgstr "Désinscrit."
+
+msgid "Destinatarios"
+msgstr "Destinataires"
+
+msgid "Detalle"
+msgstr "Détail"
+
+msgid "Detalle de %s"
+msgstr "Détail de %s"
+
+msgid "Detalles del curso"
+msgstr "Détails du cours"
+
+msgid "Dificultad"
+msgstr "Difficulté"
+
+msgid "Diplomados y agrupaciones académicas."
+msgstr "Diplômes et regroupements académiques."
+
+msgid "Directo"
+msgstr "Direct"
+
+msgid "Docente"
+msgstr "Formateur"
+
+msgid "Docente creado correctamente."
+msgstr "Formateur créé avec succès."
+
+msgid "Docente creado y asociado correctamente."
+msgstr "Formateur créé et associé avec succès."
+
+msgid "Docente líder"
+msgstr "Formateur principal"
+
+msgid "Docente reutilizado y asociado correctamente."
+msgstr "Formateur réutilisé et associé avec succès."
+
+msgid "Docente · %s"
+msgstr "Formateur · %s"
+
+msgid "Docente → estudiante"
+msgstr "Formateur → étudiant"
+
+msgid "Docentes"
+msgstr "Formateurs"
+
+msgid "Docentes del curso"
+msgstr "Formateurs du cours"
+
+msgid "Docentes del programa"
+msgstr "Formateurs du programme"
+
+msgid "Documento OpenAPI no disponible."
+msgstr "Document OpenAPI non disponible."
+
+msgid "Documento OpenAPI público no disponible."
+msgstr "Document OpenAPI public non disponible."
+
+msgid "Driver: %s"
+msgstr "Driver : %s"
+
+msgid "Drop-in detectado en: %s"
+msgstr "Drop-in détecté dans : %s"
+
+msgid "Duración"
+msgstr "Durée"
+
+msgid "Duración estimada: %s"
+msgstr "Durée estimée : %s"
+
+msgid "Editar curso"
+msgstr "Modifier le cours"
+
+msgid "Editar docente"
+msgstr "Modifier le formateur"
+
+msgid "Editar lección"
+msgstr "Modifier la leçon"
+
+msgid "Editar nivel"
+msgstr "Modifier le niveau"
+
+msgid "Editar presentación"
+msgstr "Modifier la présentation"
+
+msgid "Editar programa"
+msgstr "Modifier le programme"
+
+msgid "Editar y revisar tu presencia pública."
+msgstr "Modifier et réviser votre présence publique."
+
+msgid "Ej. 12 semanas / 6 meses"
+msgstr "Ex. : 12 semaines / 6 mois"
+
+msgid "Ej. 8 semanas"
+msgstr "Ex. : 8 semaines"
+
+msgid "Ej. Agregar más ejemplos prácticos"
+msgstr "Ex. : Ajouter plus d'exemples pratiques"
+
+msgid "Ej. Aprendizaje basado en proyectos"
+msgstr "Ex. : Apprentissage par projets"
+
+msgid "Ej. El estudiante diseña una interfaz accesible..."
+msgstr "Ex. : L'étudiant conçoit une interface accessible..."
+
+msgid "Ej. Fundamentos de diseño UX"
+msgstr "Ex. : Fondamentaux du design UX"
+
+msgid "Ej. Marketing Digital para emprendedores"
+msgstr "Ex. : Marketing Digital pour entrepreneurs"
+
+msgid "Ej. Módulo 1 · Fundamentos"
+msgstr "Ex. : Module 1 · Fondamentaux"
+
+msgid "Ej. Producto, Ingeniería, Educación"
+msgstr "Ex. : Produit, Ingénierie, Éducation"
+
+msgid "Ej. Recordatorio de entrega final"
+msgstr "Ex. : Rappel de soumission finale"
+
+msgid "Ej. Terminar este programa en 8 semanas"
+msgstr "Ex. : Terminer ce programme en 8 semaines"
+
+msgid "Ej. UX, marketing, IA aplicada"
+msgstr "Ex. : UX, marketing, IA appliquée"
+
+msgid "El JSON de YouTube está incompleto o es demasiado largo."
+msgstr "Le JSON YouTube est incomplet ou trop long."
+
+msgid "El archivo descargado está vacío."
+msgstr "Le fichier téléchargé est vide."
+
+msgid "El enlace no es válido o ha sido desactivado."
+msgstr "Le lien n'est pas valide ou a été désactivé."
+
+msgid "El enlace no existe o ha sido desactivado."
+msgstr "Le lien n'existe pas ou a été désactivé."
+
+msgid "El helper del LMS no está disponible."
+msgstr "L'assistant LMS n'est pas disponible."
+
+msgid "El mensaje está vacío."
+msgstr "Le message est vide."
+
+msgid "El módulo IA no está disponible para esta actividad."
+msgstr "Le module IA n'est pas disponible pour cette activité."
+
+msgid "El módulo IA no está disponible."
+msgstr "Le module IA n'est pas disponible."
+
+msgid "El módulo de SpeedGrade no está disponible."
+msgstr "Le module SpeedGrade n'est pas disponible."
+
+msgid "El módulo de docentes no está disponible."
+msgstr "Le module formateurs n'est pas disponible."
+
+msgid "El módulo de entregas no está disponible."
+msgstr "Le module soumissions n'est pas disponible."
+
+msgid "El módulo de quiz no está disponible para REST."
+msgstr "Le module quiz n'est pas disponible pour REST."
+
+msgid "El módulo de rúbricas no está disponible."
+msgstr "Le module rubriques n'est pas disponible."
+
+msgid "El nombre del docente es obligatorio."
+msgstr "Le nom du formateur est obligatoire."
+
+msgid "El post no es una lección."
+msgstr "Le post n'est pas une leçon."
+
+msgid "El provider IA devolvió una respuesta inválida."
+msgstr "Le fournisseur IA a renvoyé une réponse invalide."
+
+msgid "El tiempo para responder esta evaluación ha terminado."
+msgstr "Le temps pour répondre à cette évaluation est écoulé."
+
+msgid "El track de captions no tiene URL."
+msgstr "La piste de sous-titres n'a pas d'URL."
+
+msgid "El título de la lección es obligatorio."
+msgstr "Le titre de la leçon est obligatoire."
+
+msgid "El título de la rúbrica es obligatorio."
+msgstr "Le titre de la rubrique est obligatoire."
+
+msgid "El título del curso es obligatorio."
+msgstr "Le titre du cours est obligatoire."
+
+msgid "El título del programa es obligatorio."
+msgstr "Le titre du programme est obligatoire."
+
+msgid "Eliminar recurso"
+msgstr "Supprimer la ressource"
+
+msgid "Email"
+msgstr "E-mail"
+
+msgid "Email y curso son requeridos."
+msgstr "L'e-mail et le cours sont requis."
+
+msgid "Empezar ahora"
+msgstr "Commencer maintenant"
+
+msgid "En cola"
+msgstr "En file d'attente"
+
+msgid "En cola…"
+msgstr "En file d'attente…"
+
+msgid "En curso"
+msgstr "En cours"
+
+msgid "En progreso"
+msgstr "En progression"
+
+msgid "En revisión"
+msgstr "En révision"
+
+msgid "En riesgo"
+msgstr "À risque"
+
+msgid "Engagement"
+msgstr "Engagement"
+
+msgid "Enlace"
+msgstr "Lien"
+
+msgid "Enlace activo:"
+msgstr "Lien actif :"
+
+msgid "Enlace no válido."
+msgstr "Lien invalide."
+
+msgid "Enlace regenerado."
+msgstr "Lien régénéré."
+
+msgid "Entidad"
+msgstr "Entité"
+
+msgid "Entrega creada"
+msgstr "Soumission créée"
+
+msgid "Entrega evaluada"
+msgstr "Soumission évaluée"
+
+msgid "Entrega inválida para análisis IA."
+msgstr "Soumission invalide pour l'analyse IA."
+
+msgid "Entrega inválida."
+msgstr "Soumission invalide."
+
+msgid "Entrega no disponible"
+msgstr "Soumission non disponible"
+
+msgid "Entrega no válida"
+msgstr "Soumission invalide"
+
+msgid "Entrega no válida."
+msgstr "Soumission invalide."
+
+msgid "Entrega reciente"
+msgstr "Soumission récente"
+
+msgid "Entregado"
+msgstr "Soumis"
+
+msgid "Entregas"
+msgstr "Soumissions"
+
+msgid "Entregas huérfanas"
+msgstr "Soumissions orphelines"
+
+msgid "Entregas pendientes"
+msgstr "Soumissions en attente"
+
+msgid "Entregas pendientes por curso"
+msgstr "Soumissions en attente par cours"
+
+msgid "Entregas registradas"
+msgstr "Soumissions enregistrées"
+
+msgid "Entregas sin revisar"
+msgstr "Soumissions non révisées"
+
+msgid "Enviada"
+msgstr "Envoyée"
+
+msgid "Enviadas"
+msgstr "Envoyées"
+
+msgid "Enviar mensaje"
+msgstr "Envoyer un message"
+
+msgid "Enviar mensaje directo"
+msgstr "Envoyer un message direct"
+
+msgid "Equipo docente"
+msgstr "Équipe pédagogique"
+
+msgid "Error HTTP en solicitud IA."
+msgstr "Erreur HTTP dans la requête IA."
+
+msgid "Error IA"
+msgstr "Erreur IA"
+
+msgid "Error al cargar estadísticas."
+msgstr "Erreur lors du chargement des statistiques."
+
+msgid "Error al descargar el archivo (HTTP %d)."
+msgstr "Erreur lors du téléchargement du fichier (HTTP %d)."
+
+msgid "Error al eliminar el usuario."
+msgstr "Erreur lors de la suppression de l'utilisateur."
+
+msgid "Error al generar la respuesta."
+msgstr "Erreur lors de la génération de la réponse."
+
+msgid "Error al generar."
+msgstr "Erreur lors de la génération."
+
+msgid "Error al guardar."
+msgstr "Erreur lors de la sauvegarde."
+
+msgid "Error al iniciar."
+msgstr "Erreur lors du démarrage."
+
+msgid "Error al procesar el CSV."
+msgstr "Erreur lors du traitement du CSV."
+
+msgid "Error al procesar el archivo de audio."
+msgstr "Erreur lors du traitement du fichier audio."
+
+msgid "Error de cURL: %s"
+msgstr "Erreur cURL : %s"
+
+msgid "Error de conexión al guardar."
+msgstr "Erreur de connexion lors de la sauvegarde."
+
+msgid "Error de conexión."
+msgstr "Erreur de connexion."
+
+msgid "Error de conexión. Inténtalo de nuevo."
+msgstr "Erreur de connexion. Veuillez réessayer."
+
+msgid "Error de red."
+msgstr "Erreur réseau."
+
+msgid "Error de red. Intenta de nuevo."
+msgstr "Erreur réseau. Veuillez réessayer."
+
+msgid "Error desconocido de la API."
+msgstr "Erreur API inconnue."
+
+msgid "Error interno al matricular."
+msgstr "Erreur interne lors de l'inscription."
+
+msgid "Error."
+msgstr "Erreur."
+
+msgid "Error: %s"
+msgstr "Erreur : %s"
+
+msgid "Escribe tu pregunta o instrucción…"
+msgstr "Écrivez votre question ou instruction…"
+
+msgid "Escribe un email o usuario."
+msgstr "Saisissez un e-mail ou un nom d'utilisateur."
+
+msgid "Escribe un email."
+msgstr "Saisissez un e-mail."
+
+msgid "Escribe una contraseña de acceso."
+msgstr "Saisissez un mot de passe d'accès."
+
+msgid "Espacio operativo para monetización, bundles, membresías y configuración comercial."
+msgstr "Espace opérationnel pour la monétisation, les bundles, les abonnements et la configuration commerciale."
+
+msgid "Esperada: %1$s | Activa: %2$s"
+msgstr "Attendue : %1$s | Active : %2$s"
+
+msgid "Esta invitación no corresponde a tu cuenta."
+msgstr "Cette invitation ne correspond pas à votre compte."
+
+msgid "Esta invitación ya alcanzó el límite de usos."
+msgstr "Cette invitation a déjà atteint la limite d'utilisations."
+
+msgid "Esta lección aún no está disponible."
+msgstr "Cette leçon n'est pas encore disponible."
+
+msgid "Esta lección estará disponible el %s."
+msgstr "Cette leçon sera disponible le %s."
+
+msgid "Esta lección no tiene criterios de evaluación IA definidos. Agrégalos en el metabox de la lección."
+msgstr "Cette leçon n'a pas de critères d'évaluation IA définis. Ajoutez-les dans le metabox de la leçon."
+
+msgid "Estado"
+msgstr "Statut"
+
+msgid "Estado de caché y PHP"
+msgstr "État du cache et de PHP"
+
+msgid "Estado: %s"
+msgstr "Statut : %s"
+
+msgid "Este curso requiere completar la compra antes de inscribirte."
+msgstr "Ce cours nécessite de finaliser l'achat avant de vous inscrire."
+
+msgid "Este perfil se muestra automáticamente en cursos y programas cuando el docente está asociado."
+msgstr "Ce profil s'affiche automatiquement dans les cours et programmes lorsque le formateur est associé."
+
+msgid "Este video de YouTube no tiene captions disponibles."
+msgstr "Cette vidéo YouTube n'a pas de sous-titres disponibles."
+
+msgid "Este video no tiene captions activados. Para habilitar captions ve a YouTube Studio > Subtítulos."
+msgstr "Cette vidéo n'a pas de sous-titres activés. Pour activer les sous-titres, allez dans YouTube Studio > Sous-titres."
+
+msgid "Estructura principal de la oferta formativa."
+msgstr "Structure principale de l'offre de formation."
+
+msgid "Estudiante"
+msgstr "Étudiant"
+
+msgid "Estudiantes"
+msgstr "Étudiants"
+
+msgid "Etiqueta de precio"
+msgstr "Étiquette de prix"
+
+msgid "Evaluaciones"
+msgstr "Évaluations"
+
+msgid "Evaluaciones entregadas"
+msgstr "Évaluations soumises"
+
+msgid "Evaluación"
+msgstr "Évaluation"
+
+msgid "Evaluación enviada correctamente."
+msgstr "Évaluation soumise avec succès."
+
+msgid "Evaluación y banco AI"
+msgstr "Évaluation et banque IA"
+
+msgid "Evaluado por IA"
+msgstr "Évalué par IA"
+
+msgid "Evento no válido. Eventos permitidos: "
+msgstr "Événement invalide. Événements autorisés : "
+
+msgid "Evento registrado."
+msgstr "Événement enregistré."
+
+msgid "Eventos"
+msgstr "Événements"
+
+msgid "Eventos recientes"
+msgstr "Événements récents"
+
+msgid "Eventos y salud del sistema"
+msgstr "Événements et santé du système"
+
+msgid "Explora el resto del contenido disponible."
+msgstr "Explorez le reste du contenu disponible."
+
+msgid "Explora esta lección para seguir avanzando."
+msgstr "Explorez cette leçon pour continuer à progresser."
+
+msgid "Externo"
+msgstr "Externe"
+
+msgid "Exámenes IA"
+msgstr "Examens IA"
+
+msgid "Failed to parse AI response"
+msgstr "Échec de l'analyse de la réponse IA"
+
+msgid "Fallida"
+msgstr "Échoué"
+
+msgid "Falló"
+msgstr "Échoué"
+
+msgid "Falta la API key de Anthropic."
+msgstr "Clé API Anthropic manquante."
+
+msgid "Falta la API key de Gemini."
+msgstr "Clé API Gemini manquante."
+
+msgid "Falta la API key de OpenAI."
+msgstr "Clé API OpenAI manquante."
+
+msgid "Faltan datos para guardar la entrega."
+msgstr "Données manquantes pour sauvegarder la soumission."
+
+msgid "Faltan datos."
+msgstr "Données manquantes."
+
+msgid "Fecha"
+msgstr "Date"
+
+msgid "Feedback"
+msgstr "Retour"
+
+msgid "Feedback, avisos y comunicación operativa."
+msgstr "Retours, avis et communication opérationnelle."
+
+msgid "Filas de caché"
+msgstr "Lignes de cache"
+
+msgid "Filtrar"
+msgstr "Filtrer"
+
+msgid "Forma parte de un programa académico"
+msgstr "Fait partie d'un programme académique"
+
+msgid "Foto del docente"
+msgstr "Photo du formateur"
+
+msgid "Fuente"
+msgstr "Source"
+
+msgid "Fuentes"
+msgstr "Sources"
+
+msgid "Funnel"
+msgstr "Entonnoir"
+
+msgid "Funnel comercial, ingresos y productos clave."
+msgstr "Entonnoir commercial, revenus et produits clés."
+
+msgid "Gemini devolvió respuesta vacía."
+msgstr "Gemini a renvoyé une réponse vide."
+
+msgid "Gemini devolvió una respuesta vacía."
+msgstr "Gemini a renvoyé une réponse vide."
+
+msgid "Generación asistida de cuestionarios y evaluaciones automáticas."
+msgstr "Génération assistée de questionnaires et d'évaluations automatiques."
+
+msgid "General"
+msgstr "Général"
+
+msgid "Generando revisión IA..."
+msgstr "Génération de la révision IA..."
+
+msgid "Generando..."
+msgstr "Génération..."
+
+msgid "Generando…"
+msgstr "Génération…"
+
+msgid "Generando… puede tardar unos segundos."
+msgstr "Génération… cela peut prendre quelques secondes."
+
+msgid "Generar análisis IA"
+msgstr "Générer une analyse IA"
+
+msgid "Generar enlace"
+msgstr "Générer un lien"
+
+msgid "Generar plan de curso"
+msgstr "Générer un plan de cours"
+
+msgid "Generar preguntas"
+msgstr "Générer des questions"
+
+msgid "Generar →"
+msgstr "Générer →"
+
+msgid "Gestiona productos vinculados a cursos, programas, bundles y membresías."
+msgstr "Gérez les produits liés aux cours, programmes, bundles et abonnements."
+
+msgid "Gestiona tu identidad y tus accesos principales."
+msgstr "Gérez votre identité et vos accès principaux."
+
+msgid "Google Drive"
+msgstr "Google Drive"
+
+msgid "Grupo"
+msgstr "Groupe"
+
+msgid "Guardado correctamente."
+msgstr "Sauvegardé avec succès."
+
+msgid "Guardando…"
+msgstr "Sauvegarde…"
+
+msgid "Guardar ajustes"
+msgstr "Enregistrer les paramètres"
+
+msgid "Guardar como notas"
+msgstr "Enregistrer comme notes"
+
+msgid "Guardar como notas de la lección"
+msgstr "Enregistrer comme notes de la leçon"
+
+msgid "Guardar como rúbrica oficial"
+msgstr "Enregistrer comme rubrique officielle"
+
+msgid "Guardar en banco de preguntas"
+msgstr "Enregistrer dans la banque de questions"
+
+msgid "Guardar en lección"
+msgstr "Enregistrer dans la leçon"
+
+msgid "Guía"
+msgstr "Guide"
+
+msgid "Guía de estudio guardada en la lección."
+msgstr "Guide d'étude enregistré dans la leçon."
+
+msgid "Hasta"
+msgstr "Jusqu'à"
+
+msgid "Hilos por contexto"
+msgstr "Fils par contexte"
+
+msgid "Historial borrado."
+msgstr "Historique effacé."
+
+msgid "Historial borrado. ¿En qué te puedo ayudar?"
+msgstr "Historique effacé. Comment puis-je vous aider ?"
+
+msgid "Hola, %s"
+msgstr "Bonjour, %s"
+
+msgid "Hola, {name}. Ya tienes sesión iniciada."
+msgstr "Bonjour, {name}. Vous êtes déjà connecté."
+
+msgid "Hybrid"
+msgstr "Hybride"
+
+msgid "IA"
+msgstr "IA"
+
+msgid "IA / Docente"
+msgstr "IA / Formateur"
+
+msgid "IA académica"
+msgstr "IA académique"
+
+msgid "IA asistida"
+msgstr "IA assistée"
+
+msgid "IA auto grade"
+msgstr "Notation automatique IA"
+
+msgid "IA en ATORA"
+msgstr "IA dans ATORA"
+
+msgid "IA y perfil"
+msgstr "IA et profil"
+
+msgid "IA · %s"
+msgstr "IA · %s"
+
+msgid "ID de usuario inválido."
+msgstr "ID utilisateur invalide."
+
+msgid "Identidad operativa dentro de ATORA."
+msgstr "Identité opérationnelle au sein d'ATORA."
+
+msgid "Identificador o curso inválido."
+msgstr "Identifiant ou cours invalide."
+
+msgid "Imagen destacada"
+msgstr "Image mise en avant"
+
+msgid "Imprimir / PDF"
+msgstr "Imprimer / PDF"
+
+msgid "Ingresar"
+msgstr "Se connecter"
+
+msgid "Ingresos"
+msgstr "Revenus"
+
+msgid "Ingresos estimados"
+msgstr "Revenus estimés"
+
+msgid "Ingresos estimados por producto"
+msgstr "Revenus estimés par produit"
+
+msgid "Inicia sesión para ver tu perfil."
+msgstr "Connectez-vous pour voir votre profil."
+
+msgid "Iniciando…"
+msgstr "Démarrage…"
+
+msgid "Iniciar sesión"
+msgstr "Se connecter"
+
+msgid "Inscribirme"
+msgstr "M'inscrire"
+
+msgid "Inscribirme ahora"
+msgstr "M'inscrire maintenant"
+
+msgid "Inscripciones en cursos"
+msgstr "Inscriptions aux cours"
+
+msgid "Inscripción"
+msgstr "Inscription"
+
+msgid "Inscripción confirmada"
+msgstr "Inscription confirmée"
+
+msgid "Inscritos"
+msgstr "Inscrits"
+
+msgid "Instructores"
+msgstr "Instructeurs"
+
+msgid "Investigación pedagógica"
+msgstr "Recherche pédagogique"
+
+msgid "Investigar"
+msgstr "Rechercher"
+
+msgid "Investigar tema"
+msgstr "Rechercher un sujet"
+
+msgid "Invitación enviada."
+msgstr "Invitation envoyée."
+
+msgid "Invitación revocada."
+msgstr "Invitation révoquée."
+
+msgid "Ir a mi panel"
+msgstr "Aller à mon tableau de bord"
+
+msgid "Ir al siguiente paso"
+msgstr "Aller à l'étape suivante"
+
+msgid "Jerarquía académica"
+msgstr "Hiérarchie académique"
+
+msgid "La API key de OpenAI no está configurada."
+msgstr "La clé API OpenAI n'est pas configurée."
+
+msgid "La IA devolvió un formato inesperado."
+msgstr "L'IA a renvoyé un format inattendu."
+
+msgid "La actividad no tiene rúbrica ni criterios para evaluación IA segura."
+msgstr "L'activité n'a pas de rubrique ni de critères pour une évaluation IA sécurisée."
+
+msgid "La contraseña debe tener al menos 8 caracteres."
+msgstr "Le mot de passe doit comporter au moins 8 caractères."
+
+msgid "La entrega no es válida para evaluación."
+msgstr "La soumission n'est pas valide pour l'évaluation."
+
+msgid "La entrega no tiene contenido de texto evaluable."
+msgstr "La soumission n'a pas de contenu textuel évaluable."
+
+msgid "La entrega no tiene lección asociada."
+msgstr "La soumission n'a pas de leçon associée."
+
+msgid "La entrega no tiene suficiente texto para evaluación IA automática."
+msgstr "La soumission n'a pas assez de texte pour une évaluation automatique par IA."
+
+msgid "La entrega no tiene una lección asociada."
+msgstr "La soumission n'a pas de leçon associée."
+
+msgid "La fuente del video no es YouTube y Whisper no está configurado. Añade una API key de OpenAI en Ajustes > IA."
+msgstr "La source de la vidéo n'est pas YouTube et Whisper n'est pas configuré. Ajoutez une clé API OpenAI dans Paramètres > IA."
+
+msgid "La invitación ha caducado."
+msgstr "L'invitation a expiré."
+
+msgid "La invitación no existe o no es válida."
+msgstr "L'invitation n'existe pas ou n'est pas valide."
+
+msgid "La invitación no existe o ya no es válida."
+msgstr "L'invitation n'existe pas ou n'est plus valide."
+
+msgid "La lección aún no está disponible."
+msgstr "La leçon n'est pas encore disponible."
+
+msgid "La lección no es válida."
+msgstr "La leçon n'est pas valide."
+
+msgid "La lección no tiene URL de video."
+msgstr "La leçon n'a pas d'URL vidéo."
+
+msgid "La nota debe ser numérica."
+msgstr "La note doit être numérique."
+
+msgid "La plantilla activa de lecciones no coincide con la de ATORA. Esto puede ocultar mejoras de UI en nuevos sitios."
+msgstr "Le modèle actif de leçons ne correspond pas à celui d'ATORA. Cela peut masquer des améliorations d'interface sur les nouveaux sites."
+
+msgid "La revisión entre pares no está habilitada para esta lección."
+msgstr "La révision par les pairs n'est pas activée pour cette leçon."
+
+msgid "Las contraseñas no coinciden."
+msgstr "Les mots de passe ne correspondent pas."
+
+msgid "Las operaciones realizadas en esta sesión aparecerán aquí."
+msgstr "Les opérations effectuées dans cette session apparaîtront ici."
+
+msgid "Lecciones"
+msgstr "Leçons"
+
+msgid "Lecciones calificadas"
+msgstr "Leçons notées"
+
+msgid "Lecciones completadas"
+msgstr "Leçons complétées"
+
+msgid "Lección"
+msgstr "Leçon"
+
+msgid "Lección completada"
+msgstr "Leçon complétée"
+
+msgid "Lección en curso"
+msgstr "Leçon en cours"
+
+msgid "Lección inválida."
+msgstr "Leçon invalide."
+
+msgid "Lección no encontrada."
+msgstr "Leçon introuvable."
+
+msgid "Lección no válida."
+msgstr "Leçon invalide."
+
+msgid "Lección pendiente"
+msgstr "Leçon en attente"
+
+msgid "Lección:"
+msgstr "Leçon :"
+
+msgid "Lectura"
+msgstr "Lecture"
+
+msgid "Lectura operativa por rol del estado de la plataforma."
+msgstr "Lecture opérationnelle par rôle de l'état de la plateforme."
+
+msgid "Libre"
+msgstr "Gratuit"
+
+msgid "Libro"
+msgstr "Livre"
+
+msgid "Libro de calificaciones"
+msgstr "Carnet de notes"
+
+msgid "Libro de calificaciones recalculado correctamente."
+msgstr "Carnet de notes recalculé avec succès."
+
+msgid "Llevas un progreso global de %1$d%% y un promedio actual de %2$d%%."
+msgstr "Vous avez une progression globale de %1$d%% et une moyenne actuelle de %2$d%%."
+
+msgid "Logs, salud y auditoría"
+msgstr "Journaux, santé et audit"
+
+msgid "Los captions de YouTube están vacíos."
+msgstr "Les sous-titres YouTube sont vides."
+
+msgid "Los puntajes deben estar entre 0 y 100."
+msgstr "Les scores doivent être compris entre 0 et 100."
+
+msgid "Límite de revisiones IA alcanzado. Espera unos minutos antes de continuar."
+msgstr "Limite de révisions IA atteinte. Veuillez patienter quelques minutes avant de continuer."
+
+msgid "Malla del curso"
+msgstr "Grille du cours"
+
+msgid "Malla del programa"
+msgstr "Grille du programme"
+
+msgid "Mantenimiento"
+msgstr "Maintenance"
+
+msgid "Manual"
+msgstr "Manuel"
+
+msgid "Marcar como leído"
+msgstr "Marquer comme lu"
+
+msgid "María López | Estudiante | Excelente curso, muy práctico."
+msgstr "Marie Dupont | Étudiante | Excellent cours, très pratique."
+
+msgid "Material de apoyo"
+msgstr "Matériel de soutien"
+
+msgid "Matriculado correctamente."
+msgstr "Inscrit avec succès."
+
+msgid "Matrícula de %s eliminada."
+msgstr "Inscription de %s supprimée."
+
+msgid "Mejorar"
+msgstr "Améliorer"
+
+msgid "Mejorar lección"
+msgstr "Améliorer la leçon"
+
+msgid "Membresía"
+msgstr "Abonnement"
+
+msgid "Memcached"
+msgstr "Memcached"
+
+msgid "Mensaje"
+msgstr "Message"
+
+msgid "Mensaje enviado correctamente."
+msgstr "Message envoyé avec succès."
+
+msgid "Mensaje vacío."
+msgstr "Message vide."
+
+msgid "Mensajes"
+msgstr "Messages"
+
+msgid "Mensajes recientes"
+msgstr "Messages récents"
+
+msgid "Mensajes y seguimiento"
+msgstr "Messages et suivi"
+
+msgid "Mentoría"
+msgstr "Mentorat"
+
+msgid "Metadatos LMS"
+msgstr "Métadonnées LMS"
+
+msgid "Mi panel"
+msgstr "Mon tableau de bord"
+
+msgid "Mi perfil"
+msgstr "Mon profil"
+
+msgid "Mi perfil ATORA"
+msgstr "Mon profil ATORA"
+
+msgid "Mide tu progreso y actividad académica."
+msgstr "Suivez votre progression et votre activité académique."
+
+msgid "Miembro desde"
+msgstr "Membre depuis"
+
+msgid "Miniatura"
+msgstr "Miniature"
+
+msgid "Miniatura del video"
+msgstr "Miniature de la vidéo"
+
+msgid "Minimizar"
+msgstr "Réduire"
+
+msgid "Mis cursos"
+msgstr "Mes cours"
+
+msgid "Missing content or course_id"
+msgstr "Contenu ou course_id manquant"
+
+msgid "Missing content_type or content"
+msgstr "content_type ou content manquant"
+
+msgid "Modelo académico"
+msgstr "Modèle académique"
+
+msgid "Modelo académico del programa"
+msgstr "Modèle académique du programme"
+
+msgid "Modelo: %s"
+msgstr "Modèle : %s"
+
+msgid "Modo"
+msgstr "Mode"
+
+msgid "Motor"
+msgstr "Moteur"
+
+msgid "Máximo %d archivos por entrega."
+msgstr "Maximum %d fichiers par soumission."
+
+msgid "Módulo de mantenimiento no disponible."
+msgstr "Module de maintenance non disponible."
+
+msgid "Módulo de revisión entre pares no disponible."
+msgstr "Module de révision par les pairs non disponible."
+
+msgid "N.° de lecciones"
+msgstr "Nbre de leçons"
+
+msgid "N.° de slides"
+msgstr "Nbre de diapositives"
+
+msgid "N/D"
+msgstr "N/D"
+
+msgid "Navegación de usuario"
+msgstr "Navigation utilisateur"
+
+msgid "Nivel"
+msgstr "Niveau"
+
+msgid "Niveles"
+msgstr "Niveaux"
+
+msgid "No"
+msgstr "Non"
+
+msgid "No autorizado."
+msgstr "Non autorisé."
+
+msgid "No configurado"
+msgstr "Non configuré"
+
+msgid "No detectado"
+msgstr "Non détecté"
+
+msgid "No disponible"
+msgstr "Non disponible"
+
+msgid "No encontramos una entrega para revisar."
+msgstr "Nous n'avons pas trouvé de soumission à réviser."
+
+msgid "No estás asignado a esta revisión."
+msgstr "Vous n'êtes pas assigné à cette révision."
+
+msgid "No hay API key configurada para embeddings."
+msgstr "Aucune clé API configurée pour les embeddings."
+
+msgid "No hay actividades registradas para este estudiante en el curso."
+msgstr "Aucune activité enregistrée pour cet étudiant dans le cours."
+
+msgid "No hay alumnos inscritos en este curso."
+msgstr "Aucun étudiant inscrit dans ce cours."
+
+msgid "No hay contenido de lección disponible. Abre una lección antes de usar esta herramienta."
+msgstr "Aucun contenu de leçon disponible. Ouvrez une leçon avant d'utiliser cet outil."
+
+msgid "No hay contenido suficiente para analizar en la entrega."
+msgstr "Contenu insuffisant pour analyser dans la soumission."
+
+msgid "No hay datos académicos suficientes todavía."
+msgstr "Pas encore assez de données académiques."
+
+msgid "No hay entregas con los filtros seleccionados."
+msgstr "Aucune soumission avec les filtres sélectionnés."
+
+msgid "No hay eventos comerciales recientes."
+msgstr "Aucun événement commercial récent."
+
+msgid "No hay invitaciones que limpiar."
+msgstr "Aucune invitation à nettoyer."
+
+msgid "No hay mensajes todavía. Aquí aparecerán avisos del sistema, seguimiento docente, IA y recomendaciones."
+msgstr "Aucun message pour l'instant. Les avis système, le suivi pédagogique, l'IA et les recommandations apparaîtront ici."
+
+msgid "No hay preguntas válidas."
+msgstr "Aucune question valide."
+
+msgid "No hay quiz en esta lección."
+msgstr "Aucun quiz dans cette leçon."
+
+msgid "No hay un curso activo para analizar. Abre un curso antes de usar esta herramienta."
+msgstr "Aucun cours actif à analyser. Ouvrez un cours avant d'utiliser cet outil."
+
+msgid "No leídos"
+msgstr "Non lus"
+
+msgid "No pudimos validar la solicitud."
+msgstr "Nous n'avons pas pu valider la requête."
+
+msgid "No puedes asignar esta lección a otro instructor."
+msgstr "Vous ne pouvez pas attribuer cette leçon à un autre formateur."
+
+msgid "No puedes asignar este curso a otro instructor."
+msgstr "Vous ne pouvez pas attribuer ce cours à un autre formateur."
+
+msgid "No puedes asignar este programa a otro instructor."
+msgstr "Vous ne pouvez pas attribuer ce programme à un autre formateur."
+
+msgid "No puedes eliminarte a ti mismo."
+msgstr "Vous ne pouvez pas vous supprimer vous-même."
+
+msgid "No puedes escribirle a ese estudiante desde este contexto."
+msgstr "Vous ne pouvez pas écrire à cet étudiant depuis ce contexte."
+
+msgid "No puedes mover esta lección a un curso ajeno."
+msgstr "Vous ne pouvez pas déplacer cette leçon vers un cours d'un autre formateur."
+
+msgid "No puedes reasignar esta lección a otro instructor."
+msgstr "Vous ne pouvez pas réattribuer cette leçon à un autre formateur."
+
+msgid "No puedes reasignar este curso a otro instructor."
+msgstr "Vous ne pouvez pas réattribuer ce cours à un autre formateur."
+
+msgid "No puedes reasignar este programa a otro instructor."
+msgstr "Vous ne pouvez pas réattribuer ce programme à un autre formateur."
+
+msgid "No se definió un modelo de Anthropic."
+msgstr "Aucun modèle Anthropic n'a été défini."
+
+msgid "No se definió un modelo de Gemini."
+msgstr "Aucun modèle Gemini n'a été défini."
+
+msgid "No se definió un modelo de OpenAI."
+msgstr "Aucun modèle OpenAI n'a été défini."
+
+msgid "No se encontraron cursos"
+msgstr "Aucun cours trouvé"
+
+msgid "No se encontraron cursos en la papelera"
+msgstr "Aucun cours trouvé dans la corbeille"
+
+msgid "No se encontraron cursos vinculados en los productos de la orden."
+msgstr "Aucun cours lié trouvé dans les produits de la commande."
+
+msgid "No se encontraron docentes"
+msgstr "Aucun formateur trouvé"
+
+msgid "No se encontraron docentes en la papelera"
+msgstr "Aucun formateur trouvé dans la corbeille"
+
+msgid "No se encontraron entregas huérfanas."
+msgstr "Aucune soumission orpheline trouvée."
+
+msgid "No se encontraron lecciones"
+msgstr "Aucune leçon trouvée"
+
+msgid "No se encontraron lecciones en la papelera"
+msgstr "Aucune leçon trouvée dans la corbeille"
+
+msgid "No se encontraron programas"
+msgstr "Aucun programme trouvé"
+
+msgid "No se encontraron programas en la papelera"
+msgstr "Aucun programme trouvé dans la corbeille"
+
+msgid "No se encontró CLMS_Grading."
+msgstr "CLMS_Grading introuvable."
+
+msgid "No se encontró contenido para generar preguntas. Agrega texto a la lección o selecciona un archivo."
+msgstr "Aucun contenu trouvé pour générer des questions. Ajoutez du texte à la leçon ou sélectionnez un fichier."
+
+msgid "No se encontró el evaluador IA de criterios naturales."
+msgstr "Évaluateur IA de critères naturels introuvable."
+
+msgid "No se encontró el inicio del JSON en la respuesta de YouTube."
+msgstr "Début du JSON introuvable dans la réponse YouTube."
+
+msgid "No se encontró el módulo de entregas para IA."
+msgstr "Module de soumissions pour IA introuvable."
+
+msgid "No se encontró ningún usuario con ese email."
+msgstr "Aucun utilisateur trouvé avec cet e-mail."
+
+msgid "No se encontró ytInitialPlayerResponse en la página de YouTube."
+msgstr "ytInitialPlayerResponse introuvable sur la page YouTube."
+
+msgid "No se proporcionaron mensajes."
+msgstr "Aucun message fourni."
+
+msgid "No se pudieron extraer criterios de la rúbrica generada."
+msgstr "Impossible d'extraire les critères de la rubrique générée."
+
+msgid "No se pudieron extraer preguntas del quiz generado."
+msgstr "Impossible d'extraire les questions du quiz généré."
+
+msgid "No se pudieron guardar los docentes. Intenta nuevamente."
+msgstr "Impossible de sauvegarder les formateurs. Veuillez réessayer."
+
+msgid "No se pudo cargar el contexto de la entrega."
+msgstr "Impossible de charger le contexte de la soumission."
+
+msgid "No se pudo cargar el detalle del estudiante."
+msgstr "Impossible de charger les détails de l'étudiant."
+
+msgid "No se pudo completar la inscripción."
+msgstr "Impossible de finaliser l'inscription."
+
+msgid "No se pudo completar la matrícula."
+msgstr "Impossible de finaliser l'inscription."
+
+msgid "No se pudo construir el contexto de evaluación IA."
+msgstr "Impossible de construire le contexte d'évaluation IA."
+
+msgid "No se pudo crear el docente."
+msgstr "Impossible de créer le formateur."
+
+msgid "No se pudo crear el docente. Intenta nuevamente."
+msgstr "Impossible de créer le formateur. Veuillez réessayer."
+
+msgid "No se pudo crear la entrega."
+msgstr "Impossible de créer la soumission."
+
+msgid "No se pudo crear la invitación."
+msgstr "Impossible de créer l'invitation."
+
+msgid "No se pudo eliminar el curso."
+msgstr "Impossible de supprimer le cours."
+
+msgid "No se pudo eliminar el programa."
+msgstr "Impossible de supprimer le programme."
+
+msgid "No se pudo eliminar la lección."
+msgstr "Impossible de supprimer la leçon."
+
+msgid "No se pudo enviar el mensaje."
+msgstr "Impossible d'envoyer le message."
+
+msgid "No se pudo extraer el ID del video de YouTube."
+msgstr "Impossible d'extraire l'ID de la vidéo YouTube."
+
+msgid "No se pudo extraer texto de los captions."
+msgstr "Impossible d'extraire le texte des sous-titres."
+
+msgid "No se pudo generar el embedding."
+msgstr "Impossible de générer l'embedding."
+
+msgid "No se pudo generar la revisión IA."
+msgstr "Impossible de générer la révision IA."
+
+msgid "No se pudo guardar uno de los archivos adjuntos."
+msgstr "Impossible de sauvegarder l'une des pièces jointes."
+
+msgid "No se pudo guardar."
+msgstr "Impossible de sauvegarder."
+
+msgid "No se pudo inicializar el perfil. Recarga la página."
+msgstr "Impossible d'initialiser le profil. Rechargez la page."
+
+msgid "No se pudo leer el archivo de audio."
+msgstr "Impossible de lire le fichier audio."
+
+msgid "No se pudo parsear la respuesta de Anthropic."
+msgstr "Impossible d'analyser la réponse d'Anthropic."
+
+msgid "No se pudo parsear la respuesta de Gemini."
+msgstr "Impossible d'analyser la réponse de Gemini."
+
+msgid "No se pudo parsear la respuesta de OpenAI."
+msgstr "Impossible d'analyser la réponse d'OpenAI."
+
+msgid "No se pudo parsear ytInitialPlayerResponse (JSON inválido)."
+msgstr "Impossible d'analyser ytInitialPlayerResponse (JSON invalide)."
+
+msgid "No se pudo resolver usuario desde la orden."
+msgstr "Impossible de résoudre l'utilisateur depuis la commande."
+
+msgid "No se pudo serializar el body para la solicitud IA."
+msgstr "Impossible de sérialiser le corps pour la requête IA."
+
+msgid "No se pudo validar la generación IA."
+msgstr "Impossible de valider la génération IA."
+
+msgid "No se pudo validar la solicitud."
+msgstr "Impossible de valider la requête."
+
+msgid "No se puede eliminar a un administrador desde aquí."
+msgstr "Un administrateur ne peut pas être supprimé depuis ici."
+
+msgid "No se recibió audio."
+msgstr "Aucun audio reçu."
+
+msgid "No se seleccionaron archivos."
+msgstr "Aucun fichier sélectionné."
+
+msgid "No se seleccionó ningún archivo."
+msgstr "Aucun fichier sélectionné."
+
+msgid "No solicitado"
+msgstr "Non demandé"
+
+msgid "No tienes acceso a esta lección."
+msgstr "Vous n'avez pas accès à cette leçon."
+
+msgid "No tienes acceso a este curso."
+msgstr "Vous n'avez pas accès à ce cours."
+
+msgid "No tienes acceso a este recurso de la lección."
+msgstr "Vous n'avez pas accès à cette ressource de la leçon."
+
+msgid "No tienes acceso."
+msgstr "Vous n'avez pas accès."
+
+msgid "No tienes permiso para esta revisión."
+msgstr "Vous n'avez pas la permission pour cette révision."
+
+msgid "No tienes permiso para ver este certificado."
+msgstr "Vous n'avez pas la permission de voir ce certificat."
+
+msgid "No tienes permisos para acceder a esta página."
+msgstr "Vous n'avez pas la permission d'accéder à cette page."
+
+msgid "No tienes permisos para asignar esta rúbrica."
+msgstr "Vous n'avez pas la permission d'attribuer cette rubrique."
+
+msgid "No tienes permisos para asignar revisiones en esta lección."
+msgstr "Vous n'avez pas la permission d'attribuer des révisions dans cette leçon."
+
+msgid "No tienes permisos para crear docentes."
+msgstr "Vous n'avez pas la permission de créer des formateurs."
+
+msgid "No tienes permisos para crear lecciones en este curso."
+msgstr "Vous n'avez pas la permission de créer des leçons dans ce cours."
+
+msgid "No tienes permisos para editar el quiz de esta lección."
+msgstr "Vous n'avez pas la permission de modifier le quiz de cette leçon."
+
+msgid "No tienes permisos para editar esta lección."
+msgstr "Vous n'avez pas la permission de modifier cette leçon."
+
+msgid "No tienes permisos para editar esta rúbrica."
+msgstr "Vous n'avez pas la permission de modifier cette rubrique."
+
+msgid "No tienes permisos para editar este curso."
+msgstr "Vous n'avez pas la permission de modifier ce cours."
+
+msgid "No tienes permisos para editar este programa."
+msgstr "Vous n'avez pas la permission de modifier ce programme."
+
+msgid "No tienes permisos para editar la rúbrica de esta lección."
+msgstr "Vous n'avez pas la permission de modifier la rubrique de cette leçon."
+
+msgid "No tienes permisos para eliminar esta lección."
+msgstr "Vous n'avez pas la permission de supprimer cette leçon."
+
+msgid "No tienes permisos para eliminar esta rúbrica."
+msgstr "Vous n'avez pas la permission de supprimer cette rubrique."
+
+msgid "No tienes permisos para eliminar este curso."
+msgstr "Vous n'avez pas la permission de supprimer ce cours."
+
+msgid "No tienes permisos para eliminar este programa."
+msgstr "Vous n'avez pas la permission de supprimer ce programme."
+
+msgid "No tienes permisos para enviar esta tarea."
+msgstr "Vous n'avez pas la permission de soumettre ce devoir."
+
+msgid "No tienes permisos para generar análisis IA para esta entrega."
+msgstr "Vous n'avez pas la permission de générer une analyse IA pour cette soumission."
+
+msgid "No tienes permisos para revisar esta entrega."
+msgstr "Vous n'avez pas la permission de réviser cette soumission."
+
+msgid "No tienes permisos para transcribir esta lección."
+msgstr "Vous n'avez pas la permission de transcrire cette leçon."
+
+msgid "No tienes permisos para ver asignaciones de esta lección."
+msgstr "Vous n'avez pas la permission de voir les attributions de cette leçon."
+
+msgid "No tienes permisos para ver entregas de esta lección."
+msgstr "Vous n'avez pas la permission de voir les soumissions de cette leçon."
+
+msgid "No tienes permisos para ver esta rúbrica."
+msgstr "Vous n'avez pas la permission de voir cette rubrique."
+
+msgid "No tienes permisos para ver esta transcripción."
+msgstr "Vous n'avez pas la permission de voir cette transcription."
+
+msgid "No tienes permisos para ver este perfil."
+msgstr "Vous n'avez pas la permission de voir ce profil."
+
+msgid "No tienes permisos para ver la rúbrica de esta lección."
+msgstr "Vous n'avez pas la permission de voir la rubrique de cette leçon."
+
+msgid "No tienes permisos."
+msgstr "Vous n'avez pas les permissions."
+
+msgid "Nombre del docente"
+msgstr "Nom du formateur"
+
+msgid "Nonce inválido."
+msgstr "Nonce invalide."
+
+msgid "Norm.: %s%%"
+msgstr "Norm. : %s%%"
+
+msgid "Nota"
+msgstr "Note"
+
+msgid "Nota final"
+msgstr "Note finale"
+
+msgid "Nota final %s/100"
+msgstr "Note finale %s/100"
+
+msgid "Nota final (0–100)"
+msgstr "Note finale (0–100)"
+
+msgid "Nota promedio"
+msgstr "Note moyenne"
+
+msgid "Nota: %s"
+msgstr "Note : %s"
+
+msgid "Notas bajas"
+msgstr "Notes basses"
+
+msgid "Notas guardadas en la lección."
+msgstr "Notes enregistrées dans la leçon."
+
+msgid "Nueva lección"
+msgstr "Nouvelle leçon"
+
+msgid "Nuevo curso"
+msgstr "Nouveau cours"
+
+msgid "Nuevo docente"
+msgstr "Nouveau formateur"
+
+msgid "Nuevo nivel"
+msgstr "Nouveau niveau"
+
+msgid "Nuevo programa"
+msgstr "Nouveau programme"
+
+msgid "Número de criterios"
+msgstr "Nombre de critères"
+
+msgid "Número de preguntas"
+msgstr "Nombre de questions"
+
+msgid "OPcache"
+msgstr "OPcache"
+
+msgid "OPcache: %s"
+msgstr "OPcache : %s"
+
+msgid "Object cache"
+msgstr "Cache d'objets"
+
+msgid "Objetivo de aprendizaje"
+msgstr "Objectif d'apprentissage"
+
+msgid "Observabilidad"
+msgstr "Observabilité"
+
+msgid "Observación..."
+msgstr "Observation..."
+
+msgid "Ocurrió un error al generar la revisión IA."
+msgstr "Une erreur s'est produite lors de la génération de la révision IA."
+
+msgid "Opcional"
+msgstr "Optionnel"
+
+msgid "OpenAI Whisper"
+msgstr "OpenAI Whisper"
+
+msgid "OpenAI Whisper (HTTP %1$d): %2$s"
+msgstr "OpenAI Whisper (HTTP %1$d) : %2$s"
+
+msgid "OpenAI devolvió embeddings vacíos."
+msgstr "OpenAI a renvoyé des embeddings vides."
+
+msgid "OpenAI devolvió respuesta vacía."
+msgstr "OpenAI a renvoyé une réponse vide."
+
+msgid "Operación"
+msgstr "Opération"
+
+msgid "Orden"
+msgstr "Commande"
+
+msgid "Orden #%d"
+msgstr "Commande #%d"
+
+msgid "Orden procesada"
+msgstr "Commande traitée"
+
+msgid "Otro"
+msgstr "Autre"
+
+msgid "PDF"
+msgstr "PDF"
+
+msgid "Pago único / 12 cuotas / Membresía incluida"
+msgstr "Paiement unique / 12 mensualités / Abonnement inclus"
+
+msgid "Panel"
+msgstr "Tableau de bord"
+
+msgid "Panel ATORA"
+msgstr "Tableau de bord ATORA"
+
+msgid "Panel del estudiante"
+msgstr "Tableau de bord étudiant"
+
+msgid "Paquete"
+msgstr "Bundle"
+
+msgid "Para crear un docente nuevo debes indicar el nombre."
+msgstr "Pour créer un nouveau formateur, vous devez indiquer son nom."
+
+msgid "Parámetros inválidos."
+msgstr "Paramètres invalides."
+
+msgid "Parámetros requeridos."
+msgstr "Paramètres requis."
+
+msgid "Peer review"
+msgstr "Révision par les pairs"
+
+msgid "Pendiente"
+msgstr "En attente"
+
+msgid "Pendientes"
+msgstr "En attente"
+
+msgid "Pendientes con vencimiento"
+msgstr "En attente avec échéance"
+
+msgid "Pendientes por curso"
+msgstr "En attente par cours"
+
+msgid "Perfil actualizado."
+msgstr "Profil mis à jour."
+
+msgid "Perfil docente"
+msgstr "Profil du formateur"
+
+msgid "Perfil docente no encontrado"
+msgstr "Profil du formateur introuvable"
+
+msgid "Permiso denegado"
+msgstr "Permission refusée"
+
+msgid "Personaliza recomendaciones y acompañamiento"
+msgstr "Personnalisez les recommandations et l'accompagnement"
+
+msgid "Planificador de curso"
+msgstr "Planificateur de cours"
+
+msgid "Planificar"
+msgstr "Planifier"
+
+msgid "Planificar curso"
+msgstr "Planifier le cours"
+
+msgid "Podcast"
+msgstr "Podcast"
+
+msgid "Portada, video y tarea"
+msgstr "Couverture, vidéo et devoir"
+
+msgid "Precio"
+msgstr "Prix"
+
+msgid "Preguntas"
+msgstr "Questions"
+
+msgid "Presencia pública y comercial del docente."
+msgstr "Présence publique et commerciale du formateur."
+
+msgid "Presentación"
+msgstr "Présentation"
+
+msgid "Presentación actualizada."
+msgstr "Présentation mise à jour."
+
+msgid "Presentación generada: %s diapositivas."
+msgstr "Présentation générée : %s diapositives."
+
+msgid "Presentación guardada en la lección."
+msgstr "Présentation enregistrée dans la leçon."
+
+msgid "Presentación no disponible. Recarga la página."
+msgstr "Présentation non disponible. Rechargez la page."
+
+msgid "Primer contenido disponible"
+msgstr "Premier contenu disponible"
+
+msgid "Procesando"
+msgstr "Traitement"
+
+msgid "Procesando…"
+msgstr "Traitement…"
+
+msgid "Producto"
+msgstr "Produit"
+
+msgid "Producto #%d"
+msgstr "Produit #%d"
+
+msgid "Productos"
+msgstr "Produits"
+
+msgid "Productos, bundles y membresías."
+msgstr "Produits, bundles et abonnements."
+
+msgid "Productos, bundles, membresías y operación comercial."
+msgstr "Produits, bundles, abonnements et opération commerciale."
+
+msgid "Programa"
+msgstr "Programme"
+
+msgid "Programa inválido para inscripción."
+msgstr "Programme invalide pour l'inscription."
+
+msgid "Programa no encontrado."
+msgstr "Programme introuvable."
+
+msgid "Programas"
+msgstr "Programmes"
+
+msgid "Programas activos"
+msgstr "Programmes actifs"
+
+msgid "Programas comerciales"
+msgstr "Programmes commerciaux"
+
+msgid "Programas, cursos y lecciones"
+msgstr "Programmes, cours et leçons"
+
+msgid "Progreso"
+msgstr "Progression"
+
+msgid "Progreso promedio por curso"
+msgstr "Progression moyenne par cours"
+
+msgid "Progreso, completitud y carga docente"
+msgstr "Progression, complétude et charge du formateur"
+
+msgid "Prom. Final"
+msgstr "Moy. Finale"
+
+msgid "Prom. Quiz"
+msgstr "Moy. Quiz"
+
+msgid "Prom. Tareas"
+msgstr "Moy. Devoirs"
+
+msgid "Promedio final"
+msgstr "Moyenne finale"
+
+msgid "Propósito del mensaje"
+msgstr "Objet du message"
+
+msgid "Proveedor activo, modelos, APIs y parámetros base de operación."
+msgstr "Fournisseur actif, modèles, APIs et paramètres de base d'opération."
+
+msgid "Provider desconocido: %s"
+msgstr "Fournisseur inconnu : %s"
+
+msgid "Puedes subir hasta %1$d archivos. Tipos permitidos: %2$s. Máximo %3$s por archivo."
+msgstr "Vous pouvez télécharger jusqu'à %1$d fichiers. Types autorisés : %2$s. Maximum %3$s par fichier."
+
+msgid "Pulso académico"
+msgstr "Pouls académique"
+
+msgid "Punto de entrada para acompañamiento docente y respuestas operativas."
+msgstr "Point d'entrée pour l'accompagnement pédagogique et les réponses opérationnelles."
+
+msgid "Página %1$s de %2$s (%3$s entregas)"
+msgstr "Page %1$s sur %2$s (%3$s soumissions)"
+
+msgid "Página comercial del curso"
+msgstr "Page commerciale du cours"
+
+msgid "Página comercial del programa"
+msgstr "Page commerciale du programme"
+
+msgid "Público objetivo"
+msgstr "Public cible"
+
+msgid "Quitar"
+msgstr "Supprimer"
+
+msgid "Quitar foto"
+msgstr "Supprimer la photo"
+
+msgid "Quitar imagen destacada"
+msgstr "Supprimer l'image mise en avant"
+
+msgid "Quiz"
+msgstr "Quiz"
+
+msgid "Quiz deleted"
+msgstr "Quiz supprimé"
+
+msgid "Quiz generated successfully"
+msgstr "Quiz généré avec succès"
+
+msgid "Quiz no habilitado."
+msgstr "Quiz non activé."
+
+msgid "Quiz not found"
+msgstr "Quiz introuvable"
+
+msgid "Quiz pendiente"
+msgstr "Quiz en attente"
+
+msgid "Quiz saved"
+msgstr "Quiz enregistré"
+
+msgid "Re-transcribir (YouTube Captions)"
+msgstr "Retranscrire (Sous-titres YouTube)"
+
+msgid "Re-transcribir con Whisper"
+msgstr "Retranscrire avec Whisper"
+
+msgid "Recalcular libro de calificaciones"
+msgstr "Recalculer le carnet de notes"
+
+msgid "Recomendaciones"
+msgstr "Recommandations"
+
+msgid "Recomendación para más de 500 alumnos concurrentes: object cache (Redis/Memcached), OPcache y caché de página."
+msgstr "Recommandation pour plus de 500 étudiants simultanés : cache d'objets (Redis/Memcached), OPcache et cache de page."
+
+msgid "Recomendado: %s"
+msgstr "Recommandé : %s"
+
+msgid "Recordatorio"
+msgstr "Rappel"
+
+msgid "Recurso"
+msgstr "Ressource"
+
+msgid "Recuérdame"
+msgstr "Se souvenir de moi"
+
+msgid "Redactar comunicación"
+msgstr "Rédiger une communication"
+
+msgid "Redis"
+msgstr "Redis"
+
+msgid "Refuerzo"
+msgstr "Renforcement"
+
+msgid "Regenerar análisis IA"
+msgstr "Régénérer l'analyse IA"
+
+msgid "Regenerar enlace"
+msgstr "Régénérer le lien"
+
+msgid "Registrarse"
+msgstr "S'inscrire"
+
+msgid "Relación y calendario"
+msgstr "Relation et calendrier"
+
+msgid "Rendimiento"
+msgstr "Performance"
+
+msgid "Reproducir video"
+msgstr "Lire la vidéo"
+
+msgid "Requisitos"
+msgstr "Prérequis"
+
+msgid "Respuesta IA inválida."
+msgstr "Réponse IA invalide."
+
+msgid "Respuesta JSON inválida en solicitud IA."
+msgstr "Réponse JSON invalide dans la requête IA."
+
+msgid "Respuesta de Whisper no válida."
+msgstr "Réponse Whisper invalide."
+
+msgid "Respuesta inválida del servidor."
+msgstr "Réponse invalide du serveur."
+
+msgid "Resumen"
+msgstr "Résumé"
+
+msgid "Resumen académico, comercial y de salud del sistema ajustado al rol actual."
+msgstr "Résumé académique, commercial et de santé du système ajusté au rôle actuel."
+
+msgid "Resumen de tu actividad y avance."
+msgstr "Résumé de votre activité et progression."
+
+msgid "Retención"
+msgstr "Rétention"
+
+msgid "Retención, engagement y rendimiento"
+msgstr "Rétention, engagement et performance"
+
+msgid "Retoma el contenido para mantener el ritmo de avance."
+msgstr "Reprenez le contenu pour maintenir votre rythme de progression."
+
+msgid "Retoma tu siguiente lección con un solo paso."
+msgstr "Reprenez votre prochaine leçon en une seule étape."
+
+msgid "Revisa avisos, progreso y feedback reciente desde la experiencia del alumno."
+msgstr "Consultez les avis, la progression et le feedback récent depuis l'expérience de l'étudiant."
+
+msgid "Revisa cómo impactan los modos manual, asistido por IA y autoevaluado en las notas."
+msgstr "Examinez comment les modes manuel, assisté par IA et auto-évalué impactent les notes."
+
+msgid "Revisa entregas y entra al revisor unificado."
+msgstr "Révisez les soumissions et accédez au réviseur unifié."
+
+msgid "Revisa esta lección para avanzar en tu curso."
+msgstr "Révisez cette leçon pour progresser dans votre cours."
+
+msgid "Revisa feedback y avisos académicos."
+msgstr "Consultez le feedback et les avis académiques."
+
+msgid "Revisa las landings y CTA configuradas para venta por curso."
+msgstr "Examinez les pages d'atterrissage et les CTA configurés pour la vente par cours."
+
+msgid "Revisada"
+msgstr "Révisée"
+
+msgid "Revisadas"
+msgstr "Révisées"
+
+msgid "Revisado por docente"
+msgstr "Révisé par le formateur"
+
+msgid "Revisar"
+msgstr "Réviser"
+
+msgid "Revisión"
+msgstr "Révision"
+
+msgid "Revisión IA generada correctamente."
+msgstr "Révision IA générée avec succès."
+
+msgid "Revisión disponible"
+msgstr "Révision disponible"
+
+msgid "Revisión enviada correctamente."
+msgstr "Révision soumise avec succès."
+
+msgid "Revocada"
+msgstr "Révoquée"
+
+msgid "Revocar"
+msgstr "Révoquer"
+
+msgid "Rol"
+msgstr "Rôle"
+
+msgid "Ruta académica"
+msgstr "Parcours académique"
+
+msgid "Rúbrica"
+msgstr "Rubrique"
+
+msgid "Rúbrica guardada. Puedes asignarla a una lección desde el metabox de relación."
+msgstr "Rubrique enregistrée. Vous pouvez l'attribuer à une leçon depuis le metabox de relation."
+
+msgid "Rúbrica no encontrada."
+msgstr "Rubrique introuvable."
+
+msgid "Rúbricas"
+msgstr "Rubriques"
+
+msgid "Salud"
+msgstr "Santé"
+
+msgid "Se detectaron criterios inválidos en la revisión."
+msgstr "Des critères invalides ont été détectés dans la révision."
+
+msgid "Se detectó un archivo inválido."
+msgstr "Un fichier invalide a été détecté."
+
+msgid "Se necesitan al menos 2 entregas para asignar revisiones."
+msgstr "Au moins 2 soumissions sont nécessaires pour attribuer des révisions."
+
+msgid "Se reutilizó un docente reciente con el mismo nombre."
+msgstr "Un formateur récent avec le même nom a été réutilisé."
+
+msgid "Seguimiento"
+msgstr "Suivi"
+
+msgid "Seguimiento de conversiones, ventas y productos con mejor desempeño."
+msgstr "Suivi des conversions, ventes et produits les plus performants."
+
+msgid "Selecciona un archivo CSV."
+msgstr "Sélectionnez un fichier CSV."
+
+msgid "Selecciona un curso"
+msgstr "Sélectionnez un cours"
+
+msgid "Selecciona un curso para ver el libro de calificaciones."
+msgstr "Sélectionnez un cours pour voir le carnet de notes."
+
+msgid "Selecciona un estudiante"
+msgstr "Sélectionnez un étudiant"
+
+msgid "Selecciona una página"
+msgstr "Sélectionnez une page"
+
+msgid "Seleccionar"
+msgstr "Sélectionner"
+
+msgid "Seleccionar archivo"
+msgstr "Sélectionner un fichier"
+
+msgid "Seleccionar imagen"
+msgstr "Sélectionner une image"
+
+msgid "Seleccionar imágenes de galería"
+msgstr "Sélectionner des images de galerie"
+
+msgid "Seleccionar logo"
+msgstr "Sélectionner un logo"
+
+msgid "Seleccionar miniatura"
+msgstr "Sélectionner une miniature"
+
+msgid "Sesiones, actividades y contenidos."
+msgstr "Sessions, activités et contenus."
+
+msgid "Siguiente"
+msgstr "Suivant"
+
+msgid "Siguiente lección"
+msgstr "Leçon suivante"
+
+msgid "Siguientes accesos"
+msgstr "Prochains accès"
+
+msgid "Sin actividad reciente"
+msgstr "Aucune activité récente"
+
+msgid "Sin auditoría registrada."
+msgstr "Aucun audit enregistré."
+
+msgid "Sin clasificación"
+msgstr "Sans classification"
+
+msgid "Sin datos"
+msgstr "Aucune donnée"
+
+msgid "Sin docentes seleccionados."
+msgstr "Aucun formateur sélectionné."
+
+msgid "Sin historial para resumir."
+msgstr "Aucun historique à résumer."
+
+msgid "Sin imagen"
+msgstr "Sans image"
+
+msgid "Sin imágenes seleccionadas."
+msgstr "Aucune image sélectionnée."
+
+msgid "Sin permisos"
+msgstr "Sans permissions"
+
+msgid "Sin permisos para usar el asistente."
+msgstr "Pas de permissions pour utiliser l'assistant."
+
+msgid "Sin permisos."
+msgstr "Sans permissions."
+
+msgid "Sin sesión."
+msgstr "Sans session."
+
+msgid "Sin texto para guardar."
+msgstr "Aucun texte à sauvegarder."
+
+msgid "Sin texto."
+msgstr "Aucun texte."
+
+msgid "Sistema"
+msgstr "Système"
+
+msgid "Sistema de matrícula no disponible."
+msgstr "Système d'inscription non disponible."
+
+msgid "Sistema · %s"
+msgstr "Système · %s"
+
+msgid "Sobrescritura"
+msgstr "Remplacement"
+
+msgid "Solicitar información"
+msgstr "Demander des informations"
+
+msgid "Solicitud IA inválida."
+msgstr "Requête IA invalide."
+
+msgid "Solicitud inválida."
+msgstr "Requête invalide."
+
+msgid "Solicitud no válida."
+msgstr "Requête invalide."
+
+msgid "Solo puedes subir 1 archivo."
+msgstr "Vous ne pouvez télécharger qu'1 fichier."
+
+msgid "Solo se permiten archivos CSV o TXT."
+msgstr "Seuls les fichiers CSV ou TXT sont autorisés."
+
+msgid "SpeedGrade"
+msgstr "SpeedGrade"
+
+msgid "Subtítulo"
+msgstr "Sous-titre"
+
+msgid "Sí"
+msgstr "Oui"
+
+msgid "Tabla"
+msgstr "Tableau"
+
+msgid "Tabla de invitaciones no encontrada."
+msgstr "Table des invitations introuvable."
+
+msgid "Tamaño (MB)"
+msgstr "Taille (Mo)"
+
+msgid "Tarea"
+msgstr "Devoir"
+
+msgid "Tarea pendiente"
+msgstr "Devoir en attente"
+
+msgid "Tareas calificadas"
+msgstr "Devoirs notés"
+
+msgid "Te has inscrito correctamente."
+msgstr "Vous vous êtes inscrit avec succès."
+
+msgid "Tema"
+msgstr "Sujet"
+
+msgid "Tema (dejar en blanco para usar la lección)"
+msgstr "Sujet (laisser vide pour utiliser la leçon)"
+
+msgid "Tema a investigar"
+msgstr "Sujet à rechercher"
+
+msgid "Tema del curso"
+msgstr "Sujet du cours"
+
+msgid "Tendencias"
+msgstr "Tendances"
+
+msgid "Texto CTA"
+msgstr "Texte CTA"
+
+msgid "Tienes %1$d actividad(es) pendiente(s), un progreso global de %2$d%% y un promedio actual de %3$d%%."
+msgstr "Vous avez %1$d activité(s) en attente, une progression globale de %2$d%% et une moyenne actuelle de %3$d%%."
+
+msgid "Tienes %1$d entrega(s) pendiente(s) por revisar en %2$d curso(s) y %3$d lección(es) activas."
+msgstr "Vous avez %1$d soumission(s) en attente à réviser dans %2$d cours et %3$d leçon(s) active(s)."
+
+msgid "Tienes %1$d pendiente(s) y %2$d entrega(s) con feedback reciente."
+msgstr "Vous avez %1$d élément(s) en attente et %2$d soumission(s) avec un feedback récent."
+
+msgid "Tienes %d entrega(s) con feedback reciente."
+msgstr "Vous avez %d soumission(s) avec un feedback récent."
+
+msgid "Tienes %d pendiente(s) por completar."
+msgstr "Vous avez %d élément(s) en attente à compléter."
+
+msgid "Tienes foco en cursos, lecciones, evaluaciones, IA académica y tu presencia docente."
+msgstr "Votre focus est sur les cours, leçons, évaluations, IA académique et votre présence en tant que formateur."
+
+msgid "Tienes foco operativo en comercio, seguimiento, analítica y coordinación transversal."
+msgstr "Votre focus opérationnel est sur le commerce, le suivi, l'analytique et la coordination transversale."
+
+msgid "Tienes una actividad por completar."
+msgstr "Vous avez une activité à compléter."
+
+msgid "Tienes visibilidad completa del núcleo ATORA: operación académica, IA, comercio, analítica y configuración."
+msgstr "Vous avez une visibilité complète du cœur ATORA : opération académique, IA, commerce, analytique et paramètres."
+
+msgid "Tipo"
+msgstr "Type"
+
+msgid "Tipo de archivo no permitido."
+msgstr "Type de fichier non autorisé."
+
+msgid "Tipo de artefacto desconocido."
+msgstr "Type d'artefact inconnu."
+
+msgid "Tipo de recomendación"
+msgstr "Type de recommandation"
+
+msgid "Tipo:"
+msgstr "Type :"
+
+msgid "Todas las inscripciones estaban sincronizadas. Nada que reparar."
+msgstr "Toutes les inscriptions étaient synchronisées. Rien à réparer."
+
+msgid "Todas las lecciones"
+msgstr "Toutes les leçons"
+
+msgid "Todas las lecciones tienen su índice de curso correcto."
+msgstr "Toutes les leçons ont leur index de cours correct."
+
+msgid "Todos"
+msgstr "Tous"
+
+msgid "Todos los cursos"
+msgstr "Tous les cours"
+
+msgid "Todos los docentes"
+msgstr "Tous les formateurs"
+
+msgid "Todos los niveles"
+msgstr "Tous les niveaux"
+
+msgid "Todos los programas"
+msgstr "Tous les programmes"
+
+msgid "Todos los puntajes deben ser numéricos."
+msgstr "Tous les scores doivent être numériques."
+
+msgid "Token generado (no se envió email)."
+msgstr "Token généré (aucun e-mail envoyé)."
+
+msgid "Token requerido."
+msgstr "Token requis."
+
+msgid "Tono"
+msgstr "Ton"
+
+msgid "Top ingresos por producto"
+msgstr "Meilleurs revenus par produit"
+
+msgid "Total"
+msgstr "Total"
+
+msgid "Transcribir (YouTube Captions)"
+msgstr "Transcrire (Sous-titres YouTube)"
+
+msgid "Transcribir con Whisper (OpenAI)"
+msgstr "Transcrire avec Whisper (OpenAI)"
+
+msgid "Transcripción en cola. Procesando…"
+msgstr "Transcription en file d'attente. Traitement…"
+
+msgid "Transcripción fallida."
+msgstr "Transcription échouée."
+
+msgid "Transcripción guardada."
+msgstr "Transcription enregistrée."
+
+msgid "Transcripción programada."
+msgstr "Transcription planifiée."
+
+msgid "Transients LMS"
+msgstr "Transients LMS"
+
+msgid "Transients de quiz"
+msgstr "Transients quiz"
+
+msgid "Trigger: %s"
+msgstr "Déclencheur : %s"
+
+msgid "Tu docente"
+msgstr "Votre formateur"
+
+msgid "Tu evaluación ya se está procesando. Espera unos segundos."
+msgstr "Votre évaluation est déjà en cours de traitement. Veuillez patienter quelques secondes."
+
+msgid "Tu progreso personal"
+msgstr "Votre progression personnelle"
+
+msgid "Tu sesión expiró o el servicio no está disponible."
+msgstr "Votre session a expiré ou le service n'est pas disponible."
+
+msgid "Tu sesión expiró. Recarga la página e intenta de nuevo."
+msgstr "Votre session a expiré. Rechargez la page et réessayez."
+
+msgid "Título"
+msgstr "Titre"
+
+msgid "URL"
+msgstr "URL"
+
+msgid "URL del webhook inválida."
+msgstr "URL du webhook invalide."
+
+msgid "URL directa (MP4)"
+msgstr "URL directe (MP4)"
+
+msgid "URL externa"
+msgstr "URL externe"
+
+msgid "URL inválida para la solicitud IA."
+msgstr "URL invalide pour la requête IA."
+
+msgid "Umbral: %s%%"
+msgstr "Seuil : %s%%"
+
+msgid "Uno de los archivos no pudo subirse correctamente."
+msgstr "L'un des fichiers n'a pas pu être téléchargé correctement."
+
+msgid "Uno de los archivos tiene un formato no permitido."
+msgstr "L'un des fichiers a un format non autorisé."
+
+msgid "Uno de los puntajes excede el máximo permitido por la rúbrica."
+msgstr "L'un des scores dépasse le maximum autorisé par la rubrique."
+
+msgid "Usa la misma key de OpenAI si usas el modelo %s de OpenAI. Si dejas vacío, se usará la key de OpenAI del bloque anterior."
+msgstr "Utilisez la même clé OpenAI si vous utilisez le modèle OpenAI %s. Si laissé vide, la clé OpenAI du bloc précédent sera utilisée."
+
+msgid "Usar"
+msgstr "Utiliser"
+
+msgid "Usar archivo"
+msgstr "Utiliser le fichier"
+
+msgid "Usar como foto"
+msgstr "Utiliser comme photo"
+
+msgid "Usar como imagen destacada"
+msgstr "Utiliser comme image mise en avant"
+
+msgid "Usar imagen"
+msgstr "Utiliser l'image"
+
+msgid "Usar imágenes seleccionadas"
+msgstr "Utiliser les images sélectionnées"
+
+msgid "Usuario"
+msgstr "Utilisateur"
+
+msgid "Usuario \"%s\" eliminado junto con: %s."
+msgstr "Utilisateur \"%s\" supprimé avec : %s."
+
+msgid "Usuario \"%s\" eliminado. Sus contenidos se conservaron."
+msgstr "Utilisateur \"%s\" supprimé. Son contenu a été conservé."
+
+msgid "Usuario %d"
+msgstr "Utilisateur %d"
+
+msgid "Usuario creado y matriculado."
+msgstr "Utilisateur créé et inscrit."
+
+msgid "Usuario encontrado:"
+msgstr "Utilisateur trouvé :"
+
+msgid "Usuario inválido."
+msgstr "Utilisateur invalide."
+
+msgid "Usuario no encontrado."
+msgstr "Utilisateur introuvable."
+
+msgid "Usuario no encontrado. Usa email o nombre de usuario exactos."
+msgstr "Utilisateur introuvable. Utilisez l'e-mail ou le nom d'utilisateur exacts."
+
+msgid "Usuario o correo"
+msgstr "Utilisateur ou e-mail"
+
+msgid "Vence %s"
+msgstr "Expire le %s"
+
+msgid "Venta adicional"
+msgstr "Vente additionnelle"
+
+msgid "Ventas académicas"
+msgstr "Ventes académiques"
+
+msgid "Ver"
+msgstr "Voir"
+
+msgid "Ver curso"
+msgstr "Voir le cours"
+
+msgid "Ver cursos"
+msgstr "Voir les cours"
+
+msgid "Ver dashboard de comercio"
+msgstr "Voir le tableau de bord commercial"
+
+msgid "Ver detalle"
+msgstr "Voir le détail"
+
+msgid "Ver detalles"
+msgstr "Voir les détails"
+
+msgid "Ver docente"
+msgstr "Voir le formateur"
+
+msgid "Ver docentes"
+msgstr "Voir les formateurs"
+
+msgid "Ver el curso"
+msgstr "Voir le cours"
+
+msgid "Ver lecciones"
+msgstr "Voir les leçons"
+
+msgid "Ver lección"
+msgstr "Voir la leçon"
+
+msgid "Ver libro de calificaciones"
+msgstr "Voir le carnet de notes"
+
+msgid "Ver mi curso"
+msgstr "Voir mon cours"
+
+msgid "Ver presentación"
+msgstr "Voir la présentation"
+
+msgid "Ver producto"
+msgstr "Voir le produit"
+
+msgid "Ver programa"
+msgstr "Voir le programme"
+
+msgid "Ver programas"
+msgstr "Voir les programmes"
+
+msgid "Ver →"
+msgstr "Voir →"
+
+msgid "Video"
+msgstr "Vidéo"
+
+msgid "Video %s"
+msgstr "Vidéo %s"
+
+msgid "Video transcription module not available"
+msgstr "Module de transcription vidéo non disponible"
+
+msgid "Vimeo"
+msgstr "Vimeo"
+
+msgid "Visibilidad automática"
+msgstr "Visibilité automatique"
+
+msgid "Visibilidad de tu progreso, cursos y programas."
+msgstr "Visibilité de votre progression, cours et programmes."
+
+msgid "Visión integral del estado del negocio."
+msgstr "Vision globale de l'état de l'entreprise."
+
+msgid "Visión unificada del rendimiento académico, el comercio y la observabilidad de ATORA."
+msgstr "Vision unifiée des performances académiques, du commerce et de l'observabilité d'ATORA."
+
+msgid "Vista activa"
+msgstr "Vue active"
+
+msgid "Vista detallada de malla de calificaciones y auditoría por actividad."
+msgstr "Vue détaillée de la grille de notes et de l'audit par activité."
+
+msgid "Vista explícita del perfil público y comercial del docente."
+msgstr "Vue explicite du profil public et commercial du formateur."
+
+msgid "Vista formal de calificaciones por curso."
+msgstr "Vue formelle des notes par cours."
+
+msgid "Vista:"
+msgstr "Vue :"
+
+msgid "Volver al curso"
+msgstr "Retourner au cours"
+
+msgid "Volver al hub principal de ATORA."
+msgstr "Retourner au hub principal d'ATORA."
+
+msgid "WP_CACHE"
+msgstr "WP_CACHE"
+
+msgid "WP_CACHE (page cache): %s"
+msgstr "WP_CACHE (cache de page) : %s"
+
+msgid "Webhook no encontrado."
+msgstr "Webhook introuvable."
+
+msgid "Whisper devolvió un error."
+msgstr "Whisper a renvoyé une erreur."
+
+msgid "Whisper no devolvió texto."
+msgstr "Whisper n'a pas renvoyé de texte."
+
+msgid "Whisper no devolvió texto. El audio podría no tener voz inteligible."
+msgstr "Whisper n'a pas renvoyé de texte. L'audio ne contient peut-être pas de parole intelligible."
+
+msgid "Ya enviaste esta revisión."
+msgstr "Vous avez déjà soumis cette révision."
+
+msgid "Ya estaba matriculado."
+msgstr "Déjà inscrit."
+
+msgid "Ya estás inscrito en este curso."
+msgstr "Vous êtes déjà inscrit à ce cours."
+
+msgid "Ya no tienes más intentos disponibles."
+msgstr "Vous n'avez plus de tentatives disponibles."
+
+msgid "Ya tienes comentarios que pueden ayudarte a mejorar."
+msgstr "Vous avez déjà des commentaires qui peuvent vous aider à vous améliorer."
+
+msgid "Ya tienes tu curso listo. Te dejamos una ruta rápida para comenzar con claridad."
+msgstr "Votre cours est prêt. Voici un chemin rapide pour commencer clairement."
+
+msgid "YouTube"
+msgstr "YouTube"
+
+msgid "YouTube Captions"
+msgstr "Sous-titres YouTube"
+
+msgid "YouTube no devolvió contenido para el video."
+msgstr "YouTube n'a pas renvoyé de contenu pour la vidéo."
+
+msgid "YouTube: se detecta automáticamente. Para otras fuentes puedes subirla manualmente."
+msgstr "YouTube : détecté automatiquement. Pour d'autres sources, vous pouvez le télécharger manuellement."
+
+msgid "alta"
+msgstr "élevée"
+
+msgid "avanzado"
+msgstr "avancé"
+
+msgid "baja"
+msgstr "faible"
+
+msgid "cercano y empático"
+msgstr "chaleureux et empathique"
+
+msgid "crudo %s%%"
+msgstr "brut %s%%"
+
+msgid "de %d inscritos"
+msgstr "sur %d inscrits"
+
+msgid "en esta pantalla puedes abrir el panel flotante del asistente docente para investigar, planificar o redactar sin salir del hub."
+msgstr "sur cet écran vous pouvez ouvrir le panneau flottant de l'assistant pédagogique pour rechercher, planifier ou rédiger sans quitter le hub."
+
+msgid "estudiantes con entregas pendientes"
+msgstr "étudiants avec des soumissions en attente"
+
+msgid "estudiantes destacados"
+msgstr "étudiants en vedette"
+
+msgid "estudiantes en riesgo"
+msgstr "étudiants à risque"
+
+msgid "evento"
+msgstr "événement"
+
+msgid "formal"
+msgstr "formel"
+
+msgid "intermedio"
+msgstr "intermédiaire"
+
+msgid "lectura"
+msgstr "lecture"
+
+msgid "media"
+msgstr "moyenne"
+
+msgid "mensaje(s)"
+msgstr "message(s)"
+
+msgid "mixta"
+msgstr "mixte"
+
+msgid "mixto"
+msgstr "mixte"
+
+msgid "motivador y profesional"
+msgstr "motivant et professionnel"
+
+msgid "o haz clic para seleccionar en la biblioteca"
+msgstr "ou cliquez pour sélectionner dans la bibliothèque"
+
+msgid "principiante"
+msgstr "débutant"
+
+msgid "sin leer"
+msgstr "non lu"
+
+msgid "sobreescribe la rúbrica"
+msgstr "remplace la rubrique"
+
+msgid "todos los estudiantes"
+msgstr "tous les étudiants"
+
+msgid "umbral %s%%"
+msgstr "seuil %s%%"
+
+msgid "urgente pero respetuoso"
+msgstr "urgent mais respectueux"
+
+msgid "usa el panel flotante para redactar mensajes, resumir feedback o preparar comunicaciones académicas."
+msgstr "utilisez le panneau flottant pour rédiger des messages, résumer le feedback ou préparer des communications académiques."
+
+msgid "usos"
+msgstr "utilisations"
+
+msgid "¡Hola! Soy tu asistente de enseñanza. Puedo ayudarte a planificar cursos, investigar temas, mejorar tus lecciones, crear presentaciones, rúbricas y evaluaciones. ¿Por dónde empezamos?"
+msgstr "Bonjour ! Je suis votre assistant pédagogique. Je peux vous aider à planifier des cours, rechercher des sujets, améliorer vos leçons, créer des présentations, des rubriques et des évaluations. Par où commençons-nous ?"
+
+msgid "¿Borrar el historial de conversación?"
+msgstr "Effacer l'historique de conversation ?"
+
+msgid "¿Eliminar al usuario \"%s\"? Esta acción no se puede deshacer."
+msgstr "Supprimer l'utilisateur \"%s\" ? Cette action est irréversible."
+
+msgid "¿En qué quieres enfocarte? (opcional)"
+msgstr "Sur quoi voulez-vous vous concentrer ? (optionnel)"
+
+msgid "¿Necesito experiencia previa?|No, el curso parte desde cero."
+msgstr "Ai-je besoin d'une expérience préalable ?|Non, le cours part de zéro."
+
+msgid "¿Olvidaste tu contraseña?"
+msgstr "Mot de passe oublié ?"
+
+msgid "¿Quitar la matrícula de este estudiante?"
+msgstr "Supprimer l'inscription de cet étudiant ?"
+
+msgid "¿Revocar esta invitación?"
+msgstr "Révoquer cette invitation ?"
+
+msgid "Órdenes"
+msgstr "Commandes"
+
+msgid "Última actividad: %s"
+msgstr "Dernière activité : %s"
+
+msgid "—"
+msgstr "—"
+
+msgid "⚠️ Configura una API key en <a href=\"%s\">Configuración de IA</a> para activar el asistente."
+msgstr "⚠️ Configurez une clé API dans <a href=\"%s\">Paramètres IA</a> pour activer l'assistant."
+
+msgid "✓ Copiado"
+msgstr "✓ Copié"
+
+msgid "✓ Transcripción lista · %s palabras."
+msgstr "✓ Transcription prête · %s mots."
+
+msgid "Tip: abre SpeedGrade desde cada fila para revisar y calificar sin salir del flujo."
+msgstr "Astuce : ouvrez SpeedGrade depuis chaque ligne pour réviser et noter sans quitter le flux."
+
+msgid "Tip 1"
+msgstr "Astuce 1"
+
+msgid "Tip 2"
+msgstr "Astuce 2"
+
+msgid "Tip 3"
+msgstr "Astuce 3"

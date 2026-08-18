@@ -1,0 +1,41 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "atora-lms/section-faq",
+  "version": "1.0.0",
+  "title": "ATORA Premium: FAQ",
+  "category": "atora-lms",
+  "icon": "editor-help",
+  "description": "Acordeón de preguntas y respuestas del curso. Lee los datos del meta del post.",
+  "keywords": ["faq", "preguntas", "acordeón", "atora"],
+  "textdomain": "atora-lms",
+  "attributes": {
+    "eyebrow": {
+      "type": "string",
+      "default": "Preguntas frecuentes"
+    },
+    "title": {
+      "type": "string",
+      "default": "Resuelve objeciones sin romper el ritmo visual."
+    },
+    "align": {
+      "type": "string",
+      "default": "left"
+    },
+    "items": {
+      "type": "array",
+      "default": [
+        { "question": "¿Cómo se edita?", "answer": "Directamente en el bloque, con controles simples." },
+        { "question": "¿Cuántas preguntas puedo poner?", "answer": "Las que necesites." }
+      ]
+    }
+  },
+  "usesContext": ["postId", "postType"],
+  "supports": {
+    "html": false,
+    "inserter": false,
+    "multiple": false,
+    "reusable": false,
+    "lock": false
+  }
+}

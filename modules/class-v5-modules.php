@@ -1,0 +1,285 @@
+<?php
+/**
+ * ATORA LMS v5 — Orquestador de módulos
+ *
+ * Carga condicionalmente los módulos nuevos de v5 según el contexto
+ * (admin / public / cron) para minimizar la huella de memoria.
+ *
+ * @package ATORA_LMS
+ * @since   5.0.0
+ */
+
+namespace ATORA;
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+/**
+ * Class V5_Modules
+ *
+ * @since 5.0.0
+ */
+class V5_Modules {
+
+	/**
+	 * Contexto detectado del request actual.
+	 *
+	 * @var array<string,bool>|null
+	 */
+	private static ?array $context = null;
+
+	/**
+	 * Arranca todos los módulos v5 con carga condicional según contexto.
+	 *
+	 * @return void
+	 */
+	public static function boot(): void {
+		$ctx = self::get_context();
+
+		// Siempre activos para seguridad/auth y eventos base.
+		self::load_security();
+		self::load_affiliates();
+
+		// Licencias y actualizaciones (admin + cron; hooks de update corren en cualquier contexto).
+		self::load_licensing();
+
+		// Email engine se mantiene activo para colas/eventos transaccionales.
+		self::load_email_engine();
+
+		// Calendar/Live: útiles en admin, REST/webhooks, cron y pantallas frontend académicas.
+		if ( $ctx['is_admin'] || $ctx['is_rest'] || $ctx['is_webhook'] || $ctx['is_cron'] || $ctx['is_front'] ) {
+			self::load_calendar();
+			self::load_live_streaming();
+		}
+
+		// Newsletter: admin/cron/rest/ajax y rutas de archivo newsletter en frontend.
+		if ( $ctx['is_admin'] || $ctx['is_cron'] || $ctx['is_rest'] || $ctx['is_ajax'] || $ctx['is_newsletter_front'] ) {
+			self::load_newsletter();
+		}
+
+		// Analytics: engine (admin/cron/rest) + forms/popups en frontend cuando aplique.
+		self::load_analytics( $ctx );
+
+		// Messaging: evitar carga en frontend público general.
+		if ( $ctx['is_admin'] || $ctx['is_cron'] || $ctx['is_rest'] || $ctx['is_ajax'] || $ctx['is_webhook'] ) {
+			self::load_messaging();
+		}
+
+		// CRM y Automation conservan carga amplia por dependencia de eventos transversales.
+		self::load_crm();
+		self::load_automation();
+	}
+
+	// ── Loaders ──────────────────────────────────────────────────────────────
+
+	/** @return void */
+	private static function load_licensing(): void {
+		self::require_file( ATORA_LMS_MODULES_DIR . 'licensing/class-licensing.php' );
+		if ( class_exists( '\ATORA\Licensing\Licensing' ) ) {
+			\ATORA\Licensing\Licensing::init();
+		}
+	}
+
+	/** @return void */
+	private static function load_security(): void {
+		$dir = ATORA_LMS_MODULES_DIR . 'security/';
+		self::require_file( $dir . 'class-security.php' );
+		self::require_file( $dir . 'class-extended-registration.php' );
+		self::require_file( $dir . 'class-captcha.php' );
+		self::require_file( $dir . 'class-2fa-manager.php' );
+		self::require_file( $dir . 'providers/class-2fa-totp.php' );
+		self::require_file( $dir . 'providers/class-2fa-email.php' );
+		if ( class_exists( 'ATORA\Security\Security' ) ) {
+			\ATORA\Security\Security::init();
+		}
+	}
+
+	/** @return void */
+	private static function load_affiliates(): void {
+		$dir = ATORA_LMS_MODULES_DIR . 'affiliates/';
+		self::require_file( $dir . 'class-affiliates.php' );
+		self::require_file( $dir . 'class-affiliate-tracker.php' );
+		self::require_file( $dir . 'class-affiliate-commissions.php' );
+		if ( class_exists( 'ATORA\Affiliates\Affiliates' ) ) {
+			\ATORA\Affiliates\Affiliates::init();
+		}
+	}
+
+	/** @return void */
+	private static function load_email_engine(): void {
+		$dir = ATORA_LMS_MODULES_DIR . 'email-engine/';
+		self::require_file( $dir . 'class-email-templates.php' );
+		self::require_file( $dir . 'class-email-queue.php' );
+		self::require_file( $dir . 'class-email-engine.php' );
+		if ( class_exists( 'ATORA\EmailEngine\Email_Engine' ) ) {
+			\ATORA\EmailEngine\Email_Engine::init();
+		}
+	}
+
+	/** @return void */
+	private static function load_calendar(): void {
+		$dir = ATORA_LMS_MODULES_DIR . 'calendar/';
+		self::require_file( $dir . 'class-calendar.php' );
+		self::require_file( $dir . 'class-calendar-sync.php' );
+		if ( class_exists( 'ATORA\Calendar\Calendar' ) ) {
+			\ATORA\Calendar\Calendar::init();
+		}
+		if ( class_exists( 'ATORA\Calendar\Calendar_Sync' ) ) {
+			\ATORA\Calendar\Calendar_Sync::init();
+		}
+	}
+
+	/** @return void */
+	private static function load_live_streaming(): void {
+		$dir = ATORA_LMS_MODULES_DIR . 'live-streaming/';
+		self::require_file( $dir . 'class-live-streaming.php' );
+		if ( class_exists( 'ATORA\LiveStreaming\Live_Streaming' ) ) {
+			\ATORA\LiveStreaming\Live_Streaming::init();
+		}
+	}
+
+	/** @return void */
+	private static function load_newsletter(): void {
+		$dir = ATORA_LMS_MODULES_DIR . 'newsletter/';
+		self::require_file( $dir . 'class-newsletter.php' );
+		if ( class_exists( 'ATORA\Newsletter\Newsletter' ) ) {
+			\ATORA\Newsletter\Newsletter::init();
+		}
+	}
+
+	/** @return void */
+	private static function load_analytics( array $ctx = array() ): void {
+		$dir = ATORA_LMS_MODULES_DIR . 'analytics/';
+		$ctx = ! empty( $ctx ) ? $ctx : self::get_context();
+
+		if ( $ctx['is_admin'] || $ctx['is_cron'] || $ctx['is_rest'] ) {
+			self::require_file( $dir . 'class-analytics-engine.php' );
+			if ( class_exists( 'ATORA\Analytics\Analytics_Engine' ) ) {
+				\ATORA\Analytics\Analytics_Engine::init();
+			}
+		}
+
+		$needs_front_analytics = $ctx['is_front'] || $ctx['is_ajax'];
+		if ( $needs_front_analytics ) {
+			self::require_file( $dir . 'class-forms-builder.php' );
+			self::require_file( $dir . 'class-popups.php' );
+			if ( class_exists( 'ATORA\Analytics\Forms_Builder' ) ) {
+				\ATORA\Analytics\Forms_Builder::init();
+			}
+			if ( class_exists( 'ATORA\Analytics\Popups' ) ) {
+				\ATORA\Analytics\Popups::init();
+			}
+		}
+	}
+
+	/** @return void */
+	private static function load_messaging(): void {
+		$dir = ATORA_LMS_MODULES_DIR . 'messaging/';
+		self::require_file( $dir . 'class-whatsapp.php' );
+		self::require_file( $dir . 'class-telegram-bot.php' );
+		self::require_file( $dir . 'class-messaging-router.php' );
+		if ( class_exists( 'ATORA\Messaging\Messaging_Router' ) ) {
+			\ATORA\Messaging\Messaging_Router::init();
+		}
+	}
+
+	/** @return void */
+	private static function load_crm(): void {
+		$dir = ATORA_LMS_MODULES_DIR . 'crm/';
+		self::require_file( $dir . 'class-crm.php' );
+		if ( class_exists( 'ATORA\CRM\CRM' ) ) {
+			\ATORA\CRM\CRM::init();
+		}
+
+		$crm_v2_dir = ATORA_LMS_MODULES_DIR . 'crm-v2/';
+		self::require_file( $crm_v2_dir . 'class-crm-v2-app.php' );
+		if ( class_exists( 'ATORA\CRM_V2\CRM_V2_App' ) ) {
+			\ATORA\CRM_V2\CRM_V2_App::init();
+		}
+	}
+
+	/** @return void */
+	private static function load_automation(): void {
+		$dir = ATORA_LMS_MODULES_DIR . 'automation/';
+		self::require_file( $dir . 'class-outbound-webhooks.php' );
+		self::require_file( $dir . 'class-automation-engine.php' );
+		if ( class_exists( 'ATORA\Automation\Automation_Engine' ) ) {
+			\ATORA\Automation\Automation_Engine::init();
+		}
+	}
+
+	// ── Helpers ──────────────────────────────────────────────────────────────
+
+	/**
+	 * Require file solo si existe (evita fatales en entornos parciales).
+	 *
+	 * @param string $path Ruta absoluta al archivo.
+	 * @return void
+	 */
+	private static function require_file( string $path ): void {
+		if ( file_exists( $path ) ) {
+			require_once $path;
+		}
+	}
+
+	/**
+	 * Detecta contexto del request para carga condicional progresiva.
+	 *
+	 * @return array<string,bool>
+	 */
+	private static function get_context(): array {
+		if ( null !== self::$context ) {
+			return self::$context;
+		}
+
+		$is_admin   = is_admin();
+		$is_ajax    = function_exists( 'wp_doing_ajax' ) && wp_doing_ajax();
+		$is_cron    = function_exists( 'wp_doing_cron' ) && wp_doing_cron();
+		$is_rest    = ( defined( 'REST_REQUEST' ) && REST_REQUEST ) || self::is_rest_request_uri();
+		$is_webhook = self::is_webhook_request_uri();
+		$is_front   = ! $is_admin && ! $is_ajax && ! $is_cron && ! $is_rest;
+
+		self::$context = array(
+			'is_admin'           => $is_admin,
+			'is_ajax'            => $is_ajax,
+			'is_cron'            => $is_cron,
+			'is_rest'            => $is_rest,
+			'is_webhook'         => $is_webhook,
+			'is_front'           => $is_front,
+			'is_newsletter_front'=> $is_front && self::is_newsletter_front_request(),
+		);
+
+		return self::$context;
+	}
+
+	/**
+	 * Comprueba si la URI actual pertenece a REST.
+	 *
+	 * @return bool
+	 */
+	private static function is_rest_request_uri(): bool {
+		$uri = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_unslash( $_SERVER['REQUEST_URI'] ) : '';
+		return ( false !== strpos( $uri, '/wp-json/' ) || false !== strpos( $uri, 'rest_route=' ) );
+	}
+
+	/**
+	 * Comprueba si la URI actual apunta a un webhook de ATORA.
+	 *
+	 * @return bool
+	 */
+	private static function is_webhook_request_uri(): bool {
+		$uri = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_unslash( $_SERVER['REQUEST_URI'] ) : '';
+		return ( false !== strpos( $uri, '/webhooks/' ) || false !== strpos( $uri, 'webhook' ) );
+	}
+
+	/**
+	 * Detecta requests frontend relacionados al archivo/newsletter.
+	 *
+	 * @return bool
+	 */
+	private static function is_newsletter_front_request(): bool {
+		$uri = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_unslash( $_SERVER['REQUEST_URI'] ) : '';
+		return ( false !== strpos( $uri, '/newsletter' ) || false !== strpos( $uri, 'atora_newsletter' ) );
+	}
+}

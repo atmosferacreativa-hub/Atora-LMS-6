@@ -1,0 +1,28 @@
+{
+  "version": 2,
+  "preset": "default",
+  "theme": "light",
+  "variant": "default",
+  "props": {},
+  "sections": [
+    { "id": "hero",         "enabled": true, "variant": "default", "props": {}, "visibility": "always", "roles": [], "style": {} },
+    { "id": "instructor",   "enabled": true, "variant": "default", "props": {}, "visibility": "always", "roles": [], "style": {} },
+    { "id": "benefits",     "enabled": true, "variant": "default", "props": {}, "visibility": "always", "roles": [], "style": {} },
+    { "id": "summary",      "enabled": true, "variant": "default", "props": {}, "visibility": "always", "roles": [], "style": {} },
+    { "id": "profiles",     "enabled": true, "variant": "default", "props": {}, "visibility": "always", "roles": [], "style": {} },
+    { "id": "curriculum",   "enabled": true, "variant": "default", "props": {}, "visibility": "always", "roles": [], "style": {} },
+    { "id": "requirements", "enabled": true, "variant": "default", "props": {}, "visibility": "always", "roles": [], "style": {} },
+    { "id": "gallery",      "enabled": true, "variant": "default", "props": {}, "visibility": "always", "roles": [], "style": {} },
+    { "id": "testimonials", "enabled": true, "variant": "default", "props": {}, "visibility": "always", "roles": [], "style": {} },
+    { "id": "faq",          "enabled": true, "variant": "default", "props": {}, "visibility": "always", "roles": [], "style": {} },
+    { "id": "cta",          "enabled": true, "variant": "default", "props": {}, "visibility": "always", "roles": [], "style": {} },
+    { "id": "crm_lead",     "enabled": true, "variant": "default", "props": {}, "visibility": "always", "roles": [], "style": {} },
+    { "id": "related",      "enabled": true, "variant": "default", "props": {}, "visibility": "always", "roles": [], "style": {} }
+  ],
+  "limits": {
+    "lesson_preview": 6,
+    "related_items": 6,
+    "gallery_items": 0,
+    "testimonial_items": 0
+  }
+}

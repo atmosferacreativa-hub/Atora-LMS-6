@@ -1,0 +1,26 @@
+{
+  "version": 2,
+  "preset": "default",
+  "theme": "light",
+  "variant": "default",
+  "props": {},
+  "sections": [
+    { "id": "breadcrumb", "enabled": true, "variant": "default", "props": {}, "visibility": "always",        "roles": ["guest","student","instructor","admin"], "style": {} },
+    { "id": "header",     "enabled": true, "variant": "default", "props": {}, "visibility": "always",        "roles": ["guest","student","instructor","admin"], "style": {} },
+    { "id": "cover",      "enabled": true, "variant": "default", "props": {}, "visibility": "enrolled_only", "roles": ["student","instructor","admin"],          "style": {} },
+    { "id": "videos",     "enabled": true, "variant": "default", "props": {}, "visibility": "enrolled_only", "roles": ["student","instructor","admin"],          "style": {} },
+    { "id": "content",    "enabled": true, "variant": "default", "props": {}, "visibility": "enrolled_only", "roles": ["student","instructor","admin"],          "style": {} },
+    { "id": "tips",       "enabled": true, "variant": "default", "props": {}, "visibility": "enrolled_only", "roles": ["student","instructor","admin"],          "style": {} },
+    { "id": "live_class", "enabled": true, "variant": "default", "props": {}, "visibility": "enrolled_only", "roles": ["student","instructor","admin"],          "style": {} },
+    { "id": "resources",  "enabled": true, "variant": "default", "props": {}, "visibility": "enrolled_only", "roles": ["student","instructor","admin"],          "style": {} },
+    { "id": "quiz",       "enabled": true, "variant": "default", "props": {}, "visibility": "enrolled_only", "roles": ["student","instructor","admin"],          "style": {} },
+    { "id": "submission", "enabled": true, "variant": "default", "props": {}, "visibility": "enrolled_only", "roles": ["student","instructor","admin"],          "style": {} },
+    { "id": "progress",   "enabled": true, "variant": "default", "props": {}, "visibility": "enrolled_only", "roles": ["student","instructor","admin"],          "style": {} },
+    { "id": "next",       "enabled": true, "variant": "default", "props": {}, "visibility": "enrolled_only", "roles": ["student","instructor","admin"],          "style": {} }
+  ],
+  "limits": {
+    "videos": 0,
+    "resources": 0,
+    "tips": 0
+  }
+}

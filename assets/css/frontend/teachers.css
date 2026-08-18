@@ -1,0 +1,178 @@
+/**
+ * ATORA-LMS — Teachers
+ * Diseño Opción A: card bicolor con avatar solapando la banda de color.
+ */
+
+/* ── Grid ── */
+.atora-teacher-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+	gap: 24px;
+	align-items: stretch;
+}
+
+/* ── Card ── */
+.atora-teacher-card {
+	background: var(--atora-bg, #fff);
+	border: 1px solid var(--atora-border, #e2e8f0);
+	border-radius: var(--ac-radius-lg, 16px);
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+	transition:
+		box-shadow var(--ac-t, .18s) var(--ac-ease, ease),
+		transform  var(--ac-t, .18s) var(--ac-ease, ease);
+}
+.atora-teacher-card:hover {
+	box-shadow: var(--ac-shadow-md, 0 10px 20px rgba(0,0,0,.08));
+	transform: translateY(-4px);
+}
+
+/* ── Banda de color superior ── */
+.atora-teacher-card__band {
+	height: 88px;
+	background: var(--atora-accent-soft, #eef2ff);
+	flex-shrink: 0;
+}
+
+/* ── Avatar solapando la banda ── */
+.atora-teacher-avatar {
+	width: 88px;
+	height: 88px;
+	border-radius: 999px;
+	border: 4px solid var(--atora-bg, #fff);
+	overflow: hidden;
+	background: var(--atora-accent-soft, #eef2ff);
+	align-self: center;
+	margin-top: -44px;      /* sube la mitad del avatar sobre la banda */
+	flex-shrink: 0;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, .12);
+	position: relative;
+	z-index: 1;
+}
+.atora-teacher-avatar img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+.atora-teacher-avatar-fallback {
+	width: 100%;
+	height: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-weight: 800;
+	font-size: 28px;
+	color: var(--atora-accent, #6366f1);
+}
+
+/* ── Cuerpo: nombre + especialidad + bio + redes ── */
+.atora-teacher-card__body {
+	flex: 1;
+	padding: 14px 22px 0;
+	text-align: center;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.atora-teacher-name {
+	margin: 0;
+	font-size: 16px;
+	font-weight: 700;
+	line-height: 1.3;
+	color: var(--atora-text, #0f172a);
+}
+
+.atora-teacher-specialty {
+	margin: 0;
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: .08em;
+	text-transform: uppercase;
+	color: var(--atora-accent, #6366f1);
+	background: var(--atora-accent-soft, #eef2ff);
+	padding: 3px 10px;
+	border-radius: 999px;
+	display: inline-block;
+	align-self: center;
+}
+
+.atora-teacher-bio {
+	margin: 4px 0 0;
+	font-size: 13px;
+	color: var(--atora-text-muted, #475569);
+	line-height: 1.6;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.atora-teacher-socials {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px 12px;
+	justify-content: center;
+	margin-top: 4px;
+}
+.atora-teacher-socials a {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--atora-text-subtle, #64748b);
+	text-decoration: none;
+	transition: color var(--ac-t, .18s);
+}
+.atora-teacher-socials a:hover { color: var(--atora-accent, #6366f1); }
+
+/* ── Footer: botón siempre al fondo ── */
+.atora-teacher-card__footer {
+	padding: 16px 22px 20px;
+	margin-top: auto;
+}
+
+.atora-teacher-link {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	width: 100%;
+	padding: 10px 16px;
+	background: var(--atora-accent, #6366f1);
+	color: #fff;
+	border-radius: var(--ac-radius, 12px);
+	font-size: 13px;
+	font-weight: 700;
+	text-decoration: none;
+	transition: background var(--ac-t, .18s) var(--ac-ease, ease);
+}
+.atora-teacher-link:hover {
+	background: var(--atora-accent-hover, #4f46e5);
+	color: #fff;
+}
+
+/* ── Achievements (perfil completo, no en cards) ── */
+.atora-teacher-achievements {
+	margin: 0;
+	padding-left: 18px;
+	display: grid;
+	gap: 6px;
+	color: var(--atora-text-muted, #475569);
+	font-size: 13px;
+}
+
+/* ── [clms_teachers] — control de columnas ── */
+.clms-teachers-wrap .atora-teacher-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.clms-teachers-cols-2 .atora-teacher-grid { grid-template-columns: repeat(2, 1fr); }
+.clms-teachers-cols-3 .atora-teacher-grid { grid-template-columns: repeat(3, 1fr); }
+.clms-teachers-cols-4 .atora-teacher-grid { grid-template-columns: repeat(4, 1fr); }
+
+@media (max-width: 900px) {
+	.clms-teachers-cols-4 .atora-teacher-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+	.clms-teachers-cols-2 .atora-teacher-grid,
+	.clms-teachers-cols-3 .atora-teacher-grid,
+	.clms-teachers-cols-4 .atora-teacher-grid { grid-template-columns: 1fr; }
+}

@@ -1,0 +1,188 @@
+/**
+ * ATORA-LMS — Frontend tokens
+ */
+
+/* 1. Design tokens */
+:root {
+	--atora-bg:              #ffffff;
+	--atora-surface:         #f8fafc;
+	--atora-surface-2:       #f1f5f9;
+	--atora-text:            #0f172a;
+	--atora-text-muted:      #475569;
+	--atora-text-subtle:     #64748b;
+	--atora-border:          #e2e8f0;
+	--atora-border-strong:   #cbd5e1;
+	--atora-accent:          #6366f1;
+	--atora-accent-hover:    #4f46e5;
+	--atora-accent-soft:     #eef2ff;
+	--atora-success:         #22c55e;
+	--atora-success-bg:      #dcfce7;
+	--atora-success-text:    #166534;
+	--atora-warning:         #f59e0b;
+	--atora-warning-bg:      #fef3c7;
+	--atora-warning-text:    #92400e;
+	--atora-danger:          #ef4444;
+	--atora-danger-bg:       #fee2e2;
+	--atora-danger-text:     #991b1b;
+	--atora-on-accent:        #ffffff;
+
+	--ac-brand:       var(--atora-accent);
+	--ac-brand-dk:    var(--atora-accent-hover);
+	--ac-brand-lt:    var(--atora-accent-soft);
+	--ac-accent-dk:   var(--atora-accent-hover);
+	--ac-green:       var(--atora-success);
+	--ac-amber:       var(--atora-warning);
+	--ac-red:         var(--atora-danger);
+
+	--ac-gray-900:    var(--atora-text);
+	--ac-gray-800:    var(--atora-text);
+	--ac-gray-700:    var(--atora-text-muted);
+	--ac-gray-600:    var(--atora-text-muted);
+	--ac-gray-500:    var(--atora-text-subtle);
+	--ac-gray-400:    var(--atora-border-strong);
+	--ac-gray-300:    var(--atora-border);
+	--ac-gray-200:    var(--atora-surface);
+	--ac-gray-100:    var(--atora-surface-2);
+	--ac-gray-50:     var(--atora-bg);
+	--ac-white:       #ffffff;
+
+	--ac-radius-xs:   4px;
+	--ac-radius-sm:   8px;
+	--ac-radius:      12px;
+	--ac-radius-lg:   16px;
+	--ac-radius-xl:   24px;
+
+	--ac-shadow-xs:   0 1px 2px rgba(0,0,0,.05);
+	--ac-shadow-sm:   0 1px 3px rgba(0,0,0,.07), 0 1px 2px rgba(0,0,0,.04);
+	--ac-shadow:      0 4px 8px rgba(0,0,0,.06), 0 2px 4px rgba(0,0,0,.04);
+	--ac-shadow-md:   0 10px 20px rgba(0,0,0,.07), 0 4px 8px rgba(0,0,0,.04);
+	--ac-shadow-lg:   0 20px 40px rgba(0,0,0,.09), 0 8px 16px rgba(0,0,0,.05);
+
+	--ac-ease:        cubic-bezier(.4, 0, .2, 1);
+	--ac-t:           .18s;
+}
+
+/* 1.1 Themes (global LMS) */
+body.atora-theme-light {
+	--atora-bg:            #ffffff;
+	--atora-surface:       #f8fafc;
+	--atora-surface-2:     #f1f5f9;
+	--atora-text:          #0f172a;
+	--atora-text-muted:    #475569;
+	--atora-text-subtle:   #64748b;
+	--atora-border:        #e2e8f0;
+	--atora-border-strong: #cbd5e1;
+	--atora-accent:        #6366f1;
+	--atora-accent-hover:  #4f46e5;
+	--atora-accent-soft:   #eef2ff;
+	--atora-success:       #22c55e;
+	--atora-success-bg:    #dcfce7;
+	--atora-success-text:  #166534;
+	--atora-warning:       #f59e0b;
+	--atora-warning-bg:    #fef3c7;
+	--atora-warning-text:  #92400e;
+	--atora-danger:        #ef4444;
+	--atora-danger-bg:     #fee2e2;
+	--atora-danger-text:   #991b1b;
+	--atora-on-accent:      #ffffff;
+	color-scheme: light;
+}
+body.atora-theme-dark {
+	--atora-bg:            #0b1120;
+	--atora-surface:       #111827;
+	--atora-surface-2:     #1e293b;
+	--atora-text:          #e2e8f0;
+	--atora-text-muted:    #94a3b8;
+	--atora-text-subtle:   #64748b;
+	--atora-border:        #334155;
+	--atora-border-strong: #475569;
+	--atora-accent:        #818cf8;
+	--atora-accent-hover:  #6366f1;
+	--atora-accent-soft:   #312e81;
+	--atora-success:       #22c55e;
+	--atora-success-bg:    #0f2a1a;
+	--atora-success-text:  #86efac;
+	--atora-warning:       #f59e0b;
+	--atora-warning-bg:    #3b2a05;
+	--atora-warning-text:  #fcd34d;
+	--atora-danger:        #ef4444;
+	--atora-danger-bg:     #3b0f14;
+	--atora-danger-text:   #fca5a5;
+	--atora-on-accent:      #ffffff;
+	color-scheme: dark;
+}
+body.atora-theme-vibrant {
+	--atora-bg:            #0b0d12;
+	--atora-surface:       #151821;
+	--atora-surface-2:     #1c2130;
+	--atora-text:          #f8fafc;
+	--atora-text-muted:    #cbd5f5;
+	--atora-text-subtle:   #94a3b8;
+	--atora-border:        #2a3145;
+	--atora-border-strong: #3b4560;
+	/* Accent oscurecido (#c73434) → contraste blanco ≥ 4.8:1 (WCAG AA ✓) */
+	--atora-accent:        #c73434;
+	--atora-accent-hover:  #a82b2b;
+	--atora-accent-soft:   #2a1416;
+	--atora-success:       #34d399;
+	--atora-success-bg:    #0f2a1f;
+	--atora-success-text:  #6ee7b7;
+	--atora-warning:       #f59e0b;
+	--atora-warning-bg:    #3b2a05;
+	--atora-warning-text:  #fcd34d;
+	--atora-danger:        #fb7185;
+	--atora-danger-bg:     #3b0f14;
+	--atora-danger-text:   #fda4af;
+	--atora-on-accent:      #ffffff;
+	color-scheme: dark;
+}
+body.atora-theme-pastel {
+	--atora-bg:            #fffaf5;
+	--atora-surface:       #f7f3ff;
+	--atora-surface-2:     #f1ecff;
+	--atora-text:          #2d2733;
+	--atora-text-muted:    #6b6475;
+	--atora-text-subtle:   #8a8395;
+	--atora-border:        #e6def2;
+	--atora-border-strong: #d8cdee;
+	/* Accent oscurecido (#7c3aed) → contraste blanco ≥ 5.1:1 (WCAG AA ✓) */
+	--atora-accent:        #7c3aed;
+	--atora-accent-hover:  #6d28d9;
+	--atora-accent-soft:   #ede9fe;
+	--atora-success:       #4ade80;
+	--atora-success-bg:    #dcfce7;
+	--atora-success-text:  #166534;
+	--atora-warning:       #fbbf24;
+	--atora-warning-bg:    #fef3c7;
+	--atora-warning-text:  #92400e;
+	--atora-danger:        #fb7185;
+	--atora-danger-bg:     #fee2e2;
+	--atora-danger-text:   #991b1b;
+	--atora-on-accent:      #ffffff;
+	color-scheme: light;
+}
+body.atora-theme-elegant {
+	--atora-bg:            #f7f5f2;
+	--atora-surface:       #ffffff;
+	--atora-surface-2:     #f1ede7;
+	--atora-text:          #1c1c1c;
+	--atora-text-muted:    #5f5a52;
+	--atora-text-subtle:   #7b756c;
+	--atora-border:        #e1dad0;
+	--atora-border-strong: #d1c7ba;
+	/* Accent oscurecido (#8a6220) → contraste blanco ≥ 5.3:1 (WCAG AA ✓) */
+	--atora-accent:        #8a6220;
+	--atora-accent-hover:  #6e4c18;
+	--atora-accent-soft:   #f1e5d0;
+	--atora-success:       #2f9e44;
+	--atora-success-bg:    #e5f6e9;
+	--atora-success-text:  #1b6b2a;
+	--atora-warning:       #d97706;
+	--atora-warning-bg:    #fef3c7;
+	--atora-warning-text:  #92400e;
+	--atora-danger:        #dc2626;
+	--atora-danger-bg:     #fee2e2;
+	--atora-danger-text:   #991b1b;
+	--atora-on-accent:      #ffffff;
+	color-scheme: light;
+}
