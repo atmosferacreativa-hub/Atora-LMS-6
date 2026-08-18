@@ -1,5 +1,30 @@
 # Deuda técnica — Sprints 6.3.0 y 6.4.0
 
+## Resumen de cierre — 6.4.0 (Mensajería académica)
+
+22 commits, `atora_academic_routing_enabled` en `false` por defecto
+(cero mensajes nuevos hasta activarlo). Puntos que quedan abiertos,
+todos ya documentados en su sección correspondiente más abajo:
+
+- **PT-3.5 omitido** — `improvement_plan_assigned` no tiene acción de
+  "asignar" que enganchar; la plantilla queda catalogada para cuando
+  se construya esa persistencia.
+- **Coordinador de sección sin UI** — el concepto existe
+  (`Section_Service::get_coordinator()`) pero asignarlo hoy requiere
+  un INSERT directo en la tabla.
+- **Plantilla de email del recordatorio de inactividad pendiente de
+  crear** en Email Engine (`atora_student_inactive`) — las variables
+  ya se pasan correctas, falta el contenido.
+- **Doble cooldown de inactividad** corriendo en paralelo a propósito
+  (mismo criterio que la paridad de F4 en 6.3.0) — comparar antes de
+  retirar el mecanismo viejo.
+- **No se pudo correr `php -l`, phpcs ni phpunit** — sin intérprete
+  PHP disponible en el entorno de esta sesión. Se verificó balance de
+  llaves/paréntesis en los 23 archivos PHP tocados como sustituto
+  parcial; la matriz de prueba manual y la prueba de campo con
+  teléfono real de la OT quedan pendientes de un entorno WordPress
+  real.
+
 ## PT-3.5 (6.4.0) — `improvement_plan_assigned` omitido: no hay acción de "asignar" que enganchar
 
 `CLMS_Improvement_Plan_Service` nunca persiste un plan — cada llamador
