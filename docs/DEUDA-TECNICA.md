@@ -26,6 +26,32 @@ para usar el mismo filtro. Ver test de regresión en
 
 ---
 
+## PT-4.2 — Métodos render_atora_*_page() huérfanos en trait-admin-menu-hubs.php
+
+Al colapsar el doble registro de `atora-emails`, `atora-newsletter`,
+`atora-messaging`, `atora-automations`, `atora-webhooks`, `atora-security`
+y `atora-affiliates` (7 commits `[MENU]`), los 7 métodos wrapper
+`render_atora_*_page()` en `trait-admin-menu-hubs.php` (líneas ~1700-1727,
+cada uno un `require_hidden_module_view()` de una línea) quedaron sin
+ningún `add_submenu_page()` que los invoque. No se eliminaron en este
+sprint (regla "un paquete = un commit" enfocado solo en el registro, no
+en limpieza de código muerto derivado). Candidatos a retirar en 6.4.0
+junto con el resto de la limpieza de menú.
+
+## PT-4.2 — Historia del patrón de doble registro (para 5.3)
+
+El patrón (copia oculta en el hub + auto-registro del módulo vía el
+puente `atora_lms_admin_menu`) es scaffolding de cuando los módulos v5
+se cableaban directo en `trait-admin-menu-hubs.php` y luego se les dio
+su propio hook de auto-registro sin retirar la entrada original del
+hub. `atora-calendar` es el caso más antiguo e interesante: el módulo
+ya tenía protección contra el doble registro (`register_admin_menu()`
+comprueba `$submenu['clms-dashboard']` antes de registrar), pero nadie
+notó que esa protección lo dejaba permanentemente inerte porque el hub
+siempre se registra primero — probablemente la razón por la que nadie
+lo "arregló" antes: en apariencia funcionaba (la página cargaba), solo
+que servida por el registro equivocado.
+
 ## PT-3 — Ambigüedad de la OT sobre automation/webhooks/mcp en el perfil institucional
 
 La OT lista explícitamente qué módulos SÍ trae `institucional` y qué
