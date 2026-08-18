@@ -834,7 +834,6 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 				array( 'clms-instructor-profile',  $teacher_cap,                  'render_instructor_profile_page' ),
 				array( 'clms-gradebook',           $grading_cap,                  'render_gradebook_page' ),
 				array( 'clms-speedgrader',         $grading_cap,                  'render_speedgrader_page' ),
-			array( 'clms-ai-hub',              $courses_cap,                  'render_ai_hub_page' ),
 			array( 'clms-academic-content',    'read',                        'render_academic_content_page' ),
 				array( 'clms-commercial-operations', $commerce_cap,               'render_commerce_hub_page' ),
 			array( 'clms-commerce-hub',          $commerce_cap,               'render_legacy_commerce_hub_alias_page' ),
