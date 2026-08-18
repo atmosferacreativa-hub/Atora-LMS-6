@@ -37,38 +37,68 @@ class V5_Modules {
 	public static function boot(): void {
 		$ctx = self::get_context();
 
-		// Siempre activos para seguridad/auth y eventos base.
+		// Siempre activos para seguridad/auth y eventos base. Security es
+		// núcleo (no desactivable); affiliates sí es un módulo apagable (PT-2).
 		self::load_security();
-		self::load_affiliates();
+		if ( self::module_active( 'affiliates' ) ) {
+			self::load_affiliates();
+		}
 
 		// Licencias y actualizaciones (admin + cron; hooks de update corren en cualquier contexto).
+		// No es uno de los 19 slugs de módulo del sprint — queda fuera del gate.
 		self::load_licensing();
 
 		// Email engine se mantiene activo para colas/eventos transaccionales.
-		self::load_email_engine();
+		if ( self::module_active( 'email-engine' ) ) {
+			self::load_email_engine();
+		}
 
 		// Calendar/Live: útiles en admin, REST/webhooks, cron y pantallas frontend académicas.
 		if ( $ctx['is_admin'] || $ctx['is_rest'] || $ctx['is_webhook'] || $ctx['is_cron'] || $ctx['is_front'] ) {
-			self::load_calendar();
-			self::load_live_streaming();
+			if ( self::module_active( 'calendar' ) ) {
+				self::load_calendar();
+			}
+			if ( self::module_active( 'live-streaming' ) ) {
+				self::load_live_streaming();
+			}
 		}
 
 		// Newsletter: admin/cron/rest/ajax y rutas de archivo newsletter en frontend.
-		if ( $ctx['is_admin'] || $ctx['is_cron'] || $ctx['is_rest'] || $ctx['is_ajax'] || $ctx['is_newsletter_front'] ) {
+		if ( ( $ctx['is_admin'] || $ctx['is_cron'] || $ctx['is_rest'] || $ctx['is_ajax'] || $ctx['is_newsletter_front'] )
+			&& self::module_active( 'newsletter' ) ) {
 			self::load_newsletter();
 		}
 
 		// Analytics: engine (admin/cron/rest) + forms/popups en frontend cuando aplique.
-		self::load_analytics( $ctx );
+		if ( self::module_active( 'analytics' ) ) {
+			self::load_analytics( $ctx );
+		}
 
 		// Messaging: evitar carga en frontend público general.
-		if ( $ctx['is_admin'] || $ctx['is_cron'] || $ctx['is_rest'] || $ctx['is_ajax'] || $ctx['is_webhook'] ) {
+		if ( ( $ctx['is_admin'] || $ctx['is_cron'] || $ctx['is_rest'] || $ctx['is_ajax'] || $ctx['is_webhook'] )
+			&& self::module_active( 'messaging' ) ) {
 			self::load_messaging();
 		}
 
 		// CRM y Automation conservan carga amplia por dependencia de eventos transversales.
-		self::load_crm();
-		self::load_automation();
+		if ( self::module_active( 'crm' ) ) {
+			self::load_crm();
+		}
+		if ( self::module_active( 'automation' ) ) {
+			self::load_automation();
+		}
+	}
+
+	/**
+	 * Consulta el registro de módulos (PT-2, 6.3.0). Fail-open si el
+	 * registro no está disponible por algún motivo, igual que
+	 * CLMS_Loader::module_condition_passes().
+	 *
+	 * @param string $slug
+	 * @return bool
+	 */
+	private static function module_active( string $slug ): bool {
+		return ! class_exists( 'CLMS_Module_Registry' ) || \CLMS_Module_Registry::is_active( $slug );
 	}
 
 	// ── Loaders ──────────────────────────────────────────────────────────────

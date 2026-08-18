@@ -213,6 +213,12 @@ trait CLMS_Loader_Modules_Trait {
 			return true;
 		}
 
+		// PT-2: 'module:SLUG' delega en el registro de módulos (6.3.0).
+		if ( 0 === strpos( $condition, 'module:' ) ) {
+			$slug = substr( $condition, 7 );
+			return ! class_exists( 'CLMS_Module_Registry' ) || CLMS_Module_Registry::is_active( $slug );
+		}
+
 		switch ( $condition ) {
 			case 'woocommerce':
 				return class_exists( 'WooCommerce' ) || function_exists( 'WC' );

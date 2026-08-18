@@ -572,6 +572,25 @@ function atora_lms_require_module( string $relative_path, ?callable $on_loaded =
 }
 
 /**
+ * Igual que atora_lms_require_module(), pero primero consulta el registro
+ * de módulos (PT-2, 6.3.0). Si el módulo está desactivado, no requiere el
+ * archivo ni ejecuta el callback — comportamiento equivalente a que el
+ * archivo no existiera, pero sin el aviso de "módulo faltante" (es una
+ * ausencia intencional, no un deploy incompleto).
+ *
+ * @param string        $slug          Slug del módulo en CLMS_Module_Registry.
+ * @param string        $relative_path Ruta relativa al archivo principal.
+ * @param callable|null $on_loaded     Callback tras requerir el archivo.
+ * @return bool True si se cargó (módulo activo y archivo encontrado).
+ */
+function atora_lms_require_module_if_active( string $slug, string $relative_path, ?callable $on_loaded = null ): bool {
+	if ( class_exists( 'CLMS_Module_Registry' ) && ! CLMS_Module_Registry::is_active( $slug ) ) {
+		return false;
+	}
+	return atora_lms_require_module( $relative_path, $on_loaded );
+}
+
+/**
  * Registra un módulo esperado que no se encontró en disco.
  *
  * @param string $relative_path Ruta relativa esperada.
@@ -626,6 +645,14 @@ add_action( 'admin_notices', static function() {
  */
 add_action( 'init', static function () {
 	global $clms_loader_instance;
+
+	// ── PT-2 (6.3.0): registro de módulos — debe cargar antes que cualquier
+	// sistema de carga (A/B/C) que lo consulte.
+	require_once ATORA_LMS_DIR . 'includes/modularity/class-module-registry.php';
+	require_once ATORA_LMS_DIR . 'includes/modularity/class-module-guard.php';
+	require_once ATORA_LMS_DIR . 'includes/modularity/class-module-admin-page.php';
+	if ( class_exists( 'CLMS_Module_Guard' ) ) { CLMS_Module_Guard::init(); }
+	if ( class_exists( 'CLMS_Module_Admin_Page' ) ) { CLMS_Module_Admin_Page::init(); }
 
 	// Registro de versión actual y anterior para facilitar rollback controlado.
 	$current_version = (string) get_option( 'atora_lms_current_version', '' );
@@ -717,10 +744,10 @@ add_action( 'init', static function () {
 	} );
 
 	// ── Fase IV S15: Academy Context (multi-tenant base) ─────────────────────
-	atora_lms_require_module( 'modules/crm-v2/class-academy-context.php' );
+	atora_lms_require_module_if_active( 'crm', 'modules/crm-v2/class-academy-context.php' );
 
 	// ── Fase IV S13: Webhook Dispatcher ──────────────────────────────────────
-	atora_lms_require_module( 'modules/webhooks/class-webhook-dispatcher.php', static function() {
+	atora_lms_require_module_if_active( 'webhooks', 'modules/webhooks/class-webhook-dispatcher.php', static function() {
 		ATORA_Webhook_Dispatcher::init();
 	} );
 
@@ -747,18 +774,19 @@ add_action( 'init', static function () {
 	}, 10, 2 );
 
 	// ── Fase III S9: Gamificación pública (leaderboard shortcode) ─────────────
-	atora_lms_require_module( 'includes/class-atora-gamification-public.php' );
+	atora_lms_require_module_if_active( 'gamification', 'includes/class-atora-gamification-public.php' );
 
 	// ── Fase II S4: Scoring predictivo ───────────────────────────────────────
-	atora_lms_require_module( 'modules/crm-v2/services/class-scoring-service.php' );
-	if ( ! wp_next_scheduled( 'atora_scoring_cron' ) ) {
-		wp_schedule_event( time(), 'daily', 'atora_scoring_cron' );
-	}
-	add_action( 'atora_scoring_cron', function() {
-		if ( class_exists( '\ATORA\CRM_V2\Services\Scoring_Service' ) ) {
-			\ATORA\CRM_V2\Services\Scoring_Service::recalculate_all( 100 );
+	if ( atora_lms_require_module_if_active( 'crm', 'modules/crm-v2/services/class-scoring-service.php' ) ) {
+		if ( ! wp_next_scheduled( 'atora_scoring_cron' ) ) {
+			wp_schedule_event( time(), 'daily', 'atora_scoring_cron' );
 		}
-	} );
+		add_action( 'atora_scoring_cron', function() {
+			if ( class_exists( '\ATORA\CRM_V2\Services\Scoring_Service' ) ) {
+				\ATORA\CRM_V2\Services\Scoring_Service::recalculate_all( 100 );
+			}
+		} );
+	}
 
 	// ── Fase 12B: Design system admin CSS ────────────────────────────────────
 	add_action( 'admin_enqueue_scripts', function( string $hook ) {
@@ -771,7 +799,7 @@ add_action( 'init', static function () {
 	} );
 
 	// ── Fase 10: Abandoned Cart Service (WooCommerce) ─────────────────────────
-	atora_lms_require_module( 'includes/commerce/class-abandoned-cart-service.php', static function() {
+	atora_lms_require_module_if_active( 'commerce', 'includes/commerce/class-abandoned-cart-service.php', static function() {
 		ATORA_Abandoned_Cart_Service::init();
 	} );
 
@@ -794,15 +822,17 @@ add_action( 'init', static function () {
 	}, 20 );
 
 	// ── Fase 12C: MCP + API Keys ──────────────────────────────────────────────
-	foreach ( array(
-		'class-api-key-service.php',
-		'class-mcp-module.php',
-		'class-api-keys-rest-controller.php',
-	) as $mcp_file ) {
-		atora_lms_require_module( 'modules/mcp/' . $mcp_file );
-	}
-	if ( class_exists( 'ATORA_MCP_Module' ) ) {
-		ATORA_MCP_Module::init();
+	if ( ! class_exists( 'CLMS_Module_Registry' ) || CLMS_Module_Registry::is_active( 'mcp' ) ) {
+		foreach ( array(
+			'class-api-key-service.php',
+			'class-mcp-module.php',
+			'class-api-keys-rest-controller.php',
+		) as $mcp_file ) {
+			atora_lms_require_module( 'modules/mcp/' . $mcp_file );
+		}
+		if ( class_exists( 'ATORA_MCP_Module' ) ) {
+			ATORA_MCP_Module::init();
+		}
 	}
 	add_action( 'rest_api_init', function() {
 		if ( class_exists( 'ATORA_API_Keys_REST_Controller' ) ) {

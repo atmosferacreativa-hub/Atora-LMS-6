@@ -6,7 +6,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 trait CLMS_Loader_Module_Groups_Trait {
 	protected function get_module_groups() {
-		return array(
+		$groups = array(
 			'core' => array(
 				array(
 					'file'         => 'includes/class-access.php',
@@ -227,16 +227,19 @@ trait CLMS_Loader_Module_Groups_Trait {
 					'file'         => 'includes/gamification/class-gamification-rules.php',
 					'class'        => 'CLMS_Gamification_Rules',
 					'dependencies' => array( 'CLMS_Helper' ),
+					'condition'    => 'module:gamification',
 				),
 				array(
 					'file'         => 'includes/gamification/class-gamification-summary-service.php',
 					'class'        => 'CLMS_Gamification_Summary_Service',
 					'dependencies' => array( 'CLMS_Helper' ),
+					'condition'    => 'module:gamification',
 				),
 				array(
 					'file'         => 'includes/class-gamification-core.php',
 					'class'        => 'CLMS_Gamification_Core',
 					'dependencies' => array( 'CLMS_Gamification_Rules' ),
+					'condition'    => 'module:gamification',
 				),
 			),
 
@@ -314,21 +317,25 @@ trait CLMS_Loader_Module_Groups_Trait {
 					'file'         => 'includes/certificates/class-certificate-rules.php',
 					'class'        => 'CLMS_Certificate_Rules',
 					'dependencies' => array( 'CLMS_Helper' ),
+					'condition'    => 'module:certificates',
 				),
 				array(
 					'file'         => 'includes/certificates/class-program-certificate-service.php',
 					'class'        => 'CLMS_Program_Certificate_Service',
 					'dependencies' => array( 'CLMS_Helper', 'CLMS_Certificate_Rules' ),
+					'condition'    => 'module:certificates',
 				),
 				array(
 					'file'         => 'includes/certificates/class-certificate-presentation-service.php',
 					'class'        => 'CLMS_Certificate_Presentation_Service',
 					'dependencies' => array( 'CLMS_Helper' ),
+					'condition'    => 'module:certificates',
 				),
 				array(
 					'file'         => 'includes/class-certificates.php',
 					'class'        => 'CLMS_Certificates',
 					'dependencies' => array( 'CLMS_Helper', 'CLMS_Certificate_Rules', 'CLMS_Program_Certificate_Service', 'CLMS_Certificate_Presentation_Service' ),
+					'condition'    => 'module:certificates',
 				),
 				array(
 					'file'         => 'includes/class-student-profile.php',
@@ -339,16 +346,19 @@ trait CLMS_Loader_Module_Groups_Trait {
 					'file'         => 'includes/class-ai-knowledge-base.php',
 					'class'        => 'CLMS_AI_Knowledge_Base',
 					'dependencies' => array( 'CLMS_Helper', 'CLMS_Transcription' ),
+					'condition'    => 'module:ai',
 				),
 				array(
 					'file'         => 'includes/class-ai-copilots.php',
 					'class'        => 'CLMS_AI_Copilots',
 					'dependencies' => array( 'CLMS_Helper' ),
+					'condition'    => 'module:ai',
 				),
 				array(
 					'file'         => 'includes/class-ai-log.php',
 					'class'        => 'CLMS_AI_Log',
 					'dependencies' => array(),
+					'condition'    => 'module:ai',
 				),
 				array(
 					'file'         => 'includes/class-student-assistant.php',
@@ -364,11 +374,13 @@ trait CLMS_Loader_Module_Groups_Trait {
 					'file'         => 'includes/class-ai-alerts.php',
 					'class'        => 'CLMS_AI_Alerts',
 					'dependencies' => array( 'CLMS_Helper' ),
+					'condition'    => 'module:ai',
 				),
 				array(
 					'file'         => 'includes/class-ai-grading.php',
 					'class'        => 'CLMS_AI_Grading',
 					'dependencies' => array( 'CLMS_Helper' ),
+					'condition'    => 'module:ai',
 				),
 				array(
 					'file'         => 'includes/class-student-memory.php',
@@ -475,6 +487,16 @@ trait CLMS_Loader_Module_Groups_Trait {
 				),
 			),
 		);
+
+		// PT-2 (6.3.0): todo el grupo 'ai' cuelga del módulo 'ai' del registro.
+		foreach ( $groups['ai'] as &$module ) {
+			if ( ! isset( $module['condition'] ) ) {
+				$module['condition'] = 'module:ai';
+			}
+		}
+		unset( $module );
+
+		return $groups;
 	}
 
 }

@@ -136,3 +136,8 @@ foreach ( array(
 		require_once $lms_dir . $lms;
 	}
 }
+
+$modularity_file = __DIR__ . '/../includes/modularity/class-module-registry.php';
+if ( file_exists( $modularity_file ) ) {
+	require_once $modularity_file;
+}
