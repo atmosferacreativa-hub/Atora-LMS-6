@@ -787,15 +787,17 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 			);
 		}
 
-		// ── Calendario — visible para todos ───────────────────────────────────
-		add_submenu_page(
-			'clms-dashboard',
-			__( 'Calendario', 'atora-lms' ),
-			__( '📅 Calendario', 'atora-lms' ),
-			'read',
-			'atora-calendar',
-			array( $this, 'render_calendar_page' )
-		);
+		// ── Calendario — visible para todos, si el módulo 'calendar' está activo ──
+		if ( ! class_exists( 'CLMS_Module_Registry' ) || CLMS_Module_Registry::is_active( 'calendar' ) ) {
+			add_submenu_page(
+				'clms-dashboard',
+				__( 'Calendario', 'atora-lms' ),
+				__( '📅 Calendario', 'atora-lms' ),
+				'read',
+				'atora-calendar',
+				array( $this, 'render_calendar_page' )
+			);
+		}
 
 		// ── Ajustes — solo admin ──────────────────────────────────────────────
 		if ( current_user_can( $settings_cap ) ) {
