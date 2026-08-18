@@ -1726,7 +1726,7 @@ class Automation_Engine {
 		}
 
 		add_submenu_page(
-			'clms-dashboard',
+			'', // PT-4.4.3: reubicado bajo el hub "Crecimiento" (atora-growth-hub).
 			__( 'Automatizaciones', 'atora-lms' ),
 			__( 'Automatizaciones', 'atora-lms' ),
 			'manage_options',

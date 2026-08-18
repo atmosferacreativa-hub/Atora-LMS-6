@@ -65,7 +65,7 @@ class Affiliates {
 	 */
 	public static function register_admin_menu(): void {
 		add_submenu_page(
-			'clms-dashboard',
+			'', // PT-4.4.3: reubicado bajo el hub "Crecimiento" (atora-growth-hub).
 			__( 'Afiliados', 'atora-lms' ),
 			__( 'Afiliados', 'atora-lms' ),
 			'manage_options',
