@@ -30,6 +30,81 @@ class CLMS_Academic_Messaging_Bridge {
 
 		// PT-3.2 — submission_received.
 		add_action( 'clms_submission_created', array( __CLASS__, 'on_submission_created' ), 10, 3 );
+
+		// PT-3.4 — at_risk_flagged. Señal real: las alertas diarias de
+		// CLMS_AI_Alerts (ver DEUDA-TECNICA.md — no existe un evento de
+		// "marcar en riesgo" propio). Estos hooks YA tienen un listener
+		// que notifica al estudiante (CLMS_Messaging, in-app) — este es
+		// un segundo listener independiente que notifica docente +
+		// coordinador, nunca al estudiante (PT-1.2).
+		add_action( 'clms_ai_inactivity_alert_generated', array( __CLASS__, 'on_at_risk_signal' ), 10, 3 );
+		add_action( 'clms_ai_low_grade_alert_generated', array( __CLASS__, 'on_at_risk_signal' ), 10, 3 );
+	}
+
+	/**
+	 * PT-3.4: estudiante en riesgo → docente + coordinador de su
+	 * sección, nunca al estudiante mismo.
+	 *
+	 * @param int   $student_id
+	 * @param int   $course_id
+	 * @param array $payload
+	 */
+	public static function on_at_risk_signal( $student_id, $course_id, $payload = array() ): void {
+		if ( ! \ATORA\Messaging\Messaging_Router::is_academic_routing_enabled() ) { return; }
+
+		// PT-1.2, defensa en profundidad: aunque el resto de este
+		// método nunca use $student_id como destinatario, se verifica
+		// explícitamente antes de construir la lista de envío.
+		if ( ! \ATORA\Messaging\Messaging_Router::is_never_student_facing( 'at_risk_flagged' ) ) {
+			return; // el tipo dejó de estar en la lista de bloqueo — no enviar sin revisar por qué.
+		}
+
+		$student_id = absint( $student_id );
+		$course_id  = absint( $course_id );
+		if ( ! $student_id || ! $course_id ) { return; }
+
+		$reason = isset( $payload['days_inactive'] )
+			? sprintf( '%d días de inactividad', absint( $payload['days_inactive'] ) )
+			: __( 'promedio bajo', 'atora-lms' );
+
+		// Resolución correcta de docente (Section_Service), no el
+		// post_author ingenuo que usa CLMS_AI_Alerts::run_daily_check()
+		// para su propio digest (ese código no se toca en este sprint).
+		$recipients = array();
+		if ( class_exists( '\ATORA\LMS\Section_Service' ) ) {
+			$teacher = \ATORA\LMS\Section_Service::get_effective_instructor( $student_id, $course_id );
+			if ( $teacher && $teacher !== $student_id ) {
+				$recipients[] = (int) $teacher;
+			}
+			$coordinator = \ATORA\LMS\Section_Service::get_effective_coordinator( $student_id, $course_id );
+			if ( $coordinator && $coordinator !== $student_id && ! in_array( (int) $coordinator, $recipients, true ) ) {
+				$recipients[] = (int) $coordinator;
+			}
+		}
+
+		if ( empty( $recipients ) ) { return; }
+
+		$variables = array(
+			'student_name' => self::display_name( $student_id ),
+			'course_title' => sanitize_text_field( (string) get_the_title( $course_id ) ),
+			'reason'       => $reason,
+			'button_url'   => admin_url( 'admin.php?page=clms-academic-content&student_id=' . $student_id ),
+		);
+
+		foreach ( $recipients as $recipient_id ) {
+			if ( ! \ATORA\Messaging\Messaging_Router::under_recipient_cap( $recipient_id ) ) { continue; }
+
+			\ATORA\Messaging\Messaging_Router::send(
+				$recipient_id,
+				'at_risk_flagged',
+				'atora_at_risk_teacher',
+				array_merge( $variables, array( 'recipient_name' => self::display_name( $recipient_id ) ) ),
+				array(
+					'dedupe_key'            => "at_risk_{$student_id}_{$course_id}_{$recipient_id}",
+					'dedupe_window_minutes' => 24 * 60,
+				)
+			);
+		}
 	}
 
 	/**

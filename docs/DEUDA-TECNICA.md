@@ -1,5 +1,32 @@
 # Deuda técnica — Sprints 6.3.0 y 6.4.0
 
+## PT-3.4 (6.4.0) — Sin UI para asignar coordinador de sección
+
+`Section_Service::get_coordinator()`/`get_effective_coordinator()`
+reutilizan `atora_section_teachers` con `role = 'coordinator'`, pero no
+existe ninguna pantalla de admin para insertar esa fila — hoy requiere
+un INSERT directo en la tabla. Es intencional para este sprint (el
+foco es conectar la notificación, no construir gestión de roles), pero
+sin una UI, en la práctica ningún sitio va a tener coordinadores
+asignados. Candidato obvio para 6.5.0: un selector en la pantalla de
+gestión de secciones existente, mismo patrón que ya se usa para
+asignar `lead`/`assistant`/`guest`.
+
+## PT-3.4 (6.4.0) — `at_risk_flagged` usa las alertas de IA existentes, no un evento propio
+
+No existe un evento de "marcar en riesgo" en el código (confirmado por
+auditoría: solo hay un cálculo en vivo de `'en_riesgo'`, nunca
+persistido). Se usa como señal real
+`clms_ai_inactivity_alert_generated`/`clms_ai_low_grade_alert_generated`
+(el cron diario `CLMS_AI_Alerts`, ya existente) — son el disparador más
+cercano a "un estudiante fue señalado por un problema" que hay hoy.
+Esto significa que `at_risk_flagged` hereda la cadencia y los criterios
+de `CLMS_AI_Alerts` (diaria, umbral de inactividad + umbral de nota
+baja) en vez de ser un concepto propio — si en 6.5.0 se construye un
+verdadero sistema de flagging con seguimiento de intervenciones (ver
+"fuera de alcance" de la OT de 6.4.0), este puente debería
+re-engancharse ahí en vez de a las alertas de IA.
+
 ## PT-2.2 (6.4.0) — Doble cooldown en el recordatorio de inactividad, a propósito
 
 Con el enrutamiento académico activo, `CLMS_Student_Inactivity_Reminder_Service`
