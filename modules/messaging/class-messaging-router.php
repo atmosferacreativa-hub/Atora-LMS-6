@@ -116,6 +116,73 @@ class Messaging_Router {
 	/** Option: tope de mensajes por destinatario en 24h (PT-3.7, 6.4.0). 0 = sin tope. */
 	const OPT_RECIPIENT_CAP_24H = 'atora_messaging_recipient_cap_24h';
 
+	/** Option: mapa template_key => 'approved'|'pending'|'rejected' (PT-6.1/6.2, 6.4.0). */
+	const OPT_TEMPLATE_APPROVAL = 'atora_whatsapp_template_approval';
+
+	/**
+	 * Catálogo de plantillas académicas de este sprint — ver
+	 * docs/PLANTILLAS-WHATSAPP.md. Solo estas se gatean por estado de
+	 * aprobación; cualquier template_key fuera de esta lista (todo lo
+	 * que ya existía antes de 6.4.0) se trata como aprobado, sin
+	 * cambio de comportamiento.
+	 *
+	 * @var string[]
+	 */
+	const ACADEMIC_TEMPLATES = array(
+		'atora_assignment_graded',
+		'atora_assignment_due_soon',
+		'atora_submission_received',
+		'atora_student_inactive',
+		'atora_at_risk_teacher',
+		'atora_improvement_plan',
+		'atora_lesson_published',
+		'atora_section_announcement',
+		'atora_daily_digest_student',
+		'atora_daily_digest_teacher',
+		'atora_phone_verification',
+	);
+
+	/**
+	 * @param string $template_key
+	 * @return bool
+	 */
+	public static function is_template_approved( string $template_key ): bool {
+		$template_key = sanitize_key( $template_key );
+		if ( ! in_array( $template_key, self::ACADEMIC_TEMPLATES, true ) ) {
+			return true;
+		}
+
+		$statuses = (array) get_option( self::OPT_TEMPLATE_APPROVAL, array() );
+		return 'approved' === ( $statuses[ $template_key ] ?? 'pending' );
+	}
+
+	/**
+	 * @return array<string,string> template_key => estado, para las 11 del catálogo (default 'pending').
+	 */
+	public static function get_template_approval_map(): array {
+		$stored = (array) get_option( self::OPT_TEMPLATE_APPROVAL, array() );
+		$map    = array();
+		foreach ( self::ACADEMIC_TEMPLATES as $key ) {
+			$status       = (string) ( $stored[ $key ] ?? 'pending' );
+			$map[ $key ]  = in_array( $status, array( 'approved', 'pending', 'rejected' ), true ) ? $status : 'pending';
+		}
+		return $map;
+	}
+
+	/**
+	 * @param string $template_key
+	 * @param string $status 'approved'|'pending'|'rejected'.
+	 * @return void
+	 */
+	public static function set_template_approval( string $template_key, string $status ): void {
+		$template_key = sanitize_key( $template_key );
+		$status       = in_array( $status, array( 'approved', 'pending', 'rejected' ), true ) ? $status : 'pending';
+
+		$stored                  = (array) get_option( self::OPT_TEMPLATE_APPROVAL, array() );
+		$stored[ $template_key ] = $status;
+		update_option( self::OPT_TEMPLATE_APPROVAL, $stored );
+	}
+
 	/**
 	 * PT-3.7 (6.4.0): tope de seguridad independiente de la
 	 * deduplicación por clave — evita que, por ejemplo, un docente que
@@ -905,6 +972,24 @@ class Messaging_Router {
 				if ( ! class_exists( 'ATORA\Messaging\WhatsApp' ) ) {
 					return false;
 				}
+				$template_key = sanitize_key( (string) ( $row->template_key ?? '' ) );
+
+				// PT-6.2 (6.4.0): degradar limpio a email si la plantilla
+				// académica todavía no está aprobada en Meta — "no fallar
+				// en silencio". Solo aplica al catálogo nuevo de este
+				// sprint (self::ACADEMIC_TEMPLATES); cualquier otra
+				// plantilla (purchase, grade, etc., de antes de este
+				// sprint) se sigue tratando como aprobada, sin cambio de
+				// comportamiento.
+				if ( ! self::is_template_approved( $template_key ) ) {
+					self::log_queue_event(
+						(int) ( $row->id ?? 0 ),
+						'template_not_approved',
+						array( 'template_key' => $template_key )
+					);
+					return false;
+				}
+
 				$phone = sanitize_text_field( (string) ( $row->recipient_phone ?? '' ) );
 				if ( '' === $phone ) {
 					$phone = sanitize_text_field( (string) get_user_meta( (int) ( $row->user_id ?? 0 ), 'atora_phone', true ) );
@@ -914,7 +999,7 @@ class Messaging_Router {
 				}
 				return WhatsApp::send_template(
 					$phone,
-					sanitize_key( (string) ( $row->template_key ?? '' ) ),
+					$template_key,
 					$variables
 				);
 
