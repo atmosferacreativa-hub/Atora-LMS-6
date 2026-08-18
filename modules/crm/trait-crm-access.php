@@ -91,13 +91,15 @@ trait CRM_Access_Trait {
 			return true;
 		}
 
-		// Operación/comercial: visibilidad completa.
-		if (
-			user_can( $user_id, 'clms_access_admin' )
-			|| user_can( $user_id, 'clms_manage_commerce' )
-			|| user_can( $user_id, 'clms_manage_courses' )
-			|| user_can( $user_id, 'clms_manage_lessons' )
-		) {
+		// PT-1.3 (6.5.1): clms_manage_courses/clms_manage_lessons son caps
+		// docentes — cualquier lms_instructor las tiene y no debía heredar
+		// alcance global de contactos por eso (hallazgo de la auditoría).
+		// clms_access_admin también salió de aquí: solo significa "puede
+		// entrar al panel ATORA" (CLMS_Access::can_access_admin()), y el
+		// rol lms_instructor la tiene igual — dejarla habría vuelto a abrir
+		// el mismo agujero por otra puerta. Alcance global operativo queda
+		// solo para clms_manage_commerce (shop_manager, sin caps docentes).
+		if ( user_can( $user_id, 'clms_manage_commerce' ) ) {
 			return true;
 		}
 

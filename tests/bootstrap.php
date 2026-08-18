@@ -72,7 +72,10 @@ if ( ! function_exists( 'sanitize_key' ) )     { function sanitize_key( $s ): st
 if ( ! function_exists( 'esc_url_raw' ) )      { function esc_url_raw( $s ): string { return filter_var( (string) $s, FILTER_SANITIZE_URL ) ?: ''; } }
 if ( ! function_exists( 'wp_json_encode' ) )   { function wp_json_encode( $d ): string { return (string) json_encode( $d ); } }
 if ( ! function_exists( 'current_time' ) )     { function current_time( string $t, bool $gmt = false ): string { return date( 'Y-m-d H:i:s' ); } }
-if ( ! function_exists( 'get_current_user_id' ) ) { function get_current_user_id(): int { return 1; } }
+$GLOBALS['__atora_test_current_user_id'] = 1;
+if ( ! function_exists( 'get_current_user_id' ) ) {
+	function get_current_user_id(): int { return (int) ( $GLOBALS['__atora_test_current_user_id'] ?? 1 ); }
+}
 if ( ! function_exists( 'wp_generate_uuid4' ) ) {
 	function wp_generate_uuid4(): string {
 		return sprintf( '%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
@@ -122,6 +125,32 @@ if ( ! function_exists( 'delete_user_meta' ) ) {
 }
 if ( ! function_exists( 'atora_test_reset_user_meta' ) ) {
 	function atora_test_reset_user_meta(): void { $GLOBALS['__atora_test_user_meta'] = array(); }
+}
+$GLOBALS['__atora_test_user_caps'] = array();
+if ( ! function_exists( 'user_can' ) ) {
+	function user_can( $user_id, string $capability ): bool {
+		$user_id = is_object( $user_id ) ? absint( $user_id->ID ?? 0 ) : absint( $user_id );
+		return ! empty( $GLOBALS['__atora_test_user_caps'][ $user_id ][ $capability ] );
+	}
+}
+if ( ! function_exists( 'current_user_can' ) ) {
+	function current_user_can( string $capability ): bool {
+		return user_can( get_current_user_id(), $capability );
+	}
+}
+if ( ! function_exists( 'is_super_admin' ) ) {
+	function is_super_admin( $user_id = 0 ): bool { return false; }
+}
+if ( ! function_exists( 'atora_test_set_user_cap' ) ) {
+	function atora_test_set_user_cap( int $user_id, string $capability, bool $has = true ): void {
+		$GLOBALS['__atora_test_user_caps'][ $user_id ][ $capability ] = $has;
+	}
+}
+if ( ! function_exists( 'atora_test_reset_user_caps' ) ) {
+	function atora_test_reset_user_caps(): void { $GLOBALS['__atora_test_user_caps'] = array(); }
+}
+if ( ! function_exists( 'is_email' ) ) {
+	function is_email( $email ) { return filter_var( (string) $email, FILTER_VALIDATE_EMAIL ) ? $email : false; }
 }
 if ( ! function_exists( 'wp_hash' ) )  { function wp_hash( string $data ): string { return hash_hmac( 'sha256', $data, 'test-salt' ); } }
 if ( ! function_exists( 'wp_salt' ) )  { function wp_salt( string $scheme = 'auth' ): string { return 'test-salt-' . $scheme; } }
@@ -176,6 +205,16 @@ if ( file_exists( $inactivity_service_file ) ) {
 $preferences_file = __DIR__ . '/../modules/messaging/class-messaging-preferences.php';
 if ( file_exists( $preferences_file ) ) {
 	require_once $preferences_file;
+}
+
+$crm_access_trait_file = __DIR__ . '/../modules/crm/trait-crm-access.php';
+if ( file_exists( $crm_access_trait_file ) ) {
+	require_once $crm_access_trait_file;
+}
+
+$crm_v2_rest_controller_file = __DIR__ . '/../modules/crm-v2/rest/class-crm-rest-controller.php';
+if ( file_exists( $crm_v2_rest_controller_file ) ) {
+	require_once $crm_v2_rest_controller_file;
 }
 
 foreach ( array( 'class-module-registry.php', 'class-install-profiles.php', 'class-profile-labels.php' ) as $mod_file ) {
