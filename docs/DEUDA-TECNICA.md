@@ -1,5 +1,19 @@
 # Deuda técnica — Sprints 6.3.0 y 6.4.0
 
+## PT-3.5 (6.4.0) — `improvement_plan_assigned` omitido: no hay acción de "asignar" que enganchar
+
+`CLMS_Improvement_Plan_Service` nunca persiste un plan — cada llamador
+(SpeedGrade, dashboard del estudiante, academic-status-service, etc.)
+lo recalcula al vuelo cada vez que se necesita mostrar. No hay tabla,
+postmeta, ni hook de "esto se acaba de asignar". Conectar una
+notificación aquí requeriría primero construir esa persistencia (una
+tabla o postmeta nueva, un botón/acción admin explícita de "asignar
+plan") — eso es "construir", no "conectar lo que ya existe", que es el
+encuadre de este sprint. Decisión confirmada: se omite 3.5 en 6.4.0.
+La plantilla de WhatsApp queda catalogada en
+`docs/PLANTILLAS-WHATSAPP.md` para no perder el trabajo de diseño
+cuando 6.5.0 (o un sprint posterior) construya la persistencia.
+
 ## PT-3.4 (6.4.0) — Sin UI para asignar coordinador de sección
 
 `Section_Service::get_coordinator()`/`get_effective_coordinator()`
