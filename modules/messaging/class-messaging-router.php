@@ -113,6 +113,41 @@ class Messaging_Router {
 		return (bool) get_option( self::OPT_ACADEMIC_ROUTING, false );
 	}
 
+	/** Option: tope de mensajes por destinatario en 24h (PT-3.7, 6.4.0). 0 = sin tope. */
+	const OPT_RECIPIENT_CAP_24H = 'atora_messaging_recipient_cap_24h';
+
+	/**
+	 * PT-3.7 (6.4.0): tope de seguridad independiente de la
+	 * deduplicación por clave — evita que, por ejemplo, un docente que
+	 * publica 6 lecciones seguidas genere 6 notificaciones separadas al
+	 * mismo estudiante. Cuenta filas en la cola compartida
+	 * (`atora_message_queue`), sin importar tipo/canal/plantilla.
+	 * Llamar ANTES de encolar, no reemplaza el chequeo de consentimiento.
+	 *
+	 * @param int $user_id      Destinatario.
+	 * @param int $window_hours Ventana en horas (default 24).
+	 * @return bool true si el destinatario todavía está bajo el tope.
+	 */
+	public static function under_recipient_cap( int $user_id, int $window_hours = 24 ): bool {
+		$max = max( 0, absint( get_option( self::OPT_RECIPIENT_CAP_24H, 5 ) ) );
+		if ( 0 === $max ) { return true; }
+
+		global $wpdb;
+		$since = gmdate( 'Y-m-d H:i:s', time() - ( max( 1, $window_hours ) * HOUR_IN_SECONDS ) );
+
+		$count = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM {$wpdb->prefix}atora_message_queue
+				 WHERE user_id = %d AND scheduled_at >= %s
+				   AND status IN ('pending','sending','sent','delivered','read')",
+				$user_id,
+				$since
+			)
+		);
+
+		return $count < $max;
+	}
+
 	public static function init(): void {
 		// Registrar intervalo antes de programar cron para evitar acoplamiento entre módulos.
 		add_filter( 'cron_schedules', array( __CLASS__, 'add_cron_intervals' ) );

@@ -104,6 +104,11 @@ trait CLMS_Loader_Module_Groups_Trait {
 					'dependencies' => array( 'CLMS_Helper', 'CLMS_Student_Activity_Tracker', 'CLMS_Email' ),
 				),
 				array(
+					'file'         => 'includes/academic/class-assignment-due-reminder-service.php',
+					'class'        => 'CLMS_Assignment_Due_Reminder_Service',
+					'dependencies' => array( 'CLMS_Helper' ),
+				),
+				array(
 					'file'         => 'includes/gradebook/class-gradebook-normalizer.php',
 					'class'        => 'CLMS_Gradebook_Normalizer',
 					'dependencies' => array(),
