@@ -55,6 +55,15 @@ trait CRM_Contacts_Trait {
 				}
 				$meta_key = (string) $meta_pair[0];
 				$value    = (string) $meta_pair[1];
+				// PT-4.3 (6.5.1): atora_phone pasa por
+				// Preferences::update_phone() — invalida la verificación
+				// si el número cambió de verdad, en vez de un
+				// update_user_meta() directo que dejaba "verificado" un
+				// número que el CRM acababa de sobreescribir.
+				if ( 'atora_phone' === $meta_key && class_exists( '\ATORA\Messaging\Preferences' ) ) {
+					\ATORA\Messaging\Preferences::update_phone( $user_id, $value );
+					continue;
+				}
 				update_user_meta( $user_id, $meta_key, $value );
 			}
 		}

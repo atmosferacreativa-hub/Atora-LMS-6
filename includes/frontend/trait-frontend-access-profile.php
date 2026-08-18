@@ -233,7 +233,14 @@ trait CLMS_Frontend_Access_Profile_Trait {
 				if ( is_wp_error( $result ) ) {
 					$errors[] = $result->get_error_message();
 				} else {
-					update_user_meta( $user_id, 'atora_phone', $phone );
+					// PT-4.3 (6.5.1): pasa por Preferences::update_phone() en
+					// vez de update_user_meta() directo — invalida la
+					// verificación si el número cambió de verdad.
+					if ( class_exists( '\ATORA\Messaging\Preferences' ) ) {
+						\ATORA\Messaging\Preferences::update_phone( $user_id, $phone );
+					} else {
+						update_user_meta( $user_id, 'atora_phone', $phone );
+					}
 					update_user_meta( $user_id, 'atora_whatsapp', $whatsapp );
 					update_user_meta( $user_id, 'atora_telegram', $telegram );
 					update_user_meta( $user_id, 'atora_country_code', $country_code );

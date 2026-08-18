@@ -29,6 +29,8 @@ class Preferences {
 
 	const META_PREFS            = 'atora_messaging_preferences';
 	const META_PHONE_VERIFIED   = 'atora_phone_verified';
+	/** PT-4.1 (6.5.1): huella del número verificado — si el teléfono cambia, la huella deja de coincidir y is_phone_verified() falla aunque el booleano siga en 1. */
+	const META_PHONE_VERIFIED_HASH = 'atora_phone_verified_hash';
 	const META_VERIFY_CODE_HASH = 'atora_phone_verify_code_hash';
 	const META_VERIFY_EXPIRES   = 'atora_phone_verify_expires';
 	const META_VERIFY_ATTEMPTS  = 'atora_phone_verify_attempts';
@@ -141,7 +143,71 @@ class Preferences {
 	 * @return bool
 	 */
 	public static function is_phone_verified( int $user_id ): bool {
-		return (bool) get_user_meta( $user_id, self::META_PHONE_VERIFIED, true );
+		if ( ! (bool) get_user_meta( $user_id, self::META_PHONE_VERIFIED, true ) ) {
+			return false;
+		}
+
+		// PT-4.1 (6.5.1): la huella ata la verificación al número exacto
+		// que se verificó. Sin ella (verificaciones de antes de 6.5.1),
+		// no forzamos re-verificación retroactiva — regla 6 del sprint,
+		// nadie pierde su estado por una migración. La huella se crea
+		// sola la próxima vez que ese usuario verifique un número.
+		$stored_hash = (string) get_user_meta( $user_id, self::META_PHONE_VERIFIED_HASH, true );
+		if ( '' === $stored_hash ) {
+			return true;
+		}
+
+		$current_phone = trim( (string) get_user_meta( $user_id, 'atora_phone', true ) );
+		return hash_equals( $stored_hash, wp_hash( self::normalize_phone_for_hash( $current_phone ) ) );
+	}
+
+	/**
+	 * Normalización estable para comparar números — mismo criterio que
+	 * CRM::normalize_contact_phone() (dígitos + '+' inicial si lo
+	 * tenía), reimplementado aquí porque esa está en el namespace
+	 * ATORA\CRM y no se expone públicamente.
+	 *
+	 * @param string $phone
+	 * @return string
+	 */
+	private static function normalize_phone_for_hash( string $phone ): string {
+		$phone = sanitize_text_field( $phone );
+		if ( '' === $phone ) {
+			return '';
+		}
+
+		$has_plus = 0 === strpos( $phone, '+' );
+		$digits   = (string) preg_replace( '/\D+/', '', $phone );
+		if ( '' === $digits ) {
+			return '';
+		}
+
+		return $has_plus ? '+' . $digits : $digits;
+	}
+
+	/**
+	 * PT-4.3 (6.5.1): punto único de escritura de atora_phone — escribe
+	 * el número e invalida la verificación si de verdad cambió (no en
+	 * cada guardado, que sería invalidar de más por un no-cambio real).
+	 * Reemplaza los tres puntos que escribían atora_phone directo
+	 * (perfil del estudiante, ficha del CRM, edición admin del perfil
+	 * académico) — encontrados al buscar "atora_phone" en todo el
+	 * árbol, no solo los dos que mencionaba la auditoría.
+	 *
+	 * @param int    $user_id
+	 * @param string $phone
+	 * @return void
+	 */
+	public static function update_phone( int $user_id, string $phone ): void {
+		$phone   = sanitize_text_field( $phone );
+		$current = trim( (string) get_user_meta( $user_id, 'atora_phone', true ) );
+		$changed = self::normalize_phone_for_hash( $current ) !== self::normalize_phone_for_hash( $phone );
+
+		update_user_meta( $user_id, 'atora_phone', $phone );
+
+		if ( $changed ) {
+			self::invalidate_phone_verification( $user_id );
+		}
 	}
 
 	/**
@@ -240,7 +306,9 @@ class Preferences {
 			return array( 'ok' => false, 'reason' => 'codigo_incorrecto' );
 		}
 
+		$phone = trim( (string) get_user_meta( $user_id, 'atora_phone', true ) );
 		update_user_meta( $user_id, self::META_PHONE_VERIFIED, true );
+		update_user_meta( $user_id, self::META_PHONE_VERIFIED_HASH, wp_hash( self::normalize_phone_for_hash( $phone ) ) );
 		delete_user_meta( $user_id, self::META_VERIFY_CODE_HASH );
 		delete_user_meta( $user_id, self::META_VERIFY_EXPIRES );
 
@@ -257,6 +325,7 @@ class Preferences {
 	 */
 	public static function invalidate_phone_verification( int $user_id ): void {
 		delete_user_meta( $user_id, self::META_PHONE_VERIFIED );
+		delete_user_meta( $user_id, self::META_PHONE_VERIFIED_HASH );
 		delete_user_meta( $user_id, self::META_VERIFY_CODE_HASH );
 		delete_user_meta( $user_id, self::META_VERIFY_EXPIRES );
 	}

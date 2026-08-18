@@ -279,6 +279,14 @@ trait CLMS_Admin_Menu_Main_Pages_Academic_Trait {
 						);
 
 						foreach ( $meta_updates as $meta_key => $meta_value ) {
+							// PT-4.3 (6.5.1): atora_phone pasa por
+							// Preferences::update_phone() — invalida la
+							// verificación si un admin cambia el número del
+							// estudiante desde este panel.
+							if ( 'atora_phone' === $meta_key && class_exists( '\ATORA\Messaging\Preferences' ) ) {
+								\ATORA\Messaging\Preferences::update_phone( $user_id, (string) $meta_value );
+								continue;
+							}
 							update_user_meta( $user_id, $meta_key, $meta_value );
 						}
 
