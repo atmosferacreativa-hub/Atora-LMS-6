@@ -658,6 +658,60 @@ class Messaging_Router {
 	}
 
 	/**
+	 * PT-6.4: simulador — resuelve qué pasaría con un envío de este
+	 * tipo a este usuario, SIN encolar ni enviar nada. Es la
+	 * herramienta que evita el 80% de los tickets de "no me llegó
+	 * nada" — la OT.
+	 *
+	 * @param int    $user_id
+	 * @param string $type
+	 * @return array{
+	 *   type:string, category:string|null, priority:string,
+	 *   would_digest:bool, candidate_channels:string[],
+	 *   consented_channels:string[], resolved_channel:string|null,
+	 *   whatsapp:array{phone:bool,consent:bool,verified:bool,active:bool},
+	 *   telegram:array{active:bool}, under_cap:bool, academic_routing_enabled:bool,
+	 * }
+	 */
+	public static function simulate( int $user_id, string $type ): array {
+		$type      = sanitize_key( $type );
+		$rules     = (array) apply_filters( 'atora/messaging/routing_rules', self::$routing_rules, $user_id );
+		$candidates = $rules[ $type ] ?? array( 'email' );
+
+		$consented = array_values( array_filter( $candidates, static function ( $channel ) use ( $user_id ) {
+			return self::user_accepts_channel( $user_id, $channel );
+		} ) );
+
+		$phone           = trim( (string) get_user_meta( $user_id, 'atora_phone', true ) );
+		$whatsapp_consent = (bool) get_user_meta( $user_id, 'atora_consent_whatsapp', true );
+		$whatsapp_verified = class_exists( '\ATORA\Messaging\Preferences' ) && Preferences::is_phone_verified( $user_id );
+		$whatsapp_active   = class_exists( '\ATORA\Messaging\Preferences' ) && Preferences::is_whatsapp_active( $user_id );
+
+		$options = array();
+
+		return array(
+			'type'                     => $type,
+			'category'                 => self::category_for_type( $type ),
+			'priority'                 => self::default_priority_label_for_type( $type ),
+			'would_digest'             => self::should_digest( $user_id, $type, $options ),
+			'candidate_channels'       => array_values( $candidates ),
+			'consented_channels'       => $consented,
+			'resolved_channel'         => $consented[0] ?? null,
+			'whatsapp'                 => array(
+				'phone'    => '' !== $phone,
+				'consent'  => $whatsapp_consent,
+				'verified' => $whatsapp_verified,
+				'active'   => $whatsapp_active,
+			),
+			'telegram'                 => array(
+				'active' => (bool) get_user_meta( $user_id, 'atora_consent_telegram', true ),
+			),
+			'under_cap'                => self::under_recipient_cap( $user_id ),
+			'academic_routing_enabled' => self::is_academic_routing_enabled(),
+		);
+	}
+
+	/**
 	 * PT-5.1: true si este envío debe agruparse en vez de despacharse
 	 * ya. Ver el comentario en send() para las dos condiciones.
 	 *
