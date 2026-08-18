@@ -26,6 +26,22 @@ para usar el mismo filtro. Ver test de regresión en
 
 ---
 
+## PT-6.3 — 17 tablas faltaban en la lista de borrado opt-in de uninstall.php (resuelto)
+
+Verificación de `uninstall.php` contra el código real (grep de
+`$wpdb->prefix . 'tabla'` y `{$wpdb->prefix}tabla` en todo `includes/`
+y `modules/`, comparado contra el array `$atora_tables`): 16 tablas
+reales (más una detección falsa de `usermeta`, descartada) no estaban
+en la lista de `DROP TABLE`, así que un "Eliminar datos al desinstalar"
+opt-in las dejaba huérfanas en la base de datos. La mayoría son de CRM
+v2 (`atora_crm_campaigns`, `atora_crm_deals`, `atora_crm_tasks`, etc.)
+y del motor de secuencias de email (`atora_email_sequences` y sus
+tablas relacionadas) — no son nuevas de este sprint, el desfase venía
+de antes. Se corrigió: el array pasó de 52 a 69 tablas. La única tabla
+genuinamente nueva desde 6.2.1 (`atora_lms_parity_reads`, de F3.2 en el
+sprint anterior de migración LMS) también estaba huérfana y quedó
+incluida.
+
 ## PT-3.4 — Poca superficie visible bajo institucional que realmente necesite el vocabulario
 
 Al aplicar `atora_profile_label()` en los puntos visibles (orden de
