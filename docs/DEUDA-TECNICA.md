@@ -26,6 +26,32 @@ para usar el mismo filtro. Ver test de regresión en
 
 ---
 
+## PT-2 — Slugs con implementación duplicada (decisión de scope, no deuda a resolver)
+
+Cinco slugs del registro de módulos (`security`, `messaging`, `analytics`,
+`commerce`, `gamification`) tienen dos implementaciones separadas en el
+código: una antigua bajo `includes/` (system A del loader, plomería
+básica que ya existía antes de los módulos v5) y otra bajo `modules/`
+(el módulo "real" que el toggle de PT-2 apaga). Ejemplos: `CLMS_Messaging`
+(mensajería in-app básica) vs. `ATORA\Messaging\Messaging_Router`
+(integración WhatsApp/Telegram); `CLMS_Analytics` vs.
+`ATORA\Analytics\Analytics_Engine`.
+
+**Decisión (confirmada con el solicitante del sprint):** el toggle de
+PT-2 gatea únicamente el lado `modules/`. El lado `includes/` queda
+siempre activo — es tratado como plomería núcleo, no como "el módulo"
+que un perfil institucional/corporativo elegiría apagar. `security` ya
+es `core` en el registro así que esto es irrelevante para ese slug en
+particular; para los otros cuatro, la descripción de cada módulo en
+`CLMS_Module_Registry::get_modules()` deja esto explícito.
+
+**Por qué queda anotado igual:** si en el futuro se decide que ambos
+lados deberían fusionarse (p.ej. que `CLMS_Analytics` desaparezca y todo
+viva en `modules/analytics`), ese es un trabajo de unificación de
+arquitectura fuera de alcance de este sprint — no un bug a corregir.
+
+---
+
 ## PT-2 — Tres sistemas de carga de módulos independientes
 
 El loader documentado (`trait-loader-module-groups.php` +
