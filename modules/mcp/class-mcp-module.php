@@ -82,7 +82,13 @@ class ATORA_MCP_Module {
 		}
 
 		$raw_key = substr( $auth_header, 7 );
-		$key_row = ATORA_API_Key_Service::validate( $raw_key );
+		// PT-6.2 (6.5.1): la operación real (read|write) se deriva del
+		// tool pedido en la ruta — el mismo cálculo que dispatch_tool()
+		// usa más abajo para el check de scope, para que el límite de
+		// rate limiting corresponda a la operación que se va a ejecutar.
+		$tool      = basename( $r->get_route() );
+		$operation = self::tool_scope( $tool );
+		$key_row   = ATORA_API_Key_Service::validate( $raw_key, $operation );
 
 		if ( ! $key_row ) {
 			return new WP_Error( 'mcp_invalid_key', 'API key inválida o expirada.', array( 'status' => 401 ) );

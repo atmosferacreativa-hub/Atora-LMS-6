@@ -59,10 +59,16 @@ class ATORA_API_Key_Service {
 	/**
 	 * Valida una API key y devuelve sus datos si es válida.
 	 *
-	 * @param string $raw_key Key en texto plano del header Authorization.
+	 * @param string $raw_key   Key en texto plano del header Authorization.
+	 * @param string $operation PT-6.2 (6.5.1): 'read'|'write' — la operación
+	 *                          real que se va a ejecutar, para aplicar el
+	 *                          límite de rate limiting correcto. La
+	 *                          autorización de si la key puede hacer esa
+	 *                          operación la sigue decidiendo has_scope()
+	 *                          después de esto, sin cambios.
 	 * @return array|null Fila de la key o null si inválida/inactiva.
 	 */
-	public static function validate( string $raw_key ): ?array {
+	public static function validate( string $raw_key, string $operation = 'read' ): ?array {
 		global $wpdb;
 
 		if ( '' === $raw_key || ! str_starts_with( $raw_key, self::PREFIX ) ) {
@@ -88,12 +94,25 @@ class ATORA_API_Key_Service {
 		if ( empty( $row ) ) { return null; }
 
 		// ── Fase IV S14: Rate limiting por minuto ─────────────────────────────
-		$prefix      = sanitize_key( (string) ( $row['key_prefix'] ?? '' ) );
-		$scope       = sanitize_key( (string) ( $row['scopes']     ?? 'read' ) );
+		// PT-6.1 (6.5.1): el bucket era substr($raw_key,0,8) — con el
+		// prefijo fijo "atora_" (6 chars), solo quedaban 2 caracteres hex
+		// aleatorios de verdad: 256 combinaciones, colisión trivial entre
+		// keys distintas. Se usa el id de la fila (clave primaria, ya
+		// disponible aquí) en su lugar.
+		$key_id = absint( $row['id'] ?? 0 );
+
+		// PT-6.2 (6.5.1): antes se hacía sanitize_key() sobre el string
+		// completo de scopes ("read,write" → "readwrite", que no coincide
+		// con ninguna clave de $limits y siempre caía al default de 100
+		// sin importar el scope real). Se explota igual que has_scope()
+		// y se aplica el límite de la operación que de verdad se va a
+		// ejecutar — 'all' siempre manda si la key lo tiene.
+		$scopes      = array_map( 'sanitize_key', explode( ',', (string) ( $row['scopes'] ?? 'read' ) ) );
+		$operation   = sanitize_key( $operation );
 		$limits      = array( 'read' => 100, 'write' => 20, 'all' => 200 );
-		$limit       = $limits[ $scope ] ?? 100;
+		$limit       = in_array( 'all', $scopes, true ) ? $limits['all'] : ( $limits[ $operation ] ?? 100 );
 		$minute      = gmdate( 'YmdHi' );
-		$rl_key      = 'atora_rl_' . $prefix . '_' . $minute;
+		$rl_key      = 'atora_rl_' . $key_id . '_' . $operation . '_' . $minute;
 		$current_req = (int) get_transient( $rl_key );
 
 		if ( $current_req >= $limit ) {

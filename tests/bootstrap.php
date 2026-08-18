@@ -187,14 +187,57 @@ if ( ! function_exists( 'rest_ensure_response' ) ) {
 if ( ! class_exists( 'WP_REST_Request' ) ) {
 	class WP_REST_Request {
 		private array $params;
-		public function __construct( array $params = array() ) { $this->params = $params; }
+		private array $headers;
+		private string $route;
+		public function __construct( array $params = array(), array $headers = array(), string $route = '' ) {
+			$this->params  = $params;
+			$this->headers = $headers;
+			$this->route   = $route;
+		}
 		public function get_param( string $key ) { return $this->params[ $key ] ?? null; }
+		public function set_param( string $key, $value ): void { $this->params[ $key ] = $value; }
 		public function get_json_params(): array { return $this->params; }
+		public function get_header( string $name ) { return $this->headers[ $name ] ?? null; }
+		public function get_route(): string { return $this->route; }
 	}
+}
+if ( ! class_exists( 'WP_Error' ) ) {
+	class WP_Error {
+		private string $code;
+		private string $message;
+		private array $data;
+		public function __construct( string $code = '', string $message = '', $data = array() ) {
+			$this->code    = $code;
+			$this->message = $message;
+			$this->data    = is_array( $data ) ? $data : array( $data );
+		}
+		public function get_error_code(): string { return $this->code; }
+		public function get_error_message(): string { return $this->message; }
+		public function get_error_data() { return $this->data; }
+	}
+}
+if ( ! function_exists( 'is_wp_error' ) ) {
+	function is_wp_error( $thing ): bool { return $thing instanceof WP_Error; }
 }
 if ( ! function_exists( 'wp_hash' ) )  { function wp_hash( string $data ): string { return hash_hmac( 'sha256', $data, 'test-salt' ); } }
 if ( ! function_exists( 'wp_salt' ) )  { function wp_salt( string $scheme = 'auth' ): string { return 'test-salt-' . $scheme; } }
 if ( ! function_exists( 'wp_rand' ) )  { function wp_rand( int $min = 0, int $max = 0 ): int { return random_int( $min, $max ?: PHP_INT_MAX ); } }
+$GLOBALS['__atora_test_transients'] = array();
+if ( ! function_exists( 'get_transient' ) ) {
+	function get_transient( string $key ) { return $GLOBALS['__atora_test_transients'][ $key ] ?? false; }
+}
+if ( ! function_exists( 'set_transient' ) ) {
+	function set_transient( string $key, $value, int $expiration = 0 ): bool {
+		$GLOBALS['__atora_test_transients'][ $key ] = $value;
+		return true;
+	}
+}
+if ( ! function_exists( 'delete_transient' ) ) {
+	function delete_transient( string $key ): bool { unset( $GLOBALS['__atora_test_transients'][ $key ] ); return true; }
+}
+if ( ! function_exists( 'atora_test_reset_transients' ) ) {
+	function atora_test_reset_transients(): void { $GLOBALS['__atora_test_transients'] = array(); }
+}
 if ( ! function_exists( 'wp_cache_get' ) )     { function wp_cache_get( string $k, string $g = '' ) { return false; } }
 if ( ! function_exists( 'wp_cache_set' ) )     { function wp_cache_set( string $k, $v, string $g = '', int $ttl = 0 ): bool { return true; } }
 if ( ! function_exists( 'wp_cache_delete' ) )  { function wp_cache_delete( string $k, string $g = '' ): bool { return true; } }
@@ -270,6 +313,16 @@ if ( file_exists( $crm_inbox_rest_controller_file ) ) {
 $crm_v2_file = __DIR__ . '/../modules/crm-v2/class-crm-v2.php';
 if ( file_exists( $crm_v2_file ) ) {
 	require_once $crm_v2_file;
+}
+
+$mcp_api_key_service_file = __DIR__ . '/../modules/mcp/class-api-key-service.php';
+if ( file_exists( $mcp_api_key_service_file ) ) {
+	require_once $mcp_api_key_service_file;
+}
+
+$mcp_module_file = __DIR__ . '/../modules/mcp/class-mcp-module.php';
+if ( file_exists( $mcp_module_file ) ) {
+	require_once $mcp_module_file;
 }
 
 foreach ( array( 'class-module-registry.php', 'class-install-profiles.php', 'class-profile-labels.php' ) as $mod_file ) {
