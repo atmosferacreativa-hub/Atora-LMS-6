@@ -21,28 +21,31 @@ class Companies_Lists_REST_Controller {
 
 	public static function register_routes(): void {
 		$ns  = self::REST_NAMESPACE;
-		$can = array( 'ATORA\CRM_V2\Rest\CRM_REST_Controller', 'can_access' );
+		// PT-1.2 (6.5.1): lectura se queda en can_access; crear/actualizar/
+		// asignar/suscribir exige can_manage — antes todo compartía $can.
+		$can         = array( 'ATORA\CRM_V2\Rest\CRM_REST_Controller', 'can_access' );
+		$can_manage  = array( 'ATORA\CRM_V2\Rest\CRM_REST_Controller', 'can_manage' );
 
 		register_rest_route( $ns, '/companies', array(
 			array( 'methods' => 'GET',  'callback' => array( __CLASS__, 'list_companies' ),  'permission_callback' => $can ),
-			array( 'methods' => 'POST', 'callback' => array( __CLASS__, 'create_company' ), 'permission_callback' => $can ),
+			array( 'methods' => 'POST', 'callback' => array( __CLASS__, 'create_company' ), 'permission_callback' => $can_manage ),
 		) );
 		register_rest_route( $ns, '/companies/(?P<company_id>\d+)', array(
 			array( 'methods' => 'GET',  'callback' => array( __CLASS__, 'get_company' ),    'permission_callback' => $can ),
-			array( 'methods' => 'POST', 'callback' => array( __CLASS__, 'update_company' ), 'permission_callback' => $can ),
+			array( 'methods' => 'POST', 'callback' => array( __CLASS__, 'update_company' ), 'permission_callback' => $can_manage ),
 		) );
 		register_rest_route( $ns, '/companies/(?P<company_id>\d+)/assign', array(
-			'methods' => 'POST', 'callback' => array( __CLASS__, 'assign_contact' ), 'permission_callback' => $can,
+			'methods' => 'POST', 'callback' => array( __CLASS__, 'assign_contact' ), 'permission_callback' => $can_manage,
 		) );
 		register_rest_route( $ns, '/lists', array(
 			array( 'methods' => 'GET',  'callback' => array( __CLASS__, 'list_lists' ),  'permission_callback' => $can ),
-			array( 'methods' => 'POST', 'callback' => array( __CLASS__, 'create_list' ), 'permission_callback' => $can ),
+			array( 'methods' => 'POST', 'callback' => array( __CLASS__, 'create_list' ), 'permission_callback' => $can_manage ),
 		) );
 		register_rest_route( $ns, '/lists/(?P<list_id>\d+)/subscribe', array(
-			'methods' => 'POST', 'callback' => array( __CLASS__, 'subscribe' ), 'permission_callback' => $can,
+			'methods' => 'POST', 'callback' => array( __CLASS__, 'subscribe' ), 'permission_callback' => $can_manage,
 		) );
 		register_rest_route( $ns, '/lists/(?P<list_id>\d+)/unsubscribe', array(
-			'methods' => 'POST', 'callback' => array( __CLASS__, 'unsubscribe' ), 'permission_callback' => $can,
+			'methods' => 'POST', 'callback' => array( __CLASS__, 'unsubscribe' ), 'permission_callback' => $can_manage,
 		) );
 	}
 
