@@ -1,0 +1,17 @@
+.git
+.gitignore
+.github
+.claude
+.qodo
+agents
+tests
+docs
+phpunit.xml
+composer.json
+composer.lock
+vendor
+node_modules
+CHANGELOG.md
+SECURITY-AUDIT.md
+.DS_Store
+*.log

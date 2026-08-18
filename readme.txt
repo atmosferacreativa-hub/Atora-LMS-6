@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.4
 Requires PHP: 8.1
-Stable tag: 6.3.0
+Stable tag: 6.5.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,9 +47,19 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.5.1 =
+* Security: CRM v2 write endpoints now require management permission instead of view-only access.
+* Security: fixed a scope check that could grant instructors global visibility over the contacts database instead of their own enrolled students.
+* Security: closed a gap in the CRM inbox reply endpoint that allowed sending email to an arbitrary address.
+* Security: WhatsApp messages now require a verified phone number, not just consent, across every send path (router, campaigns, CRM pipeline).
+* Security: changing a student's phone number now invalidates its previous verification.
+* Security: added a rate limit to phone verification code attempts.
+* Security: fixed a rate-limit bucket collision and a scope-parsing bug in MCP API keys.
 = 5.0.0 =
 * Major release aligned with ATORA_v5 architecture and modules.
 
 == Upgrade Notice ==
+= 6.5.1 =
+* Security fixes for CRM permissions, arbitrary email sending, WhatsApp verification enforcement, and MCP API key rate limiting. Recommended update.
 = 5.0.0 =
 * Recommended update for the ATORA_v5 branch.
