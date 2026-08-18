@@ -63,7 +63,7 @@ class CRM_REST_Controller {
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( __CLASS__, 'save_note' ),
-				'permission_callback' => array( __CLASS__, 'can_access' ),
+				'permission_callback' => array( __CLASS__, 'can_manage' ),
 			)
 		);
 
@@ -93,7 +93,7 @@ class CRM_REST_Controller {
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( __CLASS__, 'save_custom_field' ),
-				'permission_callback' => array( __CLASS__, 'can_access' ),
+				'permission_callback' => array( __CLASS__, 'can_manage' ),
 			)
 		);
 	}
