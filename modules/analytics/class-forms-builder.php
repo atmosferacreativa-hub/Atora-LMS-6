@@ -384,7 +384,7 @@ class Forms_Builder {
 		}
 
 		add_submenu_page(
-			'clms-dashboard',
+			'', // PT-4.4.3: reubicado bajo el hub "Informes" (atora-reports-hub).
 			__( 'Formularios', 'atora-lms' ),
 			__( 'Formularios', 'atora-lms' ),
 			'manage_options',

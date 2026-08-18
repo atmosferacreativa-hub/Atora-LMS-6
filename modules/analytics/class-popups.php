@@ -217,7 +217,7 @@ class Popups {
 		}
 
 		add_submenu_page(
-			'clms-dashboard',
+			'', // PT-4.4.3: reubicado bajo el hub "Informes" (atora-reports-hub).
 			__( 'Popups', 'atora-lms' ),
 			__( 'Popups', 'atora-lms' ),
 			'manage_options',
