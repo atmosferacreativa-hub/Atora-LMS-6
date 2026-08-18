@@ -844,7 +844,6 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 				array( 'clms-analytics',           'clms_access_admin',           'render_analytics_page' ),
 				array( 'clms-messages',            'clms_access_admin',           'render_messages_page' ),
 				array( 'clms-maintenance',         'manage_options',              'render_maintenance_page' ),
-				array( 'atora-webhooks',           $settings_cap,                 'render_atora_webhooks_page' ),
 				array( 'atora-security',           $settings_cap,                 'render_atora_security_page' ),
 				array( 'atora-affiliates',         $commerce_cap,                 'render_atora_affiliates_page' ),
 			);
@@ -916,7 +915,6 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 			'atora-calendar',
 			'atora-analytics',
 			'atora-live-streaming',
-				'atora-webhooks',
 				'atora-security',
 				'atora-affiliates',
 			);
