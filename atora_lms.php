@@ -3,7 +3,7 @@
  * Plugin Name:       ATORA LMS
  * Plugin URI:        https://atora-lms.com
  * Description:       El LMS más completo del mundo. LMS, Email Marketing, CRM, Calendario, Mensajería multi-canal, Afiliados, Live Streaming y más.
- * Version:           6.5.2
+ * Version:           6.5.3
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            @mundocap - 
@@ -52,7 +52,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * - Limpieza automática de notificaciones >90 días
  */
 if ( ! defined( 'ATORA_LMS_VERSION' ) ) {
-	define( 'ATORA_LMS_VERSION', '6.5.2' );
+	define( 'ATORA_LMS_VERSION', '6.5.3' );
 }
 
 if ( ! defined( 'ATORA_LMS_FILE' ) ) {

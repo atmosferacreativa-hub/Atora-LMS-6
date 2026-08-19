@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.4
 Requires PHP: 8.1
-Stable tag: 6.5.2
+Stable tag: 6.5.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,10 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.5.3 =
+* Security: `wp_post_id` (the identity bridge to the legacy LMS content) can no longer be written through the generic course create/update REST endpoints, by anyone.
+* Security: the courses table now allows multiple native courses without a legacy post link, fixing a schema constraint that previously only allowed one.
+* Security: the legacy-to-tables migrator no longer silently trusts an existing table row during the migration window; it now flags instructor mismatches for manual review instead of assuming the row is correct.
 = 6.5.2 =
 * Security: instructors can no longer read, edit, view stats, enroll users into, or view the cohort of courses they don't own via the LMS REST API.
 * Security: draft and private courses are no longer readable by arbitrary logged-in users, by listing or by direct ID.
@@ -63,6 +67,8 @@ Translation files are loaded from the `/languages` directory.
 * Major release aligned with ATORA_v5 architecture and modules.
 
 == Upgrade Notice ==
+= 6.5.3 =
+* Security fixes for the wp_post_id identity bridge between the legacy and table-based LMS, plus a schema fix for native courses. Recommended update — includes a one-time database schema change.
 = 6.5.2 =
 * Security fixes for LMS REST course ownership and draft/private course visibility. Recommended update.
 = 6.5.1 =
