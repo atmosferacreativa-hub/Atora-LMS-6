@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.4
 Requires PHP: 8.1
-Stable tag: 6.5.1
+Stable tag: 6.5.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,10 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.5.2 =
+* Security: instructors can no longer read, edit, view stats, enroll users into, or view the cohort of courses they don't own via the LMS REST API.
+* Security: draft and private courses are no longer readable by arbitrary logged-in users, by listing or by direct ID.
+* Security: removed a backward-compatibility fallback in phone verification that could have allowed unverified WhatsApp delivery for pre-6.5.1 accounts.
 = 6.5.1 =
 * Security: CRM v2 write endpoints now require management permission instead of view-only access.
 * Security: fixed a scope check that could grant instructors global visibility over the contacts database instead of their own enrolled students.
@@ -59,6 +63,8 @@ Translation files are loaded from the `/languages` directory.
 * Major release aligned with ATORA_v5 architecture and modules.
 
 == Upgrade Notice ==
+= 6.5.2 =
+* Security fixes for LMS REST course ownership and draft/private course visibility. Recommended update.
 = 6.5.1 =
 * Security fixes for CRM permissions, arbitrary email sending, WhatsApp verification enforcement, and MCP API key rate limiting. Recommended update.
 = 5.0.0 =
