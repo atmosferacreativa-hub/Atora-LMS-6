@@ -430,3 +430,24 @@ directamente en `Preferences::is_phone_verified()`; `verified=1` sin
 huella ahora se trata como no verificado, sin excepción. No queda
 fecha de retiro pendiente porque no se dejó nada por retirar después
 — esta entrada es solo el registro de que existió y por qué se fue.
+
+## `wp_post_id` de lecciones — mismo patrón de PT-1 (6.5.3), sin exposición REST hoy
+
+PT-1 (6.5.3) blindó `atora_courses.wp_post_id` porque
+`create_course()`/`update_course()` lo aceptaban del payload sin
+filtrar. `LMS_Course_Service::upsert_lesson()`
+(`sanitize_lesson_data()`) tiene exactamente el mismo patrón para
+`atora_lessons.wp_post_id` — lo toma de `$data['wp_post_id']` sin
+validar contra el post real.
+
+**Por qué no se toca en este sprint:** verificado — a diferencia de
+cursos, no hay ninguna ruta REST que exponga `upsert_lesson()`
+directamente (`class-lms-rest-controller.php` no tiene un endpoint de
+creación/edición de lecciones, solo `/lessons/{id}/complete`). El
+método solo se llama desde el migrador hoy. Sin superficie de ataque
+actual, no es parte del hallazgo que ordena este sprint.
+
+**Propuesta:** si en algún momento se expone un CRUD de lecciones por
+REST, aplicar el mismo tratamiento — filtrar `wp_post_id` del payload
+y crear el equivalente de `link_to_legacy_post()` para lecciones antes
+de exponer la ruta, no después.

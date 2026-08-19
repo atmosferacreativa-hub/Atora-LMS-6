@@ -134,7 +134,7 @@ if ( ! function_exists( 'user_can' ) ) {
 	}
 }
 if ( ! function_exists( 'current_user_can' ) ) {
-	function current_user_can( string $capability ): bool {
+	function current_user_can( string $capability, ...$args ): bool {
 		return user_can( get_current_user_id(), $capability );
 	}
 }
@@ -143,6 +143,21 @@ if ( ! function_exists( 'is_super_admin' ) ) {
 }
 if ( ! function_exists( 'is_user_logged_in' ) ) {
 	function is_user_logged_in(): bool { return get_current_user_id() > 0; }
+}
+$GLOBALS['__atora_test_post_types'] = array();
+if ( ! function_exists( 'get_post_type' ) ) {
+	function get_post_type( $post = 0 ) {
+		$id = is_object( $post ) ? absint( $post->ID ?? 0 ) : absint( $post );
+		return $GLOBALS['__atora_test_post_types'][ $id ] ?? false;
+	}
+}
+if ( ! function_exists( 'atora_test_set_post_type' ) ) {
+	function atora_test_set_post_type( int $post_id, string $post_type ): void {
+		$GLOBALS['__atora_test_post_types'][ $post_id ] = $post_type;
+	}
+}
+if ( ! function_exists( 'atora_test_reset_post_types' ) ) {
+	function atora_test_reset_post_types(): void { $GLOBALS['__atora_test_post_types'] = array(); }
 }
 if ( ! function_exists( 'atora_test_set_user_cap' ) ) {
 	function atora_test_set_user_cap( int $user_id, string $capability, bool $has = true ): void {

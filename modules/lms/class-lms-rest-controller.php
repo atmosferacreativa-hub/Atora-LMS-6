@@ -216,6 +216,13 @@ class LMS_REST_Controller {
 		if ( ! current_user_can( 'manage_options' ) && ! current_user_can( 'edit_others_lm_courses' ) ) {
 			$data['instructor_id'] = get_current_user_id();
 		}
+		// PT-1.1/1.3 (6.5.3): wp_post_id es el puente de identidad con
+		// el LMS legado (CPT lm_course), no un campo de CRUD genérico —
+		// ni siquiera manage_options lo escribe por acá. La única vía
+		// es LMS_Course_Service::link_to_legacy_post(), que valida el
+		// post_type, el permiso sobre ese post puntual y que no esté
+		// ya vinculado a otro curso.
+		unset( $data['wp_post_id'] );
 
 		$id = LMS_Course_Service::create( $data );
 		if ( ! $id ) {
@@ -229,7 +236,21 @@ class LMS_REST_Controller {
 		if ( ! self::can_manage_this_course( $id ) ) {
 			return self::forbidden_course_response();
 		}
-		$ok = LMS_Course_Service::update( $id, $r->get_json_params() ?: array() );
+
+		$data = $r->get_json_params() ?: array();
+		// PT-1.2 (6.5.3): sin capability ampliada, tampoco puede
+		// reasignar instructor_id — el gate de propiedad verifica quién
+		// es dueño hoy, no que pueda transferirse el curso a sí mismo
+		// desde otro instructor_id, ni "regalarlo" a uno arbitrario.
+		if ( ! current_user_can( 'manage_options' ) && ! current_user_can( 'edit_others_lm_courses' ) ) {
+			unset( $data['instructor_id'] );
+		}
+		// PT-1.2/1.3 (6.5.3): wp_post_id nunca vía CRUD genérico, ni
+		// siquiera para el propietario legítimo del curso — ver
+		// create_course() para el porqué completo.
+		unset( $data['wp_post_id'] );
+
+		$ok = LMS_Course_Service::update( $id, $data );
 		if ( ! $ok ) {
 			return new \WP_REST_Response( array( 'success' => false, 'message' => __( 'No se pudo actualizar.', 'atora-lms' ) ), 400 );
 		}

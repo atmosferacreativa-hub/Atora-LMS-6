@@ -108,6 +108,59 @@ class LMS_Course_Service {
 		);
 	}
 
+	/**
+	 * PT-1.3 (6.5.3): única vía de escritura de wp_post_id fuera del
+	 * migrador — el CRUD genérico (create()/update()) ya no acepta ese
+	 * campo en absoluto, sin importar la capability del llamador. Es
+	 * el puente de identidad con el LMS legado (CPT lm_course), no
+	 * metadata decorativa: LMS_Enrollment_Service lo usa para resolver
+	 * matrícula cuando atora_lms_read_source = tables, y el migrador
+	 * lo consulta para decidir si un curso ya fue migrado.
+	 *
+	 * @param int $course_id
+	 * @param int $wp_post_id
+	 * @return array{ok:bool, reason?:string}
+	 */
+	public static function link_to_legacy_post( int $course_id, int $wp_post_id ): array {
+		global $wpdb;
+
+		if ( ! $course_id || ! $wp_post_id ) {
+			return array( 'ok' => false, 'reason' => 'datos_invalidos' );
+		}
+
+		if ( 'lm_course' !== get_post_type( $wp_post_id ) ) {
+			return array( 'ok' => false, 'reason' => 'no_es_lm_course' );
+		}
+
+		if ( ! current_user_can( 'edit_post', $wp_post_id ) ) {
+			return array( 'ok' => false, 'reason' => 'sin_permiso_sobre_el_post' );
+		}
+
+		// Defensa en profundidad además del UNIQUE KEY de la tabla —
+		// para devolver un error claro en vez de que el UPDATE falle
+		// en seco por la restricción de base de datos.
+		$existing = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT id FROM {$wpdb->prefix}atora_courses WHERE wp_post_id = %d AND id != %d LIMIT 1",
+				$wp_post_id,
+				$course_id
+			)
+		);
+		if ( $existing ) {
+			return array( 'ok' => false, 'reason' => 'ya_vinculado_a_otro_curso' );
+		}
+
+		$updated = $wpdb->update(
+			$wpdb->prefix . 'atora_courses',
+			array( 'wp_post_id' => $wp_post_id ),
+			array( 'id' => $course_id ),
+			array( '%d' ),
+			array( '%d' )
+		);
+
+		return array( 'ok' => false !== $updated );
+	}
+
 	// ── Lecciones ────────────────────────────────────────────────────────────
 
 	public static function get_lessons( int $course_id ): array {
