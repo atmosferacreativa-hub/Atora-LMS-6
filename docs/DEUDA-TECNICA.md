@@ -451,3 +451,28 @@ actual, no es parte del hallazgo que ordena este sprint.
 REST, aplicar el mismo tratamiento — filtrar `wp_post_id` del payload
 y crear el equivalente de `link_to_legacy_post()` para lecciones antes
 de exponer la ruta, no después.
+
+## `wp_post_id NOT NULL DEFAULT 0` en lessons/programs/quiz_submissions — mismo defecto de esquema que PT-2 (6.5.3)
+
+PT-2 (6.5.3) migró `atora_courses.wp_post_id` a
+`BIGINT UNSIGNED NULL DEFAULT NULL` porque `NOT NULL DEFAULT 0` con
+`UNIQUE KEY` solo permite una fila con 0 — un segundo curso nativo sin
+CPT asociado fallaba al crearse. `modules/class-v5-installer.php`
+declara exactamente el mismo patrón (`NOT NULL DEFAULT 0` +
+`UNIQUE KEY wp_post_id`) para `atora_lessons` (línea ~694),
+`atora_programs` (línea ~780) y `atora_quiz_submissions` (línea
+~843).
+
+**Por qué no se migran ahora:** el hallazgo que ordena este sprint
+(auditoría) cita específicamente `atora_courses`. Las otras tres
+tablas comparten el defecto pero no fueron parte del diagnóstico
+verificado — no se generaliza el fix sin que esté en el alcance
+explícito del paquete (regla 1 del sprint).
+
+**Propuesta:** si se necesita crear lecciones/programas/envíos de
+quiz nativos sin CPT asociado (mismo escenario que motivó PT-2 para
+cursos), aplicar la misma migración
+(`ALTER TABLE ... MODIFY COLUMN wp_post_id BIGINT UNSIGNED NULL DEFAULT NULL`
++ `UPDATE ... SET wp_post_id = NULL WHERE wp_post_id = 0`) a esas tres
+tablas, siguiendo el mismo patrón de
+`V5_Installer::migrate_course_wp_post_id_nullable()`.

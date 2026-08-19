@@ -344,6 +344,11 @@ if ( file_exists( $mcp_module_file ) ) {
 	require_once $mcp_module_file;
 }
 
+$v5_installer_file = __DIR__ . '/../modules/class-v5-installer.php';
+if ( file_exists( $v5_installer_file ) ) {
+	require_once $v5_installer_file;
+}
+
 foreach ( array( 'class-module-registry.php', 'class-install-profiles.php', 'class-profile-labels.php' ) as $mod_file ) {
 	$path = __DIR__ . '/../includes/modularity/' . $mod_file;
 	if ( file_exists( $path ) ) {

@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class V5_Installer {
 
 	/** Versión del esquema. Incrementar para forzar re-instalación. */
-	const SCHEMA_VERSION = '5.1.0-sections';
+	const SCHEMA_VERSION = '5.1.1-course-wp-post-id-nullable';
 
 	/** Option key que almacena la versión instalada. */
 	const OPTION_KEY = 'atora_v5_schema_version';
@@ -39,6 +39,7 @@ class V5_Installer {
 		}
 
 		if ( self::create_tables() ) {
+			self::migrate_course_wp_post_id_nullable();
 			update_option( self::OPTION_KEY, self::SCHEMA_VERSION );
 		}
 	}
@@ -50,8 +51,45 @@ class V5_Installer {
 	 */
 	public static function force_install(): void {
 		if ( self::create_tables() ) {
+			self::migrate_course_wp_post_id_nullable();
 			update_option( self::OPTION_KEY, self::SCHEMA_VERSION );
 		}
+	}
+
+	/**
+	 * PT-2 (6.5.3): wp_post_id BIGINT UNSIGNED NOT NULL DEFAULT 0 con
+	 * UNIQUE KEY solo permitía una fila con 0 — un segundo curso
+	 * nativo sin CPT asociado fallaba al crearse. dbDelta() no
+	 * modifica de forma confiable NOT NULL/DEFAULT de una columna ya
+	 * existente (limitación conocida), así que el cambio de esquema
+	 * en atora_courses se hace explícito acá, con ALTER TABLE directo
+	 * — install nuevo ya crea la columna nullable vía create_tables(),
+	 * esto es solo para instalaciones existentes.
+	 *
+	 * Alcance: solo atora_courses, que es el hallazgo confirmado de
+	 * este sprint. atora_lessons/atora_programs/atora_quiz_submissions
+	 * comparten el mismo defecto de esquema — documentado en
+	 * docs/DEUDA-TECNICA.md, no tocado acá (fuera del hallazgo que
+	 * ordena este sprint).
+	 *
+	 * @return void
+	 */
+	private static function migrate_course_wp_post_id_nullable(): void {
+		global $wpdb;
+
+		$table = $wpdb->prefix . 'atora_courses';
+		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) ) !== $table ) {
+			return;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+		$wpdb->query( "ALTER TABLE {$table} MODIFY COLUMN wp_post_id BIGINT UNSIGNED NULL DEFAULT NULL" );
+
+		// Todo registro con 0 "sin vínculo legado" pasa a NULL — a lo
+		// sumo una fila podía tener 0 bajo el UNIQUE KEY anterior, así
+		// que esto nunca choca con el propio índice único.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$wpdb->query( "UPDATE {$table} SET wp_post_id = NULL WHERE wp_post_id = 0" );
 	}
 
 	/**
@@ -660,7 +698,7 @@ class V5_Installer {
 		// ── Fase 11: LMS — tablas propias (desacopla wp_posts) ───────────────
 		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_courses (
 			id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-			wp_post_id      BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			wp_post_id      BIGINT UNSIGNED NULL DEFAULT NULL,
 			title           VARCHAR(500)    NOT NULL DEFAULT '',
 			slug            VARCHAR(500)    NOT NULL DEFAULT '',
 			description     LONGTEXT        NOT NULL,
