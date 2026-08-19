@@ -83,6 +83,48 @@ class LMS_REST_Controller {
 		return current_user_can( 'manage_options' );
 	}
 
+	/**
+	 * PT-1 (6.5.2): propiedad de recurso para el LMS de tablas — mismo
+	 * patrón jerárquico que CLMS_Access::can_manage_resource_context()
+	 * ya usa para el LMS legado de posts (admin → propietario →
+	 * edit_others_lm_courses → false), portado a atora_courses.
+	 * instructor_id en vez de post_author. Fail closed: curso
+	 * inexistente no es "permitido".
+	 *
+	 * permission_callback ($can_inst) no tiene acceso al course_id de
+	 * la ruta con la firma actual — se verifica al inicio de cada
+	 * callback en vez de en el registro de la ruta.
+	 *
+	 * @param int $course_id
+	 * @return bool
+	 */
+	private static function can_manage_this_course( int $course_id ): bool {
+		if ( current_user_can( 'manage_options' ) ) {
+			return true;
+		}
+		if ( current_user_can( 'edit_others_lm_courses' ) ) {
+			return true;
+		}
+
+		$course = LMS_Course_Service::get( $course_id );
+		if ( ! $course ) {
+			return false;
+		}
+
+		return current_user_can( 'clms_manage_courses' )
+			&& (int) ( $course['instructor_id'] ?? 0 ) === get_current_user_id();
+	}
+
+	/**
+	 * @return \WP_REST_Response
+	 */
+	private static function forbidden_course_response(): \WP_REST_Response {
+		return new \WP_REST_Response(
+			array( 'success' => false, 'message' => __( 'No tienes permisos sobre este curso.', 'atora-lms' ) ),
+			403
+		);
+	}
+
 	// ── Cursos ───────────────────────────────────────────────────────────────
 
 	public static function list_courses( \WP_REST_Request $r ): \WP_REST_Response {
@@ -107,7 +149,18 @@ class LMS_REST_Controller {
 	}
 
 	public static function create_course( \WP_REST_Request $r ): \WP_REST_Response {
-		$id = LMS_Course_Service::create( $r->get_json_params() ?: array() );
+		$data = $r->get_json_params() ?: array();
+
+		// PT-1.3 (6.5.2): nunca confiar en un instructor_id enviado por
+		// el cliente que no sea el propio, salvo capability ampliada —
+		// si no, cualquier instructor podría crear un curso "a nombre"
+		// de otro (o de nadie), sorteando el gate de propiedad del
+		// resto de las rutas desde el origen.
+		if ( ! current_user_can( 'manage_options' ) && ! current_user_can( 'edit_others_lm_courses' ) ) {
+			$data['instructor_id'] = get_current_user_id();
+		}
+
+		$id = LMS_Course_Service::create( $data );
 		if ( ! $id ) {
 			return new \WP_REST_Response( array( 'success' => false, 'message' => __( 'El título es obligatorio.', 'atora-lms' ) ), 400 );
 		}
@@ -116,6 +169,9 @@ class LMS_REST_Controller {
 
 	public static function update_course( \WP_REST_Request $r ): \WP_REST_Response {
 		$id = absint( $r->get_param( 'course_id' ) );
+		if ( ! self::can_manage_this_course( $id ) ) {
+			return self::forbidden_course_response();
+		}
 		$ok = LMS_Course_Service::update( $id, $r->get_json_params() ?: array() );
 		if ( ! $ok ) {
 			return new \WP_REST_Response( array( 'success' => false, 'message' => __( 'No se pudo actualizar.', 'atora-lms' ) ), 400 );
@@ -125,12 +181,18 @@ class LMS_REST_Controller {
 
 	public static function course_stats( \WP_REST_Request $r ): \WP_REST_Response {
 		$id = absint( $r->get_param( 'course_id' ) );
+		if ( ! self::can_manage_this_course( $id ) ) {
+			return self::forbidden_course_response();
+		}
 		return new \WP_REST_Response( array( 'success' => true, 'stats' => LMS_Enrollment_Service::get_course_stats( $id ) ), 200 );
 	}
 
 	public static function enroll( \WP_REST_Request $r ): \WP_REST_Response {
 		$b         = $r->get_json_params() ?: array();
 		$course_id = absint( $r->get_param( 'course_id' ) );
+		if ( ! self::can_manage_this_course( $course_id ) ) {
+			return self::forbidden_course_response();
+		}
 		$user_id   = absint( $b['user_id'] ?? get_current_user_id() );
 		$order_id  = absint( $b['order_id'] ?? 0 );
 
@@ -194,6 +256,9 @@ class LMS_REST_Controller {
 		global $wpdb;
 
 		$course_id = absint( $r->get_param( 'course_id' ) );
+		if ( ! self::can_manage_this_course( $course_id ) ) {
+			return self::forbidden_course_response();
+		}
 		$limit     = absint( $r->get_param( 'limit' )  ?: 50 );
 		$offset    = absint( $r->get_param( 'offset' ) ?: 0 );
 

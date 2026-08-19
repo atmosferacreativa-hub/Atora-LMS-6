@@ -141,6 +141,9 @@ if ( ! function_exists( 'current_user_can' ) ) {
 if ( ! function_exists( 'is_super_admin' ) ) {
 	function is_super_admin( $user_id = 0 ): bool { return false; }
 }
+if ( ! function_exists( 'is_user_logged_in' ) ) {
+	function is_user_logged_in(): bool { return get_current_user_id() > 0; }
+}
 if ( ! function_exists( 'atora_test_set_user_cap' ) ) {
 	function atora_test_set_user_cap( int $user_id, string $capability, bool $has = true ): void {
 		$GLOBALS['__atora_test_user_caps'][ $user_id ][ $capability ] = $has;
@@ -269,6 +272,7 @@ foreach ( array(
 	'class-lms-enrollment-service.php',
 	'class-lms-read-router.php',
 	'class-lms-parity.php',
+	'class-lms-rest-controller.php',
 ) as $lms ) {
 	if ( file_exists( $lms_dir . $lms ) ) {
 		require_once $lms_dir . $lms;
