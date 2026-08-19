@@ -392,3 +392,27 @@ este mismo sprint (mover el `.md` a `docs/` y eliminar el directorio).
 
 No se toca en este sprint (fuera de alcance explícito, salvo el
 inventario de paridad). Ver `docs/CRM-V1-V2-PARIDAD.md`.
+
+## Catálogo público vs curriculum completo (LMS de tablas)
+
+PT-2.4 (6.5.2): la auditoría sugirió que un curso `published` podría
+mostrar solo datos de catálogo (título, descripción, precio) a
+cualquiera, y el curriculum completo solo a matriculados —
+`GET /courses/{id}` hoy devuelve ambos juntos sin distinción, para
+cualquier usuario logueado.
+
+**Por qué no se implementa ahora:** verificado — no existe ese
+contrato en ningún lado del sistema hoy. Lo único parecido es
+`is_free_preview` por lección individual
+(`LMS_Course_Service::sanitize_lesson_data()`), que es un flag de
+"esta lección puntual es de muestra", no una regla sistemática de
+"todo el curriculum es privado salvo matrícula". Inventar la
+distinción ahora cambiaría el contrato de la API pública del catálogo
+sin el ciclo de prueba que eso merece — fuera de alcance de un sprint
+de seguridad.
+
+**Propuesta para 6.6.0:** decidir si `GET /courses/{id}` debe separar
+`course` (catálogo, siempre visible si `published`) de `curriculum`
+(completo solo si hay matrícula activa o `is_free_preview` por
+lección), y si el LMS legado de posts ya resuelve esto de otra forma
+que debería alinearse en vez de duplicarse.

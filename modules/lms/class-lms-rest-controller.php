@@ -128,12 +128,28 @@ class LMS_REST_Controller {
 	// ── Cursos ───────────────────────────────────────────────────────────────
 
 	public static function list_courses( \WP_REST_Request $r ): \WP_REST_Response {
+		$status        = sanitize_key( (string) ( $r->get_param( 'status' ) ?: 'published' ) );
+		$instructor_id = absint( $r->get_param( 'instructor_id' ) ?: 0 );
+
+		// PT-2.1 (6.5.2): status=all o un estado no público (draft,
+		// private) no debe llegar sin restricción al servicio — antes
+		// se confiaba en que el frontend simplemente no lo pidiera.
+		$requests_non_public = 'all' === $status || ! in_array( $status, array( 'published' ), true );
+		if ( $requests_non_public && ! current_user_can( 'manage_options' ) && ! current_user_can( 'edit_others_lm_courses' ) ) {
+			if ( current_user_can( 'clms_manage_courses' ) ) {
+				// Ve sus propios cursos no publicados, no los de nadie más.
+				$instructor_id = get_current_user_id();
+			} else {
+				$status = 'published';
+			}
+		}
+
 		$args = array(
 			'limit'         => absint( $r->get_param( 'limit' ) ?: 20 ),
 			'offset'        => absint( $r->get_param( 'offset' ) ?: 0 ),
-			'status'        => sanitize_key( (string) ( $r->get_param( 'status' ) ?: 'published' ) ),
+			'status'        => $status,
 			'search'        => sanitize_text_field( (string) ( $r->get_param( 'search' ) ?: '' ) ),
-			'instructor_id' => absint( $r->get_param( 'instructor_id' ) ?: 0 ),
+			'instructor_id' => $instructor_id,
 		);
 		return new \WP_REST_Response( array_merge( array( 'success' => true ), LMS_Course_Service::get_all( $args ) ), 200 );
 	}
@@ -144,8 +160,49 @@ class LMS_REST_Controller {
 		if ( ! $course ) {
 			return new \WP_REST_Response( array( 'success' => false, 'message' => __( 'Curso no encontrado.', 'atora-lms' ) ), 404 );
 		}
+
+		// PT-2.2/2.3 (6.5.2): 'published' es visible para cualquier
+		// logueado, igual que hoy. 'draft'/'private' solo para el
+		// propietario, edit_others_lm_courses/manage_options, o —
+		// específicamente para 'private', que en este LMS es un espejo
+		// directo del post_status nativo de WP (confirmado contra
+		// LMS_Migrator: migra 'publish','draft','private' 1:1, no es un
+		// estado propio de "acceso restringido a matriculados") — un
+		// usuario con read_private_lm_courses, la misma capability que
+		// ya cumple ese rol para el LMS legado de posts. El curriculum
+		// se adjunta después de este gate, así que sigue la misma
+		// regla que el curso — no hay una regla separada que filtrarle.
+		if ( ! self::course_is_visible( $course ) ) {
+			return new \WP_REST_Response( array( 'success' => false, 'message' => __( 'Curso no encontrado.', 'atora-lms' ) ), 404 );
+		}
+
 		$course['curriculum'] = LMS_Course_Service::get_curriculum( $id );
 		return new \WP_REST_Response( array( 'success' => true, 'course' => $course ), 200 );
+	}
+
+	/**
+	 * @param array $course Curso de LMS_Course_Service::get()/get_all().
+	 * @return bool
+	 */
+	private static function course_is_visible( array $course ): bool {
+		if ( current_user_can( 'manage_options' ) || current_user_can( 'edit_others_lm_courses' ) ) {
+			return true;
+		}
+
+		$status = (string) ( $course['status'] ?? '' );
+		if ( 'published' === $status ) {
+			return is_user_logged_in();
+		}
+
+		if ( (int) ( $course['instructor_id'] ?? 0 ) === get_current_user_id() && get_current_user_id() > 0 ) {
+			return true;
+		}
+
+		if ( 'private' === $status ) {
+			return current_user_can( 'read_private_lm_courses' );
+		}
+
+		return false;
 	}
 
 	public static function create_course( \WP_REST_Request $r ): \WP_REST_Response {
