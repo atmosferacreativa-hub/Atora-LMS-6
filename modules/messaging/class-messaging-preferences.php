@@ -150,14 +150,17 @@ class Preferences {
 			return false;
 		}
 
-		// PT-4.1 (6.5.1): la huella ata la verificación al número exacto
-		// que se verificó. Sin ella (verificaciones de antes de 6.5.1),
-		// no forzamos re-verificación retroactiva — regla 6 del sprint,
-		// nadie pierde su estado por una migración. La huella se crea
-		// sola la próxima vez que ese usuario verifique un número.
+		// PT-3.1/3.2 (6.5.2): la rama de compatibilidad de PT-4.1 (6.5.1)
+		// que trataba "verified=1 con hash vacío" como verificado por
+		// retrocompatibilidad se retira aquí — confirmado con el
+		// responsable del proyecto que ninguna instalación real llegó a
+		// operar con el esquema de verificación anterior a 6.5.1, así
+		// que no hay nadie a quien esa rama estuviera protegiendo. Sin
+		// huella, no hay verificación válida — fail closed, sin
+		// excepción de compatibilidad.
 		$stored_hash = (string) get_user_meta( $user_id, self::META_PHONE_VERIFIED_HASH, true );
 		if ( '' === $stored_hash ) {
-			return true;
+			return false;
 		}
 
 		$current_phone = trim( (string) get_user_meta( $user_id, 'atora_phone', true ) );

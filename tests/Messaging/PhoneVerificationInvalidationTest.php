@@ -83,13 +83,16 @@ class PhoneVerificationInvalidationTest extends TestCase {
 	}
 
 	/** @test */
-	public function test_legacy_verified_record_without_hash_stays_verified(): void {
-		// Regla 6: compatibilidad — una verificación de antes de 6.5.1
-		// no tiene huella guardada. No se fuerza re-verificación.
+	public function test_legacy_verified_record_without_hash_is_no_longer_treated_as_verified(): void {
+		// PT-3.1/3.2 (6.5.2): la rama de compatibilidad de PT-4.1
+		// (6.5.1) se retiró — confirmado que ninguna instalación real
+		// operó bajo el esquema anterior a 6.5.1, así que no había
+		// nadie a quien "gradfatherear". verified=1 sin huella ya no
+		// basta.
 		update_user_meta( 4, 'atora_phone', '+58 412 1234567' );
 		update_user_meta( 4, \ATORA\Messaging\Preferences::META_PHONE_VERIFIED, true );
 
-		$this->assertTrue( \ATORA\Messaging\Preferences::is_phone_verified( 4 ) );
+		$this->assertFalse( \ATORA\Messaging\Preferences::is_phone_verified( 4 ) );
 	}
 
 	/** @test */

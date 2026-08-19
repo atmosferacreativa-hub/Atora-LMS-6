@@ -416,3 +416,17 @@ de seguridad.
 (completo solo si hay matrícula activa o `is_free_preview` por
 lección), y si el LMS legado de posts ya resuelve esto de otra forma
 que debería alinearse en vez de duplicarse.
+
+## Rama de compatibilidad de verificación de teléfono — retirada (6.5.2)
+
+PT-4.1 (6.5.1) introdujo `atora_phone_verified_hash` y, para no
+romper cuentas verificadas bajo el esquema anterior, trataba
+`verified=1` con hash vacío como verificado igual (retrocompatible).
+
+PT-3 (6.5.2): confirmado con el responsable del proyecto que ninguna
+instalación real llegó a operar bajo el esquema anterior a 6.5.1 —
+no había nadie a quien esa rama estuviera protegiendo. Se retiró
+directamente en `Preferences::is_phone_verified()`; `verified=1` sin
+huella ahora se trata como no verificado, sin excepción. No queda
+fecha de retiro pendiente porque no se dejó nada por retirar después
+— esta entrada es solo el registro de que existió y por qué se fue.
