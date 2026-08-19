@@ -476,3 +476,25 @@ cursos), aplicar la misma migración
 + `UPDATE ... SET wp_post_id = NULL WHERE wp_post_id = 0`) a esas tres
 tablas, siguiendo el mismo patrón de
 `V5_Installer::migrate_course_wp_post_id_nullable()`.
+
+## `LMS_Migrator::migrate_programs()` — mismo patrón de "confiar en que la fila ya existe" que PT-3.1 (6.5.3)
+
+PT-3.1 (6.5.3) corrigió `migrate_courses()` para que, al encontrar un
+`wp_post_id` ya presente en `atora_courses`, compare el
+`instructor_id` de esa fila contra el autor/instructor real del CPT y
+registre la discrepancia en vez de confiar ciegamente. `migrate_programs()`
+(línea ~428) tiene el mismo `LEFT JOIN ... WHERE pg.id IS NULL` +
+mismo tipo de doble-chequeo por existencia, sin la verificación
+nueva.
+
+**Por qué no se corrige ahora:** el diagnóstico verificado de este
+sprint (auditoría) habla específicamente de "cursos" — `atora_courses`
+/ `lm_course`. Programas comparten el patrón pero no son parte del
+hallazgo confirmado.
+
+**Propuesta:** si `atora_programs` queda expuesto a escritura por REST
+con el mismo nivel de exposición que `atora_courses` (verificar si ya
+lo está antes de asumir que no), aplicar el mismo tratamiento de
+PT-1/PT-3.1 (6.5.3): filtrar `wp_post_id` del CRUD genérico, un
+`link_to_legacy_post()` equivalente, y la verificación de discrepancia
+de instructor en el migrador de programas.

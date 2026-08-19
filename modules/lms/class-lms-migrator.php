@@ -168,10 +168,24 @@ class LMS_Migrator {
 		foreach ( (array) $pending_ids as $post_id ) {
 			$post_id = absint( $post_id );
 			// Double-check (race condition guard)
-			$exists = (int) $wpdb->get_var(
-				$wpdb->prepare( "SELECT id FROM {$wpdb->prefix}atora_courses WHERE wp_post_id = %d LIMIT 1", $post_id )
+			$existing_row = $wpdb->get_row(
+				$wpdb->prepare( "SELECT id, instructor_id FROM {$wpdb->prefix}atora_courses WHERE wp_post_id = %d LIMIT 1", $post_id ),
+				ARRAY_A
 			);
-			if ( $exists ) { $skipped++; continue; }
+			if ( $existing_row ) {
+				// PT-3.1 (6.5.3): no confiar ciegamente en que "la fila
+				// ya existe" significa "ya migrado correctamente" — esa
+				// fila pudo haberse creado por REST durante la ventana
+				// de cutover, antes de que el migrador llegara a este
+				// CPT (el escenario que ordena este sprint). Se sigue
+				// saltando (no sobreescribir automáticamente: podría
+				// ser una reasignación intencional legítima), pero se
+				// registra la discrepancia si el instructor_id no
+				// coincide con el autor/instructor real del CPT.
+				self::log_migration_discrepancy_if_instructor_mismatch( $post_id, absint( $existing_row['instructor_id'] ?? 0 ) );
+				$skipped++;
+				continue;
+			}
 
 			$post = get_post( $post_id );
 			if ( ! $post ) { $errors++; continue; }
@@ -220,6 +234,56 @@ class LMS_Migrator {
 			'skipped'  => $skipped,
 			'errors'   => $errors,
 			'total'    => count( $pending_ids ),
+		);
+	}
+
+	/**
+	 * PT-3.1 (6.5.3): compara el instructor_id de una fila ya presente
+	 * en atora_courses contra el autor/instructor real del CPT
+	 * lm_course correspondiente. Si difieren, registra la divergencia
+	 * en atora_lms_parity_log (misma tabla que ya usa LMS_Parity para
+	 * "reportar divergencia, no asumir") — no sobreescribe nada, es
+	 * solo visibilidad para el administrador.
+	 *
+	 * @param int $post_id       ID del CPT lm_course.
+	 * @param int $row_instructor_id instructor_id de la fila ya existente en atora_courses.
+	 * @return void
+	 */
+	private static function log_migration_discrepancy_if_instructor_mismatch( int $post_id, int $row_instructor_id ): void {
+		$post = get_post( $post_id );
+		if ( ! $post ) { return; }
+
+		$instructor_ids  = get_post_meta( $post_id, '_clms_instructor_ids', true );
+		$real_instructor  = is_array( $instructor_ids ) && ! empty( $instructor_ids )
+			? absint( $instructor_ids[0] )
+			: absint( $post->post_author );
+
+		if ( $real_instructor === $row_instructor_id ) {
+			return;
+		}
+
+		if ( ! class_exists( '\ATORA\LMS\LMS_Parity' ) ) {
+			return;
+		}
+
+		global $wpdb;
+		$table = $wpdb->prefix . \ATORA\LMS\LMS_Parity::TABLE_SUFFIX;
+		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) ) !== $table ) {
+			return;
+		}
+
+		$wpdb->insert(
+			$table,
+			array(
+				'reader'         => 'migrator_instructor_mismatch',
+				'user_id'        => 0,
+				'wp_course_id'   => $post_id,
+				'legacy_digest'  => substr( md5( (string) $real_instructor ), 0, 8 ),
+				'table_digest'   => substr( md5( (string) $row_instructor_id ), 0, 8 ),
+				'legacy_summary' => sprintf( 'CPT instructor_id=%d', $real_instructor ),
+				'table_summary'  => sprintf( 'atora_courses.instructor_id=%d (fila ya existente al migrar)', $row_instructor_id ),
+				'logged_at'      => current_time( 'mysql', true ),
+			)
 		);
 	}
 

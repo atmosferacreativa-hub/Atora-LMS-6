@@ -159,6 +159,50 @@ if ( ! function_exists( 'atora_test_set_post_type' ) ) {
 if ( ! function_exists( 'atora_test_reset_post_types' ) ) {
 	function atora_test_reset_post_types(): void { $GLOBALS['__atora_test_post_types'] = array(); }
 }
+$GLOBALS['__atora_test_posts'] = array();
+if ( ! function_exists( 'get_post' ) ) {
+	function get_post( $post_id = 0 ) {
+		$id = absint( $post_id );
+		return $GLOBALS['__atora_test_posts'][ $id ] ?? null;
+	}
+}
+if ( ! function_exists( 'atora_test_set_post' ) ) {
+	function atora_test_set_post( int $post_id, array $fields = array() ): void {
+		$defaults = array(
+			'ID'             => $post_id,
+			'post_type'      => 'lm_course',
+			'post_author'    => 0,
+			'post_date_gmt'  => '2026-01-01 00:00:00',
+			'post_title'     => '',
+			'post_name'      => '',
+			'post_content'   => '',
+			'post_excerpt'   => '',
+			'post_status'    => 'publish',
+		);
+		$GLOBALS['__atora_test_posts'][ $post_id ] = (object) array_merge( $defaults, $fields );
+		$GLOBALS['__atora_test_post_types'][ $post_id ] = $fields['post_type'] ?? 'lm_course';
+	}
+}
+if ( ! function_exists( 'atora_test_reset_posts' ) ) {
+	function atora_test_reset_posts(): void { $GLOBALS['__atora_test_posts'] = array(); }
+}
+$GLOBALS['__atora_test_post_meta'] = array();
+if ( ! function_exists( 'get_post_meta' ) ) {
+	function get_post_meta( int $post_id, string $key = '', bool $single = false ) {
+		if ( '' === $key ) { return $GLOBALS['__atora_test_post_meta'][ $post_id ] ?? array(); }
+		$has = isset( $GLOBALS['__atora_test_post_meta'][ $post_id ][ $key ] );
+		if ( ! $single ) { return $has ? array( $GLOBALS['__atora_test_post_meta'][ $post_id ][ $key ] ) : array(); }
+		return $has ? $GLOBALS['__atora_test_post_meta'][ $post_id ][ $key ] : '';
+	}
+}
+if ( ! function_exists( 'atora_test_set_post_meta' ) ) {
+	function atora_test_set_post_meta( int $post_id, string $key, $value ): void {
+		$GLOBALS['__atora_test_post_meta'][ $post_id ][ $key ] = $value;
+	}
+}
+if ( ! function_exists( 'atora_test_reset_post_meta' ) ) {
+	function atora_test_reset_post_meta(): void { $GLOBALS['__atora_test_post_meta'] = array(); }
+}
 if ( ! function_exists( 'atora_test_set_user_cap' ) ) {
 	function atora_test_set_user_cap( int $user_id, string $capability, bool $has = true ): void {
 		$GLOBALS['__atora_test_user_caps'][ $user_id ][ $capability ] = $has;
@@ -288,6 +332,7 @@ foreach ( array(
 	'class-lms-read-router.php',
 	'class-lms-parity.php',
 	'class-lms-rest-controller.php',
+	'class-lms-migrator.php',
 ) as $lms ) {
 	if ( file_exists( $lms_dir . $lms ) ) {
 		require_once $lms_dir . $lms;
