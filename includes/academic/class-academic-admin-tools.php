@@ -993,6 +993,21 @@ class CLMS_Academic_Admin_Tools {
 			exit;
 		}
 
+		// PT-9 (6.5.5): can_manage_academic_setup() es una capability
+		// genérica (clms_manage_courses/clms_access_admin/manage_options)
+		// — sin esto, cualquier instructor podía pasar el course_id de
+		// OTRO instructor por POST y el asistente escribía sobre ese
+		// curso ajeno en cada paso (título, competencias, etc.).
+		// ensure_course() ya devuelve el mismo course_id sin verificar
+		// dueño cuando el post ya existe.
+		if ( ! current_user_can( 'manage_options' ) && ! current_user_can( 'edit_others_lm_courses' )
+			&& (int) get_post_field( 'post_author', $course_id ) !== $user_id
+		) {
+			$this->set_wizard_notice( 'error', __( 'No tienes permiso para editar este curso.', 'atora-lms' ) );
+			wp_safe_redirect( admin_url( 'admin.php?page=' . self::WIZARD_PAGE ) );
+			exit;
+		}
+
 		if ( 1 === $step && method_exists( $wizard_service, 'save_basic_info' ) ) {
 			$wizard_service->save_basic_info(
 				$course_id,
