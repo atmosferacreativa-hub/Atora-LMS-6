@@ -30,31 +30,83 @@ class Preferences_Shortcode {
 	}
 
 	/**
-	 * PT-4.4: `?atora_unsubscribe=TOKEN` — funciona sin iniciar sesión.
-	 * Un estudiante que no puede darse de baja fácil termina bloqueando
-	 * el número, y eso cuesta el canal completo para esa persona.
+	 * PT-4.4 (6.4.0) / PT-1 (6.5.4): `?atora_unsubscribe=TOKEN` —
+	 * funciona sin iniciar sesión. Un estudiante que no puede darse de
+	 * baja fácil termina bloqueando el número, y eso cuesta el canal
+	 * completo para esa persona.
+	 *
+	 * PT-1 (6.5.4): el GET ya NO ejecuta el cambio — un escáner
+	 * antispam, un preview de cliente de correo o cualquier bot que
+	 * visite el enlace ya no da de baja al usuario solo por visitarlo.
+	 * El GET con token válido muestra una confirmación; el cambio real
+	 * ocurre en el POST que dispara el botón de esa página, con el
+	 * mismo token como campo oculto — verify_unsubscribe_token() es un
+	 * HMAC sin estado en BD (no de un solo uso), pero la acción en sí
+	 * es idempotente (desuscribir dos veces de la misma categoría no
+	 * tiene efecto distinto a una vez), así que no hace falta
+	 * protección extra contra reenvío del POST.
 	 *
 	 * @return void
 	 */
 	public static function maybe_handle_unsubscribe_link(): void {
-		if ( ! isset( $_GET['atora_unsubscribe'] ) ) { return; } // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-
-		$token  = sanitize_text_field( wp_unslash( (string) $_GET['atora_unsubscribe'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		$result = Preferences::verify_unsubscribe_token( $token );
+		$outcome = self::resolve_unsubscribe_request(
+			isset( $_GET['atora_unsubscribe'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['atora_unsubscribe'] ) ) : null, // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			isset( $_POST['atora_unsubscribe_confirm'] ), // phpcs:ignore WordPress.Security.NonceVerification.Missing
+			isset( $_POST['atora_unsubscribe'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['atora_unsubscribe'] ) ) : null // phpcs:ignore WordPress.Security.NonceVerification.Missing
+		);
+		if ( null === $outcome ) { return; }
 
 		nocache_headers();
 
+		switch ( $outcome['action'] ) {
+			case 'confirm':
+				self::render_unsubscribe_confirm_page( $outcome['token'], $outcome['category'] );
+				break;
+			case 'done':
+				self::render_unsubscribe_page( __( 'Listo, hecho', 'atora-lms' ), $outcome['body'], true );
+				break;
+			default:
+				self::render_unsubscribe_page(
+					__( 'Este enlace ya no es válido', 'atora-lms' ),
+					__( 'Puede que haya vencido. Inicia sesión y entra a tus preferencias para hacer el cambio ahí.', 'atora-lms' ),
+					false
+				);
+				break;
+		}
+		exit;
+	}
+
+	/**
+	 * PT-1 (6.5.4): núcleo testable — decide qué mostrar y ejecuta el
+	 * cambio de estado (solo en la rama POST), separado del shell que
+	 * hace exit/imprime HTML. Sin esto, el único punto de entrada
+	 * termina el proceso con exit en cada rama y no se puede probar
+	 * directo.
+	 *
+	 * @param string|null $get_token         $_GET['atora_unsubscribe'], ya saneado.
+	 * @param bool        $is_post_confirm   Si llegó el POST de confirmación.
+	 * @param string|null $post_token        $_POST['atora_unsubscribe'], ya saneado.
+	 * @return array{action:string,token?:string,category?:string,body?:string}|null null = no hay nada que manejar (ni GET ni POST presentes).
+	 */
+	private static function resolve_unsubscribe_request( ?string $get_token, bool $is_post_confirm, ?string $post_token ): ?array {
+		if ( null === $get_token && ! $is_post_confirm ) {
+			return null;
+		}
+
+		$token  = $is_post_confirm ? (string) $post_token : (string) $get_token;
+		$result = Preferences::verify_unsubscribe_token( $token );
+
 		if ( ! $result['ok'] ) {
-			self::render_unsubscribe_page(
-				__( 'Este enlace ya no es válido', 'atora-lms' ),
-				__( 'Puede que haya vencido. Inicia sesión y entra a tus preferencias para hacer el cambio ahí.', 'atora-lms' ),
-				false
-			);
-			exit;
+			return array( 'action' => 'error' );
 		}
 
 		$user_id  = (int) $result['user_id'];
 		$category = (string) $result['category'];
+
+		if ( ! $is_post_confirm ) {
+			// PT-1 (6.5.4): solo mostrar confirmación — el GET no cambia nada.
+			return array( 'action' => 'confirm', 'token' => $token, 'category' => $category );
+		}
 
 		if ( 'all' === $category ) {
 			Preferences::unsubscribe_all( $user_id );
@@ -64,8 +116,44 @@ class Preferences_Shortcode {
 			$body = __( 'Actualizamos tus preferencias para este tipo de aviso.', 'atora-lms' );
 		}
 
-		self::render_unsubscribe_page( __( 'Listo, hecho', 'atora-lms' ), $body, true );
-		exit;
+		return array( 'action' => 'done', 'category' => $category, 'body' => $body );
+	}
+
+	/**
+	 * PT-1 (6.5.4): un solo clic adicional, no un formulario largo —
+	 * mismo token de la URL, pasado como campo oculto.
+	 *
+	 * @param string $token
+	 * @param string $category
+	 * @return void
+	 */
+	private static function render_unsubscribe_confirm_page( string $token, string $category ): void {
+		$label = 'all' === $category
+			? __( 'todos los avisos por WhatsApp, Telegram y correo de notificaciones', 'atora-lms' )
+			: __( 'este tipo de aviso', 'atora-lms' );
+		?><!DOCTYPE html><html <?php language_attributes(); ?>><head><meta charset="<?php bloginfo( 'charset' ); ?>">
+		<meta name="viewport" content="width=device-width,initial-scale=1"><title><?php esc_html_e( 'Confirmar baja', 'atora-lms' ); ?></title></head>
+		<body style="font-family:-apple-system,system-ui,sans-serif;max-width:420px;margin:60px auto;padding:0 20px;text-align:center;color:#0f172a">
+			<div style="font-size:40px">✋</div>
+			<h1 style="font-size:20px"><?php esc_html_e( '¿Confirmar la baja?', 'atora-lms' ); ?></h1>
+			<p style="color:#475569;font-size:14px">
+				<?php
+				printf(
+					/* translators: %s: descripción de lo que se desactiva */
+					esc_html__( 'Vas a dejar de recibir %s.', 'atora-lms' ),
+					esc_html( $label )
+				);
+				?>
+			</p>
+			<form method="post">
+				<input type="hidden" name="atora_unsubscribe" value="<?php echo esc_attr( $token ); ?>">
+				<input type="hidden" name="atora_unsubscribe_confirm" value="1">
+				<button type="submit" style="min-height:44px;padding:0 20px;border-radius:10px;border:0;background:#1d4ed8;color:#fff;font-size:15px;font-weight:700;cursor:pointer">
+					<?php esc_html_e( 'Sí, dar de baja', 'atora-lms' ); ?>
+				</button>
+			</form>
+			<p><a href="<?php echo esc_url( home_url( '/' ) ); ?>" style="color:#1d4ed8"><?php esc_html_e( 'Cancelar y volver al inicio', 'atora-lms' ); ?></a></p>
+		</body></html><?php
 	}
 
 	/**

@@ -354,6 +354,11 @@ if ( file_exists( $preferences_file ) ) {
 	require_once $preferences_file;
 }
 
+$preferences_shortcode_file = __DIR__ . '/../modules/messaging/class-messaging-preferences-shortcode.php';
+if ( file_exists( $preferences_shortcode_file ) ) {
+	require_once $preferences_shortcode_file;
+}
+
 $crm_access_trait_file = __DIR__ . '/../modules/crm/trait-crm-access.php';
 if ( file_exists( $crm_access_trait_file ) ) {
 	require_once $crm_access_trait_file;
