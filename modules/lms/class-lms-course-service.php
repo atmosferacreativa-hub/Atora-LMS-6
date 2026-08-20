@@ -85,7 +85,39 @@ class LMS_Course_Service {
 		);
 	}
 
+	/**
+	 * PT-6 (6.5.5): create() genérico nunca acepta wp_post_id, sin
+	 * importar quién llame ni con qué capability — sigue habiendo un
+	 * solo vínculo permitido con el CPT legado: link_to_legacy_post()
+	 * (o create_from_legacy(), exclusivo del migrador). Antes de este
+	 * sprint, sanitize_course_data() sí lo aceptaba si algún llamador
+	 * interno futuro lo pasara — el endpoint REST ya lo filtraba
+	 * (unset($data['wp_post_id'])) pero eso dependía de que TODO
+	 * llamador hiciera lo mismo; ahora es create() quien lo garantiza,
+	 * en un solo lugar.
+	 *
+	 * @param array $data
+	 * @return int
+	 */
 	public static function create( array $data ): int {
+		unset( $data['wp_post_id'] );
+		return self::insert_course_row( $data );
+	}
+
+	/**
+	 * PT-6 (6.5.5): única vía además de link_to_legacy_post() que
+	 * puede escribir wp_post_id en un INSERT — exclusiva de
+	 * LMS_Migrator, donde wp_post_id es por definición el post legado
+	 * que se está migrando, no un valor de entrada externo/REST.
+	 *
+	 * @param array $data
+	 * @return int
+	 */
+	public static function create_from_legacy( array $data ): int {
+		return self::insert_course_row( $data );
+	}
+
+	private static function insert_course_row( array $data ): int {
 		global $wpdb;
 		$row = self::sanitize_course_data( $data );
 		if ( '' === ( $row['title'] ?? '' ) ) { return 0; }
@@ -94,8 +126,17 @@ class LMS_Course_Service {
 		return $ok ? (int) $wpdb->insert_id : 0;
 	}
 
+	/**
+	 * PT-6 (6.5.5): igual que create() — wp_post_id nunca se acepta
+	 * por esta vía genérica, tampoco en update.
+	 *
+	 * @param int   $course_id
+	 * @param array $data
+	 * @return bool
+	 */
 	public static function update( int $course_id, array $data ): bool {
 		global $wpdb;
+		unset( $data['wp_post_id'] );
 		$row = self::sanitize_course_data( $data );
 		unset( $row['created_at'] );
 		if ( empty( $row ) ) { return false; }
@@ -134,6 +175,24 @@ class LMS_Course_Service {
 
 		if ( ! current_user_can( 'edit_post', $wp_post_id ) ) {
 			return array( 'ok' => false, 'reason' => 'sin_permiso_sobre_el_post' );
+		}
+
+		// PT-6 (6.5.5): antes solo se validaba el lado del post legado
+		// (WP) — un método sin exponer todavía por un endpoint público,
+		// pero seguro-por-diseño de cara a cualquier endpoint futuro:
+		// también se exige permiso para administrar el curso Atora del
+		// otro lado del vínculo, no solo el post de WP. Mismo criterio
+		// jerárquico que LMS_REST_Controller::can_manage_this_course().
+		if ( ! current_user_can( 'manage_options' ) && ! current_user_can( 'edit_others_lm_courses' ) ) {
+			$course = self::get( $course_id );
+			if ( ! $course ) {
+				return array( 'ok' => false, 'reason' => 'curso_inexistente' );
+			}
+			$owns_course = current_user_can( 'clms_manage_courses' )
+				&& (int) ( $course['instructor_id'] ?? 0 ) === get_current_user_id();
+			if ( ! $owns_course ) {
+				return array( 'ok' => false, 'reason' => 'sin_permiso_sobre_el_curso' );
+			}
 		}
 
 		// Defensa en profundidad además del UNIQUE KEY de la tabla —

@@ -182,8 +182,13 @@ class LMSWpPostIdBindingTest extends TestCase {
 	public function test_link_to_legacy_post_succeeds_for_valid_lm_course(): void {
 		atora_test_set_post_type( 800, 'lm_course' );
 		atora_test_set_user_cap( 1, 'edit_post' );
+		// PT-6 (6.5.5): además del permiso sobre el post de WP, ahora
+		// también hace falta permiso sobre el curso Atora — el usuario
+		// debe ser dueño del curso 55 (o tener manage_options/
+		// edit_others_lm_courses).
+		atora_test_set_user_cap( 1, 'clms_manage_courses' );
 		$GLOBALS['__atora_test_current_user_id'] = 1;
-		$original = $this->install_wpdb_fixture();
+		$original = $this->install_wpdb_fixture( 55, 1 );
 
 		$result = \ATORA\LMS\LMS_Course_Service::link_to_legacy_post( 55, 800 );
 
@@ -232,9 +237,12 @@ class LMSWpPostIdBindingTest extends TestCase {
 	public function test_link_to_legacy_post_fails_when_already_linked_to_another_course(): void {
 		atora_test_set_post_type( 800, 'lm_course' );
 		atora_test_set_user_cap( 1, 'edit_post' );
+		atora_test_set_user_cap( 1, 'clms_manage_courses' );
 		$GLOBALS['__atora_test_current_user_id'] = 1;
-		// wp_post_id 800 ya está vinculado al curso 999 (distinto de 55).
-		$original = $this->install_wpdb_fixture( 0, 0, array( 800 => 999 ) );
+		// wp_post_id 800 ya está vinculado al curso 999 (distinto de 55);
+		// el curso 55 sí es del usuario 1, para llegar hasta el chequeo
+		// de unicidad que este test ejercita.
+		$original = $this->install_wpdb_fixture( 55, 1, array( 800 => 999 ) );
 
 		$result = \ATORA\LMS\LMS_Course_Service::link_to_legacy_post( 55, 800 );
 
@@ -243,6 +251,110 @@ class LMSWpPostIdBindingTest extends TestCase {
 
 		global $wpdb;
 		$this->assertSame( array(), $wpdb->last_update_data );
+
+		$this->restore_wpdb( $original );
+	}
+
+	/**
+	 * PT-6 (6.5.5): un instructor con permiso sobre el post de WP pero
+	 * SIN ser dueño del curso Atora (ni con edit_others_lm_courses/
+	 * manage_options) no debe poder vincularlo — el gate anterior solo
+	 * validaba el lado del post; ahora exige ambos lados.
+	 *
+	 * @test
+	 */
+	public function test_link_to_legacy_post_fails_without_permission_over_the_atora_course(): void {
+		atora_test_set_post_type( 800, 'lm_course' );
+		atora_test_set_user_cap( 1, 'edit_post' );
+		atora_test_set_user_cap( 1, 'clms_manage_courses' );
+		$GLOBALS['__atora_test_current_user_id'] = 1;
+		// El curso 55 pertenece al usuario 2, no al usuario 1.
+		$original = $this->install_wpdb_fixture( 55, 2 );
+
+		$result = \ATORA\LMS\LMS_Course_Service::link_to_legacy_post( 55, 800 );
+
+		$this->assertFalse( $result['ok'] );
+		$this->assertSame( 'sin_permiso_sobre_el_curso', $result['reason'] );
+
+		global $wpdb;
+		$this->assertSame( array(), $wpdb->last_update_data, 'no debe escribir nada sin permiso sobre el curso' );
+
+		$this->restore_wpdb( $original );
+	}
+
+	/**
+	 * PT-6 (6.5.5): edit_others_lm_courses basta para vincular
+	 * cualquier curso, sin ser su dueño — mismo criterio jerárquico que
+	 * el resto del REST controller.
+	 *
+	 * @test
+	 */
+	public function test_link_to_legacy_post_succeeds_with_edit_others_lm_courses_regardless_of_ownership(): void {
+		atora_test_set_post_type( 800, 'lm_course' );
+		atora_test_set_user_cap( 1, 'edit_post' );
+		atora_test_set_user_cap( 1, 'edit_others_lm_courses' );
+		$GLOBALS['__atora_test_current_user_id'] = 1;
+		$original = $this->install_wpdb_fixture( 55, 2 ); // dueño real: 2.
+
+		$result = \ATORA\LMS\LMS_Course_Service::link_to_legacy_post( 55, 800 );
+
+		$this->assertTrue( $result['ok'] );
+
+		$this->restore_wpdb( $original );
+	}
+
+	// ── create() / create_from_legacy() ─────────────────────────────────────
+
+	/**
+	 * PT-6 (6.5.5): create() genérico nunca acepta wp_post_id, ni
+	 * siquiera si un llamador interno (no REST) lo pasara directamente
+	 * — antes sanitize_course_data() sí lo aceptaba, dependiendo de que
+	 * cada llamador filtrara el campo por su cuenta.
+	 *
+	 * @test
+	 */
+	public function test_create_strips_wp_post_id_when_called_directly_on_the_service(): void {
+		$original = $this->install_wpdb_fixture();
+
+		\ATORA\LMS\LMS_Course_Service::create( array( 'title' => 'Curso directo', 'wp_post_id' => 4242 ) );
+
+		global $wpdb;
+		$this->assertArrayNotHasKey( 'wp_post_id', $wpdb->last_insert_data, 'create() debe descartar wp_post_id sin importar el llamador' );
+
+		$this->restore_wpdb( $original );
+	}
+
+	/**
+	 * PT-6 (6.5.5): create_from_legacy() —exclusiva del migrador— sí
+	 * debe poder escribir wp_post_id, porque ahí representa el post
+	 * legado que efectivamente se está migrando.
+	 *
+	 * @test
+	 */
+	public function test_create_from_legacy_allows_wp_post_id(): void {
+		$original = $this->install_wpdb_fixture();
+
+		\ATORA\LMS\LMS_Course_Service::create_from_legacy( array( 'title' => 'Curso migrado', 'wp_post_id' => 4242 ) );
+
+		global $wpdb;
+		$this->assertSame( 4242, $wpdb->last_insert_data['wp_post_id'] ?? null );
+
+		$this->restore_wpdb( $original );
+	}
+
+	/**
+	 * PT-6 (6.5.5): update() también descarta wp_post_id sin importar
+	 * el llamador, no solo a través del REST controller.
+	 *
+	 * @test
+	 */
+	public function test_update_strips_wp_post_id_when_called_directly_on_the_service(): void {
+		$original = $this->install_wpdb_fixture( 55, 2 );
+
+		\ATORA\LMS\LMS_Course_Service::update( 55, array( 'title' => 'x', 'wp_post_id' => 999 ) );
+
+		global $wpdb;
+		$this->assertArrayNotHasKey( 'wp_post_id', $wpdb->last_update_data );
 
 		$this->restore_wpdb( $original );
 	}

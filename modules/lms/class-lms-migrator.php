@@ -219,7 +219,11 @@ class LMS_Migrator {
 				'level'         => $level_terms[0] ?? 'beginner',
 			);
 
-			$id = LMS_Course_Service::create( $data );
+			// PT-6 (6.5.5): create() genérico ya no acepta wp_post_id bajo
+			// ninguna circunstancia — el migrador usa la vía explícita
+			// para contenido legado, donde wp_post_id es por definición
+			// el post que se está migrando.
+			$id = LMS_Course_Service::create_from_legacy( $data );
 			if ( $id ) {
 				$migrated++;
 				self::migrate_lessons_for_course( $post_id, $id );
