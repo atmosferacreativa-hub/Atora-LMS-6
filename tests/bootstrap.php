@@ -71,6 +71,11 @@ if ( ! function_exists( 'sanitize_email' ) )   { function sanitize_email( $s ): 
 if ( ! function_exists( 'sanitize_key' ) )     { function sanitize_key( $s ): string { return strtolower( preg_replace( '/[^a-z0-9_\-]/i', '', (string) $s ) ); } }
 if ( ! function_exists( 'esc_url_raw' ) )      { function esc_url_raw( $s ): string { return filter_var( (string) $s, FILTER_SANITIZE_URL ) ?: ''; } }
 if ( ! function_exists( 'wp_json_encode' ) )   { function wp_json_encode( $d ): string { return (string) json_encode( $d ); } }
+if ( ! function_exists( 'wp_unslash' ) ) {
+	function wp_unslash( $value ) {
+		return is_array( $value ) ? array_map( 'wp_unslash', $value ) : ( is_string( $value ) ? stripslashes( $value ) : $value );
+	}
+}
 if ( ! function_exists( 'current_time' ) )     { function current_time( string $t, bool $gmt = false ): string { return date( 'Y-m-d H:i:s' ); } }
 $GLOBALS['__atora_test_current_user_id'] = 1;
 if ( ! function_exists( 'get_current_user_id' ) ) {
@@ -125,6 +130,11 @@ if ( ! function_exists( 'delete_user_meta' ) ) {
 }
 if ( ! function_exists( 'atora_test_reset_user_meta' ) ) {
 	function atora_test_reset_user_meta(): void { $GLOBALS['__atora_test_user_meta'] = array(); }
+}
+if ( ! function_exists( 'get_userdata' ) ) {
+	function get_userdata( int $id ) {
+		return (object) array( 'ID' => $id, 'display_name' => 'Test User ' . $id, 'user_email' => 'user' . $id . '@example.test' );
+	}
 }
 $GLOBALS['__atora_test_user_caps'] = array();
 if ( ! function_exists( 'user_can' ) ) {

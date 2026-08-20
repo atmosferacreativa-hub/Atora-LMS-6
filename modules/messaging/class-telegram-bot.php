@@ -248,9 +248,48 @@ class Telegram_Bot {
 			wp_send_json_error( array( 'message' => __( 'Código inválido o expirado.', 'atora-lms' ) ) );
 		}
 
+		// PT-4 (6.5.5): un chat_id no puede quedar vinculado a dos
+		// cuentas de WP a la vez — antes update_user_meta() sobrescribía
+		// silenciosamente cualquier vínculo anterior de OTRO usuario a
+		// este mismo chat_id (usermeta no tiene una restricción UNIQUE
+		// nativa sobre meta_value). Política explícita: si el chat ya
+		// pertenece a otra cuenta, se rechaza — nunca se transfiere
+		// solo. Mismo usuario reintentando su propio chat_id es
+		// idempotente (éxito, sin duplicar nada).
+		//
+		// Concurrencia: dos solicitudes de vinculación simultáneas para
+		// el mismo chat_id, de usuarios distintos, podrían en teoría
+		// pasar ambas esta comprobación antes de que cualquiera escriba
+		// — el modelo usermeta no ofrece una restricción UNIQUE a nivel
+		// de BD para cerrar esa ventana por completo (limitación
+		// documentada en SECURITY-AUDIT.md). El candado corto de abajo
+		// (transient) es mitigación de mejor esfuerzo, no una garantía
+		// atómica — reduce la ventana de carrera a la práctica sin
+		// requerir una tabla nueva solo para esto.
+		$lock_key = 'atora_tg_link_lock_' . md5( $chat_id );
+		if ( get_transient( $lock_key ) ) {
+			wp_send_json_error( array( 'message' => __( 'Ese chat ya está siendo vinculado, intenta de nuevo en unos segundos.', 'atora-lms' ) ) );
+		}
+		set_transient( $lock_key, 1, 10 );
+
+		$existing_user_id = self::get_user_by_chat( $chat_id );
+
+		if ( $existing_user_id && $existing_user_id === $user_id ) {
+			delete_transient( 'atora_tg_link_' . $code );
+			delete_transient( $lock_key );
+			self::reset_link_attempts( $user_id );
+			wp_send_json_success( array( 'message' => __( 'Esta cuenta ya estaba vinculada con este chat de Telegram.', 'atora-lms' ) ) );
+		}
+
+		if ( $existing_user_id && $existing_user_id !== $user_id ) {
+			delete_transient( $lock_key );
+			wp_send_json_error( array( 'message' => __( 'Este chat de Telegram ya está vinculado a otra cuenta. Desvincúlalo primero para poder usarlo aquí.', 'atora-lms' ) ) );
+		}
+
 		self::reset_link_attempts( $user_id );
 		update_user_meta( $user_id, 'atora_telegram_chat_id', $chat_id );
 		delete_transient( 'atora_tg_link_' . $code );
+		delete_transient( $lock_key );
 
 		self::api_send_message(
 			$chat_id,
