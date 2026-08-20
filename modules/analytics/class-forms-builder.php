@@ -189,8 +189,24 @@ class Forms_Builder {
 	 *
 	 * @return void
 	 */
+	/** PT-5.1 (6.5.4): envíos por IP por formulario permitidos dentro de la ventana, si el formulario no fija su propio `throttle_per_15min` en el schema. */
+	const DEFAULT_THROTTLE_LIMIT = 10;
+	const THROTTLE_WINDOW_MINUTES = 15;
+
 	public static function handle_submit(): void {
 		$form_id = absint( wp_unslash( $_POST['form_id'] ?? 0 ) );
+
+		// PT-5.1 (6.5.4): antes que nada — nonce y honeypot no bastan
+		// contra un script que obtiene el nonce de la página pública
+		// una vez y lo reutiliza en envíos repetidos (los nonces de WP
+		// no son de un solo uso). Se cuenta el intento aunque el resto
+		// de la validación falle después (regla 5.3: el throttle cuenta
+		// envíos que llegan al servidor, no solo los exitosos).
+		if ( self::is_throttled( $form_id ) ) {
+			// PT-5.2: mensaje genérico — no revela el límite exacto,
+			// para no ayudar a calibrar el ataque.
+			wp_send_json_error( array( 'message' => __( 'Demasiados envíos, intenta más tarde.', 'atora-lms' ) ) );
+		}
 
 		if ( ! wp_verify_nonce(
 			sanitize_text_field( wp_unslash( $_POST['atora_form_nonce'] ?? '' ) ),
@@ -241,6 +257,66 @@ class Forms_Builder {
 
 		$success_message = sanitize_text_field( $schema['success_message'] ?? __( '¡Gracias! Tu mensaje fue enviado.', 'atora-lms' ) );
 		wp_send_json_success( array( 'message' => $success_message ) );
+	}
+
+	/**
+	 * PT-5.1 (6.5.4): tope por IP por formulario en la ventana de 15
+	 * minutos — configurable por formulario vía `throttle_per_15min`
+	 * en el schema JSON (mismo campo flexible donde ya viven
+	 * `success_message`/`notify_admin`, sin pantalla nueva). Mismo
+	 * mecanismo de contador por transient que ya usa
+	 * ATORA_API_Key_Service::validate() para el rate limit de API
+	 * keys — no había un helper de throttling extraído para reutilizar
+	 * directamente (cada caso construye su propia clave), así que se
+	 * sigue el mismo patrón en vez de inventar uno nuevo.
+	 *
+	 * Regla 5.3: si no se puede determinar la IP, no se bloquea — sin
+	 * IP no hay una clave de conteo confiable, y el nonce + honeypot
+	 * ya filtran buena parte del spam trivial de todos modos.
+	 *
+	 * @param int $form_id
+	 * @return bool
+	 */
+	private static function is_throttled( int $form_id ): bool {
+		$ip = self::get_client_ip();
+		if ( '' === $ip ) {
+			return false;
+		}
+
+		$schema = json_decode( (string) get_post_meta( $form_id, 'atora_form_schema', true ), true );
+		$limit  = max( 1, absint( $schema['throttle_per_15min'] ?? self::DEFAULT_THROTTLE_LIMIT ) );
+
+		$key   = 'atora_form_rl_' . $form_id . '_' . md5( $ip );
+		$count = (int) get_transient( $key );
+
+		if ( $count >= $limit ) {
+			return true;
+		}
+
+		set_transient( $key, $count + 1, self::THROTTLE_WINDOW_MINUTES * MINUTE_IN_SECONDS );
+		return false;
+	}
+
+	/**
+	 * Misma lógica de cabeceras de confianza que ya usan
+	 * Extended_Registration::get_client_ip() y
+	 * Affiliate_Tracker::get_ip() en otros módulos — sin un helper
+	 * compartido hoy, se replica el patrón en vez de exponer uno de
+	 * esos métodos privados fuera de su clase.
+	 *
+	 * @return string
+	 */
+	private static function get_client_ip(): string {
+		$headers = array( 'HTTP_X_FORWARDED_FOR', 'HTTP_CLIENT_IP', 'REMOTE_ADDR' );
+		foreach ( $headers as $header ) {
+			if ( ! empty( $_SERVER[ $header ] ) ) {
+				$ip = trim( explode( ',', sanitize_text_field( wp_unslash( $_SERVER[ $header ] ) ) )[0] );
+				if ( filter_var( $ip, FILTER_VALIDATE_IP ) ) {
+					return $ip;
+				}
+			}
+		}
+		return '';
 	}
 
 	/**

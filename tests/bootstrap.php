@@ -369,6 +369,11 @@ if ( file_exists( $telegram_bot_file ) ) {
 	require_once $telegram_bot_file;
 }
 
+$forms_builder_file = __DIR__ . '/../modules/analytics/class-forms-builder.php';
+if ( file_exists( $forms_builder_file ) ) {
+	require_once $forms_builder_file;
+}
+
 $crm_access_trait_file = __DIR__ . '/../modules/crm/trait-crm-access.php';
 if ( file_exists( $crm_access_trait_file ) ) {
 	require_once $crm_access_trait_file;
