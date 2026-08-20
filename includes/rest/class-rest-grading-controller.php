@@ -222,7 +222,7 @@ class CLMS_REST_Grading_Controller {
 		}
 		$record = $loop->get_tracking_record( $tracking_id );
 
-		if ( ! $record ) {
+		if ( ! $record || ! self::tracking_record_is_visible( $record ) ) {
 			return new WP_Error( 'not_found', __( 'Tracking no encontrado.', 'atora-lms' ), array( 'status' => 404 ) );
 		}
 
@@ -294,6 +294,12 @@ class CLMS_REST_Grading_Controller {
 		if ( ! $loop ) {
 			return new WP_Error( 'feedback_loop_unavailable', __( 'El servicio de retroalimentación no está disponible.', 'atora-lms' ), array( 'status' => 500 ) );
 		}
+
+		$record = $loop->get_tracking_record( $tracking_id );
+		if ( ! $record || ! self::tracking_record_is_visible( $record ) ) {
+			return new WP_Error( 'update_failed', __( 'No se pudo actualizar el progreso. Verifica el tracking_id.', 'atora-lms' ), array( 'status' => 404 ) );
+		}
+
 		$updated = $loop->update_progress(
 			$tracking_id,
 			$event_type,
@@ -356,6 +362,24 @@ class CLMS_REST_Grading_Controller {
 	 */
 	public function can_access_logged_in( WP_REST_Request $request ) {
 		return $this->permissions->can_access_logged_in();
+	}
+
+	/**
+	 * PT-9 (6.5.5, hallazgo del barrido P8/P9): get_action_plan()/
+	 * record_progress_event() solo exigían estar logueado — cualquier
+	 * usuario autenticado podía leer o mutar el tracking de progreso de
+	 * OTRO alumno con solo conocer su tracking_id. Mitigado en la
+	 * práctica por ser un UUIDv4 (no enumerable), pero el chequeo de
+	 * dueño faltaba igual — se agrega en defensa en profundidad.
+	 *
+	 * @param array $record Fila de tracking ya obtenida.
+	 * @return bool
+	 */
+	private static function tracking_record_is_visible( array $record ): bool {
+		if ( current_user_can( 'manage_options' ) || current_user_can( 'edit_others_lm_courses' ) ) {
+			return true;
+		}
+		return absint( $record['student_id'] ?? 0 ) === get_current_user_id();
 	}
 
 	/**
