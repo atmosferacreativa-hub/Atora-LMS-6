@@ -485,6 +485,17 @@ trait CLMS_Metabox_Course_Enrollment_Ajax_Trait {
 			wp_send_json_error( __( 'Curso inválido.', 'atora-lms' ) );
 		}
 
+		// PT-9 (6.5.5): la comprobación de arriba solo exige la
+		// capability genérica clms_manage_courses — sin esto, cualquier
+		// instructor podía matricular usuarios en un curso que no le
+		// pertenece. Mismo criterio jerárquico que
+		// LMS_REST_Controller::can_manage_this_course().
+		if ( ! current_user_can( 'manage_options' ) && ! current_user_can( 'edit_others_lm_courses' )
+			&& (int) get_post_field( 'post_author', $course_id ) !== get_current_user_id()
+		) {
+			wp_send_json_error( __( 'Sin permisos sobre este curso.', 'atora-lms' ) );
+		}
+
 		// Find user by email or login
 		$user = get_user_by( 'email', $user_login );
 		if ( ! $user ) {
@@ -525,6 +536,15 @@ trait CLMS_Metabox_Course_Enrollment_Ajax_Trait {
 
 		if ( ! $course_id || ! $user_id ) {
 			wp_send_json_error( __( 'Datos inválidos.', 'atora-lms' ) );
+		}
+
+		// PT-9 (6.5.5): igual que ajax_enroll_user() — sin esto,
+		// cualquier instructor con clms_manage_courses podía desmatricular
+		// usuarios de un curso ajeno.
+		if ( ! current_user_can( 'manage_options' ) && ! current_user_can( 'edit_others_lm_courses' )
+			&& (int) get_post_field( 'post_author', $course_id ) !== get_current_user_id()
+		) {
+			wp_send_json_error( __( 'Sin permisos sobre este curso.', 'atora-lms' ) );
 		}
 
 		// Remove from user meta

@@ -457,6 +457,15 @@ trait CLMS_Metabox_Program_Enrollment_Ajax_Trait {
 			wp_send_json_error( __( 'Programa inválido.', 'atora-lms' ) );
 		}
 
+		// PT-9 (6.5.5): sin esto, cualquier instructor con
+		// clms_manage_courses podía matricular usuarios en un programa
+		// que no le pertenece.
+		if ( ! current_user_can( 'manage_options' ) && ! current_user_can( 'edit_others_lm_courses' )
+			&& (int) get_post_field( 'post_author', $program_id ) !== get_current_user_id()
+		) {
+			wp_send_json_error( __( 'Sin permisos sobre este programa.', 'atora-lms' ) );
+		}
+
 		$user = get_user_by( 'email', $user_login );
 		if ( ! $user ) {
 			$user = get_user_by( 'login', $user_login );
@@ -521,6 +530,13 @@ trait CLMS_Metabox_Program_Enrollment_Ajax_Trait {
 			wp_send_json_error( __( 'Datos inválidos.', 'atora-lms' ) );
 		}
 
+		// PT-9 (6.5.5): igual que ajax_enroll_user_program().
+		if ( ! current_user_can( 'manage_options' ) && ! current_user_can( 'edit_others_lm_courses' )
+			&& (int) get_post_field( 'post_author', $program_id ) !== get_current_user_id()
+		) {
+			wp_send_json_error( __( 'Sin permisos sobre este programa.', 'atora-lms' ) );
+		}
+
 		// Quitar programa del usuario
 		$user_programs = (array) get_user_meta( $user_id, CLMS_Helper::USER_ENROLLED_PROGRAMS_META, true );
 		$user_programs = array_values( array_diff( array_map( 'absint', $user_programs ), array( $program_id ) ) );
@@ -555,6 +571,15 @@ trait CLMS_Metabox_Program_Enrollment_Ajax_Trait {
 
 		if ( ! $program_id || 'lm_program' !== get_post_type( $program_id ) ) {
 			wp_send_json_error( __( 'Programa inválido.', 'atora-lms' ) );
+		}
+
+		// PT-9 (6.5.5): igual que ajax_enroll_user_program() — sin esto,
+		// un instructor podía importar un CSV completo de alumnos a un
+		// programa ajeno.
+		if ( ! current_user_can( 'manage_options' ) && ! current_user_can( 'edit_others_lm_courses' )
+			&& (int) get_post_field( 'post_author', $program_id ) !== get_current_user_id()
+		) {
+			wp_send_json_error( __( 'Sin permisos sobre este programa.', 'atora-lms' ) );
 		}
 
 		if ( empty( $_FILES['csv_file']['tmp_name'] ) ) {
@@ -986,6 +1011,14 @@ trait CLMS_Metabox_Program_Enrollment_Ajax_Trait {
 
 		if ( ! $program_id || 'lm_program' !== get_post_type( $program_id ) ) {
 			wp_send_json_error( __( 'Programa inválido.', 'atora-lms' ) );
+		}
+
+		// PT-9 (6.5.5): sin esto, un instructor podía re-vincular el
+		// producto de WooCommerce de un programa ajeno.
+		if ( ! current_user_can( 'manage_options' ) && ! current_user_can( 'edit_others_lm_courses' )
+			&& (int) get_post_field( 'post_author', $program_id ) !== get_current_user_id()
+		) {
+			wp_send_json_error( __( 'Sin permisos sobre este programa.', 'atora-lms' ) );
 		}
 
 		update_post_meta( $program_id, '_clms_program_linked_product_id', $product_id );

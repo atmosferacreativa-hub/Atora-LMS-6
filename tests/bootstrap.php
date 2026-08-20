@@ -217,6 +217,18 @@ if ( ! function_exists( 'atora_test_set_post_meta' ) ) {
 		$GLOBALS['__atora_test_post_meta'][ $post_id ][ $key ] = $value;
 	}
 }
+if ( ! function_exists( 'update_post_meta' ) ) {
+	function update_post_meta( int $post_id, string $key, $value ): bool {
+		$GLOBALS['__atora_test_post_meta'][ $post_id ][ $key ] = $value;
+		return true;
+	}
+}
+if ( ! function_exists( 'delete_post_meta' ) ) {
+	function delete_post_meta( int $post_id, string $key ): bool {
+		unset( $GLOBALS['__atora_test_post_meta'][ $post_id ][ $key ] );
+		return true;
+	}
+}
 if ( ! function_exists( 'atora_test_reset_post_meta' ) ) {
 	function atora_test_reset_post_meta(): void { $GLOBALS['__atora_test_post_meta'] = array(); }
 }
