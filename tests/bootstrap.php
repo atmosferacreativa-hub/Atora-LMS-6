@@ -331,6 +331,24 @@ if ( ! function_exists( 'atora_test_reset_nonces' ) ) {
 	function atora_test_reset_nonces(): void { $GLOBALS['__atora_test_valid_nonces'] = array(); }
 }
 
+// PT-3 (6.5.5): passwords de enlace de acceso — hash simulado estable
+// (no bcrypt real, no hace falta para probar la lógica de rate limit).
+if ( ! function_exists( 'wp_hash_password' ) ) {
+	function wp_hash_password( string $password ): string { return 'hashed:' . $password; }
+}
+if ( ! function_exists( 'wp_check_password' ) ) {
+	function wp_check_password( string $password, string $hash, $user_id = '' ): bool { return $hash === 'hashed:' . $password; }
+}
+if ( ! function_exists( 'check_ajax_referer' ) ) {
+	function check_ajax_referer( $action = -1, $query_arg = false, $die = true ) { return 1; }
+}
+if ( ! function_exists( 'add_action' ) ) {
+	function add_action( $hook, $cb, $priority = 10, $args = 1 ): bool { return true; }
+}
+if ( ! function_exists( 'add_filter' ) ) {
+	function add_filter( $hook, $cb, $priority = 10, $args = 1 ): bool { return true; }
+}
+
 // Cargar servicios bajo test
 $services_dir = __DIR__ . '/../modules/crm-v2/services/';
 foreach ( array(
@@ -433,6 +451,11 @@ if ( file_exists( $mcp_api_key_service_file ) ) {
 $mcp_module_file = __DIR__ . '/../modules/mcp/class-mcp-module.php';
 if ( file_exists( $mcp_module_file ) ) {
 	require_once $mcp_module_file;
+}
+
+$enrollment_manager_file = __DIR__ . '/../includes/class-enrollment-manager.php';
+if ( file_exists( $enrollment_manager_file ) ) {
+	require_once $enrollment_manager_file;
 }
 
 $v5_installer_file = __DIR__ . '/../modules/class-v5-installer.php';

@@ -130,9 +130,26 @@ trait CLMS_Enrollment_Manager_Access_Enrollment_Trait {
 		}
 
 		if ( $row->access_mode === self::LINK_PASSWORD ) {
+			// PT-3 (6.5.5): wp_check_password() por sí solo no limita
+			// intentos — un usuario autenticado con acceso al link podía
+			// probar contraseñas indefinidamente. Contador por
+			// usuario+token (nunca solo por IP, para no bloquear a otros
+			// usuarios detrás de la misma IP ni depender de una señal
+			// falsificable): 5 intentos fallidos por 15 minutos, se
+			// limpia en el primer acierto.
+			$lock_key = 'clms_access_pw_attempts_' . $user_id . '_' . md5( $token );
+			$attempts = (int) get_transient( $lock_key );
+
+			if ( $attempts >= 5 ) {
+				return new WP_Error( 'too_many_attempts', __( 'Demasiados intentos. Intenta de nuevo más tarde.', 'atora-lms' ) );
+			}
+
 			if ( ! wp_check_password( $password_attempt, $row->access_password ) ) {
+				set_transient( $lock_key, $attempts + 1, 15 * MINUTE_IN_SECONDS );
 				return new WP_Error( 'wrong_password', __( 'Contraseña incorrecta.', 'atora-lms' ) );
 			}
+
+			delete_transient( $lock_key );
 		}
 
 		if ( class_exists( 'CLMS_Helper' ) && CLMS_Helper::user_is_enrolled_in_course( $user_id, $row->course_id ) ) {
