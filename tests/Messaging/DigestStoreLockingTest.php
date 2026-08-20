@@ -42,7 +42,7 @@ class DigestStoreLockingTest extends TestCase {
 				}, $sql );
 			}
 
-			public function seed( int $user_id, string $status = 'pending', string $created_at = '', ?string $claimed_at = null ): int {
+			public function seed( int $user_id, string $status = 'pending', string $created_at = '', ?string $claimed_at = null, ?string $claim_token = null ): int {
 				$id = $this->next_id++;
 				$this->rows[ $id ] = array(
 					'id'           => $id,
@@ -52,6 +52,7 @@ class DigestStoreLockingTest extends TestCase {
 					'variables'    => wp_json_encode( array( 'lesson_title' => 'Lección ' . $id ) ),
 					'status'       => $status,
 					'claimed_at'   => $claimed_at,
+					'claim_token'  => $claim_token,
 					'created_at'   => $created_at ?: current_time( 'mysql', true ),
 				);
 				return $id;
@@ -96,11 +97,11 @@ class DigestStoreLockingTest extends TestCase {
 			}
 
 			public function get_results( $sql, $output = 'ARRAY_A' ) {
-				if ( preg_match( "/user_id = (\d+) AND status = 'claimed' AND claimed_at = (.+?) ORDER BY/", $sql, $m ) ) {
+				if ( preg_match( "/user_id = (\d+) AND status = 'claimed' AND claim_token = (.+?) ORDER BY/", $sql, $m ) ) {
 					$uid = (int) $m[1];
-					$claimed_at = trim( $m[2] );
-					return array_values( array_filter( $this->rows, static function( $r ) use ( $uid, $claimed_at ) {
-						return $r['user_id'] === $uid && 'claimed' === $r['status'] && $r['claimed_at'] === $claimed_at;
+					$claim_token = trim( $m[2] );
+					return array_values( array_filter( $this->rows, static function( $r ) use ( $uid, $claim_token ) {
+						return $r['user_id'] === $uid && 'claimed' === $r['status'] && $r['claim_token'] === $claim_token;
 					} ) );
 				}
 				if ( preg_match( '/user_id = (\d+) ORDER BY id ASC/', $sql, $m ) ) {
@@ -133,26 +134,28 @@ class DigestStoreLockingTest extends TestCase {
 			}
 
 			public function query( $sql ) {
-				if ( false !== strpos( $sql, "SET status = 'pending', claimed_at = NULL WHERE status = 'claimed' AND claimed_at <" ) ) {
+				if ( false !== strpos( $sql, "SET status = 'pending', claimed_at = NULL, claim_token = NULL WHERE status = 'claimed' AND claimed_at <" ) ) {
 					preg_match( "/claimed_at < (.+)$/", $sql, $m );
 					$threshold = trim( $m[1] );
 					$count = 0;
 					foreach ( $this->rows as $id => $row ) {
 						if ( 'claimed' === $row['status'] && $row['claimed_at'] < $threshold ) {
-							$this->rows[ $id ]['status']     = 'pending';
-							$this->rows[ $id ]['claimed_at'] = null;
+							$this->rows[ $id ]['status']      = 'pending';
+							$this->rows[ $id ]['claimed_at']  = null;
+							$this->rows[ $id ]['claim_token'] = null;
 							$count++;
 						}
 					}
 					return $count;
 				}
-				if ( false !== strpos( $sql, "SET status = 'pending', claimed_at = NULL WHERE id IN" ) ) {
+				if ( false !== strpos( $sql, "SET status = 'pending', claimed_at = NULL, claim_token = NULL WHERE id IN" ) ) {
 					preg_match( '/WHERE id IN \(([\d,]+)\)/', $sql, $m );
 					$ids = array_map( 'intval', explode( ',', $m[1] ?? '' ) );
 					foreach ( $ids as $id ) {
 						if ( isset( $this->rows[ $id ] ) ) {
-							$this->rows[ $id ]['status']     = 'pending';
-							$this->rows[ $id ]['claimed_at'] = null;
+							$this->rows[ $id ]['status']      = 'pending';
+							$this->rows[ $id ]['claimed_at']  = null;
+							$this->rows[ $id ]['claim_token'] = null;
 						}
 					}
 					return count( $ids );
@@ -282,6 +285,45 @@ class DigestStoreLockingTest extends TestCase {
 			'no debe crecer más allá del tope — se descarta lo más viejo al insertar'
 		);
 		$this->assertArrayNotHasKey( 1, $wpdb->rows, 'la fila más vieja (id 1) debe haberse descartado' );
+
+		$this->restore_wpdb( $original );
+	}
+
+	/**
+	 * PT-2 (6.5.5): dos reclamos que caen en el mismo segundo
+	 * (claimed_at idéntico) no deben poder leerse cruzados — el
+	 * criterio de lectura es claim_token, no claimed_at. Se siembra a
+	 * mano una fila "de otro worker" con el mismo claimed_at que la
+	 * fila recién reclamada por este, para simular la colisión de
+	 * precisión de 1 segundo que el hallazgo original describía.
+	 *
+	 * @test
+	 */
+	public function test_same_second_claims_are_not_cross_selected_by_token(): void {
+		$original = $this->install_wpdb_fixture();
+		global $wpdb;
+
+		$own_id = $wpdb->seed( 16, 'pending' );
+		$claimed = \ATORA\Messaging\Digest_Store::claim_items_for_user( 16 );
+		$this->assertCount( 1, $claimed );
+
+		$same_second = $wpdb->rows[ $own_id ]['claimed_at'];
+
+		// Fila "de otro worker": mismo claimed_at, mismo user_id (podría
+		// ser un run posterior tras liberarse), pero un claim_token
+		// distinto — nunca debe aparecer en una lectura por token ajena.
+		$foreign_id = $wpdb->seed( 16, 'claimed', '', $same_second, 'foreign-worker-token' );
+
+		// Reproduce la consulta antigua (por claimed_at) para confirmar
+		// que el hallazgo era real: habría devuelto AMBAS filas.
+		$by_claimed_at = array_values( array_filter( $wpdb->rows, static function ( $r ) use ( $same_second ) {
+			return 16 === $r['user_id'] && 'claimed' === $r['status'] && $r['claimed_at'] === $same_second;
+		} ) );
+		$this->assertCount( 2, $by_claimed_at, 'filtrar solo por claimed_at sí mezclaría ambas filas (el bug que se corrige)' );
+
+		// La propia fila reclamada por este worker sigue teniendo su
+		// propio claim_token, distinto del de la fila "foránea".
+		$this->assertNotSame( 'foreign-worker-token', $wpdb->rows[ $own_id ]['claim_token'] );
 
 		$this->restore_wpdb( $original );
 	}

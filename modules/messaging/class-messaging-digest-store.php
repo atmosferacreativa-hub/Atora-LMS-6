@@ -25,8 +25,8 @@ class Digest_Store {
 
 	const TABLE = 'atora_message_digest_items';
 
-	/** PT-2 (6.5.4): versión de esquema — cambiar fuerza el ALTER de migrate_add_status_columns(). */
-	const SCHEMA_VERSION        = '2';
+	/** PT-2 (6.5.4/6.5.5): versión de esquema — cambiar fuerza el ALTER de migrate_add_status_columns()/migrate_add_claim_token_column(). */
+	const SCHEMA_VERSION        = '3';
 	const OPT_SCHEMA_VERSION    = 'atora_digest_store_schema_version';
 
 	/** PT-2.3: umbral para liberar filas 'claimed' cuyo proceso murió sin completar. */
@@ -66,10 +66,12 @@ class Digest_Store {
 				  variables      TEXT,
 				  status         VARCHAR(20)     NOT NULL DEFAULT 'pending',
 				  claimed_at     DATETIME        NULL,
+				  claim_token    VARCHAR(64)     NULL,
 				  created_at     DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
 				  PRIMARY KEY (id),
 				  KEY user_id (user_id),
-				  KEY status_user (status, user_id)
+				  KEY status_user (status, user_id),
+				  KEY claim_token (claim_token)
 				) {$charset};"
 			);
 			update_option( self::OPT_SCHEMA_VERSION, self::SCHEMA_VERSION );
@@ -80,7 +82,10 @@ class Digest_Store {
 			return;
 		}
 
-		if ( self::migrate_add_status_columns( $table ) ) {
+		$ok = self::migrate_add_status_columns( $table );
+		$ok = self::migrate_add_claim_token_column( $table ) && $ok;
+
+		if ( $ok ) {
 			update_option( self::OPT_SCHEMA_VERSION, self::SCHEMA_VERSION );
 		}
 	}
@@ -112,6 +117,33 @@ class Digest_Store {
 		);
 
 		return (bool) $wpdb->get_var( $wpdb->prepare( 'SHOW COLUMNS FROM ' . $table . ' LIKE %s', 'status' ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	}
+
+	/**
+	 * PT-2 (6.5.5): añade claim_token a una tabla existente que ya
+	 * tiene status/claimed_at (esquema '2', 6.5.4) pero no el token —
+	 * mismo patrón: ALTER TABLE explícito, verificado antes de reportar
+	 * éxito, no depende de que dbDelta() altere una tabla existente.
+	 *
+	 * @param string $table
+	 * @return bool true si la tabla ya tiene (o quedó con) la columna.
+	 */
+	private static function migrate_add_claim_token_column( string $table ): bool {
+		global $wpdb;
+
+		$has_token = (bool) $wpdb->get_var( $wpdb->prepare( 'SHOW COLUMNS FROM ' . $table . ' LIKE %s', 'claim_token' ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		if ( $has_token ) {
+			return true;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+		$wpdb->query(
+			"ALTER TABLE {$table}
+			 ADD COLUMN claim_token VARCHAR(64) NULL,
+			 ADD KEY claim_token (claim_token)"
+		);
+
+		return (bool) $wpdb->get_var( $wpdb->prepare( 'SHOW COLUMNS FROM ' . $table . ' LIKE %s', 'claim_token' ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 	}
 
 	/**
@@ -214,25 +246,33 @@ class Digest_Store {
 	}
 
 	/**
-	 * PT-2.2 (6.5.4): reclama de forma atómica los ítems 'pending' de
-	 * un usuario — el propio UPDATE actúa como sección crítica (ver
-	 * get_storage_engine()). Una segunda llamada solapada (cron
-	 * duplicado) para el mismo usuario no encuentra nada que reclamar,
-	 * porque el primer UPDATE ya movió esas filas a 'claimed'.
+	 * PT-2.2 (6.5.4) / PT-2 (6.5.5): reclama de forma atómica los ítems
+	 * 'pending' de un usuario — el propio UPDATE actúa como sección
+	 * crítica (ver get_storage_engine()). Una segunda llamada solapada
+	 * (cron duplicado) para el mismo usuario no encuentra nada que
+	 * reclamar, porque el primer UPDATE ya movió esas filas a
+	 * 'claimed'.
+	 *
+	 * PT-2 (6.5.5): el lote reclamado ya no se identifica solo por
+	 * claimed_at (precisión de 1 segundo — dos workers podían reclamar
+	 * dentro del mismo segundo y, en teoría, leer de vuelta filas del
+	 * otro) — cada llamada genera un claim_token único (CSPRNG) y el
+	 * SELECT de lectura filtra por ese token exacto, no por timestamp.
 	 *
 	 * @param int $user_id
 	 * @return array<int,array{id:int,type:string,template_key:string,variables:array}>
 	 */
 	public static function claim_items_for_user( int $user_id ): array {
 		global $wpdb;
-		$table      = $wpdb->prefix . self::TABLE;
-		$claimed_at = current_time( 'mysql', true );
+		$table       = $wpdb->prefix . self::TABLE;
+		$claimed_at  = current_time( 'mysql', true );
+		$claim_token = bin2hex( random_bytes( 16 ) );
 
 		$updated = $wpdb->update(
 			$table,
-			array( 'status' => 'claimed', 'claimed_at' => $claimed_at ),
+			array( 'status' => 'claimed', 'claimed_at' => $claimed_at, 'claim_token' => $claim_token ),
 			array( 'user_id' => $user_id, 'status' => 'pending' ),
-			array( '%s', '%s' ),
+			array( '%s', '%s', '%s' ),
 			array( '%d', '%s' )
 		);
 
@@ -242,9 +282,9 @@ class Digest_Store {
 
 		$rows = (array) $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT id, type, template_key, variables FROM {$table} WHERE user_id = %d AND status = 'claimed' AND claimed_at = %s ORDER BY id ASC", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				"SELECT id, type, template_key, variables FROM {$table} WHERE user_id = %d AND status = 'claimed' AND claim_token = %s ORDER BY id ASC", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 				$user_id,
-				$claimed_at
+				$claim_token
 			),
 			ARRAY_A
 		);
@@ -294,7 +334,7 @@ class Digest_Store {
 
 		return (int) $wpdb->query(
 			$wpdb->prepare(
-				"UPDATE {$table} SET status = 'pending', claimed_at = NULL WHERE status = 'claimed' AND claimed_at < %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				"UPDATE {$table} SET status = 'pending', claimed_at = NULL, claim_token = NULL WHERE status = 'claimed' AND claimed_at < %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 				$threshold
 			)
 		);
@@ -342,7 +382,7 @@ class Digest_Store {
 		$placeholders = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
 		$wpdb->query(
 			$wpdb->prepare(
-				"UPDATE {$table} SET status = 'pending', claimed_at = NULL WHERE id IN ({$placeholders})", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				"UPDATE {$table} SET status = 'pending', claimed_at = NULL, claim_token = NULL WHERE id IN ({$placeholders})", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 				...$ids
 			)
 		);
