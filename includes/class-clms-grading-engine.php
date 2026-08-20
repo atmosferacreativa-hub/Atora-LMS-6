@@ -535,6 +535,20 @@ class CLMS_Grading_Engine {
 			return false;
 		}
 
+		// PT-8 (6.5.5): submit_grade_appeal() no verificaba que la
+		// entrega perteneciera al alumno que apela — cualquier usuario
+		// autenticado podía leer (y "apelar") la calificación de otro
+		// alumno pasando cualquier submission_id, porque la respuesta
+		// del endpoint devuelve original_grade/course_id de la entrega.
+		// La entrega usa post_author como dueño (mismo criterio que
+		// Assessment_Engine).
+		if ( absint( get_post_field( 'post_author', $submission_id ) ) !== $student_id
+			&& ! current_user_can( 'manage_options' )
+			&& ! current_user_can( 'edit_others_lm_courses' )
+		) {
+			return false;
+		}
+
 		$course_id = absint( get_post_meta( $submission_id, '_clms_submission_course_id', true ) );
 
 		$appeal_id = self::APPEAL_ID_PREFIX . wp_generate_uuid4();
@@ -588,6 +602,20 @@ class CLMS_Grading_Engine {
 
 		if ( ! $appeal || 'pending' !== $appeal['status'] ) {
 			return false;
+		}
+
+		// PT-9 (6.5.5): process_appeal() solo estaba gateado por
+		// can_manage_content() — una capability genérica, no específica
+		// del curso — así que cualquier instructor podía aprobar/
+		// rechazar apelaciones de cursos ajenos y modificar la nota de
+		// alumnos que no le pertenecen. Mismo criterio jerárquico que
+		// LMS_REST_Controller::can_manage_this_course(): admin →
+		// edit_others_lm_courses → dueño (post_author) del curso.
+		if ( ! current_user_can( 'manage_options' ) && ! current_user_can( 'edit_others_lm_courses' ) ) {
+			$owner_id = absint( get_post_field( 'post_author', absint( $appeal['course_id'] ?? 0 ) ) );
+			if ( ! $owner_id || $owner_id !== get_current_user_id() ) {
+				return false;
+			}
 		}
 
 		$update = array(

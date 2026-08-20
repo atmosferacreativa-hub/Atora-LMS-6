@@ -176,6 +176,13 @@ if ( ! function_exists( 'get_post' ) ) {
 		return $GLOBALS['__atora_test_posts'][ $id ] ?? null;
 	}
 }
+if ( ! function_exists( 'get_post_field' ) ) {
+	function get_post_field( string $field, $post = 0 ) {
+		$id   = is_object( $post ) ? absint( $post->ID ?? 0 ) : absint( $post );
+		$row  = $GLOBALS['__atora_test_posts'][ $id ] ?? null;
+		return $row[ $field ] ?? '';
+	}
+}
 if ( ! function_exists( 'atora_test_set_post' ) ) {
 	function atora_test_set_post( int $post_id, array $fields = array() ): void {
 		$defaults = array(
@@ -461,6 +468,11 @@ if ( file_exists( $mcp_api_key_service_file ) ) {
 $mcp_module_file = __DIR__ . '/../modules/mcp/class-mcp-module.php';
 if ( file_exists( $mcp_module_file ) ) {
 	require_once $mcp_module_file;
+}
+
+$grading_engine_file = __DIR__ . '/../includes/class-clms-grading-engine.php';
+if ( file_exists( $grading_engine_file ) ) {
+	require_once $grading_engine_file;
 }
 
 $enrollment_manager_file = __DIR__ . '/../includes/class-enrollment-manager.php';
