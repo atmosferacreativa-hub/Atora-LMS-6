@@ -498,3 +498,30 @@ lo está antes de asumir que no), aplicar el mismo tratamiento de
 PT-1/PT-3.1 (6.5.3): filtrar `wp_post_id` del CRUD genérico, un
 `link_to_legacy_post()` equivalente, y la verificación de discrepancia
 de instructor en el migrador de programas.
+
+## Contador de intentos duplicado — WhatsApp (`Preferences`) y Telegram (`Telegram_Bot`)
+
+PT-3.2 (6.5.4): el tope de intentos fallidos de vinculación de
+Telegram (`Telegram_Bot::link_attempts_locked()` /
+`register_link_attempt_failure()` / `reset_link_attempts()`) es una
+implementación paralela a `Preferences::verify_phone_code()` (PT-5,
+6.5.1) — mismo propósito (limitar fuerza bruta sobre un código de un
+solo uso), lógica casi idéntica, dos lugares distintos.
+
+**Por qué no se extrajo a un helper compartido ahora:** evaluado
+(regla 3.2 de la OT) — la semántica de "contra quién se cuenta" es
+distinta. WhatsApp conoce el usuario objetivo desde el inicio
+(`verify_phone_code( $user_id, $code )`) y cuenta intentos contra ese
+usuario. Telegram no sabe a qué chat_id apunta un código hasta
+resolverlo, así que el contador queda atado al usuario de WP que está
+probando códigos (`get_current_user_id()`), no a un código puntual.
+Generalizar ambos casos en un solo helper implicaba tocar
+`Preferences::verify_phone_code()`, ya probado y en producción desde
+6.5.1 — riesgo de regresión que no valía la pena en un sprint de
+hardening de menor riesgo (la propia OT lo encuadra así).
+
+**Propuesta:** si aparece un tercer canal con el mismo patrón, ahí sí
+vale la pena extraer `Verification_Attempt_Guard` (o nombre similar)
+aceptando explícitamente la clave de conteo (user_id objetivo O
+user_id actuante) como parámetro, y migrar los tres a la vez con su
+propia suite de regresión.

@@ -198,14 +198,24 @@ class Telegram_Bot {
 
 	// ── Vinculación de cuenta ─────────────────────────────────────────────────
 
+	/** PT-3.2 (6.5.4): tope de intentos fallidos de vinculación — mismo patrón que Preferences::MAX_CODE_ATTEMPTS (6.5.1). */
+	const MAX_LINK_ATTEMPTS = 5;
+	const LINK_ATTEMPTS_META = 'atora_telegram_link_attempts';
+	const LINK_ATTEMPTS_WINDOW_META = 'atora_telegram_link_attempts_window_start';
+	const LINK_ATTEMPTS_LOCKOUT_MINUTES = 15;
+
 	/**
-	 * Genera un código de vinculación y lo asocia al chat_id.
+	 * PT-3.1 (6.5.4): antes era substr(md5($chat_id . wp_salt() .
+	 * time()), 0, 6) — 6 hex chars (~24 bits), derivado de entrada
+	 * parcialmente predecible (time() es adivinable dentro de una
+	 * ventana razonable). random_bytes(5) da 10 hex chars (40 bits),
+	 * sin derivar de nada predecible.
 	 *
 	 * @param string $chat_id Chat ID de Telegram.
-	 * @return string Código de 6 caracteres.
+	 * @return string Código de 10 caracteres hex.
 	 */
 	public static function generate_link_code( string $chat_id ): string {
-		$code = strtoupper( substr( md5( $chat_id . wp_salt() . time() ), 0, 6 ) );
+		$code = strtoupper( bin2hex( random_bytes( 5 ) ) );
 		set_transient( 'atora_tg_link_' . $code, $chat_id, 10 * MINUTE_IN_SECONDS );
 		return $code;
 	}
@@ -219,14 +229,26 @@ class Telegram_Bot {
 		check_ajax_referer( 'atora_telegram_link' );
 
 		$user_id = get_current_user_id();
-		$code    = strtoupper( sanitize_text_field( wp_unslash( $_POST['code'] ?? '' ) ) );
-
-		$chat_id = get_transient( 'atora_tg_link_' . $code );
-
-		if ( ! $user_id || ! $chat_id ) {
+		if ( ! $user_id ) {
 			wp_send_json_error( array( 'message' => __( 'Código inválido o expirado.', 'atora-lms' ) ) );
 		}
 
+		// PT-3.2 (6.5.4): sin esto, el código de 10 caracteres hex
+		// (40 bits) igual sería fuerza-bruteable dentro de su ventana
+		// de 10 minutos con suficientes intentos sin límite.
+		if ( self::link_attempts_locked( $user_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'Demasiados intentos. Espera unos minutos y vuelve a intentarlo con un código nuevo.', 'atora-lms' ) ) );
+		}
+
+		$code    = strtoupper( sanitize_text_field( wp_unslash( $_POST['code'] ?? '' ) ) );
+		$chat_id = get_transient( 'atora_tg_link_' . $code );
+
+		if ( ! $chat_id ) {
+			self::register_link_attempt_failure( $user_id );
+			wp_send_json_error( array( 'message' => __( 'Código inválido o expirado.', 'atora-lms' ) ) );
+		}
+
+		self::reset_link_attempts( $user_id );
 		update_user_meta( $user_id, 'atora_telegram_chat_id', $chat_id );
 		delete_transient( 'atora_tg_link_' . $code );
 
@@ -239,6 +261,57 @@ class Telegram_Bot {
 		);
 
 		wp_send_json_success( array( 'message' => __( 'Cuenta vinculada con Telegram.', 'atora-lms' ) ) );
+	}
+
+	/**
+	 * PT-3.2 (6.5.4): true si el usuario agotó sus intentos dentro de
+	 * la ventana de lockout vigente. Se evaluó extraer un helper
+	 * compartido con Preferences::verify_phone_code() (6.5.1) — el
+	 * caso de WhatsApp cuenta intentos contra un usuario objetivo ya
+	 * conocido de antemano; acá el "objetivo" (a qué chat_id vincula
+	 * el código) solo se resuelve al intentar, así que el contador
+	 * queda atado al usuario de WP que está probando códigos, no a un
+	 * código puntual — semántica distinta que complicaba la extracción
+	 * sin tocar el flujo de WhatsApp ya probado. Implementación
+	 * paralela a propósito; duplicación anotada en
+	 * docs/DEUDA-TECNICA.md.
+	 *
+	 * @param int $user_id
+	 * @return bool
+	 */
+	private static function link_attempts_locked( int $user_id ): bool {
+		$window_start = absint( get_user_meta( $user_id, self::LINK_ATTEMPTS_WINDOW_META, true ) );
+		if ( ! $window_start ) {
+			return false;
+		}
+		if ( ( time() - $window_start ) >= self::LINK_ATTEMPTS_LOCKOUT_MINUTES * MINUTE_IN_SECONDS ) {
+			self::reset_link_attempts( $user_id );
+			return false;
+		}
+		return absint( get_user_meta( $user_id, self::LINK_ATTEMPTS_META, true ) ) >= self::MAX_LINK_ATTEMPTS;
+	}
+
+	/**
+	 * @param int $user_id
+	 * @return void
+	 */
+	private static function register_link_attempt_failure( int $user_id ): void {
+		$window_start = absint( get_user_meta( $user_id, self::LINK_ATTEMPTS_WINDOW_META, true ) );
+		if ( ! $window_start ) {
+			update_user_meta( $user_id, self::LINK_ATTEMPTS_WINDOW_META, time() );
+			update_user_meta( $user_id, self::LINK_ATTEMPTS_META, 1 );
+			return;
+		}
+		update_user_meta( $user_id, self::LINK_ATTEMPTS_META, absint( get_user_meta( $user_id, self::LINK_ATTEMPTS_META, true ) ) + 1 );
+	}
+
+	/**
+	 * @param int $user_id
+	 * @return void
+	 */
+	private static function reset_link_attempts( int $user_id ): void {
+		delete_user_meta( $user_id, self::LINK_ATTEMPTS_META );
+		delete_user_meta( $user_id, self::LINK_ATTEMPTS_WINDOW_META );
 	}
 
 	/**

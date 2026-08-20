@@ -364,6 +364,11 @@ if ( file_exists( $digest_store_file ) ) {
 	require_once $digest_store_file;
 }
 
+$telegram_bot_file = __DIR__ . '/../modules/messaging/class-telegram-bot.php';
+if ( file_exists( $telegram_bot_file ) ) {
+	require_once $telegram_bot_file;
+}
+
 $crm_access_trait_file = __DIR__ . '/../modules/crm/trait-crm-access.php';
 if ( file_exists( $crm_access_trait_file ) ) {
 	require_once $crm_access_trait_file;
