@@ -193,19 +193,35 @@ class Forms_Builder {
 	const DEFAULT_THROTTLE_LIMIT = 10;
 	const THROTTLE_WINDOW_MINUTES = 15;
 
+	/**
+	 * PT-1 (6.5.5): orden del flujo de envío, corregido — form_id
+	 * válido → el post existe → es realmente un atora_form → nonce
+	 * válido → (recién ahí) resolver IP y aplicar rate limit → honeypot
+	 * → validar campos → guardar/procesar. Antes, is_throttled() corría
+	 * como primera instrucción, antes de confirmar siquiera que
+	 * form_id > 0 o que el formulario existiera — una petición anónima
+	 * con miles de form_id fabricados podía generar filas de contador
+	 * ilimitadas (DoS de bajo costo) sin pasar nunca el nonce. Ahora
+	 * ninguna escritura persistente (contador, entrada, email) ocurre
+	 * hasta que form_id y nonce son válidos.
+	 *
+	 * @return void
+	 */
 	public static function handle_submit(): void {
 		$form_id = absint( wp_unslash( $_POST['form_id'] ?? 0 ) );
 
-		// PT-5.1 (6.5.4): antes que nada — nonce y honeypot no bastan
-		// contra un script que obtiene el nonce de la página pública
-		// una vez y lo reutiliza en envíos repetidos (los nonces de WP
-		// no son de un solo uso). Se cuenta el intento aunque el resto
-		// de la validación falle después (regla 5.3: el throttle cuenta
-		// envíos que llegan al servidor, no solo los exitosos).
-		if ( self::is_throttled( $form_id ) ) {
-			// PT-5.2: mensaje genérico — no revela el límite exacto,
-			// para no ayudar a calibrar el ataque.
-			wp_send_json_error( array( 'message' => __( 'Demasiados envíos, intenta más tarde.', 'atora-lms' ) ) );
+		if ( $form_id <= 0 ) {
+			wp_send_json_error( array( 'message' => __( 'Formulario no encontrado.', 'atora-lms' ) ) );
+		}
+
+		if ( 'atora_form' !== get_post_type( $form_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'Formulario no encontrado.', 'atora-lms' ) ) );
+		}
+
+		$schema = json_decode( (string) get_post_meta( $form_id, 'atora_form_schema', true ), true );
+
+		if ( ! $schema ) {
+			wp_send_json_error( array( 'message' => __( 'Formulario no encontrado.', 'atora-lms' ) ) );
 		}
 
 		if ( ! wp_verify_nonce(
@@ -215,15 +231,23 @@ class Forms_Builder {
 			wp_send_json_error( array( 'message' => __( 'Nonce inválido.', 'atora-lms' ) ) );
 		}
 
+		// PT-1 (6.5.5): recién acá — form_id y nonce ya son válidos —
+		// se resuelve la IP y se consume cupo del rate limit. Nonce y
+		// honeypot no bastan solos contra un script que obtiene el
+		// nonce de la página pública una vez y lo reutiliza en envíos
+		// repetidos (los nonces de WP no son de un solo uso), así que
+		// el throttle sigue contando el intento aunque el resto de la
+		// validación falle después (regla 5.3: cuenta envíos que llegan
+		// al servidor con nonce válido, no solo los exitosos).
+		if ( self::is_throttled( $form_id ) ) {
+			// PT-5.2: mensaje genérico — no revela el límite exacto,
+			// para no ayudar a calibrar el ataque.
+			wp_send_json_error( array( 'message' => __( 'Demasiados envíos, intenta más tarde.', 'atora-lms' ) ) );
+		}
+
 		// Honeypot.
 		if ( ! empty( $_POST['atora_hp_name'] ) ) {
 			wp_send_json_success( array( 'message' => __( 'Formulario enviado.', 'atora-lms' ) ) );
-		}
-
-		$schema = json_decode( get_post_meta( $form_id, 'atora_form_schema', true ), true );
-
-		if ( ! $schema ) {
-			wp_send_json_error( array( 'message' => __( 'Formulario no encontrado.', 'atora-lms' ) ) );
 		}
 
 		// Sanitizar campos.
@@ -260,15 +284,28 @@ class Forms_Builder {
 	}
 
 	/**
-	 * PT-5.1 (6.5.4): tope por IP por formulario en la ventana de 15
+	 * PT-1 (6.5.5): tope por IP por formulario en la ventana de 15
 	 * minutos — configurable por formulario vía `throttle_per_15min`
-	 * en el schema JSON (mismo campo flexible donde ya viven
-	 * `success_message`/`notify_admin`, sin pantalla nueva). Mismo
-	 * mecanismo de contador por transient que ya usa
-	 * ATORA_API_Key_Service::validate() para el rate limit de API
-	 * keys — no había un helper de throttling extraído para reutilizar
-	 * directamente (cada caso construye su propia clave), así que se
-	 * sigue el mismo patrón en vez de inventar uno nuevo.
+	 * en el schema JSON. Contador atómico en tabla dedicada
+	 * (atora_form_throttle) vía INSERT ... ON DUPLICATE KEY UPDATE en
+	 * vez del patrón get_transient()+set_transient() anterior
+	 * (lectura-incremento-escritura no atómico: dos peticiones
+	 * concurrentes podían leer el mismo valor y ambas incrementar mal,
+	 * excediendo el límite real bajo carga). El incremento en sí es
+	 * atómico por bloqueo de fila InnoDB — la fila (form_id, ip_hash,
+	 * window_start) es única, así que el motor serializa cualquier
+	 * incremento concurrente sobre la misma clave.
+	 *
+	 * Ventana fija (no deslizante): window_start = inicio del bloque
+	 * de THROTTLE_WINDOW_MINUTES actual — evita el efecto de la
+	 * versión anterior donde cada envío repetido renovaba el TTL del
+	 * transient, extendiendo el bloqueo indefinidamente mientras
+	 * siguieran llegando intentos.
+	 *
+	 * Se llama únicamente después de confirmar que form_id corresponde
+	 * a un atora_form real (ver handle_submit()) — la clave nunca
+	 * depende de un form_id arbitrario, así que la cardinalidad de
+	 * filas está acotada a "IP real × formulario real × ventana".
 	 *
 	 * Regla 5.3: si no se puede determinar la IP, no se bloquea — sin
 	 * IP no hay una clave de conteo confiable, y el nonce + honeypot
@@ -278,7 +315,7 @@ class Forms_Builder {
 	 * @return bool
 	 */
 	private static function is_throttled( int $form_id ): bool {
-		$ip = self::get_client_ip();
+		$ip = \ATORA_Client_IP::get();
 		if ( '' === $ip ) {
 			return false;
 		}
@@ -286,37 +323,33 @@ class Forms_Builder {
 		$schema = json_decode( (string) get_post_meta( $form_id, 'atora_form_schema', true ), true );
 		$limit  = max( 1, absint( $schema['throttle_per_15min'] ?? self::DEFAULT_THROTTLE_LIMIT ) );
 
-		$key   = 'atora_form_rl_' . $form_id . '_' . md5( $ip );
-		$count = (int) get_transient( $key );
+		global $wpdb;
+		$table        = $wpdb->prefix . 'atora_form_throttle';
+		$window_secs  = self::THROTTLE_WINDOW_MINUTES * MINUTE_IN_SECONDS;
+		$window_start = (int) ( floor( time() / $window_secs ) * $window_secs );
+		$ip_hash      = hash( 'sha256', $ip . '|' . wp_salt( 'auth' ) );
 
-		if ( $count >= $limit ) {
-			return true;
-		}
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$wpdb->query(
+			$wpdb->prepare(
+				"INSERT INTO {$table} (form_id, ip_hash, window_start, attempts) VALUES (%d, %s, %d, 1)
+				 ON DUPLICATE KEY UPDATE attempts = attempts + 1", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$form_id,
+				$ip_hash,
+				$window_start
+			)
+		);
 
-		set_transient( $key, $count + 1, self::THROTTLE_WINDOW_MINUTES * MINUTE_IN_SECONDS );
-		return false;
-	}
+		$attempts = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT attempts FROM {$table} WHERE form_id = %d AND ip_hash = %s AND window_start = %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$form_id,
+				$ip_hash,
+				$window_start
+			)
+		);
 
-	/**
-	 * Misma lógica de cabeceras de confianza que ya usan
-	 * Extended_Registration::get_client_ip() y
-	 * Affiliate_Tracker::get_ip() en otros módulos — sin un helper
-	 * compartido hoy, se replica el patrón en vez de exponer uno de
-	 * esos métodos privados fuera de su clase.
-	 *
-	 * @return string
-	 */
-	private static function get_client_ip(): string {
-		$headers = array( 'HTTP_X_FORWARDED_FOR', 'HTTP_CLIENT_IP', 'REMOTE_ADDR' );
-		foreach ( $headers as $header ) {
-			if ( ! empty( $_SERVER[ $header ] ) ) {
-				$ip = trim( explode( ',', sanitize_text_field( wp_unslash( $_SERVER[ $header ] ) ) )[0] );
-				if ( filter_var( $ip, FILTER_VALIDATE_IP ) ) {
-					return $ip;
-				}
-			}
-		}
-		return '';
+		return $attempts > $limit;
 	}
 
 	/**
@@ -335,7 +368,11 @@ class Forms_Builder {
 				'form_id'    => $form_id,
 				'user_id'    => get_current_user_id(),
 				'entry_data' => wp_json_encode( $submitted ),
-				'ip_address' => \ATORA\Security\Extended_Registration::is_valid_phone( '' ) ? '' : sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ?? '' ) ),
+				// PT-1 (6.5.5): antes evaluaba una condición sin relación
+				// (Extended_Registration::is_valid_phone('')) que siempre
+				// tomaba la misma rama, y leía REMOTE_ADDR directo sin
+				// pasar por el resolutor de proxies confiables.
+				'ip_address' => \ATORA_Client_IP::get(),
 			),
 			array( '%d', '%d', '%s', '%s' )
 		);

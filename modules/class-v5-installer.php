@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class V5_Installer {
 
 	/** Versión del esquema. Incrementar para forzar re-instalación. */
-	const SCHEMA_VERSION = '5.1.2-lesson-program-wp-post-id-nullable';
+	const SCHEMA_VERSION = '5.1.3-form-throttle-table';
 
 	/** Option key que almacena la versión instalada. */
 	const OPTION_KEY = 'atora_v5_schema_version';
@@ -442,6 +442,25 @@ class V5_Installer {
 			created_at DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			PRIMARY KEY  (id),
 			KEY form_id (form_id)
+		) $charset_collate;" );
+
+		// PT-1 (6.5.5): contador de throttle por IP/formulario/ventana,
+		// atómico vía INSERT ... ON DUPLICATE KEY UPDATE (bloqueo de fila
+		// InnoDB) — reemplaza el patrón get_transient()+set_transient()
+		// (lectura-incremento-escritura no atómico, vulnerable a
+		// condiciones de carrera bajo concurrencia real). La cardinalidad
+		// de filas está acotada: Forms_Builder solo llama a esto tras
+		// confirmar que form_id corresponde a un atora_form real — nunca
+		// con un form_id arbitrario/inexistente.
+		dbDelta( "CREATE TABLE {$wpdb->prefix}atora_form_throttle (
+			id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			form_id      BIGINT UNSIGNED NOT NULL,
+			ip_hash      CHAR(64)        NOT NULL,
+			window_start INT UNSIGNED    NOT NULL,
+			attempts     INT UNSIGNED    NOT NULL DEFAULT 1,
+			updated_at   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			PRIMARY KEY  (id),
+			UNIQUE KEY form_ip_window (form_id, ip_hash, window_start)
 		) $charset_collate;" );
 
 		// ── Sprint 11-12: Messaging / CRM ────────────────────────────────────
@@ -1185,6 +1204,7 @@ class V5_Installer {
 			// Analytics.
 			"{$wpdb->prefix}atora_user_engagement",
 			"{$wpdb->prefix}atora_form_entries",
+			"{$wpdb->prefix}atora_form_throttle",
 			// Messaging.
 			"{$wpdb->prefix}atora_message_queue",
 			"{$wpdb->prefix}atora_message_log",

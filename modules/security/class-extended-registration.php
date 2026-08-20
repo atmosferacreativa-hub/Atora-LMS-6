@@ -568,16 +568,11 @@ class Extended_Registration {
 	 * @return string
 	 */
 	private static function get_client_ip(): string {
-		$headers = array( 'HTTP_X_FORWARDED_FOR', 'HTTP_CLIENT_IP', 'REMOTE_ADDR' );
-		foreach ( $headers as $header ) {
-			if ( ! empty( $_SERVER[ $header ] ) ) {
-				$ip = trim( explode( ',', sanitize_text_field( wp_unslash( $_SERVER[ $header ] ) ) )[0] );
-				if ( filter_var( $ip, FILTER_VALIDATE_IP ) ) {
-					return $ip;
-				}
-			}
-		}
-		return '';
+		// PT-1 (6.5.5): antes confiaba en X-Forwarded-For/Client-IP sin
+		// verificar que la petición viniera realmente de un proxy
+		// confiable — evadible falsificando la cabecera. Delega en el
+		// resolutor centralizado (REMOTE_ADDR como fuente de verdad).
+		return \ATORA_Client_IP::get();
 	}
 
 	/**

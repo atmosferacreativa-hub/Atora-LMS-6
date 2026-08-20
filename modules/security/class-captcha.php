@@ -216,7 +216,12 @@ class Captcha {
 			'body'    => array(
 				'secret'   => $secret_key,
 				'response' => $token,
-				'remoteip' => Extended_Registration::get_client_ip(),
+				// PT-1/PT-8 (6.5.5): Extended_Registration::get_client_ip() es
+				// privado — la llamada anterior a esta clase producía un
+				// fatal error ("call to private method") en cuanto había un
+				// proveedor de captcha configurado. Se usa el resolutor
+				// centralizado directamente en su lugar.
+				'remoteip' => \ATORA_Client_IP::get(),
 			),
 			'timeout' => 10,
 		) );

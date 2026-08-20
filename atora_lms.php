@@ -646,6 +646,12 @@ add_action( 'admin_notices', static function() {
 add_action( 'init', static function () {
 	global $clms_loader_instance;
 
+	// PT-1 (6.5.5): resolución de IP centralizada — utilidad de bajo nivel,
+	// sin dependencias, cargada incondicionalmente para que cualquier
+	// módulo (Forms_Builder, Student_Assistant, Extended_Registration...)
+	// pueda usarla sin importar el orden/estado del sistema de módulos.
+	require_once ATORA_LMS_DIR . 'includes/class-atora-client-ip.php';
+
 	// ── PT-2 (6.3.0): registro de módulos — debe cargar antes que cualquier
 	// sistema de carga (A/B/C) que lo consulte.
 	require_once ATORA_LMS_DIR . 'includes/modularity/class-module-registry.php';

@@ -310,6 +310,27 @@ if ( ! function_exists( 'esc_attr' ) )         { function esc_attr( string $s ):
 if ( ! function_exists( 'wp_send_json_success' ) ) { function wp_send_json_success( $d = null ): void { exit( json_encode( array( 'success' => true, 'data' => $d ) ) ); } }
 if ( ! function_exists( 'wp_send_json_error' ) )   { function wp_send_json_error( $d = null, int $status = 0 ): void { exit( json_encode( array( 'success' => false, 'data' => $d ) ) ); } }
 
+// PT-1 (6.5.5): nonces — un set de nonces "válidos" configurable por
+// test, para poder probar el orden de validación de handle_submit().
+$GLOBALS['__atora_test_valid_nonces'] = array();
+if ( ! function_exists( 'wp_create_nonce' ) ) {
+	function wp_create_nonce( $action = -1 ): string {
+		$nonce = 'test-nonce-' . md5( (string) $action );
+		$GLOBALS['__atora_test_valid_nonces'][ $nonce ] = (string) $action;
+		return $nonce;
+	}
+}
+if ( ! function_exists( 'wp_verify_nonce' ) ) {
+	function wp_verify_nonce( $nonce, $action = -1 ): bool {
+		$nonce = (string) $nonce;
+		return isset( $GLOBALS['__atora_test_valid_nonces'][ $nonce ] )
+			&& $GLOBALS['__atora_test_valid_nonces'][ $nonce ] === (string) $action;
+	}
+}
+if ( ! function_exists( 'atora_test_reset_nonces' ) ) {
+	function atora_test_reset_nonces(): void { $GLOBALS['__atora_test_valid_nonces'] = array(); }
+}
+
 // Cargar servicios bajo test
 $services_dir = __DIR__ . '/../modules/crm-v2/services/';
 foreach ( array(
@@ -367,6 +388,11 @@ if ( file_exists( $digest_store_file ) ) {
 $telegram_bot_file = __DIR__ . '/../modules/messaging/class-telegram-bot.php';
 if ( file_exists( $telegram_bot_file ) ) {
 	require_once $telegram_bot_file;
+}
+
+$client_ip_file = __DIR__ . '/../includes/class-atora-client-ip.php';
+if ( file_exists( $client_ip_file ) ) {
+	require_once $client_ip_file;
 }
 
 $forms_builder_file = __DIR__ . '/../modules/analytics/class-forms-builder.php';
