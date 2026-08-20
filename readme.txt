@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.4
 Requires PHP: 8.1
-Stable tag: 6.5.3
+Stable tag: 6.5.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,13 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.5.4 =
+* Hardening: the unsubscribe link now requires an explicit confirmation click instead of acting on GET, so scanners and email previews can no longer unsubscribe a user by themselves.
+* Hardening: the message digest queue is now claim-based, preventing duplicate summaries from overlapping cron runs, plus retention limits so it can't grow unbounded.
+* Hardening: Telegram account linking codes now have much higher entropy and a failed-attempt lockout, matching the WhatsApp verification hardening from 6.5.1.
+* Hardening: an MCP API key with the "all" scope no longer gets a higher rate limit than a plain "write" key for write operations.
+* Hardening: public forms now throttle repeated submissions per IP per form.
+* Hardening: native lessons and programs (without a linked legacy post) can now be created without hitting a database constraint, matching the courses fix from 6.5.3.
 = 6.5.3 =
 * Security: `wp_post_id` (the identity bridge to the legacy LMS content) can no longer be written through the generic course create/update REST endpoints, by anyone.
 * Security: the courses table now allows multiple native courses without a legacy post link, fixing a schema constraint that previously only allowed one.
@@ -67,6 +74,8 @@ Translation files are loaded from the `/languages` directory.
 * Major release aligned with ATORA_v5 architecture and modules.
 
 == Upgrade Notice ==
+= 6.5.4 =
+* Hardening for unsubscribe links, message digest locking, Telegram linking, MCP rate limits, form throttling, and native lesson/program creation. Recommended update — includes a database schema change.
 = 6.5.3 =
 * Security fixes for the wp_post_id identity bridge between the legacy and table-based LMS, plus a schema fix for native courses. Recommended update — includes a one-time database schema change.
 = 6.5.2 =
