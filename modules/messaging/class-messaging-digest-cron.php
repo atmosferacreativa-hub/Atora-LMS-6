@@ -45,6 +45,10 @@ class Digest_Cron {
 			return $stats;
 		}
 
+		// PT-2.3 (6.5.4): liberar reclamos abandonados y descartar lo
+		// vencido antes de procesar nada esta corrida.
+		Digest_Store::run_maintenance();
+
 		$send_hour = max( 0, min( 23, absint( get_option( self::OPT_SEND_HOUR, 18 ) ) ) );
 		if ( (int) current_time( 'G' ) < $send_hour ) {
 			// Todavía no es la hora del resumen — nada que hacer esta corrida.
@@ -61,15 +65,23 @@ class Digest_Cron {
 				continue;
 			}
 
-			$items = Digest_Store::get_items( $user_id );
+			// PT-2.2 (6.5.4): reclamo atómico — si otra corrida de cron
+			// solapada ya se llevó estas filas, esto devuelve vacío y
+			// se salta sin reprocesar nada.
+			$items = Digest_Store::claim_items_for_user( $user_id );
 			if ( empty( $items ) ) {
-				++$stats['skipped_empty']; // PT-5.5: no debería pasar (get_users_with_pending_items ya filtra), defensa extra.
+				++$stats['skipped_empty'];
 				continue;
 			}
 
 			if ( self::in_do_not_disturb_window( $user_id ) ) {
+				// PT-2.2 (6.5.4): liberar el reclamo puntual en vez de
+				// dejarlo 'claimed' hasta que la limpieza de reclamos
+				// abandonados lo libere por antigüedad — se reintenta
+				// en la próxima corrida horaria, no en ~15-60 min.
+				Digest_Store::release_claim( wp_list_pluck( $items, 'id' ) );
 				++$stats['deferred'];
-				continue; // se reintenta en la próxima corrida horaria.
+				continue;
 			}
 
 			$sent_ok = ( 1 === count( $items ) )

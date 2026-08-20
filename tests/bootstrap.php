@@ -359,6 +359,11 @@ if ( file_exists( $preferences_shortcode_file ) ) {
 	require_once $preferences_shortcode_file;
 }
 
+$digest_store_file = __DIR__ . '/../modules/messaging/class-messaging-digest-store.php';
+if ( file_exists( $digest_store_file ) ) {
+	require_once $digest_store_file;
+}
+
 $crm_access_trait_file = __DIR__ . '/../modules/crm/trait-crm-access.php';
 if ( file_exists( $crm_access_trait_file ) ) {
 	require_once $crm_access_trait_file;
