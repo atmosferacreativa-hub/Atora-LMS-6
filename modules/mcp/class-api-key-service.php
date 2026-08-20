@@ -115,22 +115,47 @@ class ATORA_API_Key_Service {
 		// abajo en el flujo), no una categoría de límite más permisiva:
 		// el límite depende siempre de la operación real que se
 		// ejecuta, nunca del scope declarado.
-		$operation   = sanitize_key( $operation );
-		$limits      = array( 'read' => 100, 'write' => 20 );
-		$limit       = $limits[ $operation ] ?? 100;
-		$minute      = gmdate( 'YmdHi' );
-		$rl_key      = 'atora_rl_' . $key_id . '_' . $operation . '_' . $minute;
-		$current_req = (int) get_transient( $rl_key );
+		$operation = sanitize_key( $operation );
+		$limits    = array( 'read' => 100, 'write' => 20 );
+		$limit     = $limits[ $operation ] ?? 100;
+		$minute    = gmdate( 'YmdHi' );
 
-		if ( $current_req >= $limit ) {
+		// PT-5 (6.5.5): el contador era get_transient()+set_transient()
+		// (leer → incrementar en PHP → escribir) — dos peticiones
+		// concurrentes de la misma key podían leer el mismo valor antes
+		// de que cualquiera escribiera, perdiendo un incremento y
+		// dejando pasar más peticiones que el límite real bajo carga.
+		// wp_cache_incr()/add() solo son atómicos de verdad con un
+		// object cache persistente (Redis/Memcached) — no garantizado en
+		// una instalación estándar — así que se usa la misma tabla
+		// dedicada + INSERT ... ON DUPLICATE KEY UPDATE que
+		// Forms_Builder::is_throttled() (PT-1), atómico por bloqueo de
+		// fila InnoDB, funciona con cualquier MySQL/MariaDB estándar.
+		$rl_table = $wpdb->prefix . 'atora_api_rate_limit';
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$wpdb->query(
+			$wpdb->prepare(
+				"INSERT INTO {$rl_table} (key_id, operation, minute_key, requests) VALUES (%d, %s, %s, 1)
+				 ON DUPLICATE KEY UPDATE requests = requests + 1", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$key_id,
+				$operation,
+				$minute
+			)
+		);
+
+		$current_req = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT requests FROM {$rl_table} WHERE key_id = %d AND operation = %s AND minute_key = %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$key_id,
+				$operation,
+				$minute
+			)
+		);
+
+		if ( $current_req > $limit ) {
 			// Rate limit excedido — devolver null para que el autenticador rechace
 			return null;
-		}
-
-		if ( 0 === $current_req ) {
-			set_transient( $rl_key, 1, 65 ); // expira al cabo de ~1 minuto + buffer
-		} else {
-			set_transient( $rl_key, $current_req + 1, 65 );
 		}
 		// ── /Rate limiting ────────────────────────────────────────────────────
 

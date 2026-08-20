@@ -22,17 +22,17 @@ class ApiKeyRateLimitTest extends TestCase {
 
 	protected function setUp(): void {
 		parent::setUp();
-		\atora_test_reset_transients();
 	}
 
 	protected function tearDown(): void {
-		\atora_test_reset_transients();
-		parent::tearDown();
 	}
 
 	/**
 	 * $wpdb con una o varias keys en memoria, indexadas por su hash
-	 * sha256 (igual que hace validate() para buscarlas).
+	 * sha256 (igual que hace validate() para buscarlas), más un
+	 * contador de rate limit en memoria que simula
+	 * atora_api_rate_limit: INSERT ... ON DUPLICATE KEY UPDATE
+	 * incrementa de forma atómica por (key_id, operation, minute_key).
 	 */
 	private function install_wpdb_fixture( array $keys_by_raw_value ): object {
 		global $wpdb;
@@ -54,13 +54,16 @@ class ApiKeyRateLimitTest extends TestCase {
 		$wpdb = new class( $rows_by_hash ) {
 			public string $prefix = 'wp_';
 			private array $rows_by_hash;
+			public array $rl_counters = array(); // "$key_id|$operation|$minute_key" => requests
 
 			public function __construct( array $rows_by_hash ) { $this->rows_by_hash = $rows_by_hash; }
 
 			public function prepare( string $sql, ...$args ): string {
 				$i = 0;
-				return preg_replace_callback( '/%[ds]/', function() use ( &$i, $args ) {
-					return isset( $args[ $i ] ) ? (string) $args[ $i++ ] : '?';
+				return preg_replace_callback( '/%[ds]/', function( $m ) use ( &$i, $args ) {
+					if ( ! isset( $args[ $i ] ) ) { return '?'; }
+					$value = $args[ $i++ ];
+					return '%s' === $m[0] ? "'" . $value . "'" : (string) $value;
 				}, $sql );
 			}
 
@@ -73,13 +76,30 @@ class ApiKeyRateLimitTest extends TestCase {
 				return null;
 			}
 
-			public function get_var( $sql ) { return null; }
+			public function get_var( $sql ) {
+				if ( false !== strpos( $sql, 'SELECT requests FROM' )
+					&& preg_match( "/key_id = (\d+) AND operation = '([^']*)' AND minute_key = '([^']*)'/", $sql, $m ) ) {
+					$key = $m[1] . '|' . $m[2] . '|' . $m[3];
+					return $this->rl_counters[ $key ] ?? null;
+				}
+				return null;
+			}
+
 			public function get_results( $sql, $output = 'ARRAY_A' ) { return array(); }
 			public function get_col( $sql ) { return array(); }
 			public function insert( $table, $data, $format = null ): int { return 1; }
 			public function update( $table, $data, $where, $format = null, $where_format = null ): int { return 1; }
 			public function delete( $table, $where, $where_format = null ): int { return 1; }
-			public function query( $sql ): int { return 1; }
+
+			public function query( $sql ): int {
+				if ( false !== strpos( $sql, 'ON DUPLICATE KEY UPDATE' )
+					&& preg_match( "/VALUES \((\d+), '([^']*)', '([^']*)', 1\)/", $sql, $m ) ) {
+					$key = $m[1] . '|' . $m[2] . '|' . $m[3];
+					$this->rl_counters[ $key ] = ( $this->rl_counters[ $key ] ?? 0 ) + 1;
+				}
+				return 1;
+			}
+
 			public function esc_like( string $s ): string { return $s; }
 			public function get_charset_collate(): string { return ''; }
 		};

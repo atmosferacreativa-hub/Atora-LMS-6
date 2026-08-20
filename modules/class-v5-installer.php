@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class V5_Installer {
 
 	/** Versión del esquema. Incrementar para forzar re-instalación. */
-	const SCHEMA_VERSION = '5.1.3-form-throttle-table';
+	const SCHEMA_VERSION = '5.1.4-mcp-rate-limit-table';
 
 	/** Option key que almacena la versión instalada. */
 	const OPTION_KEY = 'atora_v5_schema_version';
@@ -1036,6 +1036,23 @@ class V5_Installer {
 			KEY key_prefix (key_prefix),
 			KEY is_active  (is_active)
 		) $charset_collate;" );
+
+		// PT-5 (6.5.5): contador de rate limit por API key/operación/minuto,
+		// atómico vía INSERT ... ON DUPLICATE KEY UPDATE — reemplaza el
+		// patrón get_transient()+set_transient() de
+		// ATORA_API_Key_Service::validate() (lectura-incremento-escritura
+		// no atómico, racy bajo concurrencia real; wp_cache_incr()/add()
+		// solo son realmente atómicos con un object cache persistente
+		// como Redis/Memcached, que no todas las instalaciones tienen).
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_api_rate_limit (
+			id         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			key_id     BIGINT UNSIGNED NOT NULL,
+			operation  VARCHAR(20)     NOT NULL,
+			minute_key CHAR(12)        NOT NULL,
+			requests   INT UNSIGNED    NOT NULL DEFAULT 1,
+			PRIMARY KEY (id),
+			UNIQUE KEY key_op_minute (key_id, operation, minute_key)
+		) $charset_collate;" );
 		// ── /Fase 12C ─────────────────────────────────────────────────────────
 
 		// ── Fase III S9: Badges de gamificación ───────────────────────────────
@@ -1205,6 +1222,13 @@ class V5_Installer {
 			"{$wpdb->prefix}atora_user_engagement",
 			"{$wpdb->prefix}atora_form_entries",
 			"{$wpdb->prefix}atora_form_throttle",
+			// PT-5 (6.5.5): atora_api_keys nunca se había agregado a esta
+			// lista (hallazgo de la auditoría de esquema de este sprint)
+			// — all_tables_exist() no la verificaba, así que un fallo
+			// silencioso al crearla no habría impedido que install()
+			// marcara el esquema como completo.
+			"{$wpdb->prefix}atora_api_keys",
+			"{$wpdb->prefix}atora_api_rate_limit",
 			// Messaging.
 			"{$wpdb->prefix}atora_message_queue",
 			"{$wpdb->prefix}atora_message_log",
