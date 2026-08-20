@@ -482,6 +482,11 @@ if ( file_exists( $mcp_module_file ) ) {
 	require_once $mcp_module_file;
 }
 
+$campaign_builder_rest_file = __DIR__ . '/../modules/crm-v2/rest/class-campaign-builder-rest-controller.php';
+if ( file_exists( $campaign_builder_rest_file ) ) {
+	require_once $campaign_builder_rest_file;
+}
+
 $grading_engine_file = __DIR__ . '/../includes/class-clms-grading-engine.php';
 if ( file_exists( $grading_engine_file ) ) {
 	require_once $grading_engine_file;

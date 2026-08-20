@@ -71,6 +71,32 @@ class Campaign_Builder_REST_Controller {
 			|| current_user_can( 'manage_options' );
 	}
 
+	/**
+	 * PT-9 (6.5.5, hallazgo del barrido P8/P9): can_access() solo
+	 * exigía la capability de la RUTA completa — ninguna operación
+	 * sobre un campaign_id concreto (get/update/launch/clone/pause/
+	 * metrics) verificaba que la campaña perteneciera a quien la pide,
+	 * pese a que atora_crm_campaigns.created_by ya existe justamente
+	 * para eso (se escribe en create_campaign() pero nunca se leía).
+	 * manage_options/clms_manage_crm (gestión CRM completa) siguen
+	 * viendo cualquier campaña; crm_manage_campaigns por sí solo queda
+	 * acotado a las propias — mismo criterio que ya usan los
+	 * controladores de contactos/inbox de este mismo módulo
+	 * (contact_id_is_visible()/get_scope_user_ids()).
+	 *
+	 * @param array $row Fila de campaña ya obtenida (o vacía).
+	 * @return bool
+	 */
+	private static function campaign_is_visible( array $row ): bool {
+		if ( empty( $row ) ) {
+			return false;
+		}
+		if ( current_user_can( 'manage_options' ) || current_user_can( 'clms_manage_crm' ) ) {
+			return true;
+		}
+		return absint( $row['created_by'] ?? 0 ) === get_current_user_id();
+	}
+
 	/* ─── Helpers ───────────────────────────────────────────────── */
 
 	private static function ok( string $message, array $data = array() ): \WP_REST_Response {
@@ -309,7 +335,7 @@ class Campaign_Builder_REST_Controller {
 		$campaign_id = absint( $request->get_param( 'campaign_id' ) );
 		$row         = Campaign_Service::get_campaign( $campaign_id );
 
-		if ( empty( $row ) ) {
+		if ( ! self::campaign_is_visible( $row ) ) {
 			return self::fail( __( 'Campaña no encontrada.', 'atora-lms' ), 404 );
 		}
 
@@ -332,7 +358,7 @@ class Campaign_Builder_REST_Controller {
 		$campaign_id = absint( $request->get_param( 'campaign_id' ) );
 		$existing    = Campaign_Service::get_campaign( $campaign_id );
 
-		if ( empty( $existing ) ) {
+		if ( ! self::campaign_is_visible( $existing ) ) {
 			return self::fail( __( 'Campaña no encontrada.', 'atora-lms' ), 404 );
 		}
 
@@ -417,7 +443,7 @@ class Campaign_Builder_REST_Controller {
 		}
 
 		$existing = Campaign_Service::get_campaign( $campaign_id );
-		if ( empty( $existing ) ) {
+		if ( ! self::campaign_is_visible( $existing ) ) {
 			return self::fail( __( 'Campaña no encontrada.', 'atora-lms' ), 404 );
 		}
 
@@ -457,6 +483,10 @@ class Campaign_Builder_REST_Controller {
 			return self::fail( __( 'Campaña inválida.', 'atora-lms' ), 400 );
 		}
 
+		if ( ! self::campaign_is_visible( Campaign_Service::get_campaign( $campaign_id ) ) ) {
+			return self::fail( __( 'Campaña no encontrada.', 'atora-lms' ), 404 );
+		}
+
 		return self::ok(
 			'',
 			array(
@@ -471,7 +501,7 @@ class Campaign_Builder_REST_Controller {
 		$campaign_id = absint( $request->get_param( 'campaign_id' ) );
 		$original    = Campaign_Service::get_campaign( $campaign_id );
 
-		if ( empty( $original ) ) {
+		if ( ! self::campaign_is_visible( $original ) ) {
 			return self::fail( __( 'Campaña no encontrada.', 'atora-lms' ), 404 );
 		}
 
@@ -515,7 +545,7 @@ class Campaign_Builder_REST_Controller {
 		$campaign_id = absint( $request->get_param( 'campaign_id' ) );
 		$existing    = Campaign_Service::get_campaign( $campaign_id );
 
-		if ( empty( $existing ) ) {
+		if ( ! self::campaign_is_visible( $existing ) ) {
 			return self::fail( __( 'Campaña no encontrada.', 'atora-lms' ), 404 );
 		}
 
