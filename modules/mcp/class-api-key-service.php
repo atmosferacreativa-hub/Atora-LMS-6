@@ -106,11 +106,18 @@ class ATORA_API_Key_Service {
 		// con ninguna clave de $limits y siempre caía al default de 100
 		// sin importar el scope real). Se explota igual que has_scope()
 		// y se aplica el límite de la operación que de verdad se va a
-		// ejecutar — 'all' siempre manda si la key lo tiene.
-		$scopes      = array_map( 'sanitize_key', explode( ',', (string) ( $row['scopes'] ?? 'read' ) ) );
+		// ejecutar.
+		//
+		// PT-4 (6.5.4): 'all' ya NO tiene su propio número — antes una
+		// key con ese scope podía hacer hasta 200 escrituras/min, diez
+		// veces el límite de una key 'write' pura. 'all' es la unión de
+		// capacidades (qué puede hacer, ya decidido por has_scope() más
+		// abajo en el flujo), no una categoría de límite más permisiva:
+		// el límite depende siempre de la operación real que se
+		// ejecuta, nunca del scope declarado.
 		$operation   = sanitize_key( $operation );
-		$limits      = array( 'read' => 100, 'write' => 20, 'all' => 200 );
-		$limit       = in_array( 'all', $scopes, true ) ? $limits['all'] : ( $limits[ $operation ] ?? 100 );
+		$limits      = array( 'read' => 100, 'write' => 20 );
+		$limit       = $limits[ $operation ] ?? 100;
 		$minute      = gmdate( 'YmdHi' );
 		$rl_key      = 'atora_rl_' . $key_id . '_' . $operation . '_' . $minute;
 		$current_req = (int) get_transient( $rl_key );

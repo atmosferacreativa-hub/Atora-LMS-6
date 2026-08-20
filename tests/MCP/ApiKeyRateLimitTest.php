@@ -207,17 +207,40 @@ class ApiKeyRateLimitTest extends TestCase {
 	}
 
 	/** @test */
-	public function test_all_scope_gets_the_all_limit_regardless_of_operation(): void {
+	public function test_all_scope_no_longer_gets_its_own_higher_limit(): void {
+		// PT-4 (6.5.4): 'all' dejó de tener su propio número — antes
+		// una key 'all' aguantaba 200 escrituras/min (diez veces el
+		// límite de una key 'write' pura). El límite depende siempre
+		// de la operación real, nunca del scope declarado.
 		$key = 'atora_ee6666666666666666666666666666666666';
 		$original = $this->install_wpdb_fixture( array(
 			501 => array( 'raw' => $key, 'scopes' => 'all' ),
 		) );
 
-		// Límite de 'all' es 200/min — muy por encima del de 'write' (20).
-		for ( $i = 0; $i < 21; $i++ ) {
+		for ( $i = 0; $i < 20; $i++ ) {
 			$row = \ATORA_API_Key_Service::validate( $key, 'write' );
-			$this->assertNotNull( $row, "una key con scope 'all' no debe topar al límite de write (intento {$i})" );
+			$this->assertNotNull( $row, "no debería bloquearse antes del límite de write (intento {$i})" );
 		}
+		$this->assertNull(
+			\ATORA_API_Key_Service::validate( $key, 'write' ),
+			"una key con scope 'all' debe topar en el límite de write (20/min) igual que una key 'write' pura"
+		);
+
+		$this->restore_wpdb( $original );
+	}
+
+	/** @test */
+	public function test_all_scope_gets_read_limit_for_read_operations(): void {
+		$key = 'atora_gg8888888888888888888888888888888888';
+		$original = $this->install_wpdb_fixture( array(
+			502 => array( 'raw' => $key, 'scopes' => 'all' ),
+		) );
+
+		for ( $i = 0; $i < 100; $i++ ) {
+			$row = \ATORA_API_Key_Service::validate( $key, 'read' );
+			$this->assertNotNull( $row, "no debería bloquearse antes del límite de read (intento {$i})" );
+		}
+		$this->assertNull( \ATORA_API_Key_Service::validate( $key, 'read' ) );
 
 		$this->restore_wpdb( $original );
 	}
