@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class V5_Installer {
 
 	/** Versión del esquema. Incrementar para forzar re-instalación. */
-	const SCHEMA_VERSION = '5.1.1-course-wp-post-id-nullable';
+	const SCHEMA_VERSION = '5.1.2-lesson-program-wp-post-id-nullable';
 
 	/** Option key que almacena la versión instalada. */
 	const OPTION_KEY = 'atora_v5_schema_version';
@@ -38,8 +38,7 @@ class V5_Installer {
 			return;
 		}
 
-		if ( self::create_tables() ) {
-			self::migrate_course_wp_post_id_nullable();
+		if ( self::create_tables() && self::migrate_wp_post_id_nullable_columns() ) {
 			update_option( self::OPTION_KEY, self::SCHEMA_VERSION );
 		}
 	}
@@ -50,46 +49,98 @@ class V5_Installer {
 	 * @return void
 	 */
 	public static function force_install(): void {
-		if ( self::create_tables() ) {
-			self::migrate_course_wp_post_id_nullable();
+		if ( self::create_tables() && self::migrate_wp_post_id_nullable_columns() ) {
 			update_option( self::OPTION_KEY, self::SCHEMA_VERSION );
 		}
 	}
 
 	/**
-	 * PT-2 (6.5.3): wp_post_id BIGINT UNSIGNED NOT NULL DEFAULT 0 con
-	 * UNIQUE KEY solo permitía una fila con 0 — un segundo curso
-	 * nativo sin CPT asociado fallaba al crearse. dbDelta() no
-	 * modifica de forma confiable NOT NULL/DEFAULT de una columna ya
-	 * existente (limitación conocida), así que el cambio de esquema
-	 * en atora_courses se hace explícito acá, con ALTER TABLE directo
-	 * — install nuevo ya crea la columna nullable vía create_tables(),
-	 * esto es solo para instalaciones existentes.
+	 * PT-2 (6.5.3) / PT-6.1 (6.5.4): wp_post_id BIGINT UNSIGNED NOT
+	 * NULL DEFAULT 0 con UNIQUE KEY solo permitía una fila con 0 — un
+	 * segundo curso/lección/programa nativo sin CPT asociado fallaba
+	 * al crearse. dbDelta() no modifica de forma confiable NOT
+	 * NULL/DEFAULT de una columna ya existente, así que el cambio de
+	 * esquema se hace explícito acá, con ALTER TABLE directo — install
+	 * nuevo ya crea las columnas nullable vía create_tables(), esto es
+	 * solo para instalaciones existentes.
 	 *
-	 * Alcance: solo atora_courses, que es el hallazgo confirmado de
-	 * este sprint. atora_lessons/atora_programs/atora_quiz_submissions
-	 * comparten el mismo defecto de esquema — documentado en
-	 * docs/DEUDA-TECNICA.md, no tocado acá (fuera del hallazgo que
-	 * ordena este sprint).
+	 * PT-6.1 (6.5.4): a diferencia de la versión de 6.5.3
+	 * (migrate_course_wp_post_id_nullable(), void, sin verificar el
+	 * resultado del ALTER antes de que install()/force_install()
+	 * marcaran el esquema como actualizado), esta versión sí verifica
+	 * — devuelve bool, y el llamador solo marca la versión si las tres
+	 * tablas quedaron de verdad nullable. Si algo falla (permisos,
+	 * etc.), se reintenta en la próxima carga en vez de darlo por
+	 * hecho — la robustez que la propia auditoría de 6.5.3 señaló
+	 * como pendiente.
 	 *
-	 * @return void
+	 * PT-6.3 (6.5.4): atora_quiz_submissions NO se incluye acá a
+	 * propósito — verificado que su wp_post_id vincula con el CPT
+	 * legado clms_submission del que siempre se migra (el comentario
+	 * de la propia definición de la tabla lo dice: "migra CPT
+	 * clms_submission"), y no existe ningún punto de escritura nativa
+	 * hoy — solo el migrador la escribe. No es "contenido nativo
+	 * opcionalmente sin CPT" como cursos/lecciones/programas, es un
+	 * espejo de un registro legado que siempre debe existir. Aplicar
+	 * la migración por uniformidad sería resolver un problema que esa
+	 * tabla no tiene.
+	 *
+	 * @return bool true si las tres columnas quedaron nullable (o ya lo estaban).
 	 */
-	private static function migrate_course_wp_post_id_nullable(): void {
+	private static function migrate_wp_post_id_nullable_columns(): bool {
+		$ok = true;
+		$ok = self::migrate_column_nullable( 'atora_courses', 'wp_post_id' ) && $ok;
+		$ok = self::migrate_column_nullable( 'atora_lessons', 'wp_post_id' ) && $ok;
+		$ok = self::migrate_column_nullable( 'atora_programs', 'wp_post_id' ) && $ok;
+		return $ok;
+	}
+
+	/**
+	 * @param string $table_suffix Nombre de tabla sin el prefijo de WP.
+	 * @param string $column
+	 * @return bool true si la columna quedó (o ya estaba) nullable.
+	 */
+	private static function migrate_column_nullable( string $table_suffix, string $column ): bool {
 		global $wpdb;
 
-		$table = $wpdb->prefix . 'atora_courses';
+		$table = $wpdb->prefix . $table_suffix;
 		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) ) !== $table ) {
-			return;
+			// La tabla no existe todavía (create_tables() falló para
+			// esta en particular) — no hay nada que migrar, pero
+			// tampoco se puede confirmar éxito.
+			return false;
+		}
+
+		if ( self::column_is_nullable( $table, $column ) ) {
+			return true;
 		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
-		$wpdb->query( "ALTER TABLE {$table} MODIFY COLUMN wp_post_id BIGINT UNSIGNED NULL DEFAULT NULL" );
+		$wpdb->query( "ALTER TABLE {$table} MODIFY COLUMN {$column} BIGINT UNSIGNED NULL DEFAULT NULL" );
 
-		// Todo registro con 0 "sin vínculo legado" pasa a NULL — a lo
+		// Todo registro con 0 ("sin vínculo legado") pasa a NULL — a lo
 		// sumo una fila podía tener 0 bajo el UNIQUE KEY anterior, así
 		// que esto nunca choca con el propio índice único.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$wpdb->query( "UPDATE {$table} SET wp_post_id = NULL WHERE wp_post_id = 0" );
+		$wpdb->query( "UPDATE {$table} SET {$column} = NULL WHERE {$column} = 0" );
+
+		return self::column_is_nullable( $table, $column );
+	}
+
+	/**
+	 * @param string $table Nombre completo (con prefijo).
+	 * @param string $column
+	 * @return bool
+	 */
+	private static function column_is_nullable( string $table, string $column ): bool {
+		global $wpdb;
+
+		$row = $wpdb->get_row(
+			$wpdb->prepare( "SHOW COLUMNS FROM {$table} LIKE %s", $column ), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			ARRAY_A
+		);
+
+		return isset( $row['Null'] ) && 'YES' === $row['Null'];
 	}
 
 	/**
@@ -729,7 +780,7 @@ class V5_Installer {
 
 		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_lessons (
 			id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-			wp_post_id      BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			wp_post_id      BIGINT UNSIGNED NULL DEFAULT NULL,
 			course_id       BIGINT UNSIGNED NOT NULL DEFAULT 0,
 			title           VARCHAR(500)    NOT NULL DEFAULT '',
 			slug            VARCHAR(500)    NOT NULL DEFAULT '',
@@ -815,7 +866,7 @@ class V5_Installer {
 		// Programas/diplomados (D-001 = A).
 		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_programs (
 			id              BIGINT UNSIGNED  NOT NULL AUTO_INCREMENT,
-			wp_post_id      BIGINT UNSIGNED  NOT NULL DEFAULT 0,
+			wp_post_id      BIGINT UNSIGNED  NULL DEFAULT NULL,
 			title           VARCHAR(500)     NOT NULL DEFAULT '',
 			slug            VARCHAR(500)     NOT NULL DEFAULT '',
 			description     LONGTEXT         NOT NULL,

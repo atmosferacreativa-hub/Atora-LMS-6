@@ -452,30 +452,30 @@ REST, aplicar el mismo tratamiento — filtrar `wp_post_id` del payload
 y crear el equivalente de `link_to_legacy_post()` para lecciones antes
 de exponer la ruta, no después.
 
-## `wp_post_id NOT NULL DEFAULT 0` en lessons/programs/quiz_submissions — mismo defecto de esquema que PT-2 (6.5.3)
+## `wp_post_id NOT NULL DEFAULT 0` en `atora_quiz_submissions` — a propósito, no es el mismo caso que cursos/lecciones/programas
 
-PT-2 (6.5.3) migró `atora_courses.wp_post_id` a
-`BIGINT UNSIGNED NULL DEFAULT NULL` porque `NOT NULL DEFAULT 0` con
-`UNIQUE KEY` solo permite una fila con 0 — un segundo curso nativo sin
-CPT asociado fallaba al crearse. `modules/class-v5-installer.php`
-declara exactamente el mismo patrón (`NOT NULL DEFAULT 0` +
-`UNIQUE KEY wp_post_id`) para `atora_lessons` (línea ~694),
-`atora_programs` (línea ~780) y `atora_quiz_submissions` (línea
-~843).
+PT-2 (6.5.3) migró `atora_courses.wp_post_id`; PT-6 (6.5.4) hizo lo
+mismo para `atora_lessons` y `atora_programs` — las tres comparten
+`V5_Installer::migrate_wp_post_id_nullable_columns()`. **Resuelto**,
+ya no aplica la nota anterior de esta entrada para esas tres tablas.
 
-**Por qué no se migran ahora:** el hallazgo que ordena este sprint
-(auditoría) cita específicamente `atora_courses`. Las otras tres
-tablas comparten el defecto pero no fueron parte del diagnóstico
-verificado — no se generaliza el fix sin que esté en el alcance
-explícito del paquete (regla 1 del sprint).
+`atora_quiz_submissions` (línea ~932) sigue con
+`wp_post_id BIGINT UNSIGNED NOT NULL DEFAULT 0` — verificado (PT-6.3,
+6.5.4) que es intencional, no un descuido: el propio comentario de la
+tabla dice "migra CPT clms_submission", y hoy no existe ningún punto
+de escritura nativa de esa tabla — solo `LMS_Migrator` la escribe,
+siempre con un `wp_post_id` real tomado del CPT que migra. A
+diferencia de cursos/lecciones/programas, una entrega de examen no
+tiene un concepto de "creación nativa sin CPT asociado" en el sistema
+actual — el campo cumple una función de vínculo obligatorio, no
+opcional.
 
-**Propuesta:** si se necesita crear lecciones/programas/envíos de
-quiz nativos sin CPT asociado (mismo escenario que motivó PT-2 para
-cursos), aplicar la misma migración
+**Si esto cambia:** si en algún momento se agrega un flujo de envío
+de examen 100% nativo (sin pasar por el CPT `clms_submission`), ahí sí
+aplicaría la misma migración
 (`ALTER TABLE ... MODIFY COLUMN wp_post_id BIGINT UNSIGNED NULL DEFAULT NULL`
-+ `UPDATE ... SET wp_post_id = NULL WHERE wp_post_id = 0`) a esas tres
-tablas, siguiendo el mismo patrón de
-`V5_Installer::migrate_course_wp_post_id_nullable()`.
++ `UPDATE ... SET wp_post_id = NULL WHERE wp_post_id = 0`), siguiendo
+el mismo patrón de `V5_Installer::migrate_column_nullable()`.
 
 ## `LMS_Migrator::migrate_programs()` — mismo patrón de "confiar en que la fila ya existe" que PT-3.1 (6.5.3)
 

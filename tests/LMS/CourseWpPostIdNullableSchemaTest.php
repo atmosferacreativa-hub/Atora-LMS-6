@@ -8,6 +8,14 @@
  * BIGINT UNSIGNED NULL DEFAULT NULL (MySQL sí permite múltiples NULL
  * bajo un índice único).
  *
+ * PT-6.1 (6.5.4) generalizó el método específico de cursos a
+ * V5_Installer::migrate_column_nullable( $table_suffix, $column ),
+ * compartido con lecciones y programas — ver
+ * tests/LMS/AllTablesWpPostIdNullableTest.php para la cobertura de
+ * las tres tablas y de la verificación antes de marcar el esquema
+ * como actualizado. Este archivo se mantiene con los mismos casos de
+ * 6.5.3, adaptados a la nueva firma.
+ *
  * @package ATORA_LMS\Tests\LMS
  */
 
@@ -65,10 +73,16 @@ class CourseWpPostIdNullableSchemaTest extends TestCase {
 		$wpdb = $original;
 	}
 
+	/**
+	 * PT-6.1 (6.5.4): la corrección específica de cursos se generalizó
+	 * a migrate_column_nullable( $table_suffix, $column ), compartida
+	 * con lecciones y programas — se invoca acá con los mismos
+	 * argumentos que antes usaba la versión exclusiva de cursos.
+	 */
 	private function invoke_migration(): void {
-		$ref = new \ReflectionMethod( \ATORA\V5_Installer::class, 'migrate_course_wp_post_id_nullable' );
+		$ref = new \ReflectionMethod( \ATORA\V5_Installer::class, 'migrate_column_nullable' );
 		$ref->setAccessible( true );
-		$ref->invoke( null );
+		$ref->invoke( null, 'atora_courses', 'wp_post_id' );
 	}
 
 	/** @test */
