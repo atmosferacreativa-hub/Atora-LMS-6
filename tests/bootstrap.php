@@ -482,6 +482,11 @@ if ( file_exists( $mcp_module_file ) ) {
 	require_once $mcp_module_file;
 }
 
+$legacy_rest_permissions_file = __DIR__ . '/../includes/rest/class-rest-permissions.php';
+if ( file_exists( $legacy_rest_permissions_file ) ) {
+	require_once $legacy_rest_permissions_file;
+}
+
 $campaign_builder_rest_file = __DIR__ . '/../modules/crm-v2/rest/class-campaign-builder-rest-controller.php';
 if ( file_exists( $campaign_builder_rest_file ) ) {
 	require_once $campaign_builder_rest_file;

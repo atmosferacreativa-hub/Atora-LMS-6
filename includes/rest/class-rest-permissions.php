@@ -117,6 +117,39 @@ class CLMS_REST_Permissions {
 		return $allowed;
 	}
 
+	/**
+	 * PT-1 (6.5.6, "legacy REST hardening"): antes, /webhooks (GET/POST)
+	 * y /webhooks/{id} (DELETE) estaban gateados por can_manage_content()
+	 * — la misma capability amplia que otorga a cualquier profesor/
+	 * calificador (clms_manage_lessons/clms_manage_submissions/
+	 * clms_grade_submissions) acceso de igual nivel que un
+	 * administrador del sitio. Un webhook no tiene "dueño" ni curso al
+	 * que ligarse (es una integración de todo el sitio: se dispara para
+	 * lesson.completed/course.completed/enrollment.created/
+	 * submission.created/grade.updated/certificate.issued de
+	 * CUALQUIER curso, no solo los del creador) — así que aquí la regla
+	 * "capability + ownership" no aplica por falta de un scope natural;
+	 * en su lugar, se exige la capability más restrictiva que sí existe
+	 * para esto: manage_options. Sin este cambio, cualquier profesor
+	 * podía registrar una URL externa propia y recibir una copia de
+	 * eventos de calificación/matrícula/certificados de TODA la
+	 * plataforma, no solo de sus propios alumnos.
+	 *
+	 * @return bool
+	 */
+	public function can_manage_webhooks() {
+		$allowed = current_user_can( 'manage_options' );
+
+		if ( ! $allowed ) {
+			$this->log_permission_denied(
+				'manage_webhooks',
+				array( 'reason' => 'missing_capability' )
+			);
+		}
+
+		return $allowed;
+	}
+
 	public function can_read_lesson_meta( $allowed = false, $meta_key = '', $post_id = 0, $user_id = 0 ) {
 		unset( $allowed, $meta_key );
 

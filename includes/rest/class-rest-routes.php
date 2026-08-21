@@ -668,12 +668,12 @@ class CLMS_REST_Routes {
 					array(
 						'methods'             => WP_REST_Server::READABLE,
 						'callback'            => array( $this->api, 'get_webhooks' ),
-						'permission_callback' => array( $this->api, 'can_manage_content' ),
+						'permission_callback' => array( $this->api, 'can_manage_webhooks' ),
 					),
 					array(
 						'methods'             => WP_REST_Server::CREATABLE,
 						'callback'            => array( $this->api, 'create_webhook' ),
-						'permission_callback' => array( $this->api, 'can_manage_content' ),
+						'permission_callback' => array( $this->api, 'can_manage_webhooks' ),
 					),
 				),
 			),
@@ -683,7 +683,7 @@ class CLMS_REST_Routes {
 					array(
 						'methods'             => WP_REST_Server::DELETABLE,
 						'callback'            => array( $this->api, 'delete_webhook' ),
-						'permission_callback' => array( $this->api, 'can_manage_content' ),
+						'permission_callback' => array( $this->api, 'can_manage_webhooks' ),
 					),
 				),
 			),

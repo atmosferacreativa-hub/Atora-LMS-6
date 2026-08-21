@@ -563,6 +563,14 @@ class CLMS_REST_Extensions_Controller {
 
 	public function get_webhooks( WP_REST_Request $request ) {
 		unset( $request );
+
+		// PT-1 (6.5.6): defensa en profundidad — igual que el resto de
+		// este controlador re-verifica el permiso dentro del handler en
+		// vez de confiar solo en el permission_callback de la ruta.
+		if ( ! $this->permissions->can_manage_webhooks() ) {
+			return new WP_Error( 'clms_forbidden', __( 'No tienes permisos para ver los webhooks.', 'atora-lms' ), array( 'status' => 403 ) );
+		}
+
 		$hooks = get_option( '_clms_webhooks', array() );
 
 		$response_hooks = array();
@@ -577,6 +585,10 @@ class CLMS_REST_Extensions_Controller {
 	}
 
 	public function create_webhook( WP_REST_Request $request ) {
+		if ( ! $this->permissions->can_manage_webhooks() ) {
+			return new WP_Error( 'clms_forbidden', __( 'No tienes permisos para crear webhooks.', 'atora-lms' ), array( 'status' => 403 ) );
+		}
+
 		$data  = $this->get_json_or_body_params( $request );
 		$url   = isset( $data['url'] ) ? esc_url_raw( $data['url'] ) : '';
 		$event = isset( $data['event'] ) ? $this->sanitize_webhook_event( (string) $data['event'] ) : '';
@@ -616,6 +628,10 @@ class CLMS_REST_Extensions_Controller {
 	}
 
 	public function delete_webhook( WP_REST_Request $request ) {
+		if ( ! $this->permissions->can_manage_webhooks() ) {
+			return new WP_Error( 'clms_forbidden', __( 'No tienes permisos para eliminar webhooks.', 'atora-lms' ), array( 'status' => 403 ) );
+		}
+
 		$id    = $this->sanitize_webhook_id( (string) $request['id'] );
 		$hooks = get_option( '_clms_webhooks', array() );
 

@@ -229,6 +229,10 @@ class CLMS_REST_API {
 		return $this->permissions->can_manage_content();
 	}
 
+	public function can_manage_webhooks() {
+		return $this->permissions->can_manage_webhooks();
+	}
+
 	public function can_read_lesson_meta( $allowed = false, $meta_key = '', $post_id = 0, $user_id = 0 ) {
 		return $this->permissions->can_read_lesson_meta( $allowed, $meta_key, $post_id, $user_id );
 	}
