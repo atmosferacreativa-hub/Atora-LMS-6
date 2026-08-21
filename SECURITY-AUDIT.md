@@ -1,3 +1,43 @@
+# SECURITY AUDIT — ATORA LMS v6.5.6 "Legacy REST Hardening"
+**Fecha:** 2026-08-21
+**Auditor:** Agente autónomo Claude Code
+**Alcance:** Sprint 6.5.6 — auditoría dirigida de la superficie REST
+"legacy" (`includes/class-rest-api.php`, `includes/rest/*.php`,
+namespace `clms/v1`): cursos, programas, lecciones, rúbricas,
+transcripciones, peer review, quizzes, reportes institucionales,
+acciones masivas, reordenamiento, webhooks. Ver
+`SECURITY-REPORT-6.5.6.md` (excluido de la distribución) para el
+informe completo.
+
+## FIXED (6.5.6)
+
+| # | Área | Hallazgo | Archivo(s) |
+|---|------|----------|------------|
+| 1 | Webhooks legacy | GET/POST /webhooks y DELETE /webhooks/{id} gateados por can_manage_content() (capability amplia de cualquier profesor/calificador) en vez de manage_options — sin dueño natural al que anclar un scope, el webhook es site-wide y transmite eventos de TODOS los cursos | `includes/rest/class-rest-permissions.php`, `includes/class-rest-api.php`, `includes/rest/class-rest-routes.php`, `includes/rest/class-rest-extensions-controller.php` |
+| 2 | Esquema de calificación | GET/PUT /grades/scheme/{course_id} gateados solo por can_manage_grading() → can_manage_content(), sin verificar dueño del curso — cualquier calificador podía leer o reescribir la ponderación de notas de un curso ajeno | `includes/rest/class-rest-grading-controller.php` |
+
+## HARDENED / REVISADO SIN HALLAZGO
+
+Auditoría exhaustiva de courses/programs/lessons (create/update/delete),
+rubrics, transcriptions, peer review, quizzes, bulk-student-actions,
+lesson-presets, reorder-lessons/programs, y los reportes
+institucionales (student/teacher profile, course/admin/certification
+report, risk indicators) — todos ya usan correctamente
+`current_user_can_manage_post_resource()` o un chequeo de dueño
+equivalente dentro del propio handler, incluso cuando el
+`permission_callback` de la ruta es más amplio. Sin regresiones.
+
+## TESTED
+
+`tests/Rest/WebhookPermissionsTest.php`,
+`tests/LMS/GradingSchemeOwnershipTest.php`.
+
+## REMAINING LOW-RISK ITEMS (6.5.6)
+
+- Ninguno nuevo identificado en el alcance de este sprint.
+
+---
+
 # SECURITY AUDIT — ATORA LMS v6.5.5 "Security Hardening Closure"
 **Fecha:** 2026-08-20
 **Auditor:** Agente autónomo Claude Code

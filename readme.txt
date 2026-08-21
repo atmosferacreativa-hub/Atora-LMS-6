@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.4
 Requires PHP: 8.1
-Stable tag: 6.5.5
+Stable tag: 6.5.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,10 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.5.6 =
+* Security: legacy webhook management (register/list/delete outbound webhooks for lesson/course/enrollment/submission/grade/certificate events) now requires full site administration instead of a general content-management capability.
+* Security: reading or editing a course's grading scheme (component weights) now requires ownership of that course instead of a general grading capability.
+* Security review: full audit pass over the legacy REST API surface (courses, programs, lessons, rubrics, transcriptions, peer review, quizzes, reports, bulk actions, reorder) confirmed existing ownership checks are intact; no regressions found.
 = 6.5.5 =
 * Security: public form submissions now resolve the client IP through a centralized, trusted-proxy-aware resolver instead of trusting forwarded headers directly, closing a way to evade or poison the per-form rate limit.
 * Security: public form submissions are now validated (form exists, correct type, valid nonce) before any rate-limit counter or other persistent state is created, closing a low-cost storage-exhaustion vector.
@@ -89,6 +93,8 @@ Translation files are loaded from the `/languages` directory.
 * Major release aligned with ATORA_v5 architecture and modules.
 
 == Upgrade Notice ==
+= 6.5.6 =
+* Legacy REST hardening: webhook management is now admin-only, and grading scheme changes are now scoped to the course's own instructor. Recommended update.
 = 6.5.5 =
 * Security hardening closure: trusted-proxy-aware IP resolution, hardened form/API/MCP rate limiting, authorization fixes for grade appeals, course/program enrollment management, CRM campaigns, and student progress tracking. Recommended update — includes a database schema change.
 = 6.5.4 =
