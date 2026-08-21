@@ -497,6 +497,11 @@ if ( file_exists( $grading_engine_file ) ) {
 	require_once $grading_engine_file;
 }
 
+$legacy_rest_grading_controller_file = __DIR__ . '/../includes/rest/class-rest-grading-controller.php';
+if ( file_exists( $legacy_rest_grading_controller_file ) ) {
+	require_once $legacy_rest_grading_controller_file;
+}
+
 $enrollment_manager_file = __DIR__ . '/../includes/class-enrollment-manager.php';
 if ( file_exists( $enrollment_manager_file ) ) {
 	require_once $enrollment_manager_file;

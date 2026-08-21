@@ -100,6 +100,14 @@ class CLMS_REST_Grading_Controller {
 			return new WP_Error( 'missing_course', __( 'course_id requerido.', 'atora-lms' ), array( 'status' => 400 ) );
 		}
 
+		// PT-1 (6.5.6, "legacy REST hardening"): can_manage_grading() en
+		// la ruta solo exige la capability amplia de can_manage_content()
+		// — sin esto, cualquier instructor con esa capability podía leer
+		// el esquema de calificación de un curso ajeno.
+		if ( ! current_user_can( 'manage_options' ) && ! $this->permissions->current_user_can_manage_post_resource( $course_id ) ) {
+			return new WP_Error( 'clms_forbidden', __( 'No tienes permisos para ver el esquema de este curso.', 'atora-lms' ), array( 'status' => 403 ) );
+		}
+
 		$engine = $this->resolve_grading_engine();
 		if ( ! $engine ) {
 			return new WP_Error( 'grading_unavailable', __( 'El motor de calificación no está disponible.', 'atora-lms' ), array( 'status' => 500 ) );
@@ -118,6 +126,15 @@ class CLMS_REST_Grading_Controller {
 
 		if ( ! $course_id || empty( $scheme ) ) {
 			return new WP_Error( 'missing_params', __( 'course_id y cuerpo JSON requeridos.', 'atora-lms' ), array( 'status' => 400 ) );
+		}
+
+		// PT-1 (6.5.6, "legacy REST hardening"): mismo hallazgo que
+		// get_grading_scheme() — sin esto, cualquier instructor con la
+		// capability amplia de can_manage_content() podía reescribir la
+		// ponderación de notas (quiz/tareas/participación) de un curso
+		// que no le pertenece.
+		if ( ! current_user_can( 'manage_options' ) && ! $this->permissions->current_user_can_manage_post_resource( $course_id ) ) {
+			return new WP_Error( 'clms_forbidden', __( 'No tienes permisos para editar el esquema de este curso.', 'atora-lms' ), array( 'status' => 403 ) );
 		}
 
 		$engine = $this->resolve_grading_engine();
