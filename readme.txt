@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.4
 Requires PHP: 8.1
-Stable tag: 6.5.4
+Stable tag: 6.5.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,21 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.5.5 =
+* Security: public form submissions now resolve the client IP through a centralized, trusted-proxy-aware resolver instead of trusting forwarded headers directly, closing a way to evade or poison the per-form rate limit.
+* Security: public form submissions are now validated (form exists, correct type, valid nonce) before any rate-limit counter or other persistent state is created, closing a low-cost storage-exhaustion vector.
+* Hardening: the public form rate limiter now uses an atomic, race-resistant counter instead of a read-then-write pattern.
+* Hardening: the message digest queue now uses a unique claim token per batch, in addition to the existing claim-based locking, removing any theoretical ambiguity between overlapping claims.
+* Security: enrollment access-code/password attempts are now rate-limited per user and link, closing a brute-force gap.
+* Security: a Telegram chat can no longer become linked to two different WordPress accounts.
+* Hardening: the MCP API rate limiter now uses an atomic counter instead of a read-then-write pattern.
+* Hardening: additional isolation between the generic course create/update API and the legacy-content migration path, plus stricter validation when linking a course to its legacy post.
+* Security: closed an authorization gap that allowed reading or appealing another student's grade via a crafted submission ID, and another that allowed processing grade appeals for courses an instructor doesn't own.
+* Security: course/program enrollment management (enroll, unenroll, CSV import, WooCommerce product linking) now requires ownership of the specific course or program, not just a general management capability.
+* Security: the academic setup wizard now verifies the current user owns the course before saving to it.
+* Security: CRM campaign management (view, edit, launch, clone, pause, metrics) is now scoped to the campaign's owner for users without full CRM management access.
+* Security: student progress-tracking records are now scoped to their owning student.
+* Security review: full regression pass over previously closed CRM, LMS, WhatsApp, MCP, and messaging security fixes confirmed no regressions.
 = 6.5.4 =
 * Hardening: the unsubscribe link now requires an explicit confirmation click instead of acting on GET, so scanners and email previews can no longer unsubscribe a user by themselves.
 * Hardening: the message digest queue is now claim-based, preventing duplicate summaries from overlapping cron runs, plus retention limits so it can't grow unbounded.
@@ -74,6 +89,8 @@ Translation files are loaded from the `/languages` directory.
 * Major release aligned with ATORA_v5 architecture and modules.
 
 == Upgrade Notice ==
+= 6.5.5 =
+* Security hardening closure: trusted-proxy-aware IP resolution, hardened form/API/MCP rate limiting, authorization fixes for grade appeals, course/program enrollment management, CRM campaigns, and student progress tracking. Recommended update — includes a database schema change.
 = 6.5.4 =
 * Hardening for unsubscribe links, message digest locking, Telegram linking, MCP rate limits, form throttling, and native lesson/program creation. Recommended update — includes a database schema change.
 = 6.5.3 =

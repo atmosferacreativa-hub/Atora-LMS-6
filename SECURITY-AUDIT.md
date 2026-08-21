@@ -1,4 +1,72 @@
-# SECURITY AUDIT — ATORA LMS v6.0.0
+# SECURITY AUDIT — ATORA LMS v6.5.5 "Security Hardening Closure"
+**Fecha:** 2026-08-20
+**Auditor:** Agente autónomo Claude Code
+**Alcance:** Sprint 6.5.5 — cierre de hallazgos RED/ORANGE/YELLOW de la
+auditoría 6.5.4, más un barrido de auditoría propio (P8 endpoints
+públicos, P9 capability/ownership, P10 SQL/output) sobre todo el
+codebase. Ver `SECURITY-REPORT-6.5.5.md` (excluido de la
+distribución) para el informe ejecutivo completo con conteos de
+validación y tabla PASS/FAIL.
+
+## FIXED (6.5.5)
+
+| # | Área | Hallazgo | Archivo(s) principal(es) |
+|---|------|----------|---------------------------|
+| 1 | Forms throttle | IP resuelta sin verificar proxy confiable; rate-limiter corría antes de validar form_id/nonce; contador no atómico | `includes/class-atora-client-ip.php`, `modules/analytics/class-forms-builder.php` |
+| 2 | Messaging digest | Lote de claim identificado solo por `claimed_at` (precisión de 1s) | `modules/messaging/class-messaging-digest-store.php` |
+| 3 | Enrollment | Sin límite de intentos en contraseña de enlace de acceso | `includes/enrollment-manager/trait-enrollment-manager-access-enrollment.php` |
+| 4 | Telegram | `chat_id` podía quedar vinculado a dos cuentas | `modules/messaging/class-telegram-bot.php` |
+| 5 | MCP | Contador de rate limit no atómico (get/set transient) | `modules/mcp/class-api-key-service.php` |
+| 6 | LMS | `create()`/`update()` de cursos técnicamente aceptaban `wp_post_id`; `link_to_legacy_post()` no validaba el lado del curso Atora | `modules/lms/class-lms-course-service.php` |
+| 7 | Grading — IDOR | `submit_grade_appeal()` no verificaba dueño de la entrega; `process_appeal()` sin verificar dueño del curso | `includes/class-clms-grading-engine.php` |
+| 8 | Enrollment AJAX | Matricular/desmatricular/CSV/vínculo Woo de curso o programa sin verificar dueño | `includes/metabox-course/trait-metabox-course-enrollment-ajax.php`, `includes/metabox-program/trait-metabox-program-enrollment-ajax.php` |
+| 9 | Academic wizard | `course_id` de POST sin verificar dueño antes de escribir | `includes/academic/class-academic-admin-tools.php` |
+| 10 | CRM campañas | get/update/launch/clone/pause/metrics sin scoping por `created_by` | `modules/crm-v2/rest/class-campaign-builder-rest-controller.php` |
+| 11 | Feedback tracking | `tracking_id` sin verificar dueño (mitigado por ser UUIDv4) | `includes/rest/class-rest-grading-controller.php` |
+
+## HARDENED (defensa en profundidad, sin vulnerabilidad explotable confirmada)
+
+- `Extended_Registration::get_client_ip()` y `Captcha::verify_token()` migrados al resolutor de IP centralizado — el segundo tenía además un fatal error latente (llamaba a un método privado de otra clase).
+- `atora_api_keys` agregada a `V5_Installer::get_tables()` (nunca se había incluido — un fallo silencioso al crearla no habría bloqueado que el esquema se marcara completo).
+
+## TESTED
+
+Cobertura de test nueva en este sprint: `tests/Security/ClientIpTest.php`,
+`tests/Analytics/FormsThrottleTest.php` (extendido),
+`tests/Analytics/FormsSubmitOrderTest.php`,
+`tests/Messaging/DigestStoreLockingTest.php` (extendido),
+`tests/Messaging/TelegramChatUniquenessTest.php`,
+`tests/Enrollment/AccessLinkPasswordThrottleTest.php`,
+`tests/MCP/ApiKeyRateLimitTest.php` (extendido),
+`tests/LMS/LMSWpPostIdBindingTest.php` (extendido),
+`tests/LMS/GradeAppealOwnershipTest.php`,
+`tests/LMS/EnrollmentAjaxOwnershipTest.php`,
+`tests/CRM/CampaignScopeTest.php`.
+Suite completa de regresión (CRM, LMS ownership, draft/private,
+wp_post_id, instructor_id, WhatsApp, MCP, unsubscribe, Telegram) del
+6.4.0 en adelante revisada — sin regresiones.
+
+## REMAINING LOW-RISK ITEMS
+
+- **Academic wizard (`handle_wizard_save`) fix sin test automatizado**
+  — el fix está aplicado y verificado por lectura de código, pero no
+  tiene una prueba de regresión propia en este sprint por el costo de
+  levantar su cadena de dependencias (`check_admin_referer`,
+  `clms_core()`, `wp_safe_redirect`/`exit`). Riesgo residual bajo — la
+  lógica es idéntica al patrón ya probado en otros hallazgos de esta
+  misma auditoría.
+- **Telegram chat_id uniqueness — ventana de concurrencia** — el
+  candado (transient de 10s) es de mejor esfuerzo, no una garantía
+  atómica a nivel de BD; usermeta no soporta una restricción UNIQUE
+  nativa sobre `meta_value`. Documentado explícitamente en el propio
+  código (`class-telegram-bot.php`).
+- Recomendaciones no críticas heredadas de la auditoría v6.0.0 abajo
+  (CSP, SRI en CDN, segunda capa de MIME check) siguen pendientes,
+  sin relación con el alcance de 6.5.5.
+
+---
+
+# SECURITY AUDIT — ATORA LMS v6.0.0 (histórico)
 **Fecha:** 2026-05-18  
 **Auditor:** Agente autónomo Claude Code  
 **Alcance:** 786+ archivos PHP — módulos CRM, LMS, Email Engine, Automation, MCP

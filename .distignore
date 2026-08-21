@@ -13,5 +13,6 @@ vendor
 node_modules
 CHANGELOG.md
 SECURITY-AUDIT.md
+SECURITY-REPORT-*.md
 .DS_Store
 *.log
