@@ -90,6 +90,38 @@ class ClientIpTest extends TestCase {
 		$this->assertSame( '198.51.100.50', \ATORA_Client_IP::get() );
 	}
 
+	/**
+	 * PT-2 (6.5.7) — hallazgo real: la cadena debe recorrerse de
+	 * DERECHA a IZQUIERDA. El cliente controla el extremo izquierdo (lo
+	 * que él mismo escribe); un proxy de confianza real solo puede
+	 * APPENDEAR a la derecha. Si el "recorrido" fuera izquierda→derecha
+	 * (como en la versión anterior a este sprint), un atacante podía
+	 * anteponer una IP falsa y el proxy real simplemente la dejaría
+	 * pasar como primer valor "no confiable" encontrado.
+	 *
+	 * @test
+	 */
+	public function test_spoofed_left_value_is_ignored_when_trusted_proxy_appends_real_ip(): void {
+		$_SERVER['REMOTE_ADDR']          = '10.0.0.5'; // proxy de confianza real.
+		$_SERVER['HTTP_X_FORWARDED_FOR'] = '1.2.3.4, 203.0.113.20'; // 1.2.3.4 = valor inventado por el cliente; 203.0.113.20 = lo que el proxy de verdad anexó.
+
+		$this->assertSame( '203.0.113.20', \ATORA_Client_IP::get(), 'debe devolver lo que el proxy de confianza anexó, no lo que el cliente escribió a la izquierda' );
+	}
+
+	/**
+	 * Multi-hop: dos proxies de confianza intermedios, cliente real al
+	 * extremo izquierdo — debe resolver recorriendo de derecha a
+	 * izquierda y saltando cada hop confiable.
+	 *
+	 * @test
+	 */
+	public function test_multi_hop_chain_resolves_right_to_left_skipping_trusted_hops(): void {
+		$_SERVER['REMOTE_ADDR']          = '192.168.1.1'; // último proxy de confianza (proxy3, implícito en REMOTE_ADDR).
+		$_SERVER['HTTP_X_FORWARDED_FOR'] = '198.51.100.7, 10.0.0.2, 172.16.0.3'; // cliente, proxy1 (confiable), proxy2 (confiable).
+
+		$this->assertSame( '198.51.100.7', \ATORA_Client_IP::get() );
+	}
+
 	/** @test */
 	public function test_strips_port_from_ipv4_and_bracketed_ipv6(): void {
 		$_SERVER['REMOTE_ADDR']          = '10.1.1.1';

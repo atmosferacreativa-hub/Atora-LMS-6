@@ -93,14 +93,34 @@ class ATORA_Client_IP {
 	}
 
 	/**
-	 * Selecciona una IP válida desde una cabecera forwarded, priorizando la
-	 * primera IP no-proxy de la cadena X-Forwarded-For.
+	 * Selecciona la IP de cliente real desde una cadena X-Forwarded-For
+	 * (o cabecera equivalente de un solo valor, que igual funciona con
+	 * este mismo recorrido).
+	 *
+	 * PT-2 (6.5.7): hallazgo real — la versión anterior recorría la
+	 * cadena de IZQUIERDA a DERECHA y devolvía la primera que no fuera
+	 * un proxy de confianza. Eso es exactamente al revés de lo seguro:
+	 * el cliente controla el extremo IZQUIERDO de la cadena (puede
+	 * escribir cualquier valor ahí), y cada proxy de confianza real
+	 * solo puede APPENDEAR al final (derecha). Con REMOTE_ADDR
+	 * confiable y XFF = "1.2.3.4, 203.0.113.20" (el proxy añadió la IP
+	 * real del cliente a la derecha de lo que el propio cliente ya
+	 * había mandado), la versión anterior devolvía "1.2.3.4" —
+	 * exactamente el valor que el atacante puso — en vez de
+	 * "203.0.113.20".
+	 *
+	 * Algoritmo correcto: recorrer de DERECHA a IZQUIERDA (el salto más
+	 * cercano a REMOTE_ADDR primero) saltando cada hop que sea, a su
+	 * vez, un proxy de confianza; el primer hop NO confiable hallado en
+	 * ese recorrido es el cliente real. Solo si la cadena entera
+	 * resultara ser proxies de confianza (caso degenerado) se cae al
+	 * hop más a la derecha como mejor esfuerzo.
 	 *
 	 * @param string $raw
 	 * @return string
 	 */
 	private static function extract_forwarded_ip( string $raw ): string {
-		$candidates = array_map( 'trim', explode( ',', $raw ) );
+		$candidates = array_reverse( array_map( 'trim', explode( ',', $raw ) ) );
 		$fallback   = '';
 
 		foreach ( $candidates as $candidate ) {
@@ -148,8 +168,11 @@ class ATORA_Client_IP {
 
 		$trusted = apply_filters( 'atora_client_ip_trusted_proxies', $default_trusted );
 		$legacy  = apply_filters( 'clms_student_assistant_trusted_proxies', $default_trusted );
+		// PT-2 (6.5.7): alias con el nombre que documenta la OT de este
+		// sprint — mismo filtro, para quien ya lo use con ese nombre.
+		$cidrs   = apply_filters( 'atora_trusted_proxy_cidrs', $default_trusted );
 
-		$rules = array_merge( (array) $trusted, (array) $legacy );
+		$rules = array_merge( (array) $trusted, (array) $legacy, (array) $cidrs );
 
 		foreach ( $rules as $rule ) {
 			$rule = trim( (string) $rule );
