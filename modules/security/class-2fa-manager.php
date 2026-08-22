@@ -168,8 +168,10 @@ class Two_FA_Manager {
 	public static function ajax_verify(): void {
 		check_ajax_referer( 'atora_2fa_verify' );
 
-		// Rate limit: máx 10 intentos por IP en 5 minutos.
-		$ip = sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ?? '' ) );
+		// PT-8 (6.5.8): usaba REMOTE_ADDR directo, sin pasar por el
+		// resolutor de proxy confiable — evadible/inconsistente detrás
+		// de un proxy real. Rate limit: máx 10 intentos por IP en 5 minutos.
+		$ip = class_exists( 'ATORA_Client_IP' ) ? \ATORA_Client_IP::get() : '';
 		if ( class_exists( 'ATORA_Security' ) && ! ATORA_Security::rate_limit( '2fa_verify_' . md5( $ip ), 10, 300 ) ) {
 			wp_send_json_error( array( 'message' => __( 'Demasiados intentos. Espera unos minutos.', 'atora-lms' ) ), 429 );
 		}
@@ -200,8 +202,10 @@ class Two_FA_Manager {
 	public static function ajax_resend(): void {
 		check_ajax_referer( 'atora_2fa_resend' );
 
+		// PT-8 (6.5.8): mismo fix que ajax_verify() — IP resuelta vía el
+		// resolutor centralizado en vez de REMOTE_ADDR directo.
 		// Rate limit: máx 5 reenvíos por IP en 10 minutos.
-		$ip = sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ?? '' ) );
+		$ip = class_exists( 'ATORA_Client_IP' ) ? \ATORA_Client_IP::get() : '';
 		if ( class_exists( 'ATORA_Security' ) && ! ATORA_Security::rate_limit( '2fa_resend_' . md5( $ip ), 5, 600 ) ) {
 			wp_send_json_error( array( 'message' => __( 'Demasiados reenvíos. Espera unos minutos.', 'atora-lms' ) ), 429 );
 		}

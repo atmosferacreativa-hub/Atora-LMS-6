@@ -329,10 +329,15 @@ trait CLMS_Grading_AI_Review_Trait {
 			);
 		}
 
-		// Rate limit: max 5 revisiones IA por usuario cada 5 minutos
-		$rl_key   = 'clms_rl_airev_' . absint( $user_id );
-		$rl_count = (int) get_transient( $rl_key );
-		if ( $rl_count >= 5 ) {
+		// PT-5.3 (6.5.8): migrado de get_transient()/set_transient() (no
+		// atómico) a ATORA_Rate_Limiter — una revisión IA es una
+		// operación con costo real, así que se falla cerrado si el
+		// backend del limiter no está disponible.
+		// Rate limit: max 5 revisiones IA por usuario cada 5 minutos.
+		$rl_allowed = class_exists( 'ATORA_Rate_Limiter' )
+			&& \ATORA_Rate_Limiter::consume( 'grading_ai_review', (string) absint( $user_id ), 5, 5 * MINUTE_IN_SECONDS, false );
+
+		if ( ! $rl_allowed ) {
 			wp_send_json_error(
 				array(
 					'message' => __( 'Límite de revisiones IA alcanzado. Espera unos minutos antes de continuar.', 'atora-lms' ),
@@ -340,7 +345,6 @@ trait CLMS_Grading_AI_Review_Trait {
 				429
 			);
 		}
-		set_transient( $rl_key, $rl_count + 1, 5 * MINUTE_IN_SECONDS );
 
 		$result = $this->handle_ai_generate_request( $submission_id, $user_id, $nonce );
 

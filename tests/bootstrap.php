@@ -521,6 +521,11 @@ if ( file_exists( $client_ip_file ) ) {
 	require_once $client_ip_file;
 }
 
+$atora_security_file = __DIR__ . '/../includes/class-security.php';
+if ( file_exists( $atora_security_file ) ) {
+	require_once $atora_security_file;
+}
+
 $rate_limiter_file = __DIR__ . '/../includes/class-atora-rate-limiter.php';
 if ( file_exists( $rate_limiter_file ) ) {
 	require_once $rate_limiter_file;

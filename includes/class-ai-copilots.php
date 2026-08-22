@@ -270,10 +270,21 @@ class CLMS_AI_Copilots {
 		}
 	}
 
+	/**
+	 * PT-5.2 (6.5.8): antes usaba REMOTE_ADDR directo (sin pasar por el
+	 * resolutor de proxy confiable) para identificar invitados, y un
+	 * contador get_transient()/set_transient() no atómico — cada
+	 * respuesta de este limiter cuesta una llamada real a un proveedor
+	 * de IA, así que una condición de carrera acá no es solo un
+	 * problema de exactitud sino de costo. Migrado a
+	 * ATORA_Client_IP::get() + ATORA_Rate_Limiter::consume(),
+	 * fail-closed: si el backend del limiter falla, se bloquea en vez
+	 * de permitir tráfico ilimitado.
+	 */
 	private function check_rate_limit( $copilot, $user_id ) {
 		if ( $user_id <= 0 && self::COPILOT_COMMERCIAL === $copilot ) {
-			$client_key = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : 'guest';
-			$client_key = hash( 'sha256', $client_key . '|' . wp_salt( 'auth' ) );
+			$client_ip  = class_exists( 'ATORA_Client_IP' ) ? \ATORA_Client_IP::get() : '';
+			$client_key = hash( 'sha256', ( '' !== $client_ip ? $client_ip : 'guest' ) . '|' . wp_salt( 'auth' ) );
 			$user_key   = 'g_' . $client_key;
 			$limit      = (int) $this->get_limit_for_role( 'guest' );
 		} else {
@@ -285,14 +296,12 @@ class CLMS_AI_Copilots {
 
 		$limit = max( 1, $limit );
 		$window_seconds = HOUR_IN_SECONDS;
-		$key = 'clms_ai_rl_' . sanitize_key( $copilot ) . '_' . sanitize_key( $user_key );
-		$count = (int) get_transient( $key );
-		if ( $count >= $limit ) {
-			return false;
+
+		if ( ! class_exists( 'ATORA_Rate_Limiter' ) ) {
+			return false; // fail-closed: sin el limiter disponible, no se permite consumo de IA.
 		}
 
-		set_transient( $key, $count + 1, $window_seconds );
-		return true;
+		return \ATORA_Rate_Limiter::consume( 'ai_copilots_' . sanitize_key( $copilot ), sanitize_key( $user_key ), $limit, $window_seconds, false );
 	}
 
 	private function get_limit_for_role( $role ) {

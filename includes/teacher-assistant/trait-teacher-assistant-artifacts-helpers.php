@@ -263,8 +263,12 @@ trait CLMS_Teacher_Assistant_Artifacts_Helpers_Trait {
 	// ── Helpers ───────────────────────────────────────────────────────────────
 
 	/**
-	 * Rate limiter por usuario/acción vía transients.
-	 * Devuelve true si la petición está dentro del límite, false si lo supera.
+	 * Rate limiter por usuario/acción — PT-5.4 (6.5.8): migrado de
+	 * get_transient()/set_transient() (no atómico, y cada renovación
+	 * extendía la ventana completa en vez de mantener una ventana fija)
+	 * a ATORA_Rate_Limiter. El Teacher Assistant dispara operaciones de
+	 * IA con costo real, así que se falla cerrado si el backend del
+	 * limiter no está disponible.
 	 *
 	 * @param int    $user_id        ID del usuario.
 	 * @param string $action         Clave única de la acción.
@@ -273,22 +277,17 @@ trait CLMS_Teacher_Assistant_Artifacts_Helpers_Trait {
 	 * @return bool
 	 */
 	protected function check_rate_limit( $user_id, $action, $max_requests, $window_seconds ) {
-		$key   = 'clms_rl_' . sanitize_key( $action ) . '_' . absint( $user_id );
-		$count = (int) get_transient( $key );
-
-		if ( $count >= $max_requests ) {
+		if ( ! class_exists( 'ATORA_Rate_Limiter' ) ) {
 			return false;
 		}
 
-		if ( 0 === $count ) {
-			set_transient( $key, 1, (int) $window_seconds );
-		} else {
-			// Preserva el TTL restante (get_transient no expone TTL; usamos set_transient
-			// con la ventana completa — margen aceptable para uso educativo).
-			set_transient( $key, $count + 1, (int) $window_seconds );
-		}
-
-		return true;
+		return \ATORA_Rate_Limiter::consume(
+			'teacher_assistant_' . sanitize_key( $action ),
+			(string) absint( $user_id ),
+			max( 1, (int) $max_requests ),
+			max( 1, (int) $window_seconds ),
+			false
+		);
 	}
 
 	protected function current_user_can_use_assistant() {

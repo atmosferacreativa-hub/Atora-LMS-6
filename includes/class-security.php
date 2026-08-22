@@ -134,20 +134,16 @@ class ATORA_Security {
 	 * @return bool True si está dentro del límite.
 	 */
 	public static function rate_limit( string $key, int $max = 10, int $window_sec = 60 ): bool {
-		$transient_key = 'atora_rl_' . md5( $key );
-		$current       = (int) get_transient( $transient_key );
-
-		if ( $current >= $max ) {
+		// PT-5.5 (6.5.8): migrado de get_transient()/set_transient()
+		// (lectura-incremento-escritura no atómico) a
+		// ATORA_Rate_Limiter — este helper genérico protege flujos de
+		// autenticación (2FA verify/resend), así que se falla cerrado
+		// si el backend del limiter no está disponible.
+		if ( ! class_exists( 'ATORA_Rate_Limiter' ) ) {
 			return false;
 		}
 
-		if ( 0 === $current ) {
-			set_transient( $transient_key, 1, $window_sec );
-		} else {
-			set_transient( $transient_key, $current + 1, $window_sec );
-		}
-
-		return true;
+		return \ATORA_Rate_Limiter::consume( 'atora_security_rate_limit', $key, max( 1, $max ), max( 1, $window_sec ), false );
 	}
 
 	// ── Respuestas coherentes ─────────────────────────────────────────────
