@@ -248,48 +248,62 @@ class Telegram_Bot {
 			wp_send_json_error( array( 'message' => __( 'Código inválido o expirado.', 'atora-lms' ) ) );
 		}
 
-		// PT-4 (6.5.5): un chat_id no puede quedar vinculado a dos
-		// cuentas de WP a la vez — antes update_user_meta() sobrescribía
-		// silenciosamente cualquier vínculo anterior de OTRO usuario a
-		// este mismo chat_id (usermeta no tiene una restricción UNIQUE
-		// nativa sobre meta_value). Política explícita: si el chat ya
-		// pertenece a otra cuenta, se rechaza — nunca se transfiere
-		// solo. Mismo usuario reintentando su propio chat_id es
-		// idempotente (éxito, sin duplicar nada).
-		//
-		// Concurrencia: dos solicitudes de vinculación simultáneas para
-		// el mismo chat_id, de usuarios distintos, podrían en teoría
-		// pasar ambas esta comprobación antes de que cualquiera escriba
-		// — el modelo usermeta no ofrece una restricción UNIQUE a nivel
-		// de BD para cerrar esa ventana por completo (limitación
-		// documentada en SECURITY-AUDIT.md). El candado corto de abajo
-		// (transient) es mitigación de mejor esfuerzo, no una garantía
-		// atómica — reduce la ventana de carrera a la práctica sin
-		// requerir una tabla nueva solo para esto.
-		$lock_key = 'atora_tg_link_lock_' . md5( $chat_id );
-		if ( get_transient( $lock_key ) ) {
-			wp_send_json_error( array( 'message' => __( 'Ese chat ya está siendo vinculado, intenta de nuevo en unos segundos.', 'atora-lms' ) ) );
-		}
-		set_transient( $lock_key, 1, 10 );
-
+		// PT-5 (6.5.7): un chat_id no puede quedar vinculado a dos
+		// cuentas de WP a la vez. La versión anterior (6.5.5) solo tenía
+		// un chequeo de aplicación + un candado de transient de mejor
+		// esfuerzo — ninguno de los dos es una garantía real bajo
+		// concurrencia, porque usermeta no soporta una restricción
+		// UNIQUE a nivel de BD. Ahora la unicidad la impone la propia
+		// base de datos: atora_telegram_links tiene UNIQUE KEY sobre
+		// user_id Y sobre chat_id, así que aunque dos solicitudes
+		// pasen ambas la comprobación de "¿ya existe?" antes de que
+		// cualquiera escriba, el INSERT solo puede tener éxito para UNA
+		// de ellas — MySQL rechaza la segunda con un error de clave
+		// duplicada, que $wpdb->insert() reporta como false.
 		$existing_user_id = self::get_user_by_chat( $chat_id );
 
 		if ( $existing_user_id && $existing_user_id === $user_id ) {
 			delete_transient( 'atora_tg_link_' . $code );
-			delete_transient( $lock_key );
 			self::reset_link_attempts( $user_id );
 			wp_send_json_success( array( 'message' => __( 'Esta cuenta ya estaba vinculada con este chat de Telegram.', 'atora-lms' ) ) );
 		}
 
 		if ( $existing_user_id && $existing_user_id !== $user_id ) {
-			delete_transient( $lock_key );
+			wp_send_json_error( array( 'message' => __( 'Este chat de Telegram ya está vinculado a otra cuenta. Desvincúlalo primero para poder usarlo aquí.', 'atora-lms' ) ) );
+		}
+
+		global $wpdb;
+		$links_table = $wpdb->prefix . 'atora_telegram_links';
+
+		// Re-vincular: si este usuario ya tenía OTRO chat vinculado,
+		// se reemplaza (un usuario, un chat — la UNIQUE KEY sobre
+		// user_id no permitiría dos filas para el mismo usuario).
+		$wpdb->delete( $links_table, array( 'user_id' => $user_id ), array( '%d' ) );
+
+		$inserted = $wpdb->insert(
+			$links_table,
+			array(
+				'user_id'   => $user_id,
+				'chat_id'   => $chat_id,
+				'linked_at' => current_time( 'mysql', true ),
+			),
+			array( '%d', '%s', '%s' )
+		);
+
+		if ( ! $inserted ) {
+			// Backstop real de concurrencia: otra solicitud ganó la
+			// carrera y reclamó este chat_id entre nuestra comprobación
+			// de arriba y este INSERT — la UNIQUE KEY de la BD lo
+			// impidió. No se transfiere ni se ignora el error.
 			wp_send_json_error( array( 'message' => __( 'Este chat de Telegram ya está vinculado a otra cuenta. Desvincúlalo primero para poder usarlo aquí.', 'atora-lms' ) ) );
 		}
 
 		self::reset_link_attempts( $user_id );
+		// usermeta se mantiene en paralelo — otros módulos (CRM) todavía
+		// lo leen directamente; atora_telegram_links es quien decide
+		// unicidad, no esta línea.
 		update_user_meta( $user_id, 'atora_telegram_chat_id', $chat_id );
 		delete_transient( 'atora_tg_link_' . $code );
-		delete_transient( $lock_key );
 
 		self::api_send_message(
 			$chat_id,
@@ -362,8 +376,11 @@ class Telegram_Bot {
 	private static function get_user_by_chat( string $chat_id ): ?int {
 		global $wpdb;
 
+		// PT-5 (6.5.7): atora_telegram_links es ahora la fuente de
+		// verdad para unicidad (UNIQUE KEY chat_id a nivel de BD) — ya
+		// no usermeta, que nunca pudo garantizar esa restricción.
 		$id = $wpdb->get_var( $wpdb->prepare(
-			"SELECT user_id FROM {$wpdb->usermeta} WHERE meta_key = 'atora_telegram_chat_id' AND meta_value = %s LIMIT 1",
+			"SELECT user_id FROM {$wpdb->prefix}atora_telegram_links WHERE chat_id = %s LIMIT 1",
 			$chat_id
 		) );
 

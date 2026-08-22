@@ -1,18 +1,24 @@
 <?php
 /**
  * Telegram_Bot::ajax_link_account() — un chat_id no puede pertenecer
- * a dos usuarios — PT-4 (sprint 6.5.5).
+ * a dos usuarios — PT-4 (sprint 6.5.5), endurecido con unicidad real
+ * a nivel de BD en PT-5 (sprint 6.5.7).
  *
- * Hallazgo confirmado: update_user_meta($user_id, 'atora_telegram_chat_id', $chat_id)
- * sobrescribía silenciosamente cualquier vínculo previo de OTRO
- * usuario a ese mismo chat_id — usermeta no tiene una restricción
- * UNIQUE nativa sobre meta_value, así que nada lo impedía a nivel de
- * aplicación tampoco, hasta este sprint.
+ * Hallazgo confirmado en 6.5.5: update_user_meta() sobrescribía
+ * silenciosamente cualquier vínculo previo de OTRO usuario a ese
+ * mismo chat_id — usermeta no tiene restricción UNIQUE nativa. 6.5.5
+ * agregó un chequeo de aplicación + un candado de transient de mejor
+ * esfuerzo (no una garantía real bajo concurrencia). 6.5.7 mueve la
+ * fuente de verdad a atora_telegram_links, con UNIQUE KEY sobre
+ * user_id Y sobre chat_id — el fixture de $wpdb simula esa
+ * restricción de verdad (insert() rechaza cualquier fila que
+ * choque), incluyendo el caso de "otra solicitud ganó la carrera"
+ * justo antes del INSERT de este proceso.
  *
  * ajax_link_account() termina en exit() (wp_send_json_*), así que
  * cada escenario corre en un proceso PHP aparte vía proc_open()
  * sobre fixtures/run-telegram-link.php, que vuelca el estado final de
- * usermeta a un archivo para que este test lo revise después.
+ * la tabla simulada a un archivo para que este test lo revise después.
  *
  * @package ATORA_LMS\Tests\Messaging
  */
@@ -104,12 +110,12 @@ class TelegramChatUniquenessTest extends TestCase {
 			'ATORA_TEST_EXISTING_OWNER' => '11',
 		) );
 
-		// El shutdown function del runner solo vuelca lo que quedó en
-		// usermeta — como ya pertenecía a 11 y el flujo idempotente
-		// sale antes de tocar usermeta de nuevo, no debe haber una
-		// escritura nueva (ni, desde luego, un segundo usuario).
+		// El shutdown function vuelca el estado final de la tabla — como
+		// el chat ya pertenecía a 11 y el flujo idempotente sale antes
+		// de tocar la tabla de nuevo, debe seguir habiendo exactamente
+		// una fila, y sigue siendo la de 11 (no se duplicó ni se perdió).
 		$this->assertNotNull( $result );
-		$this->assertSame( array(), $result['linked_user_ids'] ?? null, 'camino idempotente: no debe volver a escribir usermeta' );
+		$this->assertSame( array( 11 ), $result['linked_user_ids'] ?? null, 'camino idempotente: el vínculo existente de 11 debe seguir intacto, sin duplicarse' );
 	}
 
 	/**
@@ -126,6 +132,29 @@ class TelegramChatUniquenessTest extends TestCase {
 		) );
 
 		$this->assertNotNull( $result );
-		$this->assertSame( array(), $result['linked_user_ids'] ?? null, 'el usuario 13 no debe quedar vinculado a un chat que ya es de otro usuario' );
+		$this->assertSame( array( 12 ), $result['linked_user_ids'] ?? null, 'el chat debe seguir siendo de 12 — nunca transferido silenciosamente a 13' );
+	}
+
+	/**
+	 * Backstop real de concurrencia (PT-5, 6.5.7): dos solicitudes
+	 * "simultáneas" para el mismo chat_id — el chequeo de aplicación
+	 * (get_user_by_chat) pasa para ambas porque ninguna ve todavía la
+	 * fila de la otra, pero el INSERT final solo puede tener éxito para
+	 * UNA, por la UNIQUE KEY de la tabla. La solicitud que pierde la
+	 * carrera debe recibir un error claro, nunca un éxito silencioso ni
+	 * un estado corrupto.
+	 *
+	 * @test
+	 */
+	public function test_losing_a_concurrent_link_race_is_rejected_not_silently_accepted(): void {
+		$result = $this->run_scenario( array(
+			'ATORA_TEST_CURRENT_USER'    => '14',
+			'ATORA_TEST_CHAT_ID'         => '555003',
+			'ATORA_TEST_EXISTING_OWNER'  => '',
+			'ATORA_TEST_SIMULATE_RACE'   => '1',
+		) );
+
+		$this->assertNotNull( $result );
+		$this->assertSame( array(), $result['linked_user_ids'] ?? null, 'si el INSERT pierde la carrera (UNIQUE KEY), el usuario 14 no debe quedar vinculado' );
 	}
 }

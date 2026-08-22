@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class V5_Installer {
 
 	/** Versión del esquema. Incrementar para forzar re-instalación. */
-	const SCHEMA_VERSION = '5.1.5-generic-rate-limiter-table';
+	const SCHEMA_VERSION = '5.1.6-telegram-links-table';
 
 	/** Option key que almacena la versión instalada. */
 	const OPTION_KEY = 'atora_v5_schema_version';
@@ -38,7 +38,7 @@ class V5_Installer {
 			return;
 		}
 
-		if ( self::create_tables() && self::migrate_wp_post_id_nullable_columns() && self::migrate_rate_limit_indexes() ) {
+		if ( self::create_tables() && self::migrate_wp_post_id_nullable_columns() && self::migrate_rate_limit_indexes() && self::migrate_telegram_links_from_usermeta() ) {
 			update_option( self::OPTION_KEY, self::SCHEMA_VERSION );
 		}
 	}
@@ -49,7 +49,7 @@ class V5_Installer {
 	 * @return void
 	 */
 	public static function force_install(): void {
-		if ( self::create_tables() && self::migrate_wp_post_id_nullable_columns() && self::migrate_rate_limit_indexes() ) {
+		if ( self::create_tables() && self::migrate_wp_post_id_nullable_columns() && self::migrate_rate_limit_indexes() && self::migrate_telegram_links_from_usermeta() ) {
 			update_option( self::OPTION_KEY, self::SCHEMA_VERSION );
 		}
 	}
@@ -206,6 +206,84 @@ class V5_Installer {
 		);
 
 		return ! empty( $row );
+	}
+
+	/**
+	 * PT-5 (6.5.7): backfill de atora_telegram_links desde usermeta,
+	 * para instalaciones que ya tenían vínculos de Telegram antes de
+	 * esta tabla existir. Idempotente — una fila ya presente para un
+	 * user_id se deja intacta (no se reintenta ni se sobreescribe).
+	 *
+	 * Si dos usuarios distintos tenían el MISMO chat_id en usermeta
+	 * (posible bajo el modelo anterior, sin restricción UNIQUE real),
+	 * no se decide arbitrariamente cuál es el válido: se registra el
+	 * conflicto vía error_log() para revisión manual y esa fila NO se
+	 * migra — el primer usuario en reclamarlo (por orden de ejecución)
+	 * queda con el vínculo en la tabla nueva; el resto sigue en
+	 * usermeta sin tocar, disponible para que un administrador lo
+	 * revise, nunca borrado silenciosamente.
+	 *
+	 * @return bool true si la tabla existe (migración corrida o no
+	 *              necesaria); false solo si la tabla ni siquiera existe.
+	 */
+	private static function migrate_telegram_links_from_usermeta(): bool {
+		global $wpdb;
+
+		$table = $wpdb->prefix . 'atora_telegram_links';
+		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) ) !== $table ) {
+			return false;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$rows = $wpdb->get_results(
+			"SELECT user_id, meta_value AS chat_id FROM {$wpdb->usermeta} WHERE meta_key = 'atora_telegram_chat_id' AND meta_value != ''", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			ARRAY_A
+		);
+
+		foreach ( (array) $rows as $row ) {
+			$user_id = absint( $row['user_id'] ?? 0 );
+			$chat_id = sanitize_text_field( (string) ( $row['chat_id'] ?? '' ) );
+
+			if ( ! $user_id || '' === $chat_id ) {
+				continue;
+			}
+
+			$already_migrated = (int) $wpdb->get_var(
+				$wpdb->prepare( "SELECT user_id FROM {$table} WHERE user_id = %d", $user_id ) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			);
+			if ( $already_migrated ) {
+				continue;
+			}
+
+			$chat_owner = (int) $wpdb->get_var(
+				$wpdb->prepare( "SELECT user_id FROM {$table} WHERE chat_id = %s", $chat_id ) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			);
+			if ( $chat_owner && $chat_owner !== $user_id ) {
+				if ( function_exists( 'error_log' ) ) {
+					error_log( // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+						sprintf(
+							'[ATORA][telegram-migration] chat_id %s ya reclamado por user_id %d — user_id %d no migrado, requiere revisión manual (dato ambiguo heredado de usermeta, no se resuelve automáticamente).',
+							$chat_id,
+							$chat_owner,
+							$user_id
+						)
+					);
+				}
+				continue;
+			}
+
+			$wpdb->insert(
+				$table,
+				array(
+					'user_id'   => $user_id,
+					'chat_id'   => $chat_id,
+					'linked_at' => current_time( 'mysql', true ),
+				),
+				array( '%d', '%s', '%s' )
+			);
+		}
+
+		return true;
 	}
 
 	/**
@@ -560,6 +638,27 @@ class V5_Installer {
 			created_at DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			PRIMARY KEY  (id),
 			KEY queue_id (queue_id)
+		) $charset_collate;" );
+
+		// PT-5 (6.5.7): fuente de verdad para la unicidad del vínculo
+		// Telegram — antes solo vivía en usermeta (sin restricción
+		// UNIQUE nativa posible) más un candado de mejor esfuerzo vía
+		// transient. UNIQUE(user_id) + UNIQUE(chat_id) hace que la
+		// propia base de datos rechace, a nivel de fila, cualquier
+		// intento de vincular el mismo chat a dos usuarios — incluso
+		// bajo dos solicitudes concurrentes, MySQL solo permite que una
+		// de las dos inserciones tenga éxito. usermeta se mantiene en
+		// paralelo (Telegram_Bot::ajax_link_account() sigue
+		// escribiéndolo) porque otros módulos (CRM) todavía lo leen
+		// directamente; esta tabla es la que decide unicidad de verdad.
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_telegram_links (
+			id         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			user_id    BIGINT UNSIGNED NOT NULL,
+			chat_id    VARCHAR(64)     NOT NULL,
+			linked_at  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			UNIQUE KEY user_id (user_id),
+			UNIQUE KEY chat_id (chat_id)
 		) $charset_collate;" );
 
 		dbDelta( "CREATE TABLE {$wpdb->prefix}atora_conversations (
@@ -1319,6 +1418,7 @@ class V5_Installer {
 			// Messaging.
 			"{$wpdb->prefix}atora_message_queue",
 			"{$wpdb->prefix}atora_message_log",
+			"{$wpdb->prefix}atora_telegram_links",
 			"{$wpdb->prefix}atora_conversations",
 			"{$wpdb->prefix}atora_conversation_messages",
 			// CRM.
