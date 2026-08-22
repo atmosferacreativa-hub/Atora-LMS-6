@@ -91,7 +91,30 @@ if ( ! function_exists( 'wp_generate_uuid4' ) ) {
 	}
 }
 if ( ! function_exists( 'do_action' ) )        { function do_action( string $hook, ...$args ): void {} }
-if ( ! function_exists( 'apply_filters' ) )    { function apply_filters( string $hook, $value, ...$args ) { return $value; } }
+// PT-1 (6.5.8): apply_filters() ahora despacha de verdad contra
+// callbacks registrados con add_filter() (ver más abajo) — antes era
+// un passthrough puro, así que ningún test podía configurar un filtro
+// (p.ej. atora_client_ip_trusted_proxies) y verificar su efecto.
+// Comportamiento sin cambios cuando no hay callbacks registrados para
+// un hook: sigue devolviendo $value tal cual.
+$GLOBALS['__atora_test_filters'] = array();
+if ( ! function_exists( 'apply_filters' ) ) {
+	function apply_filters( string $hook, $value, ...$args ) {
+		foreach ( $GLOBALS['__atora_test_filters'][ $hook ] ?? array() as $entry ) {
+			$value = call_user_func( $entry['cb'], $value, ...$args );
+		}
+		return $value;
+	}
+}
+if ( ! function_exists( 'atora_test_reset_filters' ) ) {
+	function atora_test_reset_filters( string $hook = '' ): void {
+		if ( '' === $hook ) {
+			$GLOBALS['__atora_test_filters'] = array();
+		} else {
+			unset( $GLOBALS['__atora_test_filters'][ $hook ] );
+		}
+	}
+}
 $GLOBALS['__atora_test_options'] = array();
 if ( ! function_exists( 'get_option' ) )       {
 	function get_option( string $k, $default = false ) {
@@ -428,7 +451,10 @@ if ( ! function_exists( 'add_action' ) ) {
 	function add_action( $hook, $cb, $priority = 10, $args = 1 ): bool { return true; }
 }
 if ( ! function_exists( 'add_filter' ) ) {
-	function add_filter( $hook, $cb, $priority = 10, $args = 1 ): bool { return true; }
+	function add_filter( $hook, $cb, $priority = 10, $args = 1 ): bool {
+		$GLOBALS['__atora_test_filters'][ $hook ][] = array( 'cb' => $cb, 'priority' => $priority, 'args' => $args );
+		return true;
+	}
 }
 
 // Cargar servicios bajo test

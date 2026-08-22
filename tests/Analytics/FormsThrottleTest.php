@@ -86,12 +86,14 @@ class FormsThrottleTest extends TestCase {
 	protected function setUp(): void {
 		parent::setUp();
 		atora_test_reset_post_meta();
+		atora_test_reset_filters();
 		$_SERVER['REMOTE_ADDR'] = '203.0.113.10';
 		unset( $_SERVER['HTTP_X_FORWARDED_FOR'], $_SERVER['HTTP_CLIENT_IP'], $_SERVER['HTTP_CF_CONNECTING_IP'], $_SERVER['HTTP_X_REAL_IP'] );
 	}
 
 	protected function tearDown(): void {
 		atora_test_reset_post_meta();
+		atora_test_reset_filters();
 		unset( $_SERVER['REMOTE_ADDR'], $_SERVER['HTTP_X_FORWARDED_FOR'], $_SERVER['HTTP_CLIENT_IP'], $_SERVER['HTTP_CF_CONNECTING_IP'], $_SERVER['HTTP_X_REAL_IP'] );
 		parent::tearDown();
 	}
@@ -204,7 +206,13 @@ class FormsThrottleTest extends TestCase {
 	public function test_forwarded_header_behind_trusted_proxy_is_used(): void {
 		$original = $this->install_wpdb_fixture();
 
-		$_SERVER['REMOTE_ADDR']         = '10.0.0.5'; // dentro del rango privado confiable por defecto.
+		// PT-1 (6.5.8): los rangos privados ya no son confiables por
+		// defecto ("PRIVATE IP ≠ TRUSTED PROXY") — se configura
+		// explícitamente para este test, igual que tendría que hacerlo
+		// un sitio real detrás de un proxy en una IP privada.
+		add_filter( 'atora_client_ip_trusted_proxies', static function () { return array( '10.0.0.5' ); } );
+
+		$_SERVER['REMOTE_ADDR']         = '10.0.0.5'; // proxy explícitamente confiable para este test.
 		$_SERVER['HTTP_X_FORWARDED_FOR'] = '198.51.100.77';
 
 		for ( $i = 0; $i < 10; $i++ ) {

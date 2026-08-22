@@ -12,6 +12,23 @@
  * Forms_Builder::get_client_ip(), confiaban en X-Forwarded-For sin
  * verificar el origen — evadible con una cabecera falsificada).
  *
+ * Sprint 6.5.7 (Prioridad 2): corrige el sentido de recorrido de
+ * X-Forwarded-For (derecha→izquierda, no izquierda→derecha).
+ *
+ * Sprint 6.5.8 (Prioridad 1): hallazgo real remanente — los rangos
+ * RFC1918 (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, fc00::/7)
+ * estaban en la lista de proxies confiables POR DEFECTO. Una IP
+ * privada no implica "proxy que reescribe cabeceras de identidad de
+ * forma confiable" — puede ser un balanceador, un ingress de
+ * Kubernetes, un contenedor, o simplemente otra máquina de la misma
+ * LAN. PRIVATE IP ≠ TRUSTED PROXY. La lista por defecto pasa a ser
+ * conservadora (solo loopback); cualquier otro rango debe
+ * configurarse explícitamente vía filtro. Además, CF-Connecting-IP
+ * ahora tiene su propia lista de confianza separada
+ * (`atora_trusted_cloudflare_cidrs`, vacía por defecto) — un proxy
+ * genérico confiable NO autoriza automáticamente ese header
+ * específico de Cloudflare.
+ *
  * @package ATORA_LMS
  * @since   6.5.5
  */
@@ -54,9 +71,12 @@ class ATORA_Client_IP {
 
 	/**
 	 * Resuelve IP de cliente respetando proxies confiables: REMOTE_ADDR
-	 * es la fuente de verdad; las cabeceras reenviadas (CF-Connecting-IP,
-	 * X-Real-IP, X-Forwarded-For, X-Forwarded) solo se consultan si
-	 * REMOTE_ADDR coincide con un proxy conocido/configurado.
+	 * es la fuente de verdad. CF-Connecting-IP solo se consulta si
+	 * REMOTE_ADDR está en la lista Cloudflare configurada
+	 * explícitamente (separada de la lista de proxies genéricos). Las
+	 * demás cabeceras reenviadas (X-Real-IP, X-Forwarded-For,
+	 * X-Forwarded) solo se consultan si REMOTE_ADDR está en la lista
+	 * de proxies genéricos confiables.
 	 *
 	 * @return string
 	 */
@@ -66,12 +86,26 @@ class ATORA_Client_IP {
 			return '';
 		}
 
-		if ( ! self::is_trusted_proxy_ip( $remote_addr ) ) {
+		// PT-1 (6.5.8): CF-Connecting-IP es un header de UN solo valor
+		// (Cloudflare nunca lo emite como cadena) y solo tiene
+		// autoridad si REMOTE_ADDR pertenece a un rango Cloudflare
+		// realmente configurado — nunca por pertenecer a un proxy
+		// genérico o a un rango privado.
+		if ( self::is_trusted_cloudflare_ip( $remote_addr ) ) {
+			$raw = isset( $_SERVER['HTTP_CF_CONNECTING_IP'] ) ? wp_unslash( $_SERVER['HTTP_CF_CONNECTING_IP'] ) : '';
+			if ( '' !== $raw ) {
+				$candidate = self::normalize_ip_candidate( (string) $raw );
+				if ( '' !== $candidate ) {
+					return $candidate;
+				}
+			}
+		}
+
+		if ( ! self::is_trusted_generic_proxy_ip( $remote_addr ) ) {
 			return $remote_addr;
 		}
 
 		$forwarded_headers = array(
-			'HTTP_CF_CONNECTING_IP',
 			'HTTP_X_REAL_IP',
 			'HTTP_X_FORWARDED_FOR',
 			'HTTP_X_FORWARDED',
@@ -97,22 +131,10 @@ class ATORA_Client_IP {
 	 * (o cabecera equivalente de un solo valor, que igual funciona con
 	 * este mismo recorrido).
 	 *
-	 * PT-2 (6.5.7): hallazgo real — la versión anterior recorría la
-	 * cadena de IZQUIERDA a DERECHA y devolvía la primera que no fuera
-	 * un proxy de confianza. Eso es exactamente al revés de lo seguro:
-	 * el cliente controla el extremo IZQUIERDO de la cadena (puede
-	 * escribir cualquier valor ahí), y cada proxy de confianza real
-	 * solo puede APPENDEAR al final (derecha). Con REMOTE_ADDR
-	 * confiable y XFF = "1.2.3.4, 203.0.113.20" (el proxy añadió la IP
-	 * real del cliente a la derecha de lo que el propio cliente ya
-	 * había mandado), la versión anterior devolvía "1.2.3.4" —
-	 * exactamente el valor que el atacante puso — en vez de
-	 * "203.0.113.20".
-	 *
-	 * Algoritmo correcto: recorrer de DERECHA a IZQUIERDA (el salto más
-	 * cercano a REMOTE_ADDR primero) saltando cada hop que sea, a su
-	 * vez, un proxy de confianza; el primer hop NO confiable hallado en
-	 * ese recorrido es el cliente real. Solo si la cadena entera
+	 * Algoritmo: recorrer de DERECHA a IZQUIERDA (el salto más cercano
+	 * a REMOTE_ADDR primero) saltando cada hop que sea, a su vez, un
+	 * proxy genérico de confianza; el primer hop NO confiable hallado
+	 * en ese recorrido es el cliente real. Solo si la cadena entera
 	 * resultara ser proxies de confianza (caso degenerado) se cae al
 	 * hop más a la derecha como mejor esfuerzo.
 	 *
@@ -133,7 +155,7 @@ class ATORA_Client_IP {
 				$fallback = $ip;
 			}
 
-			if ( ! self::is_trusted_proxy_ip( $ip ) ) {
+			if ( ! self::is_trusted_generic_proxy_ip( $ip ) ) {
 				return $ip;
 			}
 		}
@@ -142,37 +164,52 @@ class ATORA_Client_IP {
 	}
 
 	/**
-	 * Determina si una IP de salto intermedio corresponde a proxy confiable.
-	 *
-	 * Filtro `atora_client_ip_trusted_proxies` (nuevo, centralizado) y,
-	 * por compatibilidad, `clms_student_assistant_trusted_proxies`
-	 * (el filtro que ya podía estar configurado en sitios existentes
-	 * antes de esta centralización) — ambos se combinan.
+	 * Proxies genéricos de confianza — autorizan X-Real-IP/
+	 * X-Forwarded-For/X-Forwarded. Lista por defecto conservadora
+	 * (solo loopback): rangos privados (RFC1918/ULA) NO se consideran
+	 * proxies confiables automáticamente — una IP privada puede ser un
+	 * balanceador, un ingress, un contenedor, o simplemente otra
+	 * máquina de la misma LAN, no necesariamente algo que reescribe
+	 * cabeceras de identidad de forma confiable.
 	 *
 	 * @param string $ip
 	 * @return bool
 	 */
-	private static function is_trusted_proxy_ip( string $ip ): bool {
+	private static function is_trusted_generic_proxy_ip( string $ip ): bool {
+		$default = array( '127.0.0.1', '127.0.0.0/8', '::1' );
+
+		$trusted = apply_filters( 'atora_client_ip_trusted_proxies', $default );
+		$legacy  = apply_filters( 'clms_student_assistant_trusted_proxies', $default );
+		$cidrs   = apply_filters( 'atora_trusted_proxy_cidrs', $default );
+
+		return self::ip_matches_rules( $ip, array_merge( (array) $trusted, (array) $legacy, (array) $cidrs ) );
+	}
+
+	/**
+	 * Proxies Cloudflare de confianza — autorizan específicamente
+	 * CF-Connecting-IP. Vacío por defecto a propósito: solo un sitio
+	 * que de verdad está detrás de Cloudflare (y así lo configura
+	 * explícitamente con los rangos oficiales de Cloudflare) debe
+	 * confiar en este header.
+	 *
+	 * @param string $ip
+	 * @return bool
+	 */
+	private static function is_trusted_cloudflare_ip( string $ip ): bool {
+		$rules = apply_filters( 'atora_trusted_cloudflare_cidrs', array() );
+
+		return self::ip_matches_rules( $ip, (array) $rules );
+	}
+
+	/**
+	 * @param string             $ip
+	 * @param array<int,string>  $rules Lista de IPs exactas y/o CIDR.
+	 * @return bool
+	 */
+	private static function ip_matches_rules( string $ip, array $rules ): bool {
 		if ( '' === $ip || ! filter_var( $ip, FILTER_VALIDATE_IP ) ) {
 			return false;
 		}
-
-		$default_trusted = array(
-			'127.0.0.1',
-			'::1',
-			'10.0.0.0/8',
-			'172.16.0.0/12',
-			'192.168.0.0/16',
-			'fc00::/7',
-		);
-
-		$trusted = apply_filters( 'atora_client_ip_trusted_proxies', $default_trusted );
-		$legacy  = apply_filters( 'clms_student_assistant_trusted_proxies', $default_trusted );
-		// PT-2 (6.5.7): alias con el nombre que documenta la OT de este
-		// sprint — mismo filtro, para quien ya lo use con ese nombre.
-		$cidrs   = apply_filters( 'atora_trusted_proxy_cidrs', $default_trusted );
-
-		$rules = array_merge( (array) $trusted, (array) $legacy, (array) $cidrs );
 
 		foreach ( $rules as $rule ) {
 			$rule = trim( (string) $rule );
