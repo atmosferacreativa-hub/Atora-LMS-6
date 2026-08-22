@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.4
 Requires PHP: 8.1
-Stable tag: 6.5.6
+Stable tag: 6.5.7
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,15 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.5.7 =
+* Security: legacy course/program/lesson listings now scope draft, private, and "all" status requests to the requesting instructor's own content instead of trusting a client-supplied teacher_id or course_id.
+* Security: client IP resolution now correctly walks the forwarded-header chain from the trusted-proxy edge inward, closing a way to spoof the reported client IP even behind a trusted proxy.
+* Hardening: the affiliate click tracker now uses the same centralized, trusted-proxy-aware IP resolution as the rest of the plugin.
+* Hardening: rate-limit tables (public forms, MCP API keys, and a new shared counter used by the AI assistant) are now purged of expired entries on an hourly schedule instead of growing indefinitely.
+* Security: Telegram account linking now enforces chat-uniqueness at the database level (a chat can never be linked to two accounts, even under concurrent requests), replacing the previous best-effort application-level check.
+* Hardening: the AI teaching assistant's rate limit now uses an atomic, race-resistant counter instead of a read-then-write pattern, and fails closed if the counter is unavailable.
+* Production distribution now excludes internal migration-decision documents and the build script itself.
+* Security review: full regression pass over CRM, LMS ownership, WhatsApp verification, MCP limits, unsubscribe, digest, and the 6.5.5/6.5.6 fixes confirmed no regressions.
 = 6.5.6 =
 * Security: legacy webhook management (register/list/delete outbound webhooks for lesson/course/enrollment/submission/grade/certificate events) now requires full site administration instead of a general content-management capability.
 * Security: reading or editing a course's grading scheme (component weights) now requires ownership of that course instead of a general grading capability.
@@ -93,6 +102,8 @@ Translation files are loaded from the `/languages` directory.
 * Major release aligned with ATORA_v5 architecture and modules.
 
 == Upgrade Notice ==
+= 6.5.7 =
+* Verified security closure: legacy REST listing ownership, trusted-proxy IP chain resolution, atomic rate-limit cleanup, and database-enforced Telegram link uniqueness. Recommended update — includes a database schema change.
 = 6.5.6 =
 * Legacy REST hardening: webhook management is now admin-only, and grading scheme changes are now scoped to the course's own instructor. Recommended update.
 = 6.5.5 =

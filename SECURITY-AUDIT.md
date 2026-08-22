@@ -1,3 +1,47 @@
+# SECURITY AUDIT — ATORA LMS v6.5.7 "Verified Security Closure"
+**Fecha:** 2026-08-22
+**Auditor:** Agente autónomo Claude Code
+**Alcance:** Sprint 6.5.7 — cierre verificable de 6 hallazgos con
+evidencia obligatoria (archivo + diff + test + revisión final) cada
+uno. Ver `SECURITY-REPORT-6.5.7.md` (excluido de la distribución)
+para el informe completo con la tabla de evidencia y la matriz REST.
+
+## FIXED (6.5.7)
+
+| # | Área | Hallazgo | Archivo(s) |
+|---|------|----------|------------|
+| 1 | Legacy REST — listados | get_courses()/get_programs()/get_lessons() permitían leer draft/private/all de OTRO instructor via teacher_id/course_id provisto por el cliente | `includes/rest/academics/trait-rest-academics-core-resources.php` |
+| 2 | Trusted proxy / XFF | extract_forwarded_ip() recorría la cadena izquierda→derecha — exactamente al revés; el cliente controla el extremo izquierdo | `includes/class-atora-client-ip.php` |
+| 3 | Affiliate Tracker | get_ip() replicaba la resolución insegura de IP en vez de usar el resolutor centralizado | `modules/affiliates/class-affiliate-tracker.php` |
+| 4 | Rate-limit cleanup | atora_form_throttle/atora_api_rate_limit nunca se purgaban | `includes/class-atora-rate-limiter.php`, `includes/class-atora-security-maintenance.php`, `modules/class-v5-installer.php` |
+| 5 | Telegram chat_id | Unicidad solo a nivel de aplicación + candado de transient de mejor esfuerzo, no una garantía real bajo concurrencia | `modules/messaging/class-telegram-bot.php`, `modules/class-v5-installer.php` |
+| 6 | Student Assistant | check_rate_limit() seguía usando get_transient()+set_transient() (no atómico) para el throttle de IA | `includes/class-student-assistant.php`, `includes/class-atora-rate-limiter.php` |
+
+## TESTED
+
+`tests/LMS/LegacyListingOwnershipTest.php` (9 casos),
+`tests/Security/ClientIpTest.php` (extendido, +2 casos),
+`tests/Security/RateLimiterTest.php` (7 casos),
+`tests/Security/SecurityMaintenanceTest.php` (1 caso, evidencia de
+DELETE real sobre las 3 tablas),
+`tests/Messaging/TelegramChatUniquenessTest.php` (extendido, +1 caso
+de carrera concurrente),
+`tests/LMS/TelegramLinksMigrationTest.php` (4 casos).
+
+## REMAINING LOW-RISK ITEMS (6.5.7)
+
+- No existe un endpoint de "desvincular Telegram" explícito — un
+  usuario solo puede re-vincular (lo que reemplaza su propio vínculo
+  anterior). No estaba en el alcance de este hallazgo (unicidad, no
+  gestión de cuenta) y no se inventó como parte de una corrección de
+  seguridad.
+- La migración de usermeta a `atora_telegram_links` deja sin migrar
+  los conflictos ambiguos heredados (dos usuarios con el mismo
+  chat_id bajo el modelo anterior) — documentado, requiere revisión
+  manual vía el log de error, no se resuelve automáticamente.
+
+---
+
 # SECURITY AUDIT — ATORA LMS v6.5.6 "Legacy REST Hardening"
 **Fecha:** 2026-08-21
 **Auditor:** Agente autónomo Claude Code
