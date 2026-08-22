@@ -216,7 +216,7 @@ class RateLimiterTest extends TestCase {
 
 		\ATORA_Rate_Limiter::consume( 'student_assistant', 'current_row', 15, 300 );
 
-		$deleted = \ATORA_Rate_Limiter::purge_expired( 60 ); // umbral: ahora - 60s.
+		$deleted = \ATORA_Rate_Limiter::purge_expired( 'atora_rate_limit_counters', 'window_start', 60 ); // umbral: ahora - 60s.
 
 		$this->assertSame( 1, $deleted, 'debe borrar solo la fila vieja' );
 		$this->assertCount( 1, $wpdb->rows, 'la fila actual debe permanecer' );

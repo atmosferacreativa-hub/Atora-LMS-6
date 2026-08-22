@@ -91,15 +91,20 @@ class ATORA_Rate_Limiter {
 	/**
 	 * Borra contadores cuya ventana ya venció, para que las tablas de
 	 * rate limit no crezcan sin límite. Usado por el cron de
-	 * mantenimiento (ATORA_Security_Maintenance).
+	 * mantenimiento (ATORA_Security_Maintenance). Genérico — sirve
+	 * para cualquier tabla de rate limit cuya columna de ventana sea un
+	 * entero de timestamp Unix (atora_rate_limit_counters.window_start,
+	 * atora_form_throttle.window_start).
 	 *
-	 * @param int $older_than_seconds Ventanas con window_start anterior a (ahora - esto) se eliminan.
+	 * @param string $table_suffix     Nombre de tabla sin el prefijo de WP.
+	 * @param string $window_column    Columna de ventana (entero, timestamp Unix).
+	 * @param int    $older_than_seconds Ventanas anteriores a (ahora - esto) se eliminan.
 	 * @return int Filas eliminadas, o -1 si la tabla no existe todavía.
 	 */
-	public static function purge_expired( int $older_than_seconds ): int {
+	public static function purge_expired( string $table_suffix, string $window_column, int $older_than_seconds ): int {
 		global $wpdb;
 
-		$table = $wpdb->prefix . 'atora_rate_limit_counters';
+		$table = $wpdb->prefix . $table_suffix;
 		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) ) !== $table ) {
 			return -1;
 		}
@@ -108,7 +113,35 @@ class ATORA_Rate_Limiter {
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		return (int) $wpdb->query(
-			$wpdb->prepare( "DELETE FROM {$table} WHERE window_start < %d", $threshold ) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$wpdb->prepare( "DELETE FROM {$table} WHERE {$window_column} < %d", $threshold ) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		);
+	}
+
+	/**
+	 * Igual que purge_expired(), pero para tablas cuya ventana se
+	 * guarda como una clave de minuto en texto ('YmdHi', p.ej.
+	 * atora_api_rate_limit.minute_key) en vez de un entero — el
+	 * formato ordena correctamente como string, así que una
+	 * comparación lexicográfica basta.
+	 *
+	 * @param string $table_suffix       Nombre de tabla sin el prefijo de WP.
+	 * @param string $minute_key_column  Columna CHAR(12) 'YmdHi'.
+	 * @param int    $older_than_seconds Minutos anteriores a (ahora - esto) se eliminan.
+	 * @return int Filas eliminadas, o -1 si la tabla no existe todavía.
+	 */
+	public static function purge_expired_minute_key( string $table_suffix, string $minute_key_column, int $older_than_seconds ): int {
+		global $wpdb;
+
+		$table = $wpdb->prefix . $table_suffix;
+		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) ) !== $table ) {
+			return -1;
+		}
+
+		$threshold_key = gmdate( 'YmdHi', time() - max( 0, $older_than_seconds ) );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		return (int) $wpdb->query(
+			$wpdb->prepare( "DELETE FROM {$table} WHERE {$minute_key_column} < %s", $threshold_key ) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		);
 	}
 

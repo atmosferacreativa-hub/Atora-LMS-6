@@ -500,6 +500,11 @@ if ( file_exists( $rate_limiter_file ) ) {
 	require_once $rate_limiter_file;
 }
 
+$security_maintenance_file = __DIR__ . '/../includes/class-atora-security-maintenance.php';
+if ( file_exists( $security_maintenance_file ) ) {
+	require_once $security_maintenance_file;
+}
+
 $forms_builder_file = __DIR__ . '/../modules/analytics/class-forms-builder.php';
 if ( file_exists( $forms_builder_file ) ) {
 	require_once $forms_builder_file;

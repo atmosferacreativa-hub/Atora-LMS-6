@@ -653,6 +653,14 @@ add_action( 'init', static function () {
 	require_once ATORA_LMS_DIR . 'includes/class-atora-client-ip.php';
 	require_once ATORA_LMS_DIR . 'includes/class-atora-rate-limiter.php';
 
+	// PT-4 (6.5.7): limpieza periódica de tablas de rate limit — se
+	// registra incondicionalmente (no depende de ningún módulo
+	// opcional), igual que los dos helpers de arriba.
+	require_once ATORA_LMS_DIR . 'includes/class-atora-security-maintenance.php';
+	if ( class_exists( 'ATORA_Security_Maintenance' ) ) {
+		ATORA_Security_Maintenance::init();
+	}
+
 	// ── PT-2 (6.3.0): registro de módulos — debe cargar antes que cualquier
 	// sistema de carga (A/B/C) que lo consulte.
 	require_once ATORA_LMS_DIR . 'includes/modularity/class-module-registry.php';
