@@ -111,7 +111,11 @@ class URL_Store_Service {
 					'contact_id'   => $contact_id,
 					'user_id'      => get_current_user_id(),
 					'clicked_at'   => current_time( 'mysql', true ),
-					'ip_address'   => sanitize_text_field( (string) ( $_SERVER['REMOTE_ADDR'] ?? '' ) ),
+					// PT-8 (6.5.8): REMOTE_ADDR directo registraba la IP del
+					// proxy (no la del visitante real) en instalaciones
+					// detrás de uno — dato analítico, no una decisión de
+					// seguridad, pero se centraliza igual por consistencia.
+					'ip_address'   => class_exists( 'ATORA_Client_IP' ) ? \ATORA_Client_IP::get() : sanitize_text_field( (string) ( $_SERVER['REMOTE_ADDR'] ?? '' ) ),
 					'user_agent'   => sanitize_text_field( (string) substr( $_SERVER['HTTP_USER_AGENT'] ?? '', 0, 500 ) ),
 				),
 				array( '%d', '%d', '%d', '%d', '%s', '%s', '%s' )
