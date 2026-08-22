@@ -37,6 +37,25 @@ trait CLMS_REST_Academics_Core_Resources_Trait {
 			$status = 'publish';
 		}
 
+		// PT-1 (6.5.7, "legacy REST hardening" — hallazgo real, no
+		// atrapado en 6.5.6): clms_manage_courses/lessons/submissions/
+		// grade_submissions es una capability GENÉRICA (cualquier
+		// instructor la tiene, no solo edit_others_lm_courses/
+		// manage_options). Con status=draft|private + un teacher_id
+		// arbitrario provisto por el cliente, un instructor A obtenía
+		// directamente los borradores del instructor B — $args['author']
+		// se fijaba al valor del cliente sin verificar dueño. Un
+		// instructor sin capability global, al pedir contenido no
+		// público, solo puede ver LO SUYO — se ignora cualquier
+		// teacher_id ajeno y se fuerza al usuario actual (en vez de
+		// rechazar, para no habilitar enumeración por mensajes de error
+		// distintos).
+		$is_global_manager = current_user_can( 'manage_options' ) || current_user_can( 'edit_others_lm_courses' );
+
+		if ( 'publish' !== $status && ! $is_global_manager ) {
+			$teacher_id = get_current_user_id();
+		}
+
 		$args = array(
 			'post_type'      => 'lm_course',
 			'post_status'    => $status ? $status : 'publish',
@@ -262,6 +281,13 @@ trait CLMS_REST_Academics_Core_Resources_Trait {
 			$status = 'publish';
 		}
 
+		// PT-1 (6.5.7): mismo hallazgo/corrección que get_courses().
+		$is_global_manager = current_user_can( 'manage_options' ) || current_user_can( 'edit_others_lm_courses' );
+
+		if ( 'publish' !== $status && ! $is_global_manager ) {
+			$teacher_id = get_current_user_id();
+		}
+
 		$args = array(
 			'post_type'      => 'lm_program',
 			'post_status'    => $status ? $status : 'publish',
@@ -472,6 +498,19 @@ trait CLMS_REST_Academics_Core_Resources_Trait {
 		$can_manage = CLMS_Access::can_manage_lessons() || CLMS_Access::can_manage_courses();
 		$allowed_statuses = array( 'publish', 'draft', 'private', 'all' );
 
+		// PT-1 (6.5.7, "legacy REST hardening" — hallazgo real, no
+		// atrapado en 6.5.6): $can_manage es una capability GENÉRICA
+		// (clms_manage_lessons/clms_manage_courses — cualquier
+		// instructor), no ownership. Con status=draft|private|all +
+		// teacher_id o course_id de OTRO instructor, un instructor A
+		// obtenía directamente las lecciones/borradores del instructor
+		// B: $args['author'] se fijaba al teacher_id del cliente sin
+		// verificar dueño, y la rama de course_id solo validaba acceso
+		// para "!$can_manage" (nunca para un instructor con capability,
+		// que es justo el atacante en este escenario). Se calcula ANTES
+		// de que 'all' se expanda a un array, para no perder la señal.
+		$requests_non_public = $can_manage && in_array( $status, array( 'draft', 'private', 'all' ), true );
+
 		if ( ! in_array( $status, $allowed_statuses, true ) ) {
 			$status = 'publish';
 		}
@@ -484,6 +523,12 @@ trait CLMS_REST_Academics_Core_Resources_Trait {
 		}
 		if ( is_user_logged_in() && ! $can_manage ) {
 			$available_to = $current_user_id;
+		}
+
+		$is_global_manager = current_user_can( 'manage_options' ) || current_user_can( 'edit_others_lm_courses' );
+
+		if ( $requests_non_public && ! $is_global_manager ) {
+			$teacher_id = $current_user_id;
 		}
 
 		$args = array(
@@ -500,6 +545,25 @@ trait CLMS_REST_Academics_Core_Resources_Trait {
 
 		if ( $teacher_id ) {
 			$args['author'] = $teacher_id;
+		}
+
+		// PT-1 (6.5.7): el chequeo de dueño de course_id se evalúa
+		// independientemente de si CLMS_Helper está cargado — antes
+		// vivía dentro del `if ( $course_id && class_exists(
+		// 'CLMS_Helper' ) )`, así que en cualquier contexto sin esa
+		// clase (no debería ocurrir en producción, pero no hay razón
+		// para que el gate de seguridad dependa de ello) el filtro de
+		// post__in nunca se aplicaba y la comprobación tampoco corría.
+		if ( $course_id && $requests_non_public && ! $is_global_manager && ! $this->current_user_can_manage_post_resource( $course_id ) ) {
+			return rest_ensure_response(
+				array(
+					'items'       => array(),
+					'total'       => 0,
+					'total_pages' => 0,
+					'page'        => $page,
+					'per_page'    => $per_page,
+				)
+			);
 		}
 
 		if ( $course_id && class_exists( 'CLMS_Helper' ) ) {

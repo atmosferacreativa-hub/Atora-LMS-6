@@ -176,6 +176,24 @@ if ( ! function_exists( 'get_post' ) ) {
 		return $GLOBALS['__atora_test_posts'][ $id ] ?? null;
 	}
 }
+if ( ! function_exists( 'get_the_title' ) ) {
+	function get_the_title( $post = 0 ) {
+		$id  = is_object( $post ) ? absint( $post->ID ?? 0 ) : absint( $post );
+		$row = $GLOBALS['__atora_test_posts'][ $id ] ?? null;
+		return $row->post_title ?? '';
+	}
+}
+if ( ! function_exists( 'get_permalink' ) ) {
+	function get_permalink( $post = 0 ) {
+		$id = is_object( $post ) ? absint( $post->ID ?? 0 ) : absint( $post );
+		return 'https://example.test/?p=' . $id;
+	}
+}
+if ( ! function_exists( 'get_the_author_meta' ) ) {
+	function get_the_author_meta( string $field, $user_id = 0 ) {
+		return 'display_name' === $field ? ( 'User ' . absint( $user_id ) ) : '';
+	}
+}
 if ( ! function_exists( 'get_post_field' ) ) {
 	function get_post_field( string $field, $post = 0 ) {
 		$id   = is_object( $post ) ? absint( $post->ID ?? 0 ) : absint( $post );
@@ -202,6 +220,41 @@ if ( ! function_exists( 'atora_test_set_post' ) ) {
 }
 if ( ! function_exists( 'atora_test_reset_posts' ) ) {
 	function atora_test_reset_posts(): void { $GLOBALS['__atora_test_posts'] = array(); }
+}
+// PT-1 (6.5.7): WP_Query mínima sobre el mismo store que
+// atora_test_set_post()/get_post() — filtra por post_type/post_status
+// (con soporte de array de estados)/author/post__in, suficiente para
+// probar get_courses()/get_programs()/get_lessons() sin una BD real.
+if ( ! class_exists( 'WP_Query' ) ) {
+	class WP_Query {
+		public array $posts = array();
+		public int $found_posts = 0;
+		public int $max_num_pages = 1;
+
+		public function __construct( array $args = array() ) {
+			$all       = $GLOBALS['__atora_test_posts'] ?? array();
+			$post_type = $args['post_type'] ?? '';
+			$status    = $args['post_status'] ?? 'publish';
+			$statuses  = is_array( $status ) ? $status : array( $status );
+			$author    = isset( $args['author'] ) ? absint( $args['author'] ) : 0;
+			$post_in   = isset( $args['post__in'] ) && is_array( $args['post__in'] )
+				? array_map( 'absint', $args['post__in'] )
+				: null;
+
+			$matched = array();
+			foreach ( $all as $id => $row ) {
+				if ( ( $row->post_type ?? '' ) !== $post_type ) { continue; }
+				if ( ! in_array( $row->post_status ?? 'publish', $statuses, true ) ) { continue; }
+				if ( $author && absint( $row->post_author ?? 0 ) !== $author ) { continue; }
+				if ( null !== $post_in && ! in_array( absint( $id ), $post_in, true ) ) { continue; }
+				$matched[] = $row;
+			}
+
+			$this->posts       = $matched;
+			$this->found_posts = count( $matched );
+			$this->max_num_pages = 1;
+		}
+	}
 }
 $GLOBALS['__atora_test_post_meta'] = array();
 if ( ! function_exists( 'get_post_meta' ) ) {
@@ -485,6 +538,16 @@ if ( file_exists( $mcp_module_file ) ) {
 $legacy_rest_permissions_file = __DIR__ . '/../includes/rest/class-rest-permissions.php';
 if ( file_exists( $legacy_rest_permissions_file ) ) {
 	require_once $legacy_rest_permissions_file;
+}
+
+$clms_access_file = __DIR__ . '/../includes/class-access.php';
+if ( file_exists( $clms_access_file ) ) {
+	require_once $clms_access_file;
+}
+
+$legacy_rest_academics_controller_file = __DIR__ . '/../includes/rest/class-rest-academics-controller.php';
+if ( file_exists( $legacy_rest_academics_controller_file ) ) {
+	require_once $legacy_rest_academics_controller_file;
 }
 
 $campaign_builder_rest_file = __DIR__ . '/../modules/crm-v2/rest/class-campaign-builder-rest-controller.php';
