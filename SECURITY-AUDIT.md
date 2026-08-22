@@ -1,3 +1,44 @@
+# SECURITY AUDIT — ATORA LMS v6.5.8 "Final Static Security Closure"
+**Fecha:** 2026-08-23
+**Auditor:** Agente autónomo Claude Code
+**Alcance:** Cierre final de la etapa de hardening estático. Ver
+`SECURITY-REPORT-6.5.8.md` (excluido de la distribución) para el
+Evidence Gate completo (archivo/diff/test/resultado por hallazgo).
+
+## FIXED (6.5.8)
+
+| # | Área | Hallazgo | Archivo(s) |
+|---|------|----------|------------|
+| 1 | Trusted proxy | RFC1918/ULA confiables por defecto; CF-Connecting-IP sin lista separada | `includes/class-atora-client-ip.php` |
+| 2 | Telegram | send_message() seguía leyendo usermeta en vez de la tabla | `modules/messaging/class-telegram-bot.php` |
+| 3 | Telegram | Re-vinculación DELETE-then-INSERT podía dejar al usuario sin ningún vínculo | `modules/messaging/class-telegram-bot.php` |
+| 4 | Telegram | Migración usermeta→tabla asignaba un ganador arbitrario en chat_id ambiguos | `modules/class-v5-installer.php` |
+| 5.1 | Enrollment | Contador de intentos de contraseña no atómico | `includes/enrollment-manager/trait-enrollment-manager-access-enrollment.php` |
+| 5.2 | AI Copilots | Contador no atómico + REMOTE_ADDR directo para invitados | `includes/class-ai-copilots.php` |
+| 5.3 | Grading AI review | Contador no atómico | `includes/grading/trait-grading-ai-review.php` |
+| 5.4 | Teacher Assistant | Contador no atómico | `includes/teacher-assistant/trait-teacher-assistant-artifacts-helpers.php` |
+| 5.5 | 2FA | `ATORA_Security::rate_limit()` no atómico + REMOTE_ADDR directo | `includes/class-security.php`, `modules/security/class-2fa-manager.php` |
+| 6 | Forms | Fail-open si el backend de throttle fallaba | `modules/analytics/class-forms-builder.php` |
+| 8 | MCP | Mismo fail-open que forms; IP directa en URL click-tracking | `modules/mcp/class-api-key-service.php`, `modules/crm-v2/services/class-url-store-service.php` |
+
+## NO REQUIERE CAMBIO (verificado, no hallazgo nuevo)
+
+- `includes/class-student-assistant.php` — ya migrado al limiter
+  atómico en 6.5.7, verificado intacto, sin regresión.
+
+## TESTED
+
+`tests/Security/ClientIpTest.php` (reescrito, +Tests A-F de la OT),
+`tests/Messaging/TelegramSendMessageSourceOfTruthTest.php`,
+`tests/Messaging/TelegramChatUniquenessTest.php` (extendido),
+`tests/LMS/TelegramLinksMigrationTest.php` (extendido),
+`tests/Enrollment/AccessLinkPasswordThrottleTest.php` (reescrito),
+`tests/Security/AtoraSecurityRateLimitTest.php`,
+`tests/Analytics/FormsThrottleTest.php` (extendido),
+`tests/MCP/ApiKeyRateLimitTest.php` (extendido).
+
+---
+
 # SECURITY AUDIT — ATORA LMS v6.5.7 "Verified Security Closure"
 **Fecha:** 2026-08-22
 **Auditor:** Agente autónomo Claude Code

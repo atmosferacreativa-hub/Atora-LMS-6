@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.4
 Requires PHP: 8.1
-Stable tag: 6.5.7
+Stable tag: 6.5.8
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,13 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.5.8 =
+* Security: strengthened proxy/header trust boundaries — private IP ranges are no longer trusted as reverse proxies by default, and Cloudflare's client-IP header now requires its own explicit configuration separate from generic proxy trust.
+* Security: Telegram account linking now reads exclusively from its dedicated links table (not legacy user data) as the single source of truth, and re-linking to a new chat can no longer leave an account without any binding if the new chat is already taken.
+* Hardening: the Telegram usermeta-to-table migration no longer assigns ambiguous historical links to an arbitrary user; conflicting entries are quarantined for manual review instead.
+* Hardening: unified several remaining request counters (enrollment access codes, AI teaching assistant features, AI grading review, two-factor authentication) onto the same atomic, race-resistant limiting service, all failing safely closed if their backend is unavailable.
+* Security: public form submissions and API rate limiting now fail safely closed (reject the request) instead of silently allowing unlimited traffic if their backend is unavailable.
+* Security review: expanded regression coverage across CRM, LMS ownership, WhatsApp verification, MCP limits, digest locking, and all prior sprint fixes confirmed no regressions.
 = 6.5.7 =
 * Security: legacy course/program/lesson listings now scope draft, private, and "all" status requests to the requesting instructor's own content instead of trusting a client-supplied teacher_id or course_id.
 * Security: client IP resolution now correctly walks the forwarded-header chain from the trusted-proxy edge inward, closing a way to spoof the reported client IP even behind a trusted proxy.
@@ -102,6 +109,8 @@ Translation files are loaded from the `/languages` directory.
 * Major release aligned with ATORA_v5 architecture and modules.
 
 == Upgrade Notice ==
+= 6.5.8 =
+* Final static security closure: trusted proxy policy hardening, Telegram binding integrity, unified atomic abuse controls, and fail-safe rate limiting throughout. Recommended update — includes a database schema change.
 = 6.5.7 =
 * Verified security closure: legacy REST listing ownership, trusted-proxy IP chain resolution, atomic rate-limit cleanup, and database-enforced Telegram link uniqueness. Recommended update — includes a database schema change.
 = 6.5.6 =
