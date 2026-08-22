@@ -133,8 +133,15 @@ class ATORA_API_Key_Service {
 		// fila InnoDB, funciona con cualquier MySQL/MariaDB estándar.
 		$rl_table = $wpdb->prefix . 'atora_api_rate_limit';
 
+		// PT-8 (6.5.8): hallazgo real — si el INSERT/SELECT de abajo
+		// fallaban, get_var() devolvía null, (int) null = 0, y
+		// "0 > $limit" es false: la API key quedaba SIN límite de
+		// peticiones mientras el backend del contador estuviera roto.
+		// Ahora se falla cerrado — un fallo de infraestructura rechaza
+		// la petición (return null, igual que "límite excedido"), nunca
+		// la deja pasar sin límite.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$wpdb->query(
+		$inserted = $wpdb->query(
 			$wpdb->prepare(
 				"INSERT INTO {$rl_table} (key_id, operation, minute_key, requests) VALUES (%d, %s, %s, 1)
 				 ON DUPLICATE KEY UPDATE requests = requests + 1", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
@@ -144,7 +151,11 @@ class ATORA_API_Key_Service {
 			)
 		);
 
-		$current_req = (int) $wpdb->get_var(
+		if ( false === $inserted ) {
+			return null; // fail-closed.
+		}
+
+		$current_req = $wpdb->get_var(
 			$wpdb->prepare(
 				"SELECT requests FROM {$rl_table} WHERE key_id = %d AND operation = %s AND minute_key = %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 				$key_id,
@@ -153,7 +164,11 @@ class ATORA_API_Key_Service {
 			)
 		);
 
-		if ( $current_req > $limit ) {
+		if ( null === $current_req ) {
+			return null; // fail-closed.
+		}
+
+		if ( (int) $current_req > $limit ) {
 			// Rate limit excedido — devolver null para que el autenticador rechace
 			return null;
 		}

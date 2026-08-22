@@ -264,4 +264,56 @@ class ApiKeyRateLimitTest extends TestCase {
 
 		$this->restore_wpdb( $original );
 	}
+
+	/**
+	 * PT-8 (6.5.8) — hallazgo real: si el INSERT/SELECT del contador
+	 * fallan, la key quedaba SIN límite de peticiones (get_var()
+	 * devolvía null, interpretado como "0 peticiones"). Ahora debe
+	 * fallar cerrado — validate() devuelve null (igual que "límite
+	 * excedido"), nunca autoriza sin límite.
+	 *
+	 * @test
+	 */
+	public function test_fails_closed_when_rate_limit_backend_query_fails(): void {
+		global $wpdb;
+		$original = $wpdb;
+
+		$key  = 'atora_hh9999999999999999999999999999999999';
+		$hash = hash( 'sha256', $key );
+		$row  = array(
+			'id'         => 701,
+			'user_id'    => 1,
+			'key_prefix' => substr( $key, 0, 8 ),
+			'scopes'     => 'read',
+			'is_active'  => 1,
+			'expires_at' => null,
+		);
+
+		$wpdb = new class( $hash, $row ) {
+			public string $prefix = 'wp_';
+			private string $hash;
+			private array $row;
+			public function __construct( string $hash, array $row ) { $this->hash = $hash; $this->row = $row; }
+			public function prepare( string $sql, ...$args ): string {
+				$i = 0;
+				return preg_replace_callback( '/%[ds]/', function() use ( &$i, $args ) {
+					return isset( $args[ $i ] ) ? (string) $args[ $i++ ] : '?';
+				}, $sql );
+			}
+			public function get_row( $sql, $output = 'ARRAY_A' ) { return false !== strpos( $sql, $this->hash ) ? $this->row : null; }
+			public function get_var( $sql ) { return null; }
+			public function get_results( $sql, $output = 'ARRAY_A' ) { return array(); }
+			public function get_col( $sql ) { return array(); }
+			public function insert( $table, $data, $format = null ): int { return 1; }
+			public function update( $table, $data, $where, $format = null, $where_format = null ): int { return 1; }
+			public function delete( $table, $where, $where_format = null ): int { return 1; }
+			public function query( $sql ): bool { return false; } // simula un INSERT fallido.
+			public function esc_like( string $s ): string { return $s; }
+			public function get_charset_collate(): string { return ''; }
+		};
+
+		$this->assertNull( \ATORA_API_Key_Service::validate( $key, 'read' ), 'sin backend de rate limit disponible, debe fallar cerrado (rechazar), no autorizar sin límite' );
+
+		$wpdb = $original;
+	}
 }
