@@ -39,13 +39,36 @@ class Telegram_Bot {
 	 * @return bool
 	 */
 	public static function send_message( int $user_id, string $message ): bool {
-		$chat_id = get_user_meta( $user_id, 'atora_telegram_chat_id', true );
+		// PT-2 (6.5.8): atora_telegram_links es la fuente de verdad
+		// desde 6.5.7 (unicidad real vía UNIQUE KEY) — antes este
+		// método seguía leyendo usermeta, así que un vínculo
+		// desactualizado o divergente en usermeta (nunca debería pasar
+		// en un flujo normal, pero nada lo impedía) podía hacer que se
+		// enviara un mensaje a un chat_id que la tabla ya no reconoce
+		// como válido para este usuario. Si la tabla no tiene vínculo,
+		// NO se envía, aunque usermeta conserve un valor antiguo.
+		$chat_id = self::get_chat_id_for_user( $user_id );
 
 		if ( ! $chat_id ) {
 			return false;
 		}
 
-		return self::api_send_message( (string) $chat_id, $message );
+		return self::api_send_message( $chat_id, $message );
+	}
+
+	/**
+	 * @param int $user_id
+	 * @return string Cadena vacía si el usuario no tiene vínculo en la tabla.
+	 */
+	private static function get_chat_id_for_user( int $user_id ): string {
+		global $wpdb;
+
+		$chat_id = $wpdb->get_var( $wpdb->prepare(
+			"SELECT chat_id FROM {$wpdb->prefix}atora_telegram_links WHERE user_id = %d LIMIT 1",
+			$user_id
+		) );
+
+		return $chat_id ? (string) $chat_id : '';
 	}
 
 	/**
@@ -275,26 +298,49 @@ class Telegram_Bot {
 		global $wpdb;
 		$links_table = $wpdb->prefix . 'atora_telegram_links';
 
-		// Re-vincular: si este usuario ya tenía OTRO chat vinculado,
-		// se reemplaza (un usuario, un chat — la UNIQUE KEY sobre
-		// user_id no permitiría dos filas para el mismo usuario).
-		$wpdb->delete( $links_table, array( 'user_id' => $user_id ), array( '%d' ) );
+		// PT-3 (6.5.8): antes esto era DELETE del vínculo anterior +
+		// INSERT del nuevo — si el INSERT perdía la carrera por
+		// UNIQUE(chat_id), el usuario se quedaba SIN vínculo (el viejo
+		// ya se había borrado). Ahora: si el usuario ya tenía un
+		// vínculo, se actualiza esa misma fila con UPDATE — si el
+		// nuevo chat_id choca con la UNIQUE KEY de otra fila, el UPDATE
+		// falla y la fila original queda intacta con su chat_id
+		// anterior, nunca en un estado a medias. Solo se hace INSERT
+		// cuando el usuario no tenía ningún vínculo previo.
+		$existing_link_id = $wpdb->get_var( $wpdb->prepare(
+			"SELECT id FROM {$links_table} WHERE user_id = %d LIMIT 1",
+			$user_id
+		) );
 
-		$inserted = $wpdb->insert(
-			$links_table,
-			array(
-				'user_id'   => $user_id,
-				'chat_id'   => $chat_id,
-				'linked_at' => current_time( 'mysql', true ),
-			),
-			array( '%d', '%s', '%s' )
-		);
+		if ( $existing_link_id ) {
+			$saved = $wpdb->update(
+				$links_table,
+				array(
+					'chat_id'   => $chat_id,
+					'linked_at' => current_time( 'mysql', true ),
+				),
+				array( 'id' => absint( $existing_link_id ) ),
+				array( '%s', '%s' ),
+				array( '%d' )
+			);
+		} else {
+			$saved = $wpdb->insert(
+				$links_table,
+				array(
+					'user_id'   => $user_id,
+					'chat_id'   => $chat_id,
+					'linked_at' => current_time( 'mysql', true ),
+				),
+				array( '%d', '%s', '%s' )
+			);
+		}
 
-		if ( ! $inserted ) {
+		if ( ! $saved ) {
 			// Backstop real de concurrencia: otra solicitud ganó la
 			// carrera y reclamó este chat_id entre nuestra comprobación
-			// de arriba y este INSERT — la UNIQUE KEY de la BD lo
-			// impidió. No se transfiere ni se ignora el error.
+			// de arriba y este UPDATE/INSERT — la UNIQUE KEY de la BD lo
+			// impidió. El vínculo anterior (si existía) sigue intacto —
+			// no se transfiere, no se pierde, no se ignora el error.
 			wp_send_json_error( array( 'message' => __( 'Este chat de Telegram ya está vinculado a otra cuenta. Desvincúlalo primero para poder usarlo aquí.', 'atora-lms' ) ) );
 		}
 

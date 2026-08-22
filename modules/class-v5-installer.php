@@ -209,19 +209,26 @@ class V5_Installer {
 	}
 
 	/**
-	 * PT-5 (6.5.7): backfill de atora_telegram_links desde usermeta,
-	 * para instalaciones que ya tenían vínculos de Telegram antes de
-	 * esta tabla existir. Idempotente — una fila ya presente para un
-	 * user_id se deja intacta (no se reintenta ni se sobreescribe).
+	 * PT-5 (6.5.7) / PT-4 (6.5.8): backfill de atora_telegram_links
+	 * desde usermeta, para instalaciones que ya tenían vínculos de
+	 * Telegram antes de esta tabla existir. Idempotente — una fila ya
+	 * presente para un user_id se deja intacta.
 	 *
-	 * Si dos usuarios distintos tenían el MISMO chat_id en usermeta
-	 * (posible bajo el modelo anterior, sin restricción UNIQUE real),
-	 * no se decide arbitrariamente cuál es el válido: se registra el
-	 * conflicto vía error_log() para revisión manual y esa fila NO se
-	 * migra — el primer usuario en reclamarlo (por orden de ejecución)
-	 * queda con el vínculo en la tabla nueva; el resto sigue en
-	 * usermeta sin tocar, disponible para que un administrador lo
-	 * revise, nunca borrado silenciosamente.
+	 * PT-4 (6.5.8): la versión de 6.5.7 detectaba un chat_id
+	 * compartido por dos usuarios solo AL LLEGAR a la segunda fila —
+	 * "quien se procesara primero" (orden no garantizado de MySQL)
+	 * terminaba quedándose con el vínculo, un ganador arbitrario. Ahora
+	 * los chat_id ambiguos se detectan de antemano con
+	 * `GROUP BY chat_id HAVING COUNT(*) > 1` — NINGÚN usuario
+	 * involucrado en un chat_id ambiguo recibe ownership automático, ni
+	 * siquiera "el primero"; todos quedan fuera de la tabla nueva,
+	 * disponibles en usermeta para revisión manual (nunca borrados).
+	 *
+	 * Genera un reporte de migración (migrated/conflicts/skipped/errors)
+	 * guardado en una opción, sin exponer chat_id completos — solo un
+	 * hash corto, suficiente para que un administrador correlacione el
+	 * conflicto sin que quede un identificador de Telegram en claro en
+	 * logs u opciones.
 	 *
 	 * @return bool true si la tabla existe (migración corrida o no
 	 *              necesaria); false solo si la tabla ni siquiera existe.
@@ -240,11 +247,27 @@ class V5_Installer {
 			ARRAY_A
 		);
 
+		// Paso 1: detectar de antemano qué chat_id están reclamados por
+		// más de un usuario en usermeta — ninguno de esos se migra.
+		$counts = array();
+		foreach ( (array) $rows as $row ) {
+			$chat_id = sanitize_text_field( (string) ( $row['chat_id'] ?? '' ) );
+			if ( '' === $chat_id ) {
+				continue;
+			}
+			$counts[ $chat_id ] = ( $counts[ $chat_id ] ?? 0 ) + 1;
+		}
+		$ambiguous_chat_ids = array_keys( array_filter( $counts, static fn( $n ) => $n > 1 ) );
+		$ambiguous_lookup   = array_flip( $ambiguous_chat_ids );
+
+		$report = array( 'migrated' => 0, 'conflicts' => 0, 'skipped' => 0, 'errors' => 0 );
+
 		foreach ( (array) $rows as $row ) {
 			$user_id = absint( $row['user_id'] ?? 0 );
 			$chat_id = sanitize_text_field( (string) ( $row['chat_id'] ?? '' ) );
 
 			if ( ! $user_id || '' === $chat_id ) {
+				$report['skipped']++;
 				continue;
 			}
 
@@ -252,19 +275,18 @@ class V5_Installer {
 				$wpdb->prepare( "SELECT user_id FROM {$table} WHERE user_id = %d", $user_id ) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			);
 			if ( $already_migrated ) {
+				$report['skipped']++;
 				continue;
 			}
 
-			$chat_owner = (int) $wpdb->get_var(
-				$wpdb->prepare( "SELECT user_id FROM {$table} WHERE chat_id = %s", $chat_id ) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-			);
-			if ( $chat_owner && $chat_owner !== $user_id ) {
+			if ( isset( $ambiguous_lookup[ $chat_id ] ) ) {
+				$report['conflicts']++;
 				if ( function_exists( 'error_log' ) ) {
 					error_log( // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
 						sprintf(
-							'[ATORA][telegram-migration] chat_id %s ya reclamado por user_id %d — user_id %d no migrado, requiere revisión manual (dato ambiguo heredado de usermeta, no se resuelve automáticamente).',
-							$chat_id,
-							$chat_owner,
+							'[ATORA][telegram-migration] chat_id hash=%s reclamado por %d usuarios en usermeta — user_id %d NO migrado, requiere revisión manual (dato ambiguo heredado, ningún usuario recibe ownership automático).',
+							substr( hash( 'sha256', $chat_id ), 0, 12 ),
+							$counts[ $chat_id ],
 							$user_id
 						)
 					);
@@ -272,7 +294,7 @@ class V5_Installer {
 				continue;
 			}
 
-			$wpdb->insert(
+			$inserted = $wpdb->insert(
 				$table,
 				array(
 					'user_id'   => $user_id,
@@ -281,7 +303,15 @@ class V5_Installer {
 				),
 				array( '%d', '%s', '%s' )
 			);
+
+			if ( $inserted ) {
+				$report['migrated']++;
+			} else {
+				$report['errors']++;
+			}
 		}
+
+		update_option( 'atora_telegram_migration_report', $report, false );
 
 		return true;
 	}

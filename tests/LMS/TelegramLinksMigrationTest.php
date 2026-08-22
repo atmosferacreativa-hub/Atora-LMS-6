@@ -1,7 +1,8 @@
 <?php
 /**
  * V5_Installer::migrate_telegram_links_from_usermeta() — backfill de
- * atora_telegram_links — PT-5 (sprint 6.5.7).
+ * atora_telegram_links — PT-5 (sprint 6.5.7), sin ganador arbitrario
+ * en PT-4 (sprint 6.5.8).
  *
  * @package ATORA_LMS\Tests\LMS
  */
@@ -13,6 +14,16 @@ namespace ATORA\Tests\LMS;
 use PHPUnit\Framework\TestCase;
 
 class TelegramLinksMigrationTest extends TestCase {
+
+	protected function setUp(): void {
+		parent::setUp();
+		\atora_test_reset_options();
+	}
+
+	protected function tearDown(): void {
+		\atora_test_reset_options();
+		parent::tearDown();
+	}
 
 	/**
 	 * $wpdb con filas de usermeta simuladas (posiblemente con un
@@ -119,15 +130,17 @@ class TelegramLinksMigrationTest extends TestCase {
 	}
 
 	/**
-	 * Caso confirmado del hallazgo de diseño: dos usuarios distintos
-	 * con el MISMO chat_id en usermeta (posible bajo el modelo
-	 * anterior) — no debe resolverse arbitrariamente. Solo el primero
-	 * (por orden de fila) se migra; el segundo se deja fuera para
-	 * revisión manual, no se pierde ni se sobreescribe nada.
+	 * Caso confirmado del hallazgo (6.5.8, PT-4): dos usuarios
+	 * distintos con el MISMO chat_id en usermeta (posible bajo el
+	 * modelo anterior) — NINGUNO de los dos recibe ownership
+	 * automático, ni siquiera "el primero" (la versión de 6.5.7 sí lo
+	 * hacía, dependiendo del orden no garantizado de la consulta).
+	 * Ambos quedan fuera de la tabla, disponibles en usermeta para
+	 * revisión manual.
 	 *
 	 * @test
 	 */
-	public function test_ambiguous_shared_chat_id_only_migrates_the_first_and_does_not_overwrite(): void {
+	public function test_ambiguous_shared_chat_id_migrates_neither_user(): void {
 		$original = $this->install_wpdb_fixture( array(
 			array( 'user_id' => 7, 'chat_id' => '999' ),
 			array( 'user_id' => 8, 'chat_id' => '999' ), // mismo chat_id, otro usuario — dato ambiguo heredado.
@@ -136,8 +149,39 @@ class TelegramLinksMigrationTest extends TestCase {
 		$this->invoke_migration();
 
 		global $wpdb;
-		$this->assertCount( 1, $wpdb->links, 'solo debe migrarse una de las dos filas en conflicto' );
-		$this->assertSame( 7, $wpdb->links[1]['user_id'] ?? null, 'la primera fila procesada gana; la ambigua no se resuelve arbitrariamente' );
+		$this->assertCount( 0, $wpdb->links, 'ningún usuario debe recibir ownership arbitrario sobre un chat_id ambiguo' );
+
+		$report = get_option( 'atora_telegram_migration_report' );
+		$this->assertSame( 2, $report['conflicts'] ?? null, 'ambas filas ambiguas deben contarse como conflicto en el reporte' );
+		$this->assertSame( 0, $report['migrated'] ?? null );
+
+		$this->restore_wpdb( $original );
+	}
+
+	/**
+	 * Un tercer usuario, con un chat_id que NO es ambiguo, sí debe
+	 * migrarse con normalidad aunque en la misma corrida haya otro par
+	 * de filas en conflicto — el conflicto de un chat_id no debe
+	 * bloquear la migración de los demás.
+	 *
+	 * @test
+	 */
+	public function test_unambiguous_link_migrates_even_when_another_pair_conflicts(): void {
+		$original = $this->install_wpdb_fixture( array(
+			array( 'user_id' => 7, 'chat_id' => '999' ),
+			array( 'user_id' => 8, 'chat_id' => '999' ),
+			array( 'user_id' => 10, 'chat_id' => '555' ),
+		) );
+
+		$this->invoke_migration();
+
+		global $wpdb;
+		$this->assertCount( 1, $wpdb->links );
+		$this->assertSame( 10, $wpdb->links[1]['user_id'] ?? null );
+
+		$report = get_option( 'atora_telegram_migration_report' );
+		$this->assertSame( 1, $report['migrated'] ?? null );
+		$this->assertSame( 2, $report['conflicts'] ?? null );
 
 		$this->restore_wpdb( $original );
 	}

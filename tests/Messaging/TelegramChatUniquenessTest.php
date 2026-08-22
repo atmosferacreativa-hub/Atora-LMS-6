@@ -2,18 +2,19 @@
 /**
  * Telegram_Bot::ajax_link_account() — un chat_id no puede pertenecer
  * a dos usuarios — PT-4 (sprint 6.5.5), endurecido con unicidad real
- * a nivel de BD en PT-5 (sprint 6.5.7).
+ * a nivel de BD en PT-5 (sprint 6.5.7), y con re-vinculación segura
+ * (nunca DELETE-then-INSERT) en PT-3 (sprint 6.5.8).
  *
  * Hallazgo confirmado en 6.5.5: update_user_meta() sobrescribía
  * silenciosamente cualquier vínculo previo de OTRO usuario a ese
- * mismo chat_id — usermeta no tiene restricción UNIQUE nativa. 6.5.5
- * agregó un chequeo de aplicación + un candado de transient de mejor
- * esfuerzo (no una garantía real bajo concurrencia). 6.5.7 mueve la
- * fuente de verdad a atora_telegram_links, con UNIQUE KEY sobre
- * user_id Y sobre chat_id — el fixture de $wpdb simula esa
- * restricción de verdad (insert() rechaza cualquier fila que
- * choque), incluyendo el caso de "otra solicitud ganó la carrera"
- * justo antes del INSERT de este proceso.
+ * mismo chat_id. 6.5.7 movió la fuente de verdad a
+ * atora_telegram_links (UNIQUE KEY sobre user_id Y chat_id), pero
+ * re-vincular seguía siendo DELETE del vínculo viejo + INSERT del
+ * nuevo — si el INSERT perdía la carrera por UNIQUE(chat_id), el
+ * usuario se quedaba SIN vínculo (el viejo ya se había borrado). 6.5.8
+ * lo corrige: cuando el usuario ya tiene un vínculo, se usa UPDATE
+ * sobre esa misma fila — si el UPDATE falla por la UNIQUE KEY, la fila
+ * original queda intacta con su chat_id anterior.
  *
  * ajax_link_account() termina en exit() (wp_send_json_*), así que
  * cada escenario corre en un proceso PHP aparte vía proc_open()
@@ -43,7 +44,7 @@ class TelegramChatUniquenessTest extends TestCase {
 
 	/**
 	 * @param array<string,string> $env
-	 * @return array{linked_user_ids?:array<int,int>}|null
+	 * @return array{all_links?:array<int,array{user_id:int,chat_id:string}>, current_user_chat?:string|null}|null
 	 */
 	private function run_scenario( array $env ): ?array {
 		$this->out = sys_get_temp_dir() . '/atora_test_tg_link_' . bin2hex( random_bytes( 8 ) ) . '.json';
@@ -80,6 +81,16 @@ class TelegramChatUniquenessTest extends TestCase {
 		return is_array( $decoded ) ? $decoded : null;
 	}
 
+	private function chat_owners( array $result, string $chat_id ): array {
+		$owners = array();
+		foreach ( $result['all_links'] ?? array() as $row ) {
+			if ( ( $row['chat_id'] ?? null ) === $chat_id ) {
+				$owners[] = (int) $row['user_id'];
+			}
+		}
+		return $owners;
+	}
+
 	/**
 	 * Caso base: chat_id sin vincular previamente — el usuario que
 	 * envía el código correcto se vincula normalmente.
@@ -94,7 +105,7 @@ class TelegramChatUniquenessTest extends TestCase {
 		) );
 
 		$this->assertNotNull( $result );
-		$this->assertSame( array( 10 ), $result['linked_user_ids'] ?? null );
+		$this->assertSame( array( 10 ), $this->chat_owners( $result, '555000' ) );
 	}
 
 	/**
@@ -110,12 +121,8 @@ class TelegramChatUniquenessTest extends TestCase {
 			'ATORA_TEST_EXISTING_OWNER' => '11',
 		) );
 
-		// El shutdown function vuelca el estado final de la tabla — como
-		// el chat ya pertenecía a 11 y el flujo idempotente sale antes
-		// de tocar la tabla de nuevo, debe seguir habiendo exactamente
-		// una fila, y sigue siendo la de 11 (no se duplicó ni se perdió).
 		$this->assertNotNull( $result );
-		$this->assertSame( array( 11 ), $result['linked_user_ids'] ?? null, 'camino idempotente: el vínculo existente de 11 debe seguir intacto, sin duplicarse' );
+		$this->assertSame( array( 11 ), $this->chat_owners( $result, '555001' ), 'camino idempotente: el vínculo existente de 11 debe seguir intacto, sin duplicarse' );
 	}
 
 	/**
@@ -132,17 +139,14 @@ class TelegramChatUniquenessTest extends TestCase {
 		) );
 
 		$this->assertNotNull( $result );
-		$this->assertSame( array( 12 ), $result['linked_user_ids'] ?? null, 'el chat debe seguir siendo de 12 — nunca transferido silenciosamente a 13' );
+		$this->assertSame( array( 12 ), $this->chat_owners( $result, '555002' ), 'el chat debe seguir siendo de 12 — nunca transferido silenciosamente a 13' );
 	}
 
 	/**
 	 * Backstop real de concurrencia (PT-5, 6.5.7): dos solicitudes
-	 * "simultáneas" para el mismo chat_id — el chequeo de aplicación
-	 * (get_user_by_chat) pasa para ambas porque ninguna ve todavía la
-	 * fila de la otra, pero el INSERT final solo puede tener éxito para
-	 * UNA, por la UNIQUE KEY de la tabla. La solicitud que pierde la
-	 * carrera debe recibir un error claro, nunca un éxito silencioso ni
-	 * un estado corrupto.
+	 * "simultáneas" para el mismo chat_id, ninguna con vínculo previo —
+	 * el INSERT del que pierde la carrera debe rechazarse, nunca un
+	 * éxito silencioso ni un estado corrupto.
 	 *
 	 * @test
 	 */
@@ -155,6 +159,54 @@ class TelegramChatUniquenessTest extends TestCase {
 		) );
 
 		$this->assertNotNull( $result );
-		$this->assertSame( array(), $result['linked_user_ids'] ?? null, 'si el INSERT pierde la carrera (UNIQUE KEY), el usuario 14 no debe quedar vinculado' );
+		$this->assertSame( array(), $this->chat_owners( $result, '555003' ), 'si el INSERT pierde la carrera (UNIQUE KEY), el usuario 14 no debe quedar vinculado' );
+	}
+
+	/**
+	 * PT-3 (6.5.8) — caso confirmado del hallazgo: el usuario 15 ya
+	 * tiene un chat vinculado (chat_old) e intenta re-vincular a un
+	 * chat que, por una carrera de concurrencia, otra solicitud acaba
+	 * de reclamar justo antes del UPDATE de este proceso (el chequeo
+	 * previo de aplicación no la detectó todavía). El UPDATE debe
+	 * fallar por la UNIQUE KEY, y el vínculo ORIGINAL de 15 (chat_old)
+	 * debe seguir intacto — la versión anterior a 6.5.8 hacía
+	 * DELETE-then-INSERT, así que el DELETE ya habría borrado
+	 * chat_old antes de que el INSERT fallara, dejando a 15 sin ningún
+	 * vínculo.
+	 *
+	 * @test
+	 */
+	public function test_relink_conflict_preserves_the_users_existing_binding(): void {
+		$result = $this->run_scenario( array(
+			'ATORA_TEST_CURRENT_USER'           => '15',
+			'ATORA_TEST_CHAT_ID'                => '555004', // el chat NUEVO que 15 intenta reclamar.
+			'ATORA_TEST_EXISTING_OWNER'         => '',        // el chequeo previo de aplicación no ve conflicto todavía.
+			'ATORA_TEST_CURRENT_USER_OLD_CHAT'  => '555005',  // el vínculo actual de 15, antes del intento.
+			'ATORA_TEST_SIMULATE_RACE'          => '1',       // el UPDATE en sí pierde la carrera por UNIQUE(chat_id).
+		) );
+
+		$this->assertNotNull( $result );
+		$this->assertSame( '555005', $result['current_user_chat'] ?? null, '15 debe conservar su vínculo anterior (555005), no quedar sin ninguno' );
+	}
+
+	/**
+	 * PT-3 (6.5.8): re-vincular a un chat_id realmente libre SÍ debe
+	 * reemplazar el vínculo anterior del mismo usuario (una sola fila
+	 * por usuario, gracias a UNIQUE(user_id)).
+	 *
+	 * @test
+	 */
+	public function test_relink_to_a_free_chat_replaces_the_old_binding(): void {
+		$result = $this->run_scenario( array(
+			'ATORA_TEST_CURRENT_USER'          => '17',
+			'ATORA_TEST_CHAT_ID'               => '555006', // chat nuevo, libre.
+			'ATORA_TEST_EXISTING_OWNER'        => '',
+			'ATORA_TEST_CURRENT_USER_OLD_CHAT' => '555007',  // vínculo anterior de 17.
+		) );
+
+		$this->assertNotNull( $result );
+		$this->assertSame( '555006', $result['current_user_chat'] ?? null, '17 debe quedar vinculado al chat nuevo' );
+		$this->assertSame( array(), $this->chat_owners( $result, '555007' ), 'el chat viejo ya no debe pertenecer a nadie' );
+		$this->assertCount( 1, $result['all_links'] ?? array(), 'debe seguir habiendo una sola fila para el usuario 17 (UNIQUE(user_id))' );
 	}
 }

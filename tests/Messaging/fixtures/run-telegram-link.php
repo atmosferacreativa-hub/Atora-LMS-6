@@ -1,6 +1,6 @@
 <?php
 /**
- * Runner aislado para Telegram_Bot::ajax_link_account() — PT-4 (6.5.5), PT-5 (6.5.7).
+ * Runner aislado para Telegram_Bot::ajax_link_account() — PT-4 (6.5.5), PT-5 (6.5.7), PT-2/PT-3 (6.5.8).
  *
  * ajax_link_account() termina la ejecución vía wp_send_json_error()/
  * wp_send_json_success() (exit()) — se ejecuta en un proceso PHP
@@ -9,17 +9,23 @@
  * de devolverlo por stdout, para que el proceso PHPUnit padre pueda
  * inspeccionarlo después de que el hijo termine.
  *
- * PT-5 (6.5.7): el fixture de $wpdb ahora simula de verdad
+ * PT-5 (6.5.7): el fixture de $wpdb simula de verdad
  * atora_telegram_links con sus dos UNIQUE KEY (user_id, chat_id) —
- * insert() rechaza (devuelve false) cualquier fila que choque con
- * cualquiera de las dos, igual que MySQL — para poder probar el
- * backstop de concurrencia real, no solo el chequeo de aplicación.
+ * insert()/update() rechazan (devuelven false) cualquier fila que
+ * choque con cualquiera de las dos, igual que MySQL.
+ *
+ * PT-3 (6.5.8): update() simula la restricción UNIQUE(chat_id) para
+ * poder probar que un re-link fallido conserva el vínculo anterior
+ * intacto (nunca DELETE-then-INSERT).
  *
  * Variables de entorno: ATORA_TEST_OUT (archivo de resultado),
  * ATORA_TEST_CURRENT_USER, ATORA_TEST_CHAT_ID,
  * ATORA_TEST_EXISTING_OWNER (user_id ya vinculado a ese chat_id, o
  * vacío si ninguno), ATORA_TEST_SIMULATE_RACE=1 (simula que otra
- * solicitud ganó la carrera justo antes del INSERT de este proceso).
+ * solicitud ganó la carrera justo antes del INSERT/UPDATE de este
+ * proceso), ATORA_TEST_CURRENT_USER_OLD_CHAT (si se indica, siembra un
+ * vínculo previo del propio usuario actual a ese chat_id, para probar
+ * relink).
  *
  * @package ATORA_LMS\Tests\Messaging
  */
@@ -28,26 +34,31 @@ declare( strict_types = 1 );
 
 require_once __DIR__ . '/../../bootstrap.php';
 
-$out_path        = (string) getenv( 'ATORA_TEST_OUT' );
-$current_user    = (int) getenv( 'ATORA_TEST_CURRENT_USER' );
-$chat_id         = (string) getenv( 'ATORA_TEST_CHAT_ID' );
-$existing_owner  = getenv( 'ATORA_TEST_EXISTING_OWNER' );
-$existing_owner  = ( false !== $existing_owner && '' !== $existing_owner ) ? (int) $existing_owner : null;
-$simulate_race   = '1' === getenv( 'ATORA_TEST_SIMULATE_RACE' );
+$out_path         = (string) getenv( 'ATORA_TEST_OUT' );
+$current_user     = (int) getenv( 'ATORA_TEST_CURRENT_USER' );
+$chat_id          = (string) getenv( 'ATORA_TEST_CHAT_ID' );
+$existing_owner   = getenv( 'ATORA_TEST_EXISTING_OWNER' );
+$existing_owner   = ( false !== $existing_owner && '' !== $existing_owner ) ? (int) $existing_owner : null;
+$simulate_race    = '1' === getenv( 'ATORA_TEST_SIMULATE_RACE' );
+$current_old_chat = getenv( 'ATORA_TEST_CURRENT_USER_OLD_CHAT' );
+$current_old_chat = ( false !== $current_old_chat && '' !== $current_old_chat ) ? (string) $current_old_chat : null;
 
 $GLOBALS['__atora_test_current_user_id'] = $current_user;
 
 global $wpdb;
-$wpdb = new class( $existing_owner, $chat_id, $simulate_race ) {
+$wpdb = new class( $existing_owner, $chat_id, $simulate_race, $current_user, $current_old_chat ) {
 	public string $prefix   = 'wp_';
 	public string $usermeta = 'wp_usermeta';
 	public array  $links    = array(); // id => array(user_id, chat_id)
 	private int   $next_id  = 1;
 	private bool  $simulate_race;
 
-	public function __construct( ?int $existing_owner, string $chat_id, bool $simulate_race ) {
+	public function __construct( ?int $existing_owner, string $chat_id, bool $simulate_race, int $current_user, ?string $current_old_chat ) {
 		if ( null !== $existing_owner ) {
 			$this->links[ $this->next_id++ ] = array( 'user_id' => $existing_owner, 'chat_id' => $chat_id );
+		}
+		if ( null !== $current_old_chat ) {
+			$this->links[ $this->next_id++ ] = array( 'user_id' => $current_user, 'chat_id' => $current_old_chat );
 		}
 		$this->simulate_race = $simulate_race;
 	}
@@ -62,9 +73,18 @@ $wpdb = new class( $existing_owner, $chat_id, $simulate_race ) {
 	}
 
 	public function get_var( $sql ) {
-		if ( false !== strpos( $sql, 'atora_telegram_links' ) && preg_match( "/chat_id = '([^']*)'/", $sql, $m ) ) {
+		if ( false === strpos( $sql, 'atora_telegram_links' ) ) {
+			return null;
+		}
+		if ( preg_match( "/chat_id = '([^']*)'/", $sql, $m ) ) {
 			foreach ( $this->links as $row ) {
 				if ( $row['chat_id'] === $m[1] ) { return $row['user_id']; }
+			}
+			return null;
+		}
+		if ( preg_match( '/id FROM .*user_id = (\d+)/', $sql, $m ) ) {
+			foreach ( $this->links as $id => $row ) {
+				if ( (int) $row['user_id'] === (int) $m[1] ) { return $id; }
 			}
 			return null;
 		}
@@ -77,8 +97,6 @@ $wpdb = new class( $existing_owner, $chat_id, $simulate_race ) {
 		}
 
 		if ( $this->simulate_race ) {
-			// Simula que OTRA solicitud reclamó este chat_id justo antes
-			// de este INSERT — el backstop de UNIQUE KEY de MySQL.
 			$this->simulate_race = false; // solo la primera vez.
 			return 0;
 		}
@@ -90,6 +108,31 @@ $wpdb = new class( $existing_owner, $chat_id, $simulate_race ) {
 		}
 
 		$this->links[ $this->next_id++ ] = array( 'user_id' => $data['user_id'], 'chat_id' => $data['chat_id'] );
+		return 1;
+	}
+
+	public function update( $table, $data, $where, $format = null, $where_format = null ) {
+		if ( false === strpos( (string) $table, 'atora_telegram_links' ) ) {
+			return 1;
+		}
+
+		$id = $where['id'] ?? null;
+		if ( ! isset( $this->links[ $id ] ) ) {
+			return 0;
+		}
+
+		if ( $this->simulate_race ) {
+			$this->simulate_race = false;
+			return false; // UNIQUE(chat_id) violation simulada — la fila NO se toca.
+		}
+
+		foreach ( $this->links as $other_id => $row ) {
+			if ( $other_id !== $id && $row['chat_id'] === $data['chat_id'] ) {
+				return false; // otra fila ya tiene ese chat_id — UPDATE falla, fila original intacta.
+			}
+		}
+
+		$this->links[ $id ]['chat_id'] = $data['chat_id'];
 		return 1;
 	}
 
@@ -110,7 +153,6 @@ $wpdb = new class( $existing_owner, $chat_id, $simulate_race ) {
 	public function get_row( $sql, $output = 'ARRAY_A' ) { return null; }
 	public function get_results( $sql, $output = 'ARRAY_A' ) { return array(); }
 	public function get_col( $sql ) { return array(); }
-	public function update( $table, $data, $where, $format = null, $where_format = null ) { return 1; }
 	public function query( $sql ) { return 1; }
 	public function esc_like( string $s ): string { return $s; }
 	public function get_charset_collate(): string { return ''; }
@@ -125,15 +167,23 @@ $_POST['code'] = $code;
 // valor de retorno. Un shutdown function corre justo antes de que el
 // proceso termine y vuelca el estado real de la tabla simulada a un
 // archivo que el proceso PHPUnit padre lee después.
-register_shutdown_function( static function () use ( $out_path, $chat_id ) {
+register_shutdown_function( static function () use ( $out_path, $current_user ) {
 	global $wpdb;
-	$result = array();
+	$own_row = null;
 	foreach ( $wpdb->links as $row ) {
-		if ( $row['chat_id'] === $chat_id ) {
-			$result[] = (int) $row['user_id'];
+		if ( (int) $row['user_id'] === $current_user ) {
+			$own_row = $row;
+			break;
 		}
 	}
-	file_put_contents( $out_path, wp_json_encode( array( 'linked_user_ids' => $result ) ) );
+	$result = array();
+	foreach ( $wpdb->links as $row ) {
+		$result[] = array( 'user_id' => (int) $row['user_id'], 'chat_id' => $row['chat_id'] );
+	}
+	file_put_contents( $out_path, wp_json_encode( array(
+		'all_links'         => $result,
+		'current_user_chat' => $own_row['chat_id'] ?? null,
+	) ) );
 } );
 
 \ATORA\Messaging\Telegram_Bot::ajax_link_account();
