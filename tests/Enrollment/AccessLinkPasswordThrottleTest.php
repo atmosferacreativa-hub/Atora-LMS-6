@@ -9,6 +9,11 @@
  * Se agrega un contador por usuario+token (nunca solo por IP): 5
  * intentos fallidos por 15 minutos, reseteado en el primer acierto.
  *
+ * PT-5 (6.5.8): migrado de get_transient()/set_transient() (no
+ * atómico) a ATORA_Rate_Limiter (peek/consume/reset) — mismo
+ * comportamiento observable, contador ahora respaldado por la tabla
+ * atora_rate_limit_counters en vez de transients.
+ *
  * @package ATORA_LMS\Tests\Enrollment
  */
 
@@ -36,16 +41,19 @@ class Test_Access_Link_Host {
 class AccessLinkPasswordThrottleTest extends TestCase {
 
 	/**
-	 * $wpdb en memoria: una sola fila de enlace de tipo password, con
-	 * un hash conocido (via el wp_check_password() stub del bootstrap).
+	 * $wpdb en memoria: una fila de enlace de tipo password (con un
+	 * hash conocido vía el wp_check_password() stub del bootstrap) más
+	 * una simulación completa de atora_rate_limit_counters (la misma
+	 * que respalda ATORA_Rate_Limiter::peek()/consume()/reset()).
 	 */
 	private function install_wpdb_fixture( string $correct_password ): object {
 		global $wpdb;
 		$original = $wpdb;
 
 		$wpdb = new class( $correct_password ) {
-			public string $prefix = 'wp_';
+			public string $prefix  = 'wp_';
 			public object $row;
+			public array  $counters = array(); // "scope|identifier_hash|window_start" => attempts
 
 			public function __construct( string $correct_password ) {
 				$this->row = (object) array(
@@ -58,15 +66,55 @@ class AccessLinkPasswordThrottleTest extends TestCase {
 				);
 			}
 
-			public function prepare( string $sql, ...$args ): string { return $sql; }
-			public function get_row( $sql, $output = 'ARRAY_A' ) { return $this->row; }
-			public function get_var( $sql ) { return null; }
+			public function prepare( string $sql, ...$args ): string {
+				$i = 0;
+				return preg_replace_callback( '/%[ds]/', function( $m ) use ( &$i, $args ) {
+					if ( ! isset( $args[ $i ] ) ) { return '?'; }
+					$value = $args[ $i++ ];
+					return '%s' === $m[0] ? "'" . $value . "'" : (string) $value;
+				}, $sql );
+			}
+
+			public function get_row( $sql, $output = 'ARRAY_A' ) {
+				if ( false !== strpos( $sql, 'test_access_links' ) ) {
+					return $this->row;
+				}
+				return null;
+			}
+
+			public function get_var( $sql ) {
+				if ( false !== strpos( $sql, 'SHOW TABLES LIKE' ) ) {
+					return $this->prefix . 'atora_rate_limit_counters';
+				}
+				if ( false !== strpos( $sql, 'SELECT attempts FROM' )
+					&& preg_match( "/scope = '([^']*)' AND identifier_hash = '([^']*)' AND window_start = (\d+)/", $sql, $m ) ) {
+					$key = $m[1] . '|' . $m[2] . '|' . $m[3];
+					return $this->counters[ $key ] ?? null;
+				}
+				return null;
+			}
+
+			public function query( $sql ) {
+				if ( false !== strpos( $sql, 'ON DUPLICATE KEY UPDATE' )
+					&& preg_match( "/VALUES \('([^']*)', '([^']*)', (\d+), 1\)/", $sql, $m ) ) {
+					$key = $m[1] . '|' . $m[2] . '|' . $m[3];
+					$this->counters[ $key ] = ( $this->counters[ $key ] ?? 0 ) + 1;
+					return 1;
+				}
+				if ( false !== strpos( $sql, 'DELETE FROM' )
+					&& preg_match( "/scope = '([^']*)' AND identifier_hash = '([^']*)' AND window_start = (\d+)/", $sql, $m ) ) {
+					$key = $m[1] . '|' . $m[2] . '|' . $m[3];
+					unset( $this->counters[ $key ] );
+					return 1;
+				}
+				return 1;
+			}
+
 			public function get_results( $sql, $output = 'ARRAY_A' ) { return array(); }
 			public function get_col( $sql ) { return array(); }
 			public function insert( $table, $data, $format = null ): int { return 1; }
 			public function update( $table, $data, $where, $format = null, $where_format = null ) { return 1; }
 			public function delete( $table, $where, $where_format = null ): int { return 1; }
-			public function query( $sql ) { return 1; }
 			public function esc_like( string $s ): string { return $s; }
 			public function get_charset_collate(): string { return ''; }
 		};
@@ -77,16 +125,6 @@ class AccessLinkPasswordThrottleTest extends TestCase {
 	private function restore_wpdb( object $original ): void {
 		global $wpdb;
 		$wpdb = $original;
-	}
-
-	protected function setUp(): void {
-		parent::setUp();
-		atora_test_reset_transients();
-	}
-
-	protected function tearDown(): void {
-		atora_test_reset_transients();
-		parent::tearDown();
 	}
 
 	/** @test */
@@ -121,26 +159,6 @@ class AccessLinkPasswordThrottleTest extends TestCase {
 	}
 
 	/** @test */
-	public function test_lockout_expires_after_the_ttl(): void {
-		$original = $this->install_wpdb_fixture( 'correct-horse-battery-staple' );
-		$host = new Test_Access_Link_Host();
-
-		for ( $i = 1; $i <= 5; $i++ ) {
-			$host->redeem_access_link( 'tok-abc', 102, 'wrong-guess-' . $i );
-		}
-		$this->assertSame( 'too_many_attempts', $host->redeem_access_link( 'tok-abc', 102, 'wrong-again' )->get_error_code() );
-
-		// Simula el vencimiento del TTL — el stub de transients de test
-		// no expira solo por tiempo, así que se borra directo.
-		delete_transient( 'clms_access_pw_attempts_102_' . md5( 'tok-abc' ) );
-
-		$result = $host->redeem_access_link( 'tok-abc', 102, 'wrong-guess-again' );
-		$this->assertSame( 'wrong_password', $result->get_error_code(), 'tras expirar el TTL, debe volver a evaluarse la contraseña normalmente' );
-
-		$this->restore_wpdb( $original );
-	}
-
-	/** @test */
 	public function test_correct_password_resets_the_counter(): void {
 		$original = $this->install_wpdb_fixture( 'correct-horse-battery-staple' );
 		$host = new Test_Access_Link_Host();
@@ -153,14 +171,48 @@ class AccessLinkPasswordThrottleTest extends TestCase {
 		// contador de intentos ya debe haberse limpiado antes de eso.
 		$host->redeem_access_link( 'tok-abc', 103, 'correct-horse-battery-staple' );
 
-		$lock_key = 'clms_access_pw_attempts_103_' . md5( 'tok-abc' );
-		$this->assertFalse( get_transient( $lock_key ), 'un acierto debe limpiar el contador de intentos fallidos' );
+		global $wpdb;
+		$this->assertSame( array(), $wpdb->counters, 'un acierto debe limpiar el contador de intentos fallidos' );
 
 		// Y por lo tanto vuelve a tener las 5 oportunidades completas.
 		for ( $i = 1; $i <= 5; $i++ ) {
 			$result = $host->redeem_access_link( 'tok-abc', 103, 'wrong-again-' . $i );
 			$this->assertSame( 'wrong_password', $result->get_error_code() );
 		}
+
+		$this->restore_wpdb( $original );
+	}
+
+	/**
+	 * TTL: pasada la ventana de 15 minutos, el contador de la ventana
+	 * vieja ya no aplica — vuelve a evaluarse la contraseña normalmente
+	 * (ventana fija, igual que el resto de los limitadores atómicos de
+	 * este proyecto).
+	 *
+	 * @test
+	 */
+	public function test_lockout_resets_after_the_window_expires(): void {
+		$original = $this->install_wpdb_fixture( 'correct-horse-battery-staple' );
+		$host = new Test_Access_Link_Host();
+
+		for ( $i = 1; $i <= 5; $i++ ) {
+			$host->redeem_access_link( 'tok-abc', 104, 'wrong-guess-' . $i );
+		}
+		$this->assertSame( 'too_many_attempts', $host->redeem_access_link( 'tok-abc', 104, 'wrong-again' )->get_error_code() );
+
+		// Simula el paso a una ventana nueva: se mueve manualmente la
+		// clave de ventana de las filas existentes a una muy antigua —
+		// equivalente a que hayan pasado más de 15 minutos.
+		global $wpdb;
+		$moved = array();
+		foreach ( $wpdb->counters as $key => $attempts ) {
+			$parts = explode( '|', $key );
+			$moved[ $parts[0] . '|' . $parts[1] . '|0' ] = $attempts;
+		}
+		$wpdb->counters = $moved;
+
+		$result = $host->redeem_access_link( 'tok-abc', 104, 'wrong-guess-again' );
+		$this->assertSame( 'wrong_password', $result->get_error_code(), 'tras pasar a una ventana nueva, debe volver a evaluarse la contraseña normalmente' );
 
 		$this->restore_wpdb( $original );
 	}
@@ -180,5 +232,47 @@ class AccessLinkPasswordThrottleTest extends TestCase {
 		$this->assertSame( 'wrong_password', $result_b->get_error_code(), 'el bloqueo de un usuario no debe afectar a otro usuario distinto' );
 
 		$this->restore_wpdb( $original );
+	}
+
+	/**
+	 * PT-8 (6.5.8): fail-closed — si la tabla de rate limit no existe
+	 * (backend no disponible), el intento debe rechazarse, nunca
+	 * permitirse sin límite.
+	 *
+	 * @test
+	 */
+	public function test_fails_closed_when_rate_limit_table_is_unavailable(): void {
+		global $wpdb;
+		$original = $wpdb;
+
+		$wpdb = new class {
+			public string $prefix = 'wp_';
+			public object $row;
+			public function __construct() {
+				$this->row = (object) array(
+					'id' => 1, 'token' => 'tok-abc', 'course_id' => 7,
+					'access_mode' => 'password', 'access_password' => wp_hash_password( 'x' ), 'used_count' => 0,
+				);
+			}
+			public function prepare( string $sql, ...$args ): string { return $sql; }
+			public function get_row( $sql, $output = 'ARRAY_A' ) { return $this->row; }
+			public function get_var( $sql ) { return null; } // SHOW TABLES nunca encuentra la tabla.
+			public function get_results( $sql, $output = 'ARRAY_A' ) { return array(); }
+			public function get_col( $sql ) { return array(); }
+			public function insert( $table, $data, $format = null ): int { return 1; }
+			public function update( $table, $data, $where, $format = null, $where_format = null ) { return 1; }
+			public function delete( $table, $where, $where_format = null ): int { return 1; }
+			public function query( $sql ) { return 1; }
+			public function esc_like( string $s ): string { return $s; }
+			public function get_charset_collate(): string { return ''; }
+		};
+
+		$host = new Test_Access_Link_Host();
+		$result = $host->redeem_access_link( 'tok-abc', 300, 'anything' );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'too_many_attempts', $result->get_error_code(), 'sin la tabla de rate limit disponible, debe fallar cerrado (bloquear), no permitir sin límite' );
+
+		$wpdb = $original;
 	}
 }

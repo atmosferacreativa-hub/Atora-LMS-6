@@ -137,19 +137,30 @@ trait CLMS_Enrollment_Manager_Access_Enrollment_Trait {
 			// usuarios detrás de la misma IP ni depender de una señal
 			// falsificable): 5 intentos fallidos por 15 minutos, se
 			// limpia en el primer acierto.
-			$lock_key = 'clms_access_pw_attempts_' . $user_id . '_' . md5( $token );
-			$attempts = (int) get_transient( $lock_key );
+			//
+			// PT-5 (6.5.8): migrado de get_transient()/set_transient()
+			// (no atómico) a ATORA_Rate_Limiter — solo los intentos
+			// FALLIDOS cuentan (peek() antes de intentar, consume() solo
+			// si la contraseña es incorrecta, reset() en el acierto), así
+			// que se usa el par peek/consume en vez de solo consume().
+			// Fail-closed: si el backend del limiter falla, peek()
+			// devuelve -1 y se bloquea, nunca se permiten intentos
+			// ilimitados por un fallo de infraestructura.
+			$rl_scope      = 'enrollment_access_password';
+			$rl_identifier = $user_id . '|' . $token;
+			$rl_window     = 15 * MINUTE_IN_SECONDS;
+			$attempts      = \ATORA_Rate_Limiter::peek( $rl_scope, $rl_identifier, $rl_window );
 
-			if ( $attempts >= 5 ) {
+			if ( $attempts < 0 || $attempts >= 5 ) {
 				return new WP_Error( 'too_many_attempts', __( 'Demasiados intentos. Intenta de nuevo más tarde.', 'atora-lms' ) );
 			}
 
 			if ( ! wp_check_password( $password_attempt, $row->access_password ) ) {
-				set_transient( $lock_key, $attempts + 1, 15 * MINUTE_IN_SECONDS );
+				\ATORA_Rate_Limiter::consume( $rl_scope, $rl_identifier, 5, $rl_window, false );
 				return new WP_Error( 'wrong_password', __( 'Contraseña incorrecta.', 'atora-lms' ) );
 			}
 
-			delete_transient( $lock_key );
+			\ATORA_Rate_Limiter::reset( $rl_scope, $rl_identifier, $rl_window );
 		}
 
 		if ( class_exists( 'CLMS_Helper' ) && CLMS_Helper::user_is_enrolled_in_course( $user_id, $row->course_id ) ) {

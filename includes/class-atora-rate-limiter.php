@@ -89,6 +89,85 @@ class ATORA_Rate_Limiter {
 	}
 
 	/**
+	 * PT-5 (6.5.8): lee el conteo actual SIN incrementar — para casos
+	 * como intentos de contraseña, donde solo debe contarse un fallo
+	 * (no cada intento), así que hace falta decidir "¿ya estoy
+	 * bloqueado?" antes de saber si este intento en particular cuenta.
+	 *
+	 * @param string $scope
+	 * @param string $identifier
+	 * @param int    $window_seconds
+	 * @return int Intentos ya registrados en la ventana actual; 0 si
+	 *             ninguno; -1 si la tabla/consulta no existe o falla
+	 *             (distinguible de "0 intentos" a propósito, para que
+	 *             el llamador pueda fallar cerrado en vez de
+	 *             interpretar un fallo de infraestructura como "sin
+	 *             intentos registrados").
+	 */
+	public static function peek( string $scope, string $identifier, int $window_seconds ): int {
+		global $wpdb;
+
+		if ( $window_seconds < 1 ) {
+			return -1;
+		}
+
+		$table = $wpdb->prefix . 'atora_rate_limit_counters';
+		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) ) !== $table ) {
+			self::log_failure( sanitize_key( $scope ) );
+			return -1;
+		}
+
+		$window_start    = (int) ( floor( time() / $window_seconds ) * $window_seconds );
+		$identifier_hash = hash( 'sha256', $scope . '|' . $identifier . '|' . wp_salt( 'auth' ) );
+		$scope_key       = sanitize_key( $scope );
+
+		$attempts = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT attempts FROM {$table} WHERE scope = %s AND identifier_hash = %s AND window_start = %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$scope_key,
+				$identifier_hash,
+				$window_start
+			)
+		);
+
+		return null === $attempts ? 0 : (int) $attempts;
+	}
+
+	/**
+	 * PT-5 (6.5.8): borra el contador de la ventana actual — usado tras
+	 * un intento exitoso (p.ej. contraseña correcta), para que el
+	 * cupo de intentos fallidos se reinicie en vez de arrastrarse hasta
+	 * que la ventana venza por tiempo.
+	 *
+	 * @param string $scope
+	 * @param string $identifier
+	 * @param int    $window_seconds
+	 * @return void
+	 */
+	public static function reset( string $scope, string $identifier, int $window_seconds ): void {
+		global $wpdb;
+
+		if ( $window_seconds < 1 ) {
+			return;
+		}
+
+		$table           = $wpdb->prefix . 'atora_rate_limit_counters';
+		$window_start    = (int) ( floor( time() / $window_seconds ) * $window_seconds );
+		$identifier_hash = hash( 'sha256', $scope . '|' . $identifier . '|' . wp_salt( 'auth' ) );
+		$scope_key       = sanitize_key( $scope );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$wpdb->query(
+			$wpdb->prepare(
+				"DELETE FROM {$table} WHERE scope = %s AND identifier_hash = %s AND window_start = %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$scope_key,
+				$identifier_hash,
+				$window_start
+			)
+		);
+	}
+
+	/**
 	 * Borra contadores cuya ventana ya venció, para que las tablas de
 	 * rate limit no crezcan sin límite. Usado por el cron de
 	 * mantenimiento (ATORA_Security_Maintenance). Genérico — sirve
