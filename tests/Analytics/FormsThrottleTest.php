@@ -254,4 +254,37 @@ class FormsThrottleTest extends TestCase {
 
 		$this->restore_wpdb( $original );
 	}
+
+	/**
+	 * PT-6 (6.5.8) — hallazgo real: si el INSERT/SELECT del contador
+	 * fallan (tabla ausente, migración incompleta), el envío debe
+	 * rechazarse (fail-closed) — antes, get_var() devolviendo null se
+	 * interpretaba como "0 intentos", dejando el formulario público SIN
+	 * límite mientras el backend estuviera roto.
+	 *
+	 * @test
+	 */
+	public function test_fails_closed_when_throttle_backend_query_fails(): void {
+		global $wpdb;
+		$original = $wpdb;
+
+		$wpdb = new class {
+			public string $prefix = 'wp_';
+			public function prepare( string $sql, ...$args ): string { return $sql; }
+			public function query( $sql ) { return false; } // simula un INSERT fallido.
+			public function get_var( $sql ) { return null; }
+			public function get_row( $sql, $output = 'ARRAY_A' ) { return null; }
+			public function get_results( $sql, $output = 'ARRAY_A' ) { return array(); }
+			public function get_col( $sql ) { return array(); }
+			public function insert( $table, $data, $format = null ): int { return 1; }
+			public function update( $table, $data, $where, $format = null, $where_format = null ) { return 1; }
+			public function delete( $table, $where, $where_format = null ): int { return 1; }
+			public function esc_like( string $s ): string { return $s; }
+			public function get_charset_collate(): string { return ''; }
+		};
+
+		$this->assertTrue( $this->is_throttled( 99 ), 'sin backend de throttle disponible, debe rechazarse el envío (fail-closed), no permitirse sin límite' );
+
+		$wpdb = $original;
+	}
 }

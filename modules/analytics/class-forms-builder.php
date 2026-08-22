@@ -329,8 +329,18 @@ class Forms_Builder {
 		$window_start = (int) ( floor( time() / $window_secs ) * $window_secs );
 		$ip_hash      = hash( 'sha256', $ip . '|' . wp_salt( 'auth' ) );
 
+		// PT-6 (6.5.8): hallazgo real — si el INSERT/SELECT de abajo
+		// fallaba (tabla ausente, migración incompleta, error de BD),
+		// $wpdb->get_var() devolvía null, (int) null = 0, y
+		// "0 > $limit" es false: el formulario público quedaba SIN
+		// límite de envíos mientras el backend estuviera roto —
+		// exactamente lo opuesto de lo que un rate limiter debe hacer
+		// ante un fallo de infraestructura. Ahora se falla cerrado: si
+		// el INSERT o el SELECT no pueden confirmarse, se trata como
+		// "bloqueado" (mensaje genérico, igual que el límite normal),
+		// nunca como "sin límite".
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$wpdb->query(
+		$inserted = $wpdb->query(
 			$wpdb->prepare(
 				"INSERT INTO {$table} (form_id, ip_hash, window_start, attempts) VALUES (%d, %s, %d, 1)
 				 ON DUPLICATE KEY UPDATE attempts = attempts + 1", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
@@ -340,7 +350,12 @@ class Forms_Builder {
 			)
 		);
 
-		$attempts = (int) $wpdb->get_var(
+		if ( false === $inserted ) {
+			self::log_throttle_backend_failure( $form_id );
+			return true; // fail-closed.
+		}
+
+		$attempts = $wpdb->get_var(
 			$wpdb->prepare(
 				"SELECT attempts FROM {$table} WHERE form_id = %d AND ip_hash = %s AND window_start = %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 				$form_id,
@@ -349,7 +364,26 @@ class Forms_Builder {
 			)
 		);
 
-		return $attempts > $limit;
+		if ( null === $attempts ) {
+			self::log_throttle_backend_failure( $form_id );
+			return true; // fail-closed.
+		}
+
+		return (int) $attempts > $limit;
+	}
+
+	/**
+	 * Registra un fallo del backend de throttle sin datos personales
+	 * (ni IP, ni body del formulario) — solo el form_id, suficiente
+	 * para diagnosticar sin exponer información del visitante.
+	 *
+	 * @param int $form_id
+	 * @return void
+	 */
+	private static function log_throttle_backend_failure( int $form_id ): void {
+		if ( function_exists( 'error_log' ) ) {
+			error_log( '[ATORA][forms-throttle] backend de rate limit no disponible para form_id ' . $form_id . ' — envío rechazado por defecto (fail-closed).' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+		}
 	}
 
 	/**
