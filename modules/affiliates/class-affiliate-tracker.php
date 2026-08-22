@@ -160,15 +160,12 @@ class Affiliate_Tracker {
 	 * @return string
 	 */
 	private static function get_ip(): string {
-		$headers = array( 'HTTP_X_FORWARDED_FOR', 'HTTP_CLIENT_IP', 'REMOTE_ADDR' );
-		foreach ( $headers as $h ) {
-			if ( ! empty( $_SERVER[ $h ] ) ) {
-				$ip = trim( explode( ',', sanitize_text_field( wp_unslash( $_SERVER[ $h ] ) ) )[0] );
-				if ( filter_var( $ip, FILTER_VALIDATE_IP ) ) {
-					return $ip;
-				}
-			}
-		}
-		return '';
+		// PT-3 (6.5.7): antes confiaba en X-Forwarded-For/Client-IP sin
+		// verificar que la petición viniera de un proxy confiable, y
+		// tomaba el PRIMER valor de la cadena (controlado por el
+		// cliente) — evadible/falsificable, y atribuía comisiones de
+		// afiliado a la IP que el propio visitante quisiera declarar.
+		// Delega en el resolutor centralizado.
+		return \ATORA_Client_IP::get();
 	}
 }

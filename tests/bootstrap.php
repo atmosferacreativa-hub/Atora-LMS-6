@@ -495,6 +495,11 @@ if ( file_exists( $client_ip_file ) ) {
 	require_once $client_ip_file;
 }
 
+$rate_limiter_file = __DIR__ . '/../includes/class-atora-rate-limiter.php';
+if ( file_exists( $rate_limiter_file ) ) {
+	require_once $rate_limiter_file;
+}
+
 $forms_builder_file = __DIR__ . '/../modules/analytics/class-forms-builder.php';
 if ( file_exists( $forms_builder_file ) ) {
 	require_once $forms_builder_file;

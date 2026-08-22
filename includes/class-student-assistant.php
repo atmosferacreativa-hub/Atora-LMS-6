@@ -455,18 +455,23 @@ class CLMS_Student_Assistant {
 		return $messages;
 	}
 
+	/**
+	 * PT-6 (6.5.7): antes usaba get_transient()+set_transient()
+	 * (lectura-incremento-escritura no atómico) — dos preguntas
+	 * concurrentes del mismo usuario/IP podían leer el mismo contador
+	 * antes de que cualquiera escribiera, dejando pasar más de
+	 * RATE_LIMIT_REQ peticiones (cada una con coste real de IA) bajo
+	 * carga. Delega en ATORA_Rate_Limiter::consume(), atómico por
+	 * bloqueo de fila. fail_open=false a propósito: si la tabla de
+	 * rate limit no está disponible (migración incompleta, etc.), el
+	 * asistente de IA debe fallar cerrado — nunca abierto — dado el
+	 * coste real que cada respuesta genera.
+	 *
+	 * @param string $key Identificador ya construido por el llamador (user_id o IP).
+	 * @return bool
+	 */
 	protected function check_rate_limit( $key ) {
-		$data = get_transient( $key );
-		if ( false === $data ) {
-			set_transient( $key, 1, self::RATE_LIMIT_SEC );
-			return true;
-		}
-		$data = (int) $data;
-		if ( $data >= self::RATE_LIMIT_REQ ) {
-			return false;
-		}
-		set_transient( $key, $data + 1, self::RATE_LIMIT_SEC );
-		return true;
+		return \ATORA_Rate_Limiter::consume( 'student_assistant', (string) $key, self::RATE_LIMIT_REQ, self::RATE_LIMIT_SEC, false );
 	}
 
 	/**

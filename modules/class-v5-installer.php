@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class V5_Installer {
 
 	/** Versión del esquema. Incrementar para forzar re-instalación. */
-	const SCHEMA_VERSION = '5.1.4-mcp-rate-limit-table';
+	const SCHEMA_VERSION = '5.1.5-generic-rate-limiter-table';
 
 	/** Option key que almacena la versión instalada. */
 	const OPTION_KEY = 'atora_v5_schema_version';
@@ -38,7 +38,7 @@ class V5_Installer {
 			return;
 		}
 
-		if ( self::create_tables() && self::migrate_wp_post_id_nullable_columns() ) {
+		if ( self::create_tables() && self::migrate_wp_post_id_nullable_columns() && self::migrate_rate_limit_indexes() ) {
 			update_option( self::OPTION_KEY, self::SCHEMA_VERSION );
 		}
 	}
@@ -49,7 +49,7 @@ class V5_Installer {
 	 * @return void
 	 */
 	public static function force_install(): void {
-		if ( self::create_tables() && self::migrate_wp_post_id_nullable_columns() ) {
+		if ( self::create_tables() && self::migrate_wp_post_id_nullable_columns() && self::migrate_rate_limit_indexes() ) {
 			update_option( self::OPTION_KEY, self::SCHEMA_VERSION );
 		}
 	}
@@ -141,6 +141,71 @@ class V5_Installer {
 		);
 
 		return isset( $row['Null'] ) && 'YES' === $row['Null'];
+	}
+
+	/**
+	 * PT-6 (6.5.7): agrega el índice KEY window_start /
+	 * KEY minute_key a atora_form_throttle / atora_api_rate_limit en
+	 * instalaciones existentes — dbDelta() no altera de forma
+	 * confiable los índices de una tabla ya creada (mismo criterio que
+	 * migrate_column_nullable()), así que se verifica y agrega
+	 * explícitamente, con ALTER TABLE directo y verificación posterior
+	 * antes de reportar éxito. Necesario para que la limpieza periódica
+	 * (ATORA_Security_Maintenance) pueda borrar por window_start/
+	 * minute_key sin table scan.
+	 *
+	 * @return bool
+	 */
+	private static function migrate_rate_limit_indexes(): bool {
+		$ok = true;
+		$ok = self::migrate_add_index( 'atora_form_throttle', 'window_start', 'window_start', 'INT UNSIGNED' ) && $ok;
+		$ok = self::migrate_add_index( 'atora_api_rate_limit', 'minute_key', 'minute_key', 'CHAR(12)' ) && $ok;
+		return $ok;
+	}
+
+	/**
+	 * @param string $table_suffix Nombre de tabla sin el prefijo de WP.
+	 * @param string $index_name   Nombre del índice a verificar/crear.
+	 * @param string $column       Columna sobre la que crear el índice (debe existir ya).
+	 * @param string $column_type  Sin uso funcional — documenta el tipo esperado en el comentario del ALTER.
+	 * @return bool true si el índice ya existía o quedó creado.
+	 */
+	private static function migrate_add_index( string $table_suffix, string $index_name, string $column, string $column_type ): bool {
+		global $wpdb;
+		unset( $column_type );
+
+		$table = $wpdb->prefix . $table_suffix;
+		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) ) !== $table ) {
+			// La tabla todavía no existe (create_tables() falló para
+			// esta en particular) — no hay nada que indexar, pero
+			// tampoco se puede confirmar éxito.
+			return false;
+		}
+
+		if ( self::table_has_index( $table, $index_name ) ) {
+			return true;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+		$wpdb->query( "ALTER TABLE {$table} ADD KEY {$index_name} ({$column})" );
+
+		return self::table_has_index( $table, $index_name );
+	}
+
+	/**
+	 * @param string $table Nombre completo (con prefijo).
+	 * @param string $index_name
+	 * @return bool
+	 */
+	private static function table_has_index( string $table, string $index_name ): bool {
+		global $wpdb;
+
+		$row = $wpdb->get_row(
+			$wpdb->prepare( "SHOW INDEX FROM {$table} WHERE Key_name = %s", $index_name ), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			ARRAY_A
+		);
+
+		return ! empty( $row );
 	}
 
 	/**
@@ -460,7 +525,8 @@ class V5_Installer {
 			attempts     INT UNSIGNED    NOT NULL DEFAULT 1,
 			updated_at   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 			PRIMARY KEY  (id),
-			UNIQUE KEY form_ip_window (form_id, ip_hash, window_start)
+			UNIQUE KEY form_ip_window (form_id, ip_hash, window_start),
+			KEY window_start (window_start)
 		) $charset_collate;" );
 
 		// ── Sprint 11-12: Messaging / CRM ────────────────────────────────────
@@ -1051,9 +1117,29 @@ class V5_Installer {
 			minute_key CHAR(12)        NOT NULL,
 			requests   INT UNSIGNED    NOT NULL DEFAULT 1,
 			PRIMARY KEY (id),
-			UNIQUE KEY key_op_minute (key_id, operation, minute_key)
+			UNIQUE KEY key_op_minute (key_id, operation, minute_key),
+			KEY minute_key (minute_key)
 		) $charset_collate;" );
 		// ── /Fase 12C ─────────────────────────────────────────────────────────
+
+		// PT-6 (6.5.7): contador de rate limit genérico y reutilizable
+		// (ATORA_Rate_Limiter::consume()) — mismo patrón atómico que las
+		// dos tablas de arriba, para que nuevos usos (Student Assistant,
+		// y cualquier futuro límite sensible) no vuelvan a caer en
+		// get_transient()+set_transient(). index en window_start para
+		// que la limpieza periódica (ATORA_Security_Maintenance) pueda
+		// borrar por rango de forma eficiente.
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_rate_limit_counters (
+			id               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			scope            VARCHAR(60)     NOT NULL,
+			identifier_hash  CHAR(64)        NOT NULL,
+			window_start     INT UNSIGNED    NOT NULL,
+			attempts         INT UNSIGNED    NOT NULL DEFAULT 1,
+			updated_at       DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			UNIQUE KEY scope_identifier_window (scope, identifier_hash, window_start),
+			KEY window_start (window_start)
+		) $charset_collate;" );
 
 		// ── Fase III S9: Badges de gamificación ───────────────────────────────
 		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}clms_badges (
@@ -1229,6 +1315,7 @@ class V5_Installer {
 			// marcara el esquema como completo.
 			"{$wpdb->prefix}atora_api_keys",
 			"{$wpdb->prefix}atora_api_rate_limit",
+			"{$wpdb->prefix}atora_rate_limit_counters",
 			// Messaging.
 			"{$wpdb->prefix}atora_message_queue",
 			"{$wpdb->prefix}atora_message_log",

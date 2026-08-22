@@ -651,6 +651,7 @@ add_action( 'init', static function () {
 	// módulo (Forms_Builder, Student_Assistant, Extended_Registration...)
 	// pueda usarla sin importar el orden/estado del sistema de módulos.
 	require_once ATORA_LMS_DIR . 'includes/class-atora-client-ip.php';
+	require_once ATORA_LMS_DIR . 'includes/class-atora-rate-limiter.php';
 
 	// ── PT-2 (6.3.0): registro de módulos — debe cargar antes que cualquier
 	// sistema de carga (A/B/C) que lo consulte.
