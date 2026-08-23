@@ -33,11 +33,28 @@ class Preferences {
 	const META_PHONE_VERIFIED_HASH = 'atora_phone_verified_hash';
 	const META_VERIFY_CODE_HASH = 'atora_phone_verify_code_hash';
 	const META_VERIFY_EXPIRES   = 'atora_phone_verify_expires';
-	const META_VERIFY_ATTEMPTS  = 'atora_phone_verify_attempts';
-	const META_VERIFY_WINDOW    = 'atora_phone_verify_window_start';
-	/** PT-5 (6.5.1): intentos de VALIDAR un código, contador independiente del de SOLICITAR uno (META_VERIFY_ATTEMPTS/META_VERIFY_WINDOW, que limita pedir códigos nuevos). */
-	const META_VERIFY_CODE_ATTEMPTS = 'atora_phone_verify_code_attempts';
-	const MAX_CODE_ATTEMPTS         = 5;
+	const MAX_CODE_ATTEMPTS     = 5;
+
+	/**
+	 * PT-5 (6.5.9): ambos contadores (intentos de VALIDAR un código y
+	 * solicitudes de código NUEVO) migrados de usermeta
+	 * get_user_meta()/update_user_meta() (no atómico — la misma
+	 * condición de carrera que PT-4 cerró en el limiter de contraseña
+	 * de enrollment: lecturas y escrituras separadas, varias
+	 * solicitudes concurrentes podían leer el mismo contador antes de
+	 * que ninguna lo incrementara) a ATORA_Rate_Limiter, consume()
+	 * primero siempre. Las constantes de usermeta que guardaban estos
+	 * dos contadores (atora_phone_verify_code_attempts,
+	 * atora_phone_verify_attempts, atora_phone_verify_window_start) se
+	 * retiran — son contadores de minutos/horas, así que dejarlas
+	 * simplemente caducar en vez de migrar sus datos es preferible
+	 * (más simple, sin riesgo real: como mucho un usuario con un
+	 * intento en curso al momento del deploy recupera su cupo
+	 * completo, nunca lo pierde).
+	 */
+	const VERIFY_CODE_RATE_LIMIT_SCOPE  = 'whatsapp_verify_code';
+	const VERIFY_CODE_RATE_LIMIT_WINDOW = 15 * MINUTE_IN_SECONDS;
+	const VERIFY_REQUEST_RATE_LIMIT_SCOPE = 'whatsapp_verify_request';
 
 	const CATEGORIES = array( 'academico', 'recordatorios', 'institucional' );
 
@@ -270,7 +287,11 @@ class Preferences {
 			return array( 'ok' => false, 'reason' => 'sin_telefono' );
 		}
 
-		if ( ! self::under_verify_rate_limit( $user_id ) ) {
+		// PT-5.1 (6.5.9): puro límite de frecuencia (3 solicitudes/hora),
+		// sin concepto de "éxito" que resetee el cupo — consume() simple,
+		// fail-closed si el backend del limiter falla.
+		if ( ! class_exists( 'ATORA_Rate_Limiter' )
+			|| ! \ATORA_Rate_Limiter::consume( self::VERIFY_REQUEST_RATE_LIMIT_SCOPE, (string) $user_id, self::MAX_ATTEMPTS_HOUR, HOUR_IN_SECONDS, false ) ) {
 			return array( 'ok' => false, 'reason' => 'limite_intentos' );
 		}
 
@@ -278,10 +299,11 @@ class Preferences {
 
 		update_user_meta( $user_id, self::META_VERIFY_CODE_HASH, wp_hash( $code ) );
 		update_user_meta( $user_id, self::META_VERIFY_EXPIRES, time() + ( self::CODE_TTL_MINUTES * MINUTE_IN_SECONDS ) );
-		self::register_verify_attempt( $user_id );
 		// PT-5.2 (6.5.1): un código nuevo resetea el contador de intentos
 		// de validación del código anterior.
-		delete_user_meta( $user_id, self::META_VERIFY_CODE_ATTEMPTS );
+		if ( class_exists( 'ATORA_Rate_Limiter' ) ) {
+			\ATORA_Rate_Limiter::reset( self::VERIFY_CODE_RATE_LIMIT_SCOPE, (string) $user_id, self::VERIFY_CODE_RATE_LIMIT_WINDOW );
+		}
 
 		if ( ! class_exists( '\ATORA\Messaging\WhatsApp' ) ) {
 			return array( 'ok' => false, 'reason' => 'whatsapp_no_disponible' );
@@ -309,8 +331,16 @@ class Preferences {
 		// contaba los códigos incorrectos, solo la solicitud de códigos
 		// nuevos (3/hora, ya existía). Sin esto, un código de 6 dígitos
 		// es fuerza-bruteable dentro de su ventana de 10 minutos.
-		$code_attempts = absint( get_user_meta( $user_id, self::META_VERIFY_CODE_ATTEMPTS, true ) );
-		if ( $code_attempts >= self::MAX_CODE_ATTEMPTS ) {
+		//
+		// PT-5 (6.5.9): consume-primero (reserva el cupo ANTES de
+		// evaluar el código), no lectura-luego-escritura — misma
+		// atomicidad que PT-4/PT-1. La ventana fija de 15 min excede el
+		// TTL del código (10 min, ver CODE_TTL_MINUTES), así que para
+		// cuando la ventana del limiter venciera, el código ya habría
+		// expirado de todos modos — el comportamiento observable no
+		// cambia.
+		if ( ! class_exists( 'ATORA_Rate_Limiter' )
+			|| ! \ATORA_Rate_Limiter::consume( self::VERIFY_CODE_RATE_LIMIT_SCOPE, (string) $user_id, self::MAX_CODE_ATTEMPTS, self::VERIFY_CODE_RATE_LIMIT_WINDOW, false ) ) {
 			self::invalidate_current_code( $user_id );
 			return array( 'ok' => false, 'reason' => 'demasiados_intentos' );
 		}
@@ -322,15 +352,10 @@ class Preferences {
 
 		$stored_hash = (string) get_user_meta( $user_id, self::META_VERIFY_CODE_HASH, true );
 		if ( '' === $stored_hash || ! hash_equals( $stored_hash, wp_hash( $code ) ) ) {
-			update_user_meta( $user_id, self::META_VERIFY_CODE_ATTEMPTS, $code_attempts + 1 );
-			if ( $code_attempts + 1 >= self::MAX_CODE_ATTEMPTS ) {
-				self::invalidate_current_code( $user_id );
-				return array( 'ok' => false, 'reason' => 'demasiados_intentos' );
-			}
 			return array( 'ok' => false, 'reason' => 'codigo_incorrecto' );
 		}
 
-		delete_user_meta( $user_id, self::META_VERIFY_CODE_ATTEMPTS );
+		\ATORA_Rate_Limiter::reset( self::VERIFY_CODE_RATE_LIMIT_SCOPE, (string) $user_id, self::VERIFY_CODE_RATE_LIMIT_WINDOW );
 
 		$phone = trim( (string) get_user_meta( $user_id, 'atora_phone', true ) );
 		update_user_meta( $user_id, self::META_PHONE_VERIFIED, true );
@@ -366,38 +391,17 @@ class Preferences {
 	 * @return void
 	 */
 	private static function invalidate_current_code( int $user_id ): void {
+		// PT-5 (6.5.9): a propósito NO se resetea el limiter de intentos
+		// acá — este método se llama, entre otros casos, desde la propia
+		// rama "demasiados_intentos" de verify_phone_code(). Resetear el
+		// cupo compartido justo al bloquear deshace el propio bloqueo
+		// (y, bajo concurrencia real, permitiría que un proceso bloqueado
+		// reabra la ventana para otro que todavía está compitiendo). El
+		// límite de intentos solo se libera explícitamente en dos
+		// lugares: un acierto (verify_phone_code()) o una solicitud de
+		// código nuevo (request_phone_verification()) — ambos, no este.
 		delete_user_meta( $user_id, self::META_VERIFY_CODE_HASH );
 		delete_user_meta( $user_id, self::META_VERIFY_EXPIRES );
-		delete_user_meta( $user_id, self::META_VERIFY_CODE_ATTEMPTS );
-	}
-
-	/**
-	 * @param int $user_id
-	 * @return bool true si todavía puede solicitar un código esta hora.
-	 */
-	private static function under_verify_rate_limit( int $user_id ): bool {
-		$window_start = absint( get_user_meta( $user_id, self::META_VERIFY_WINDOW, true ) );
-		if ( ! $window_start || ( time() - $window_start ) >= HOUR_IN_SECONDS ) {
-			return true; // ventana vencida o inexistente — se reinicia en register_verify_attempt().
-		}
-
-		$attempts = absint( get_user_meta( $user_id, self::META_VERIFY_ATTEMPTS, true ) );
-		return $attempts < self::MAX_ATTEMPTS_HOUR;
-	}
-
-	/**
-	 * @param int $user_id
-	 * @return void
-	 */
-	private static function register_verify_attempt( int $user_id ): void {
-		$window_start = absint( get_user_meta( $user_id, self::META_VERIFY_WINDOW, true ) );
-		if ( ! $window_start || ( time() - $window_start ) >= HOUR_IN_SECONDS ) {
-			update_user_meta( $user_id, self::META_VERIFY_WINDOW, time() );
-			update_user_meta( $user_id, self::META_VERIFY_ATTEMPTS, 1 );
-			return;
-		}
-
-		update_user_meta( $user_id, self::META_VERIFY_ATTEMPTS, absint( get_user_meta( $user_id, self::META_VERIFY_ATTEMPTS, true ) ) + 1 );
 	}
 
 	// ── Token de baja sin sesión (PT-4.4) ─────────────────────────────────

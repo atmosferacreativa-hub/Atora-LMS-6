@@ -10,6 +10,11 @@
  * cuenta como verificado — pero sin necesidad de programar un ciclo
  * de retiro, porque no protegía a ningún usuario real).
  *
+ * PT-5 (6.5.9): verify_phone_code() ahora pasa por ATORA_Rate_Limiter
+ * — necesita un $wpdb en memoria que respalde
+ * atora_rate_limit_counters, aunque este test no verifique el límite
+ * en sí.
+ *
  * @package ATORA_LMS\Tests\Messaging
  */
 
@@ -21,13 +26,70 @@ use PHPUnit\Framework\TestCase;
 
 class PhoneVerificationCompatRetiredTest extends TestCase {
 
+	private ?object $original_wpdb = null;
+
 	protected function setUp(): void {
 		parent::setUp();
 		atora_test_reset_user_meta();
+
+		global $wpdb;
+		$this->original_wpdb = $wpdb;
+		$wpdb = new class {
+			public string $prefix   = 'wp_';
+			public array  $counters = array();
+
+			public function prepare( string $sql, ...$args ): string {
+				$i = 0;
+				return preg_replace_callback( '/%[ds]/', function ( $m ) use ( &$i, $args ) {
+					if ( ! isset( $args[ $i ] ) ) { return '?'; }
+					$value = $args[ $i++ ];
+					return '%s' === $m[0] ? "'" . $value . "'" : (string) $value;
+				}, $sql );
+			}
+
+			public function get_var( $sql ) {
+				if ( false !== strpos( $sql, 'SHOW TABLES LIKE' ) ) {
+					return $this->prefix . 'atora_rate_limit_counters';
+				}
+				if ( false !== strpos( $sql, 'SELECT attempts FROM' )
+					&& preg_match( "/scope = '([^']*)' AND identifier_hash = '([^']*)' AND window_start = (\d+)/", $sql, $m ) ) {
+					$key = $m[1] . '|' . $m[2] . '|' . $m[3];
+					return $this->counters[ $key ] ?? null;
+				}
+				return null;
+			}
+
+			public function query( $sql ) {
+				if ( false !== strpos( $sql, 'ON DUPLICATE KEY UPDATE' )
+					&& preg_match( "/VALUES \('([^']*)', '([^']*)', (\d+), 1\)/", $sql, $m ) ) {
+					$key = $m[1] . '|' . $m[2] . '|' . $m[3];
+					$this->counters[ $key ] = ( $this->counters[ $key ] ?? 0 ) + 1;
+					return 1;
+				}
+				if ( false !== strpos( $sql, 'DELETE FROM' )
+					&& preg_match( "/scope = '([^']*)' AND identifier_hash = '([^']*)' AND window_start = (\d+)/", $sql, $m ) ) {
+					$key = $m[1] . '|' . $m[2] . '|' . $m[3];
+					unset( $this->counters[ $key ] );
+					return 1;
+				}
+				return 1;
+			}
+
+			public function get_row( $sql, $output = 'ARRAY_A' ) { return null; }
+			public function get_results( $sql, $output = 'ARRAY_A' ) { return array(); }
+			public function get_col( $sql ) { return array(); }
+			public function insert( $table, $data, $format = null ): int { return 1; }
+			public function update( $table, $data, $where, $format = null, $where_format = null ) { return 1; }
+			public function delete( $table, $where, $where_format = null ): int { return 1; }
+			public function esc_like( string $s ): string { return $s; }
+			public function get_charset_collate(): string { return ''; }
+		};
 	}
 
 	protected function tearDown(): void {
 		atora_test_reset_user_meta();
+		global $wpdb;
+		$wpdb = $this->original_wpdb;
 		parent::tearDown();
 	}
 
