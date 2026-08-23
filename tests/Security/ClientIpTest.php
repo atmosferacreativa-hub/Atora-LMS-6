@@ -69,6 +69,13 @@ class ClientIpTest extends TestCase {
 	}
 
 	/**
+	 * @param array<int,string> $rules
+	 */
+	private function trust_x_real_ip( array $rules ): void {
+		add_filter( 'atora_trust_x_real_ip_proxies', static function () use ( $rules ) { return $rules; } );
+	}
+
+	/**
 	 * Test A (OT 6.5.8) — cliente directo, sin proxy: la cabecera
 	 * forjada por el propio cliente se ignora.
 	 *
@@ -128,6 +135,67 @@ class ClientIpTest extends TestCase {
 		$_SERVER['HTTP_X_FORWARDED_FOR']  = '203.0.113.20';
 
 		$this->assertSame( '203.0.113.20', \ATORA_Client_IP::get(), 'CF-Connecting-IP no debe usarse desde un proxy que no está en la lista Cloudflare' );
+	}
+
+	/**
+	 * PT-2 (6.5.9) — escenario del hallazgo: proxy genérico confiable
+	 * para XFF, pero SIN autorización explícita para X-Real-IP.
+	 * X-Real-IP falsificado por el cliente debe ignorarse y
+	 * X-Forwarded-For (correcto) debe usarse en su lugar — antes de
+	 * este fix, X-Real-IP se probaba primero y ganaba.
+	 *
+	 * @test
+	 */
+	public function test_g_spoofed_x_real_ip_ignored_without_explicit_authorization(): void {
+		$this->trust_generic_proxies( array( '10.0.0.2' ) );
+
+		$_SERVER['REMOTE_ADDR']          = '10.0.0.2';
+		$_SERVER['HTTP_X_REAL_IP']       = '6.6.6.6'; // falsificado por el cliente.
+		$_SERVER['HTTP_X_FORWARDED_FOR'] = '203.0.113.20';
+
+		$this->assertSame(
+			'203.0.113.20',
+			\ATORA_Client_IP::get(),
+			'sin atora_trust_x_real_ip_proxies explícito, X-Real-IP no debe usarse aunque el proxy sea confiable para XFF'
+		);
+	}
+
+	/**
+	 * PT-2 (6.5.9) — cuando el proxy SÍ está explícitamente autorizado
+	 * para X-Real-IP (además de ser un proxy genérico confiable), el
+	 * header vuelve a resolverse normalmente.
+	 *
+	 * @test
+	 */
+	public function test_h_x_real_ip_used_when_proxy_explicitly_authorized(): void {
+		$this->trust_generic_proxies( array( '10.0.0.2' ) );
+		$this->trust_x_real_ip( array( '10.0.0.2' ) );
+
+		$_SERVER['REMOTE_ADDR']    = '10.0.0.2';
+		$_SERVER['HTTP_X_REAL_IP'] = '203.0.113.55';
+
+		$this->assertSame( '203.0.113.55', \ATORA_Client_IP::get() );
+	}
+
+	/**
+	 * PT-2 (6.5.9) — un proxy que SOLO está en la lista de X-Real-IP
+	 * pero no en la lista genérica no debe ser tratado como confiable
+	 * en absoluto (la autorización de X-Real-IP es un requisito
+	 * adicional, no un sustituto de la confianza genérica).
+	 *
+	 * @test
+	 */
+	public function test_i_x_real_ip_authorization_alone_does_not_imply_generic_proxy_trust(): void {
+		$this->trust_x_real_ip( array( '10.0.0.2' ) );
+
+		$_SERVER['REMOTE_ADDR']    = '10.0.0.2';
+		$_SERVER['HTTP_X_REAL_IP'] = '203.0.113.55';
+
+		$this->assertSame(
+			'10.0.0.2',
+			\ATORA_Client_IP::get(),
+			'estar solo en la lista de X-Real-IP, sin estar en la lista genérica, no debe autorizar ningún header reenviado'
+		);
 	}
 
 	/**

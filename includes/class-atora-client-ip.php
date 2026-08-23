@@ -29,6 +29,19 @@
  * genérico confiable NO autoriza automáticamente ese header
  * específico de Cloudflare.
  *
+ * Sprint 6.5.9 (PT-2): X-Real-IP se confiaba bajo la misma condición
+ * genérica que X-Forwarded-For/X-Forwarded ("proxy genérico
+ * confiable"), sin autorización específica por header. Un proxy que
+ * sanitiza correctamente X-Forwarded-For pero no elimina un
+ * X-Real-IP inyectado por el cliente permitía spoofear la IP bajo esa
+ * configuración concreta (no la default). X-Real-IP ahora exige,
+ * además de pertenecer a la lista de proxies genéricos, estar
+ * explícitamente en una segunda lista de confianza dedicada
+ * (`atora_trust_x_real_ip_proxies`, vacía por defecto) — mismo patrón
+ * ya usado para CF-Connecting-IP. X-Forwarded-For/X-Forwarded siguen
+ * confiándose con solo la lista genérica, sin cambios de
+ * comportamiento para esos dos headers.
+ *
  * @package ATORA_LMS
  * @since   6.5.5
  */
@@ -105,11 +118,15 @@ class ATORA_Client_IP {
 			return $remote_addr;
 		}
 
-		$forwarded_headers = array(
-			'HTTP_X_REAL_IP',
-			'HTTP_X_FORWARDED_FOR',
-			'HTTP_X_FORWARDED',
-		);
+		// PT-2 (6.5.9): X-Real-IP solo se consulta si, además de ser un
+		// proxy genérico confiable, ese proxy está explícitamente
+		// habilitado para este header específico — no alcanza con estar
+		// en la lista genérica, a diferencia de X-Forwarded-For/
+		// X-Forwarded (ver docblock de la clase).
+		$forwarded_headers = array( 'HTTP_X_FORWARDED_FOR', 'HTTP_X_FORWARDED' );
+		if ( self::is_trusted_x_real_ip_proxy( $remote_addr ) ) {
+			array_unshift( $forwarded_headers, 'HTTP_X_REAL_IP' );
+		}
 
 		foreach ( $forwarded_headers as $header_key ) {
 			$raw = isset( $_SERVER[ $header_key ] ) ? wp_unslash( $_SERVER[ $header_key ] ) : '';
@@ -197,6 +214,23 @@ class ATORA_Client_IP {
 	 */
 	private static function is_trusted_cloudflare_ip( string $ip ): bool {
 		$rules = apply_filters( 'atora_trusted_cloudflare_cidrs', array() );
+
+		return self::ip_matches_rules( $ip, (array) $rules );
+	}
+
+	/**
+	 * PT-2 (6.5.9): proxies explícitamente autorizados para X-Real-IP.
+	 * Vacío por defecto a propósito, igual que la lista de Cloudflare —
+	 * pertenecer a la lista genérica de proxies confiables NO alcanza
+	 * para autorizar este header en particular; un despliegue que
+	 * necesita confiar en X-Real-IP debe habilitarlo explícitamente vía
+	 * este filtro.
+	 *
+	 * @param string $ip
+	 * @return bool
+	 */
+	private static function is_trusted_x_real_ip_proxy( string $ip ): bool {
+		$rules = apply_filters( 'atora_trust_x_real_ip_proxies', array() );
 
 		return self::ip_matches_rules( $ip, (array) $rules );
 	}
