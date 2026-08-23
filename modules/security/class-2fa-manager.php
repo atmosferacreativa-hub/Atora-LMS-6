@@ -369,7 +369,18 @@ class Two_FA_Manager {
 		// los dos caminos y comparte el mismo cupo entre ellos, así que
 		// un atacante no puede resetear su cupo cambiando de endpoint.
 		// Fail-closed: sin el limiter disponible, no se evalúa el código.
-		if ( ! self::pending_2fa_attempt_allowed( $user_id ) ) {
+		//
+		// PT-4 (6.5.9), aplicado también acá: el patrón original de esta
+		// misma OT (peek() antes de intentar, consume() solo si el
+		// código es incorrecto) tiene la MISMA ventana de carrera que
+		// PT-4 identificó y cerró en el limiter de contraseña de
+		// enrollment — varias solicitudes concurrentes contra el mismo
+		// pending_user_id podían leer el contador antes de que ninguna
+		// lo incrementara. Se usa el mismo patrón consume-primero que
+		// PT-4: se reserva el cupo ANTES de evaluar el código; si no
+		// queda cupo, se rechaza sin evaluar nada; un acierto libera el
+		// cupo con reset() para no penalizar un login legítimo.
+		if ( ! self::consume_pending_2fa_attempt( $user_id ) ) {
 			return false;
 		}
 
@@ -399,7 +410,6 @@ class Two_FA_Manager {
 		);
 
 		if ( ! $row ) {
-			self::register_pending_2fa_attempt( $user_id );
 			return false;
 		}
 
@@ -435,28 +445,14 @@ class Two_FA_Manager {
 
 	/**
 	 * @param int $user_id
-	 * @return bool
+	 * @return bool true si quedaba cupo y se reservó un intento.
 	 */
-	private static function pending_2fa_attempt_allowed( int $user_id ): bool {
+	private static function consume_pending_2fa_attempt( int $user_id ): bool {
 		if ( ! $user_id || ! class_exists( 'ATORA_Rate_Limiter' ) ) {
 			return false; // fail-closed.
 		}
 
-		$attempts = \ATORA_Rate_Limiter::peek( self::PENDING_2FA_RATE_LIMIT_SCOPE, (string) $user_id, self::PENDING_2FA_RATE_LIMIT_WINDOW );
-
-		return $attempts >= 0 && $attempts < self::PENDING_2FA_RATE_LIMIT_MAX;
-	}
-
-	/**
-	 * @param int $user_id
-	 * @return void
-	 */
-	private static function register_pending_2fa_attempt( int $user_id ): void {
-		if ( ! $user_id || ! class_exists( 'ATORA_Rate_Limiter' ) ) {
-			return;
-		}
-
-		\ATORA_Rate_Limiter::consume(
+		return \ATORA_Rate_Limiter::consume(
 			self::PENDING_2FA_RATE_LIMIT_SCOPE,
 			(string) $user_id,
 			self::PENDING_2FA_RATE_LIMIT_MAX,
@@ -600,7 +596,9 @@ class Two_FA_Manager {
 		// en la práctica. Comparte el mismo cupo que verify_token() (el
 		// scope es el mismo), así que un atacante no puede "resetear" su
 		// cupo alternando entre código normal y código de respaldo.
-		if ( ! self::pending_2fa_attempt_allowed( $user_id ) ) {
+		// PT-4 (6.5.9): consume-primero, no peek-luego-consume — mismo
+		// razonamiento de atomicidad que verify_token().
+		if ( ! self::consume_pending_2fa_attempt( $user_id ) ) {
 			return false;
 		}
 
@@ -615,8 +613,6 @@ class Two_FA_Manager {
 				return true;
 			}
 		}
-
-		self::register_pending_2fa_attempt( $user_id );
 
 		return false;
 	}

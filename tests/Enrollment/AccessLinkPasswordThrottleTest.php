@@ -14,6 +14,18 @@
  * comportamiento observable, contador ahora respaldado por la tabla
  * atora_rate_limit_counters en vez de transients.
  *
+ * PT-4 (6.5.9): el par peek()-luego-consume() de 6.5.8 tenía una
+ * ventana de carrera real (lectura y escritura separadas, no
+ * atómicas) — varias solicitudes concurrentes podían leer el mismo
+ * contador antes de que ninguna lo incrementara, permitiendo más
+ * intentos efectivos que el límite nominal. Se invierte el orden:
+ * consume() reserva el cupo ANTES de evaluar la contraseña; el
+ * comportamiento secuencial observable no cambia (siguen siendo 5
+ * intentos, el 6º rechazado, reset en el acierto), pero ahora también
+ * es atómico bajo concurrencia real — ver
+ * test_concurrent_wrong_passwords_never_exceed_the_nominal_limit(),
+ * que dispara 10 procesos del SO reales en paralelo.
+ *
  * @package ATORA_LMS\Tests\Enrollment
  */
 
@@ -274,5 +286,94 @@ class AccessLinkPasswordThrottleTest extends TestCase {
 		$this->assertSame( 'too_many_attempts', $result->get_error_code(), 'sin la tabla de rate limit disponible, debe fallar cerrado (bloquear), no permitir sin límite' );
 
 		$wpdb = $original;
+	}
+
+	/**
+	 * PT-4 (6.5.9), fila 4 de la matriz manual del OT: 10 procesos del
+	 * SO reales, disparados en simultáneo (arrancados TODOS antes de
+	 * esperar a ninguno), contra el mismo user_id|token con la misma
+	 * contraseña incorrecta. El número de intentos REALMENTE evaluados
+	 * por wp_check_password() (distinguible por el código de error
+	 * 'wrong_password' vs 'too_many_attempts' — ver
+	 * fixtures/run-access-link-redeem.php) no debe superar el límite
+	 * nominal de 5, incluso bajo esta concurrencia real. Un test
+	 * secuencial (un bucle for dentro de un solo proceso PHP, como los
+	 * de arriba) no puede demostrar esto — nunca hay dos ejecuciones
+	 * compitiendo de verdad por la misma fila del contador.
+	 *
+	 * @test
+	 */
+	public function test_concurrent_wrong_passwords_never_exceed_the_nominal_limit(): void {
+		$state_file = sys_get_temp_dir() . '/atora_test_al_state_' . bin2hex( random_bytes( 8 ) ) . '.json';
+		$tmp_files  = array( $state_file );
+
+		$php_bin = defined( 'PHP_BINARY' ) && PHP_BINARY ? PHP_BINARY : 'php';
+		$script  = __DIR__ . '/fixtures/run-access-link-redeem.php';
+
+		$processes    = array();
+		$pipes_all    = array();
+		$result_files = array();
+
+		for ( $i = 0; $i < 10; $i++ ) {
+			$result_file    = sys_get_temp_dir() . '/atora_test_al_result_' . bin2hex( random_bytes( 8 ) ) . '.txt';
+			$result_files[] = $result_file;
+			$tmp_files[]    = $result_file;
+
+			$env = array_merge( $_ENV ?? array(), array(
+				'ATORA_TEST_STATE_FILE'  => $state_file,
+				'ATORA_TEST_RESULT_FILE' => $result_file,
+				'ATORA_TEST_USER_ID'     => '900',
+			) );
+
+			$pipes   = array();
+			$process = proc_open(
+				array( $php_bin, $script ),
+				array( 1 => array( 'pipe', 'w' ), 2 => array( 'pipe', 'w' ) ),
+				$pipes,
+				null,
+				$env
+			);
+
+			if ( ! is_resource( $process ) ) {
+				$this->fail( 'no se pudo lanzar el proceso hijo ' . $i );
+			}
+
+			$processes[] = $process;
+			$pipes_all[] = $pipes;
+		}
+
+		// Recién ahora se espera — todos los 10 procesos ya estaban
+		// corriendo en paralelo.
+		foreach ( $processes as $i => $process ) {
+			stream_get_contents( $pipes_all[ $i ][1] );
+			stream_get_contents( $pipes_all[ $i ][2] );
+			fclose( $pipes_all[ $i ][1] );
+			fclose( $pipes_all[ $i ][2] );
+			proc_close( $process );
+		}
+
+		$evaluated = 0; // 'wrong_password' == wp_check_password() se llegó a evaluar.
+		$blocked   = 0; // 'too_many_attempts' == rechazado por el límite antes de evaluar.
+		foreach ( $result_files as $rf ) {
+			$code = file_exists( $rf ) ? trim( (string) file_get_contents( $rf ) ) : '';
+			if ( 'wrong_password' === $code ) {
+				++$evaluated;
+			} elseif ( 'too_many_attempts' === $code ) {
+				++$blocked;
+			}
+		}
+
+		foreach ( $tmp_files as $f ) {
+			if ( file_exists( $f ) ) {
+				@unlink( $f );
+			}
+		}
+
+		$this->assertLessThanOrEqual(
+			5,
+			$evaluated,
+			'con 10 procesos reales compitiendo, wp_check_password() no debe evaluarse más de 5 veces — de lo contrario la carrera sigue abierta'
+		);
+		$this->assertSame( 10, $evaluated + $blocked, 'cada uno de los 10 procesos debe terminar en un resultado reconocido (evaluado o bloqueado)' );
 	}
 }

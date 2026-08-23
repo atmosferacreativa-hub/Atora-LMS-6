@@ -138,25 +138,28 @@ trait CLMS_Enrollment_Manager_Access_Enrollment_Trait {
 			// falsificable): 5 intentos fallidos por 15 minutos, se
 			// limpia en el primer acierto.
 			//
-			// PT-5 (6.5.8): migrado de get_transient()/set_transient()
-			// (no atómico) a ATORA_Rate_Limiter — solo los intentos
-			// FALLIDOS cuentan (peek() antes de intentar, consume() solo
-			// si la contraseña es incorrecta, reset() en el acierto), así
-			// que se usa el par peek/consume en vez de solo consume().
-			// Fail-closed: si el backend del limiter falla, peek()
-			// devuelve -1 y se bloquea, nunca se permiten intentos
-			// ilimitados por un fallo de infraestructura.
+			// PT-4 (6.5.9): el par peek()-luego-consume() introducido en
+			// 6.5.8 tenía una ventana de carrera real — varias
+			// solicitudes concurrentes podían leer el mismo contador
+			// (p.ej. 4) antes de que ninguna lo incrementara, permitiendo
+			// más intentos efectivos de contraseña que el límite nominal
+			// de 5. Se invierte el orden: se reserva el cupo con
+			// consume() ANTES de evaluar la contraseña (atómico por
+			// bloqueo de fila InnoDB, sin lectura previa separada); si no
+			// queda cupo, se rechaza sin siquiera llamar a
+			// wp_check_password(); si la contraseña resulta correcta, se
+			// libera inmediatamente con reset() para no penalizar un
+			// acierto legítimo. Fail-closed: consume() con fail_open=false
+			// rechaza si el backend del limiter falla.
 			$rl_scope      = 'enrollment_access_password';
 			$rl_identifier = $user_id . '|' . $token;
 			$rl_window     = 15 * MINUTE_IN_SECONDS;
-			$attempts      = \ATORA_Rate_Limiter::peek( $rl_scope, $rl_identifier, $rl_window );
 
-			if ( $attempts < 0 || $attempts >= 5 ) {
+			if ( ! \ATORA_Rate_Limiter::consume( $rl_scope, $rl_identifier, 5, $rl_window, false ) ) {
 				return new WP_Error( 'too_many_attempts', __( 'Demasiados intentos. Intenta de nuevo más tarde.', 'atora-lms' ) );
 			}
 
 			if ( ! wp_check_password( $password_attempt, $row->access_password ) ) {
-				\ATORA_Rate_Limiter::consume( $rl_scope, $rl_identifier, 5, $rl_window, false );
 				return new WP_Error( 'wrong_password', __( 'Contraseña incorrecta.', 'atora-lms' ) );
 			}
 
