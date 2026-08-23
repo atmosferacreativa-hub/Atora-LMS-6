@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.4
 Requires PHP: 8.1
-Stable tag: 6.5.8
+Stable tag: 6.5.9
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,12 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.5.9 =
+* Security: two-factor login verification (the actual POST form used by the login flow, not just its AJAX counterpart) is now rate-limited per pending login, covering both regular and backup codes through a single shared quota.
+* Security: the X-Real-IP forwarded header now requires its own explicit proxy authorization, separate from generic trusted-proxy trust, closing a spoofing path under certain reverse-proxy configurations.
+* Security: CRM Telegram message attribution now reads exclusively from the same dedicated links table the bot itself uses as its source of truth, instead of legacy user data that could retain an ambiguous assignment after a resolved conflict.
+* Hardening: the enrollment access-password limiter and both WhatsApp phone-verification counters (code attempts and code requests) now reserve their rate-limit quota atomically before evaluating an attempt, closing a race that allowed more attempts than intended under concurrent requests.
+* Security review: this closes the static-hardening audit round; all findings from an external line-by-line review of 6.5.8 are resolved, verified with concurrency-specific regression tests where applicable.
 = 6.5.8 =
 * Security: strengthened proxy/header trust boundaries — private IP ranges are no longer trusted as reverse proxies by default, and Cloudflare's client-IP header now requires its own explicit configuration separate from generic proxy trust.
 * Security: Telegram account linking now reads exclusively from its dedicated links table (not legacy user data) as the single source of truth, and re-linking to a new chat can no longer leave an account without any binding if the new chat is already taken.
@@ -109,6 +115,8 @@ Translation files are loaded from the `/languages` directory.
 * Major release aligned with ATORA_v5 architecture and modules.
 
 == Upgrade Notice ==
+= 6.5.9 =
+* Static security closure: 2FA login rate limiting, tighter proxy header trust, Telegram CRM source-of-truth alignment, and atomic (race-free) throttling for enrollment and WhatsApp verification. Recommended update.
 = 6.5.8 =
 * Final static security closure: trusted proxy policy hardening, Telegram binding integrity, unified atomic abuse controls, and fail-safe rate limiting throughout. Recommended update — includes a database schema change.
 = 6.5.7 =
