@@ -1,3 +1,54 @@
+# SECURITY AUDIT — ATORA LMS v6.5.9 "Cierre definitivo de la fase estática"
+**Fecha:** 2026-08-22
+**Auditor:** Agente autónomo Claude Code
+**Alcance:** Cierre de 1 HIGH + 4 MEDIUM confirmados por una auditoría
+externa línea por línea contra 6.5.8. Ver `SECURITY-REPORT-6.5.9.md`
+(excluido de la distribución) para el Evidence Gate completo
+(archivo/diff/test/resultado por hallazgo).
+
+## FIXED (6.5.9)
+
+| # | Área | Hallazgo | Archivo(s) |
+|---|------|----------|------------|
+| PT-1 (HIGH) | 2FA | `handle_2fa_form()` (el formulario POST real) sin ningún límite de intentos; AJAX limitaba por IP, no por usuario | `modules/security/class-2fa-manager.php` |
+| PT-2 | Trusted proxy | `X-Real-IP` confiado bajo la misma condición genérica que XFF, sin autorización por header | `includes/class-atora-client-ip.php` |
+| PT-3 | Telegram / CRM | Tres puntos del CRM leían `atora_telegram_chat_id` de usermeta en vez de la tabla, fuente de verdad | `modules/crm/trait-crm-events-messaging.php`, `modules/crm-v2/trait-crm-v2-pipeline.php`, `modules/crm-v2/class-crm-v2.php`, `modules/messaging/class-telegram-bot.php` |
+| PT-4 | Enrollment | Condición de carrera real en el limiter de contraseña (peek-luego-consume) | `includes/enrollment-manager/trait-enrollment-manager-access-enrollment.php` |
+| PT-5 | WhatsApp | Misma condición de carrera en ambos contadores (intentos de código, solicitudes de código) | `modules/messaging/class-messaging-preferences.php` |
+
+## HALLAZGO ADICIONAL DETECTADO Y CORREGIDO DURANTE PT-4
+
+La búsqueda exhaustiva de `Rate_Limiter::peek` exigida por la propia OT
+(regla 4.3) encontró que el gate de PT-1, recién escrito en este mismo
+sprint, replicaba la misma condición de carrera peek-luego-consume que
+PT-4 identificó — corregido en el mismo commit de PT-4, mismo patrón
+consume-primero. Ver `modules/security/class-2fa-manager.php`.
+
+## NO REQUIERE CAMBIO (fuera de alcance explícito de la OT)
+
+- Contador de intentos de Telegram basado en usermeta — impacto bajo
+  dado el código de ~40 bits de entropía ya endurecido en 6.5.4; no es
+  un bloqueante de esta OT (regla PT-5.3).
+
+## TESTED
+
+`tests/Security/TwoFaRateLimitTest.php` (nuevo),
+`tests/Security/RateLimiterConcurrencyTest.php` (nuevo — concurrencia
+real multi-proceso sobre el primitivo compartido),
+`tests/Security/ClientIpTest.php` (extendido, +3 casos X-Real-IP),
+`tests/CRM/TelegramCrmSourceOfTruthTest.php` (nuevo),
+`tests/Enrollment/AccessLinkPasswordThrottleTest.php` (extendido,
++concurrencia real),
+`tests/Messaging/PhoneVerifyBruteForceTest.php` (reescrito,
++concurrencia real),
+`tests/Messaging/PreferencesTest.php`,
+`tests/Messaging/PhoneVerificationInvalidationTest.php`,
+`tests/Messaging/PhoneVerificationCompatRetiredTest.php` (los tres
+actualizados con el fixture de `ATORA_Rate_Limiter` que
+`verify_phone_code()` ahora requiere).
+
+---
+
 # SECURITY AUDIT — ATORA LMS v6.5.8 "Final Static Security Closure"
 **Fecha:** 2026-08-23
 **Auditor:** Agente autónomo Claude Code
