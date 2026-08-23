@@ -639,25 +639,22 @@ trait CRM_Events_Messaging_Trait {
 	 * @return int
 	 */
 	private static function find_user_id_by_telegram_chat( string $chat_id ): int {
-		global $wpdb;
-
 		$chat_id = (string) preg_replace( '/[^0-9\-]/', '', $chat_id );
 		if ( '' === $chat_id ) {
 			return 0;
 		}
 
-		$user_id = (int) $wpdb->get_var(
-			$wpdb->prepare(
-				"SELECT user_id
-				 FROM {$wpdb->usermeta}
-				 WHERE meta_key = 'atora_telegram_chat_id'
-				   AND meta_value = %s
-				 LIMIT 1",
-				$chat_id
-			)
-		);
+		// PT-3 (6.5.9): leía directo de wp_usermeta, que podía tener una
+		// asignación ambigua (dos usuarios con el mismo chat_id) que
+		// atora_telegram_links (fuente de verdad, UNIQUE KEY sobre
+		// chat_id) ya resuelve correctamente — a ninguno de los dos.
+		// Delegar a Telegram_Bot::get_user_by_chat() en vez de
+		// reimplementar la consulta acá.
+		if ( ! class_exists( '\ATORA\Messaging\Telegram_Bot' ) ) {
+			return 0;
+		}
 
-		return $user_id > 0 ? $user_id : 0;
+		return (int) ( \ATORA\Messaging\Telegram_Bot::get_user_by_chat( $chat_id ) ?? 0 );
 	}
 
 	/**

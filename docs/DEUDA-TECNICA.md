@@ -525,3 +525,29 @@ vale la pena extraer `Verification_Attempt_Guard` (o nombre similar)
 aceptando explícitamente la clave de conteo (user_id objetivo O
 user_id actuante) como parámetro, y migrar los tres a la vez con su
 propia suite de regresión.
+
+## `atora_telegram_chat_id` en usermeta — candidata a eliminación futura
+
+PT-3.3 (6.5.9): `usermeta` dejó de ser fuente de lectura para
+cualquier decisión del sistema — CRM (`trait-crm-events-messaging.php`,
+`trait-crm-v2-pipeline.php`, `class-crm-v2.php`) migró a
+`Telegram_Bot::get_user_by_chat()`/`get_chat_id_for_user()`, que
+consultan `atora_telegram_links` (la fuente de verdad real, con
+`UNIQUE KEY` sobre `chat_id`). `Telegram_Bot::link_account()` sigue
+escribiendo `atora_telegram_chat_id` en paralelo, únicamente por
+compatibilidad hacia atrás, por si algo externo al árbol de este
+plugin todavía la lee.
+
+**Por qué no se borra ahora:** la OT de este sprint (PT-3.3) es
+explícita: no eliminar la escritura este sprint. Confirmado por grep
+exhaustivo (`grep -rn "atora_telegram_chat_id" --include="*.php" .`)
+que, fuera de esta escritura de compatibilidad y del test que la
+cubre, el único otro consumidor es el migrador histórico
+(`modules/class-v5-installer.php`), que la lee como *origen* de la
+migración hacia la tabla — no una lectura de decisión del sistema.
+
+**Propuesta:** una vez confirmado (auditoría externa o telemetría) que
+ningún integrador/tema/plugin de terceros lee este meta directamente,
+eliminar la línea `update_user_meta(...)` en
+`Telegram_Bot::link_account()` y, opcionalmente, una migración de
+limpieza que borre el meta de `wp_usermeta` para todos los usuarios.

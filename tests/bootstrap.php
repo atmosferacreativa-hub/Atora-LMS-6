@@ -551,6 +551,11 @@ if ( file_exists( $crm_access_trait_file ) ) {
 	require_once $crm_access_trait_file;
 }
 
+$crm_events_messaging_trait_file = __DIR__ . '/../modules/crm/trait-crm-events-messaging.php';
+if ( file_exists( $crm_events_messaging_trait_file ) ) {
+	require_once $crm_events_messaging_trait_file;
+}
+
 $crm_v2_rest_controller_file = __DIR__ . '/../modules/crm-v2/rest/class-crm-rest-controller.php';
 if ( file_exists( $crm_v2_rest_controller_file ) ) {
 	require_once $crm_v2_rest_controller_file;

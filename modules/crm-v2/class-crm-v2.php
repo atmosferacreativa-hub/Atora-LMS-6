@@ -1088,7 +1088,14 @@ class CRM_V2 {
 			return false;
 		}
 
-		$chat_id = sanitize_text_field( (string) get_user_meta( $user_id, 'atora_telegram_chat_id', true ) );
+		// PT-3 (6.5.9): usermeta podía divergir de atora_telegram_links
+		// (la fuente de verdad real, con UNIQUE KEY) — usar la misma
+		// consulta que Telegram_Bot::send_message() en vez de leer
+		// usermeta directamente.
+		if ( ! class_exists( '\ATORA\Messaging\Telegram_Bot' ) ) {
+			return false;
+		}
+		$chat_id = \ATORA\Messaging\Telegram_Bot::get_chat_id_for_user( $user_id );
 		if ( '' === $chat_id ) {
 			return false;
 		}

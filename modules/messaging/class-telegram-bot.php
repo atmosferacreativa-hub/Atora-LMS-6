@@ -57,10 +57,15 @@ class Telegram_Bot {
 	}
 
 	/**
+	 * PT-3 (6.5.9): elevado a público — el CRM (trait-crm-v2-pipeline.php,
+	 * class-crm-v2.php) lo reutiliza para decidir elegibilidad de envío
+	 * Telegram en vez de leer usermeta directamente (que podía divergir
+	 * de esta tabla, la fuente de verdad real).
+	 *
 	 * @param int $user_id
 	 * @return string Cadena vacía si el usuario no tiene vínculo en la tabla.
 	 */
-	private static function get_chat_id_for_user( int $user_id ): string {
+	public static function get_chat_id_for_user( int $user_id ): string {
 		global $wpdb;
 
 		$chat_id = $wpdb->get_var( $wpdb->prepare(
@@ -345,9 +350,11 @@ class Telegram_Bot {
 		}
 
 		self::reset_link_attempts( $user_id );
-		// usermeta se mantiene en paralelo — otros módulos (CRM) todavía
-		// lo leen directamente; atora_telegram_links es quien decide
-		// unicidad, no esta línea.
+		// PT-3 (6.5.9): usermeta ya no se lee para ninguna decisión del
+		// sistema (CRM migrado a Telegram_Bot::get_user_by_chat()/
+		// get_chat_id_for_user(), que consultan atora_telegram_links) —
+		// se sigue escribiendo solo por compatibilidad hacia atrás, por
+		// si algo externo la lee todavía; ver docs/DEUDA-TECNICA.md.
 		update_user_meta( $user_id, 'atora_telegram_chat_id', $chat_id );
 		delete_transient( 'atora_tg_link_' . $code );
 
@@ -416,10 +423,18 @@ class Telegram_Bot {
 	/**
 	 * Obtiene el user_id de WordPress desde un chat_id de Telegram.
 	 *
+	 * PT-3 (6.5.9): elevado a público — es la única fuente de verdad
+	 * real (atora_telegram_links, UNIQUE KEY sobre chat_id) y el CRM
+	 * (trait-crm-events-messaging.php, trait-crm-v2-pipeline.php,
+	 * class-crm-v2.php) la reutiliza en vez de leer usermeta
+	 * directamente, que podía quedar con una asignación ambigua tras
+	 * un conflicto de chat_id que esta tabla ya resuelve correctamente
+	 * (a nadie).
+	 *
 	 * @param string $chat_id Chat ID de Telegram.
 	 * @return int|null
 	 */
-	private static function get_user_by_chat( string $chat_id ): ?int {
+	public static function get_user_by_chat( string $chat_id ): ?int {
 		global $wpdb;
 
 		// PT-5 (6.5.7): atora_telegram_links es ahora la fuente de
