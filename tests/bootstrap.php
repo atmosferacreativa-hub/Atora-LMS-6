@@ -531,6 +531,11 @@ if ( file_exists( $rate_limiter_file ) ) {
 	require_once $rate_limiter_file;
 }
 
+$two_fa_manager_file = __DIR__ . '/../modules/security/class-2fa-manager.php';
+if ( file_exists( $two_fa_manager_file ) ) {
+	require_once $two_fa_manager_file;
+}
+
 $security_maintenance_file = __DIR__ . '/../includes/class-atora-security-maintenance.php';
 if ( file_exists( $security_maintenance_file ) ) {
 	require_once $security_maintenance_file;

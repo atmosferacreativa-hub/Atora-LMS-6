@@ -356,12 +356,30 @@ class Two_FA_Manager {
 	public static function verify_token( int $user_id, string $code ): bool {
 		global $wpdb;
 
+		// PT-1 (6.5.9): handle_2fa_form() (el formulario POST público
+		// que el flujo de login realmente usa) no tenía ningún límite de
+		// intentos — solo el AJAX equivalente (ajax_verify()) lo tenía,
+		// y por IP, no por usuario. Con un código de 6 dígitos
+		// (1.000.000 de combinaciones) y sin límite, un atacante que ya
+		// tiene la contraseña podía automatizar el segundo factor contra
+		// el formulario sin pasar por el AJAX protegido. El gate se pone
+		// acá (y en verify_backup_code()) en vez de duplicarlo en cada
+		// punto de entrada (ajax_verify()/handle_2fa_form()), porque
+		// ambos convergen en este método — una sola verificación cubre
+		// los dos caminos y comparte el mismo cupo entre ellos, así que
+		// un atacante no puede resetear su cupo cambiando de endpoint.
+		// Fail-closed: sin el limiter disponible, no se evalúa el código.
+		if ( ! self::pending_2fa_attempt_allowed( $user_id ) ) {
+			return false;
+		}
+
 		$code = sanitize_text_field( $code );
 
 		// Para TOTP, usar el provider directamente.
 		if ( class_exists( 'ATORA\Security\Two_FA_TOTP' ) ) {
 			$secret = get_user_meta( $user_id, 'atora_2fa_totp_secret', true );
 			if ( $secret && Two_FA_TOTP::verify( $secret, $code ) ) {
+				self::reset_pending_2fa_attempts( $user_id );
 				return true;
 			}
 		}
@@ -381,6 +399,7 @@ class Two_FA_Manager {
 		);
 
 		if ( ! $row ) {
+			self::register_pending_2fa_attempt( $user_id );
 			return false;
 		}
 
@@ -393,7 +412,69 @@ class Two_FA_Manager {
 			array( '%d' )
 		);
 
+		self::reset_pending_2fa_attempts( $user_id );
+
 		return true;
+	}
+
+	/**
+	 * PT-1 (6.5.9): límite compartido entre verify_token() y
+	 * verify_backup_code() — 5 intentos por 15 minutos, el mismo número
+	 * que ya usan los demás limiters de "código corto" del sistema
+	 * (WhatsApp, enrollment), por consistencia. Identificador: solo
+	 * pending_user_id — ya es un usuario pendiente específico
+	 * determinado por get_pending_user(), combinarlo también con IP
+	 * podría bloquear a un usuario legítimo detrás de un proxy/NAT
+	 * compartido sin aportar seguridad real adicional acá (a diferencia
+	 * de ajax_verify()/ajax_resend(), sin usuario pendiente conocido de
+	 * antemano, donde sí tiene sentido limitar por IP).
+	 */
+	const PENDING_2FA_RATE_LIMIT_SCOPE   = 'pending_2fa_login';
+	const PENDING_2FA_RATE_LIMIT_MAX     = 5;
+	const PENDING_2FA_RATE_LIMIT_WINDOW  = 15 * MINUTE_IN_SECONDS;
+
+	/**
+	 * @param int $user_id
+	 * @return bool
+	 */
+	private static function pending_2fa_attempt_allowed( int $user_id ): bool {
+		if ( ! $user_id || ! class_exists( 'ATORA_Rate_Limiter' ) ) {
+			return false; // fail-closed.
+		}
+
+		$attempts = \ATORA_Rate_Limiter::peek( self::PENDING_2FA_RATE_LIMIT_SCOPE, (string) $user_id, self::PENDING_2FA_RATE_LIMIT_WINDOW );
+
+		return $attempts >= 0 && $attempts < self::PENDING_2FA_RATE_LIMIT_MAX;
+	}
+
+	/**
+	 * @param int $user_id
+	 * @return void
+	 */
+	private static function register_pending_2fa_attempt( int $user_id ): void {
+		if ( ! $user_id || ! class_exists( 'ATORA_Rate_Limiter' ) ) {
+			return;
+		}
+
+		\ATORA_Rate_Limiter::consume(
+			self::PENDING_2FA_RATE_LIMIT_SCOPE,
+			(string) $user_id,
+			self::PENDING_2FA_RATE_LIMIT_MAX,
+			self::PENDING_2FA_RATE_LIMIT_WINDOW,
+			false
+		);
+	}
+
+	/**
+	 * @param int $user_id
+	 * @return void
+	 */
+	private static function reset_pending_2fa_attempts( int $user_id ): void {
+		if ( ! $user_id || ! class_exists( 'ATORA_Rate_Limiter' ) ) {
+			return;
+		}
+
+		\ATORA_Rate_Limiter::reset( self::PENDING_2FA_RATE_LIMIT_SCOPE, (string) $user_id, self::PENDING_2FA_RATE_LIMIT_WINDOW );
 	}
 
 	// ── Dispositivos de confianza ─────────────────────────────────────────────
@@ -512,6 +593,17 @@ class Two_FA_Manager {
 	 * @return bool
 	 */
 	private static function verify_backup_code( int $user_id, string $code ): bool {
+		// PT-1 (6.5.9): mismo gate que verify_token() — el código de
+		// respaldo pasa por el mismo formulario/endpoint, así que no
+		// tiene sentido dejar esta rama sin límite de intentos solo
+		// porque sus 40 bits de entropía la hacen más difícil de forzar
+		// en la práctica. Comparte el mismo cupo que verify_token() (el
+		// scope es el mismo), así que un atacante no puede "resetear" su
+		// cupo alternando entre código normal y código de respaldo.
+		if ( ! self::pending_2fa_attempt_allowed( $user_id ) ) {
+			return false;
+		}
+
 		$code   = strtoupper( sanitize_text_field( $code ) );
 		$hashed = (array) get_user_meta( $user_id, 'atora_2fa_backup_codes', true );
 
@@ -519,9 +611,12 @@ class Two_FA_Manager {
 			if ( wp_check_password( $code, $hash ) ) {
 				unset( $hashed[ $index ] );
 				update_user_meta( $user_id, 'atora_2fa_backup_codes', array_values( $hashed ) );
+				self::reset_pending_2fa_attempts( $user_id );
 				return true;
 			}
 		}
+
+		self::register_pending_2fa_attempt( $user_id );
 
 		return false;
 	}
