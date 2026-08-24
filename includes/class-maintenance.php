@@ -255,6 +255,15 @@ class CLMS_Maintenance {
 			wp_cache_flush();
 		}
 
+		// PT-1 (6.5.13): también purga el caché de PÁGINA de los plugins
+		// de caché comunes (LiteSpeed/WP Rocket/W3TC/etc.) — antes este
+		// botón solo limpiaba el caché de objetos, dejando páginas de
+		// curso/docente potencialmente servidas desde una copia vieja
+		// (p.ej. cacheada como 404 antes de un flush de reescritura).
+		if ( function_exists( 'atora_lms_purge_known_page_caches' ) ) {
+			atora_lms_purge_known_page_caches();
+		}
+
 		return array(
 			'success' => true,
 			'data'    => array(

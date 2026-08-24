@@ -168,7 +168,26 @@ add_filter( 'cron_schedules', static function ( array $schedules ): array {
 // en su lugar antes de que 'wp_loaded' lo lea — sin importar si el
 // flush de 6.5.11 fue correcto o no, este corrige cualquier resto de
 // ese caso.
-define( 'ATORA_LMS_REWRITE_VERSION', '6.5.12-1' );
+// PT-1 (6.5.13): bump obligatorio, igual que en 6.5.12. Un sitio que
+// corrió el flush de 6.5.12 (registro determinista correcto,
+// confirmado) igual seguía sirviendo 404 en curso/docente hasta que
+// un usuario guardaba manualmente Ajustes → Enlaces permanentes en
+// wp-admin — la diferencia real no era el registro (ya correcto desde
+// 6.5.12) sino que ese flush AUTOMÁTICO y silencioso nunca purgaba el
+// caché de página (LiteSpeed/WP Rocket/W3TC/etc., muy probablemente
+// activo en producción — este mismo código ya lo detecta y lo
+// muestra en los paneles de diagnóstico vía la constante WP_CACHE,
+// solo que nunca actuaba sobre esa detección). El flush de WordPress
+// reconstruye la opción rewrite_rules correctamente, pero una
+// respuesta 404 para /cursos/algun-curso/ ya cacheada por el plugin
+// de caché de página sigue sirviéndose sin volver a tocar PHP en
+// absoluto — el guardado MANUAL de permalinks funcionaba porque la
+// mayoría de esos plugins de caché purgan su caché completo al
+// detectar un cambio en los ajustes de enlaces permanentes, algo que
+// una llamada directa a flush_rewrite_rules() por código nunca
+// dispara. Subir la versión acá fuerza un flush más, ahora
+// acompañado de una purga explícita de caché de página (ver abajo).
+define( 'ATORA_LMS_REWRITE_VERSION', '6.5.13-1' );
 
 add_action( 'wp_loaded', static function () {
 	$stored = (string) get_option( 'atora_lms_rewrite_version', '' );
@@ -178,8 +197,57 @@ add_action( 'wp_loaded', static function () {
 	}
 
 	flush_rewrite_rules( false );
+	atora_lms_purge_known_page_caches();
 	update_option( 'atora_lms_rewrite_version', ATORA_LMS_REWRITE_VERSION, false );
 }, 20 );
+
+/**
+ * PT-1 (6.5.13): purga defensiva del caché de página de los plugins de
+ * caché más comunes en WordPress, cada uno detectado por su propia
+ * función/acción pública documentada — nunca asume cuál (si alguno)
+ * está instalado. Se llama después de flush_rewrite_rules() en la
+ * migración versionada de arriba, y queda disponible para cualquier
+ * otro punto futuro que necesite el mismo comportamiento (p.ej. el
+ * botón manual "Purgar caché" del panel de Mantenimiento).
+ *
+ * @return void
+ */
+function atora_lms_purge_known_page_caches(): void {
+	// LiteSpeed Cache.
+	if ( has_action( 'litespeed_purge_all' ) ) {
+		do_action( 'litespeed_purge_all' ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound
+	}
+
+	// WP Rocket.
+	if ( function_exists( 'rocket_clean_domain' ) ) {
+		rocket_clean_domain();
+	}
+
+	// W3 Total Cache.
+	if ( function_exists( 'w3tc_flush_all' ) ) {
+		w3tc_flush_all();
+	}
+
+	// WP Super Cache.
+	if ( function_exists( 'wp_cache_clear_cache' ) ) {
+		wp_cache_clear_cache();
+	}
+
+	// WP Fastest Cache.
+	if ( isset( $GLOBALS['wp_fastest_cache'] ) && is_object( $GLOBALS['wp_fastest_cache'] ) && method_exists( $GLOBALS['wp_fastest_cache'], 'deleteCache' ) ) {
+		$GLOBALS['wp_fastest_cache']->deleteCache( true );
+	}
+
+	// SiteGround Optimizer.
+	if ( function_exists( 'sg_cachepress_purge_cache' ) ) {
+		sg_cachepress_purge_cache();
+	}
+
+	// Object cache genérico (Redis/Memcached vía el drop-in estándar de WP).
+	if ( function_exists( 'wp_cache_flush' ) ) {
+		wp_cache_flush();
+	}
+}
 
 // PT-1/PT-2 (6.5.12): registro ESTRUCTURAL determinista de CPTs/rewrite
 // de LMS — curso ('lm_course', slug 'cursos'), docente ('atora_teacher'),
