@@ -2374,8 +2374,13 @@ trait CLMS_Admin_Menu_Widgets_And_Hubs_Trait {
 		if ( ! $maintenance && class_exists( 'CLMS_Maintenance' ) ) {
 			$maintenance = new CLMS_Maintenance();
 		}
-		if ( $maintenance && method_exists( $maintenance, 'get_db_stats' ) ) {
-			$db_stats = (array) $maintenance->get_db_stats();
+		// PT-2 (6.5.10): get_db_stats() es private en CLMS_Maintenance —
+		// llamarlo desde acá (una clase distinta) es un fatal "Call to
+		// private method", no evitable con method_exists() (no
+		// distingue visibilidad). Usa el wrapper público
+		// get_db_stats_public() en su lugar.
+		if ( $maintenance && method_exists( $maintenance, 'get_db_stats_public' ) ) {
+			$db_stats = (array) $maintenance->get_db_stats_public();
 		}
 
 		ob_start();

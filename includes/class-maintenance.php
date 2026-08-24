@@ -536,6 +536,23 @@ class CLMS_Maintenance {
 		return $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) === $table;
 	}
 
+	/**
+	 * PT-2 (6.5.10): wrapper público estrecho sobre get_db_stats()
+	 * (private) — includes/admin-menu/trait-admin-menu-widgets-and-hubs.php
+	 * instancia CLMS_Maintenance directamente y llama a get_db_stats()
+	 * desde fuera de esta clase, guardado por un method_exists() que no
+	 * distingue visibilidad (mismo patrón que PT-2 en CLMS_Loader).
+	 * Este método es de solo lectura y ya se expone sin más
+	 * restricción vía handle_ajax()'s case 'db_stats' — el wrapper no
+	 * amplía la superficie expuesta, solo la hace invocable
+	 * directamente sin pasar por AJAX.
+	 *
+	 * @return array
+	 */
+	public function get_db_stats_public(): array {
+		return $this->get_db_stats();
+	}
+
 	private function get_db_stats(): array {
 		global $wpdb;
 
