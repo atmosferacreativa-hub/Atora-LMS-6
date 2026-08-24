@@ -113,6 +113,10 @@ class CRM_V2_App {
 		if ( class_exists( 'ATORA\CRM_V2\Rest\Abandoned_Carts_REST_Controller' ) ) {
 			\ATORA\CRM_V2\Rest\Abandoned_Carts_REST_Controller::register_routes();
 		}
+		// PT-4 (6.6.0) — Planes de seguimiento
+		if ( class_exists( 'ATORA\CRM_V2\Rest\Followup_Plans_REST_Controller' ) ) {
+			\ATORA\CRM_V2\Rest\Followup_Plans_REST_Controller::register_routes();
+		}
 	}
 
 	/**
@@ -1191,6 +1195,11 @@ class CRM_V2_App {
 			$base . '/services/class-url-store-service.php',
 			$base . '/rest/class-sequence-rest-controller.php',
 			$base . '/rest/class-abandoned-carts-rest-controller.php',
+			// PT-1/PT-2/PT-3/PT-4 (6.6.0) — Planes de seguimiento
+			$base . '/services/class-followup-recurrence.php',
+			$base . '/services/class-followup-plan-resolver.php',
+			$base . '/services/class-followup-plan-service.php',
+			$base . '/rest/class-followup-plans-rest-controller.php',
 			// Fase 1 — Sin recargas de página
 			$base . '/rest/class-crm-draft-rest-controller.php',
 			// Fase 2 — Calendario FullCalendar
