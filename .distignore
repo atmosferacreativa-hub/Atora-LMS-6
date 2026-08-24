@@ -14,6 +14,7 @@ vendor
 node_modules
 scripts
 CHANGELOG.md
+CHANGELOG-*.md
 SECURITY-AUDIT.md
 SECURITY-REPORT-*.md
 .DS_Store

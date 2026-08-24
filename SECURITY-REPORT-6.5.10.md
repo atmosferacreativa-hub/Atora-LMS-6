@@ -461,5 +461,10 @@ occurred here.
 ## 21. SHA-256 of final ZIP
 
 ```
-f44ad2ee07fa832123058c72069905d310c6ea1e0aa32714f04fa3a90ea4ca64  atora-lms-6.5.10-production-hotfix.zip
+7466537f0ebda2c37ea2392916df55f377cf0b336ea5a6e753936e9ac39ec238  atora-lms-6.5.10-production-hotfix.zip
 ```
+
+(Rebuilt once after adding `CHANGELOG-6.5.10.md` to `.distignore` —
+that file did not exist when the first hash was taken, and the fix
+ensures it and any future `CHANGELOG-*.md` are never packaged, matching
+the existing `SECURITY-REPORT-*.md` wildcard-exclusion pattern.)
