@@ -551,3 +551,78 @@ ningún integrador/tema/plugin de terceros lee este meta directamente,
 eliminar la línea `update_user_meta(...)` en
 `Telegram_Bot::link_account()` y, opcionalmente, una migración de
 limpieza que borre el meta de `wp_usermeta` para todos los usuarios.
+
+## `recurrence_rule` — formato propio creado en 6.6.0, sin parser previo que reutilizar
+
+PT-2 (6.6.0): la OT pedía reutilizar "el mismo formato que
+`modules/calendar` ya usa" para `recurrence_rule` — pero un grep
+exhaustivo del árbol confirmó que ningún código existente en
+`modules/calendar/` jamás expande/interpreta esa columna; es
+write-only (solo `sanitize_text_field()` al guardar). No había nada
+que reutilizar. Se creó `Followup_Recurrence::expand()`
+(`modules/crm-v2/services/class-followup-recurrence.php`) con un
+subconjunto pequeño, con sabor RRULE (ya que el nombre del campo evoca
+RFC 5545): `WEEKLY;BYDAY=...`, `DAILY;INTERVAL=N`, y dos extensiones
+propias de Atora sin equivalente en RRULE real —
+`INTENSIFY_DAYS=N` (agrega ocurrencias extra los últimos N días antes
+de una fecha de referencia, para la plantilla "Antes del cierre") y
+`FIXED;DATES=...` (fechas fijas sin patrón, para "Solo hitos").
+
+**Por qué no se generalizó a RRULE completo:** hubiera sido
+sobre-ingeniería para las necesidades actuales (4 plantillas, todas
+cubiertas por el subconjunto) y el propio `modules/calendar` no tiene
+ningún consumidor esperando un RRULE completo — no hay nada con qué
+ser compatible todavía.
+
+**Propuesta:** si un sprint futuro necesita expandir `recurrence_rule`
+para el calendario base (eventos manuales recurrentes, no solo planes
+de seguimiento), evaluar en ese momento si migrar
+`Followup_Recurrence::expand()` a una librería RRULE estándar vale la
+pena, o si el subconjunto actual basta y solo se documenta como el
+formato oficial del campo.
+
+## `INTENSIFY_DAYS` — heurística simplificada para "Antes del cierre"
+
+PT-3.1 (6.6.0): la plantilla "Antes del cierre" pide intensificar la
+frecuencia cerca de `end_date`. La implementación actual
+(`INTENSIFY_DAYS=N` en `Followup_Recurrence::expand_weekly()`) agrega
+ocurrencias fijas los jueves dentro de los últimos N días antes de la
+fecha de referencia, en vez de un algoritmo de intensificación
+configurable (p. ej. día intensificado elegible por el docente, o
+frecuencia creciente por escalones).
+
+**Por qué no se generalizó ahora:** la OT no especifica el
+comportamiento exacto de "intensificar", solo que debe existir la
+opción; el criterio más simple que cumple el objetivo (agregar más
+contacto cerca del cierre) se implementó y se documentó en el
+docblock del método. Nada indica que el docente necesite elegir el
+día intensificado en la primera versión.
+
+**Propuesta:** si retroalimentación real de campo pide otro día u otro
+patrón de intensificación, ajustar `expand_weekly()` o exponer el día
+intensificado como una opción más del asistente (paso 3), sin cambiar
+el formato de `recurrence_rule` en sí (`INTENSIFY_DAYS=N` puede
+convivir con un parámetro adicional si hace falta).
+
+## Sin afordancia de UI para "ver estudiantes actualmente excluidos" de una ocurrencia
+
+PT-4.7 (6.6.0): excluir un estudiante puntual de una ocurrencia
+(`Followup_Plan_Service::exclude_student_from_occurrence()`) funciona
+y persiste correctamente, pero el panel lateral (PT-4.4) no muestra
+una lista separada de "estudiantes excluidos de esta ocurrencia" —
+un estudiante excluido simplemente deja de aparecer en la lista de
+destinatarios, sin forma visual de revertir la exclusión desde la UI
+actual (solo es reversible editando la fila de
+`atora_followup_occurrence_state` directamente).
+
+**Por qué no se construyó ahora:** no estaba en el alcance explícito
+de PT-4.7 (que solo pide poder excluir, no pide una UI de
+"deshacer"), y agregarla hubiera significado un quinto estado visual
+en un panel que el §UX exige mantener simple ("el docente no
+configura, elige").
+
+**Propuesta:** si el uso real muestra que los docentes excluyen por
+error y necesitan revertir, agregar una sección colapsable "N
+estudiantes excluidos de este día" al panel lateral, con un botón de
+"volver a incluir" por estudiante — reutilizando
+`get_excluded_students()`, que ya existe y ya se usa para el filtro.
