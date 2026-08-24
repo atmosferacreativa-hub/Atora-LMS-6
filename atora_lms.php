@@ -156,7 +156,19 @@ add_filter( 'cron_schedules', static function ( array $schedules ): array {
 // guardada es anterior a esta, se hace UN flush suave (sin reescribir
 // .htaccess) y se persiste la nueva versión para que ningún request
 // futuro repita el flush.
-define( 'ATORA_LMS_REWRITE_VERSION', '6.5.11-1' );
+// PT-3 (6.5.12): bump obligatorio. Un sitio que ya corrió el flush de
+// 6.5.11 (versión '6.5.11-1' ya persistida) capturó las reglas TAL
+// COMO estaban registradas en ESE momento — si el registro anidado del
+// que dependía ese flush no llegó a completarse a tiempo para esa
+// ejecución puntual (la ambigüedad que este mismo sprint elimina con
+// el registro estructural temprano de arriba), ese sitio quedó
+// permanentemente con reglas incompletas, porque el chequeo de versión
+// nunca reintenta un flush ya "hecho". Subir la versión acá fuerza
+// exactamente UN flush más, esta vez con el registro determinista ya
+// en su lugar antes de que 'wp_loaded' lo lea — sin importar si el
+// flush de 6.5.11 fue correcto o no, este corrige cualquier resto de
+// ese caso.
+define( 'ATORA_LMS_REWRITE_VERSION', '6.5.12-1' );
 
 add_action( 'wp_loaded', static function () {
 	$stored = (string) get_option( 'atora_lms_rewrite_version', '' );
@@ -168,6 +180,82 @@ add_action( 'wp_loaded', static function () {
 	flush_rewrite_rules( false );
 	update_option( 'atora_lms_rewrite_version', ATORA_LMS_REWRITE_VERSION, false );
 }, 20 );
+
+// PT-1/PT-2 (6.5.12): registro ESTRUCTURAL determinista de CPTs/rewrite
+// de LMS — curso ('lm_course', slug 'cursos'), docente ('atora_teacher'),
+// programa/cohorte/lección, y la regla de perfil de docente
+// (/docentes/{slug}/) — a 'init' prioridad 0, en el NIVEL SUPERIOR del
+// archivo (no anidado dentro de otro callback de 'init' ya en
+// ejecución).
+//
+// Contexto: el bootstrap normal (más abajo) registra estos mismos CPTs/
+// reglas indirectamente — CLMS_Loader::boot() corre dentro de un
+// callback de 'init' con prioridad 1, e internamente instancia
+// CLMS_CPT/CLMS_Instructor, cuyos propios constructores hacen
+// add_action('init', ..., 5) / add_action('init', ..., 6) para el registro real. WordPress SÍ
+// soporta agregar callbacks a un hook mientras ese mismo hook está
+// corriendo (WP_Hook::add_filter()/resort_active_iterations(), estable
+// desde 4.7) — en teoría, ese registro anidado también se ejecuta en el
+// mismo pase. Pero el flush versionado de arriba (PT-3, 6.5.11) captura
+// las reglas de reescritura EXACTAMENTE como estén registradas en el
+// momento del flush, y solo se ejecuta UNA vez (protegido por versión) —
+// si por CUALQUIER motivo (un plugin de terceros interfiriendo con el
+// mismo hook, una particularidad de una versión de PHP/WP puntual, un
+// orden de carga distinto en algún contexto de request) el registro
+// anidado no llegara a completarse a tiempo para ESE flush específico,
+// el sitio quedaría con reglas incompletas guardadas permanentemente
+// (la opción de versión ya diría "hecho", así que nunca se reintenta).
+// En vez de depender de esa cadena de anidamiento para lo estructural,
+// se registra una copia determinista y temprana acá, sin esperar a
+// CLMS_Loader — así el flush de arriba (y cualquier flush manual futuro,
+// activación, o guardado de permalinks) siempre encuentra el CPT y la
+// regla de reescritura ya registrados, sin ambigüedad de orden.
+//
+// No se instancian CLMS_CPT/CLMS_Instructor con `new` (eso ejecutaría
+// sus constructores completos, duplicando después los hooks de columnas
+// admin/metaboxes cuando CLMS_Loader cree sus propias instancias más
+// adelante en el mismo request) — se usa
+// ReflectionClass::newInstanceWithoutConstructor() para invocar
+// exactamente los métodos de registro reales (mismo código, sin
+// duplicar), sin ningún efecto secundario del constructor. Volver a
+// llamar register_post_type()/add_rewrite_rule() más tarde (vía el
+// registro anidado normal, si corre) es inofensivo — WordPress permite
+// re-registrar el mismo CPT/regla sin error.
+add_action( 'init', static function () {
+	$cpt_file = ATORA_LMS_DIR . 'includes/class-cpt.php';
+	if ( file_exists( $cpt_file ) ) {
+		require_once $cpt_file;
+		if ( class_exists( 'CLMS_CPT' ) ) {
+			try {
+				$reflection = new ReflectionClass( 'CLMS_CPT' );
+				$early_cpt  = $reflection->newInstanceWithoutConstructor();
+				$early_cpt->register_post_types();
+				$early_cpt->register_taxonomies();
+			} catch ( \Throwable $e ) {
+				if ( function_exists( 'error_log' ) ) {
+					error_log( '[ATORA LMS] Registro estructural temprano de CPT falló: ' . $e->getMessage() ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+				}
+			}
+		}
+	}
+
+	$instructor_file = ATORA_LMS_DIR . 'includes/class-instructor.php';
+	if ( file_exists( $instructor_file ) ) {
+		require_once $instructor_file;
+		if ( class_exists( 'CLMS_Instructor' ) ) {
+			try {
+				$reflection        = new ReflectionClass( 'CLMS_Instructor' );
+				$early_instructor  = $reflection->newInstanceWithoutConstructor();
+				$early_instructor->register_rewrite();
+				add_filter( 'query_vars', array( $early_instructor, 'register_query_vars' ) );
+			} catch ( \Throwable $e ) {
+				if ( function_exists( 'error_log' ) ) {
+					error_log( '[ATORA LMS] Registro estructural temprano de ruta de docente falló: ' . $e->getMessage() ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+				}
+			}
+		}
+	}
+}, 0 );
 
 // Bug #4 fix: limpiar opciones de versión del schema cuando el plugin se actualiza,
 // para forzar que maybe_install_schema() cree las tablas nuevas de Fases 6-11.
