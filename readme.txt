@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.4
 Requires PHP: 8.1
-Stable tag: 6.5.11
+Stable tag: 6.5.12
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,14 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.5.12 =
+* Fixed routing bootstrap order for course registration.
+* Fixed instructor profile rewrite registration timing.
+* Ensured structural routing hooks are registered before WordPress `init` processing.
+* Preserved controlled one-time rewrite flushing.
+* Added hook-order regression tests.
+* Preserved 6.5.11 runtime performance improvements.
+* No intended security or database behavior changes.
 = 6.5.11 =
 * Restored course permalink routing after 6.5.10.
 * Restored instructor profile routing.
@@ -132,6 +140,8 @@ Translation files are loaded from the `/languages` directory.
 * Major release aligned with ATORA_v5 architecture and modules.
 
 == Upgrade Notice ==
+= 6.5.12 =
+* Routing bootstrap hotfix: course and instructor profile URLs are now registered deterministically before WordPress builds its rewrite rules, closing a residual 404 risk left after 6.5.11. Includes one more automatic, one-time rewrite-rule refresh. No new features, no security or database changes. Recommended update.
 = 6.5.11 =
 * Runtime stability hotfix: fixes course and instructor profile links returning 404 after a normal update (stale rewrite-rules cache, now refreshed automatically once on upgrade), and removes an admin-menu diagnostic that was scanning and logging noise about other plugins' pages on every wp-admin page load. No new features; all 6.5.10 security and database hardening preserved. Recommended update.
 = 6.5.10 =
