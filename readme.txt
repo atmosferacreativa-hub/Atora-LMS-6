@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.4
 Requires PHP: 8.1
-Stable tag: 6.5.12
+Stable tag: 6.5.13
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,10 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.5.13 =
+* Fixed course and instructor profile links still returning 404 after 6.5.12's automatic rewrite-rule refresh, on sites running a page-caching plugin.
+* The plugin now purges known page-caching plugins (LiteSpeed Cache, WP Rocket, W3 Total Cache, WP Super Cache, WP Fastest Cache, SiteGround Optimizer) after refreshing its rewrite rules.
+* The admin "Purge cache" button now also clears page cache, not just the WordPress object cache.
 = 6.5.12 =
 * Fixed routing bootstrap order for course registration.
 * Fixed instructor profile rewrite registration timing.
@@ -140,6 +144,8 @@ Translation files are loaded from the `/languages` directory.
 * Major release aligned with ATORA_v5 architecture and modules.
 
 == Upgrade Notice ==
+= 6.5.13 =
+* Fixes course/instructor links still 404ing after 6.5.12 on sites using a page-caching plugin (LiteSpeed, WP Rocket, W3TC, etc.) -- the rewrite-rule refresh now also purges page cache. Recommended update.
 = 6.5.12 =
 * Routing bootstrap hotfix: course and instructor profile URLs are now registered deterministically before WordPress builds its rewrite rules, closing a residual 404 risk left after 6.5.11. Includes one more automatic, one-time rewrite-rule refresh. No new features, no security or database changes. Recommended update.
 = 6.5.11 =
