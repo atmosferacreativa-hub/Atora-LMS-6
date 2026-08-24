@@ -146,7 +146,7 @@ Antes de construir el ZIP se agregó `FEATURE-REPORT-*.md` a `.distignore`, sigu
 sprints anteriores (excluir el nombre del reporte antes de empaquetar, no después).
 
 - **Archivo:** `dist/atora-lms-6.6.0.zip`
-- **SHA-256:** `ddd6fb77e47d284d2a8baa9d16189fb6877885323306f7a2264cca1ea1a20478`
+- **SHA-256:** `8a8eb53770c47e84d073cec450ea946baa07c50f5f8c357e20cb37e8183fecac`
 - **Auditoría del contenido extraído:** sin archivos de desarrollo (`tests/`, `docs/`, `.git*`,
   `scripts/`, `.claude/`) en la raíz del paquete; cadenas de versión (`Version:`,
   `ATORA_LMS_VERSION`, `Stable tag`) consistentes en `6.6.0`; los 8 archivos nuevos/modificados de
