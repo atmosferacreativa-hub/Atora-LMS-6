@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class V5_Installer {
 
 	/** Versión del esquema. Incrementar para forzar re-instalación. */
-	const SCHEMA_VERSION = '5.1.6-telegram-links-table';
+	const SCHEMA_VERSION = '5.1.7-parity-table-and-index-fix';
 
 	/** Option key que almacena la versión instalada. */
 	const OPTION_KEY = 'atora_v5_schema_version';
@@ -38,7 +38,7 @@ class V5_Installer {
 			return;
 		}
 
-		if ( self::create_tables() && self::migrate_wp_post_id_nullable_columns() && self::migrate_rate_limit_indexes() && self::migrate_telegram_links_from_usermeta() ) {
+		if ( self::create_tables() && self::migrate_wp_post_id_nullable_columns() && self::migrate_rate_limit_indexes() && self::migrate_telegram_links_from_usermeta() && self::ensure_parity_tables() ) {
 			update_option( self::OPTION_KEY, self::SCHEMA_VERSION );
 		}
 	}
@@ -49,9 +49,56 @@ class V5_Installer {
 	 * @return void
 	 */
 	public static function force_install(): void {
-		if ( self::create_tables() && self::migrate_wp_post_id_nullable_columns() && self::migrate_rate_limit_indexes() && self::migrate_telegram_links_from_usermeta() ) {
+		if ( self::create_tables() && self::migrate_wp_post_id_nullable_columns() && self::migrate_rate_limit_indexes() && self::migrate_telegram_links_from_usermeta() && self::ensure_parity_tables() ) {
 			update_option( self::OPTION_KEY, self::SCHEMA_VERSION );
 		}
+	}
+
+	/**
+	 * PT-3 (6.5.10): las tablas de paridad LMS (atora_lms_parity_log,
+	 * atora_lms_parity_reads) vivían solo detrás de
+	 * ATORA_LMS_Migration_Admin::init() en el hook 'init' — si CUALQUIER
+	 * fatal ocurría antes en la misma cadena de bootstrap (p.ej. el
+	 * fatal de namespace de PT-1, cargado antes en la misma secuencia
+	 * de atora_lms.php), ensure_table() nunca llegaba a ejecutarse y la
+	 * tabla runtime-only quedaba huérfana — sin ningún camino de
+	 * instalación oficial. Se integra acá, en el instalador real
+	 * (activación + upgrade-en-caliente ya cubierto por install(), sin
+	 * depender de que 'init' se complete sin errores). Reutiliza el
+	 * ensure_table() ya existente de LMS_Parity en vez de duplicar su
+	 * esquema acá.
+	 *
+	 * @return bool
+	 */
+	private static function ensure_parity_tables(): bool {
+		// install()/force_install() corren ANTES de que
+		// modules/lms/class-lms-parity.php se requiera en la secuencia
+		// de atora_lms.php (V5_Installer::install() se invoca en la
+		// sección "Fase V" del bootstrap, el módulo LMS se carga
+		// después) — class_exists() por sí solo devolvería false acá
+		// incluso en un bootstrap sano. Se requiere el archivo
+		// directamente: es un require_once idempotente sin efectos
+		// secundarios de carga (misma ruta que usa el propio bootstrap
+		// para este archivo), no una condición de módulo activable.
+		if ( ! class_exists( '\ATORA\LMS\LMS_Parity' ) ) {
+			$parity_file = defined( 'ATORA_LMS_DIR' ) ? ATORA_LMS_DIR . 'modules/lms/class-lms-parity.php' : '';
+			if ( $parity_file && file_exists( $parity_file ) ) {
+				require_once $parity_file;
+			}
+		}
+
+		if ( ! class_exists( '\ATORA\LMS\LMS_Parity' ) ) {
+			// Archivo genuinamente ausente (deploy incompleto) — no
+			// bloquear el resto de la instalación por esto; se
+			// reintentará en el próximo request no gateado por
+			// OPTION_KEY solo si install() vuelve a correr, lo cual
+			// ocurre en cada activación/upgrade con SCHEMA_VERSION nueva.
+			return true;
+		}
+
+		\ATORA\LMS\LMS_Parity::ensure_table();
+
+		return true;
 	}
 
 	/**
@@ -1066,6 +1113,19 @@ class V5_Installer {
 
 		// Taxonomías/categorías de cursos — tabla pivote (D-003 = B).
 		// Reemplaza el enfoque meta_json.categories[] (D-003 = A, descartado).
+		// PT-4 (6.5.10): con utf8mb4 (4 bytes/char), el prefijo original
+		// de este índice compuesto era course_id(8) + taxonomy(80)*4=320
+		// + term_slug(200)*4=800 = 1128 bytes — por encima del límite de
+		// 1000 bytes reportado en producción (y del límite histórico más
+		// conservador de 767 bytes, aún vigente en instalaciones sin
+		// innodb_large_prefix). Los prefijos de índice se reducen a
+		// taxonomy(32)/term_slug(150) — course_id(8) + 32*4=128 +
+		// 150*4=600 = 736 bytes, con margen bajo el límite de 767. La
+		// longitud LÓGICA de las columnas (VARCHAR(100)/VARCHAR(200)) no
+		// cambia — solo cuántos caracteres iniciales indexa MySQL; una
+		// colisión real requeriría dos taxonomías con el mismo nombre en
+		// los primeros 32 caracteres o dos slugs idénticos en los
+		// primeros 150, prácticamente imposible para slugs de URL.
 		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_course_terms (
 			id          BIGINT UNSIGNED  NOT NULL AUTO_INCREMENT,
 			course_id   BIGINT UNSIGNED  NOT NULL,
@@ -1073,8 +1133,8 @@ class V5_Installer {
 			term_slug   VARCHAR(200)     NOT NULL,
 			term_name   VARCHAR(200)     NOT NULL DEFAULT '',
 			PRIMARY KEY (id),
-			UNIQUE KEY uq_course_tax_slug (course_id, taxonomy(80), term_slug(200)),
-			KEY idx_taxonomy_slug         (taxonomy(80), term_slug(200))
+			UNIQUE KEY uq_course_tax_slug (course_id, taxonomy(32), term_slug(150)),
+			KEY idx_taxonomy_slug         (taxonomy(32), term_slug(150))
 		) $charset_collate;" );
 
 		// Programas/diplomados (D-001 = A).

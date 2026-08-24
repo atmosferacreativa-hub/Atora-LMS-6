@@ -43,11 +43,28 @@ class LMS_Parity {
 
 	// ── Instalación ──────────────────────────────────────────────────────────
 
+	/** Option: evita repetir el SHOW TABLES de abajo en cada request una vez confirmado. */
+	const OPT_TABLES_CONFIRMED = 'atora_lms_parity_tables_confirmed';
+
 	/**
 	 * Crea las dos tablas si no existen.
-	 * Se llama en ATORA_LMS_Migration_Admin::init().
+	 *
+	 * Se llama desde el instalador oficial (V5_Installer::install(),
+	 * activación + upgrade-en-caliente) y, como backstop de
+	 * auto-reparación, desde ATORA_LMS_Migration_Admin::init() en cada
+	 * request. PT-3 (6.5.10): antes hacía dos SHOW TABLES LIKE en TODO
+	 * request sin excepción; ahora se salta por completo una vez que
+	 * ambas tablas se confirmaron existentes, evitando ese costo
+	 * repetido — el backstop sigue funcionando (la option se borra si
+	 * alguna vez hace falta forzar una re-verificación).
+	 *
+	 * @return void
 	 */
 	public static function ensure_table(): void {
+		if ( get_option( self::OPT_TABLES_CONFIRMED ) ) {
+			return;
+		}
+
 		global $wpdb;
 		$charset = $wpdb->get_charset_collate();
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
@@ -83,6 +100,10 @@ class LMS_Parity {
 				  KEY idx_reader_date (reader, logged_date)
 				) {$charset};"
 			);
+		}
+
+		if ( $wpdb->get_var( "SHOW TABLES LIKE '{$log}'" ) === $log && $wpdb->get_var( "SHOW TABLES LIKE '{$reads}'" ) === $reads ) { // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			update_option( self::OPT_TABLES_CONFIRMED, 1, false );
 		}
 	}
 
@@ -554,13 +575,46 @@ class LMS_Parity {
 	 */
 	private static function log_read( string $reader, int $user_id ): void {
 		if ( ! $user_id ) { return; }
-		global $wpdb;
-		$wpdb->query( // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-			$wpdb->prepare(
-				"INSERT IGNORE INTO {$wpdb->prefix}atora_lms_parity_reads (reader, user_id, logged_date) VALUES (%s, %d, %s)",
-				$reader, $user_id, gmdate( 'Y-m-d' )
-			)
-		);
+
+		// PT-3 (6.5.10): la regla de esta clase es "ninguna excepción
+		// aquí puede afectar la respuesta real" — pero antes de este
+		// fix eso dependía únicamente de que $wpdb->query() no lance
+		// excepciones por sí mismo (cierto en WordPress estándar, pero
+		// no garantizado si algo convierte errores de BD en
+		// excepciones, p.ej. un handler de errores personalizado). Se
+		// envuelve explícitamente y se deduplica el log de fallos por
+		// request (self::$table_warning_logged) para no generar una
+		// entrada de log por cada lectura si la tabla está
+		// genuinamente ausente — un "log storm" en instalaciones donde
+		// la tabla no llegó a crearse.
+		try {
+			global $wpdb;
+			$wpdb->query( // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$wpdb->prepare(
+					"INSERT IGNORE INTO {$wpdb->prefix}atora_lms_parity_reads (reader, user_id, logged_date) VALUES (%s, %d, %s)",
+					$reader, $user_id, gmdate( 'Y-m-d' )
+				)
+			);
+		} catch ( \Throwable $e ) {
+			self::log_failure_once( $e );
+		}
+	}
+
+	/** @var bool Evita más de un error_log() por request si la tabla de paridad falla repetidamente. */
+	private static bool $table_warning_logged = false;
+
+	/**
+	 * @param \Throwable $e
+	 * @return void
+	 */
+	private static function log_failure_once( \Throwable $e ): void {
+		if ( self::$table_warning_logged ) {
+			return;
+		}
+		self::$table_warning_logged = true;
+		if ( function_exists( 'error_log' ) ) {
+			error_log( '[ATORA LMS_Parity] escritura de telemetría fallida (no afecta la respuesta real): ' . $e->getMessage() ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+		}
 	}
 
 	/**
@@ -590,21 +644,28 @@ class LMS_Parity {
 	): void {
 		if ( $legacy_digest === $table_digest ) { return; }
 
-		global $wpdb;
-		$wpdb->insert(
-			$wpdb->prefix . self::TABLE_SUFFIX,
-			array(
-				'reader'         => $reader,
-				'user_id'        => $user_id,
-				'wp_course_id'   => $wp_course_id,
-				'legacy_digest'  => $legacy_digest,
-				'table_digest'   => $table_digest,
-				'legacy_summary' => substr( $legacy_summary, 0, 500 ),
-				'table_summary'  => substr( $table_summary,  0, 500 ),
-				'logged_at'      => current_time( 'mysql', true ),
-			),
-			array( '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s' )
-		);
+		// PT-3 (6.5.10): misma resiliencia que log_read() — una tabla de
+		// paridad ausente no puede convertirse en un fallo visible del
+		// lector académico real que la invoca.
+		try {
+			global $wpdb;
+			$wpdb->insert(
+				$wpdb->prefix . self::TABLE_SUFFIX,
+				array(
+					'reader'         => $reader,
+					'user_id'        => $user_id,
+					'wp_course_id'   => $wp_course_id,
+					'legacy_digest'  => $legacy_digest,
+					'table_digest'   => $table_digest,
+					'legacy_summary' => substr( $legacy_summary, 0, 500 ),
+					'table_summary'  => substr( $table_summary,  0, 500 ),
+					'logged_at'      => current_time( 'mysql', true ),
+				),
+				array( '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s' )
+			);
+		} catch ( \Throwable $e ) {
+			self::log_failure_once( $e );
+		}
 	}
 
 	private static function digest_ids( array $ids ): string {
