@@ -83,6 +83,42 @@ if ( ! defined( 'ATORA_LMS_MODULES_DIR' ) ) {
 // En producción siempre es false. Permite webhooks sin firma en local y logs verbosos.
 defined( 'ATORA_DEV_MODE' ) || define( 'ATORA_DEV_MODE', false );
 
+// PT-5 (6.5.10): registro centralizado de intervalos de cron
+// personalizados ('every_5_minutes', 'every_15_minutes'). Antes, cada
+// módulo (Calendar_Sync, LMS_Migration_Admin, Live_Streaming,
+// Automation_Engine, Email_Queue, Messaging_Router) registraba su
+// propia copia vía add_filter('cron_schedules', ...) dentro de su
+// propio init() — pero V5_Modules carga los módulos v5
+// condicionalmente según el contexto del request (admin/public/cron,
+// "para minimizar la huella de memoria", ver su propio docblock), así
+// que un contexto donde el módulo QUE NECESITA el intervalo carga sin
+// que el módulo que lo REGISTRA también cargue producía
+// wp_schedule_event()->invalid_schedule. Este filtro vive acá, en el
+// bootstrap del plugin, que se ejecuta sin condición en cualquier
+// contexto (front-end, admin, cron, REST, AJAX) — así el intervalo
+// SIEMPRE está disponible sin importar qué subconjunto de módulos
+// haya cargado. Los registros existentes en cada módulo se dejan
+// intactos (redundantes pero inofensivos — mismos valores, y
+// remover una fuente de verdad ya probada no es el cambio mínimo que
+// pide este hotfix); no se renombra ningún slug de schedule
+// persistido, así que los eventos de cron ya programados en instalaciones
+// existentes siguen siendo válidos sin necesidad de reprogramarlos.
+add_filter( 'cron_schedules', static function ( array $schedules ): array {
+	if ( ! isset( $schedules['every_5_minutes'] ) ) {
+		$schedules['every_5_minutes'] = array(
+			'interval' => 300,
+			'display'  => __( 'Cada 5 minutos', 'atora-lms' ),
+		);
+	}
+	if ( ! isset( $schedules['every_15_minutes'] ) ) {
+		$schedules['every_15_minutes'] = array(
+			'interval' => 900,
+			'display'  => __( 'Cada 15 minutos', 'atora-lms' ),
+		);
+	}
+	return $schedules;
+} );
+
 // Bug #4 fix: limpiar opciones de versión del schema cuando el plugin se actualiza,
 // para forzar que maybe_install_schema() cree las tablas nuevas de Fases 6-11.
 add_action( 'plugins_loaded', static function() {
