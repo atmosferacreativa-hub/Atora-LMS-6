@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class V5_Installer {
 
 	/** Versión del esquema. Incrementar para forzar re-instalación. */
-	const SCHEMA_VERSION = '5.1.7-parity-table-and-index-fix';
+	const SCHEMA_VERSION = '5.1.8-followup-plans';
 
 	/** Option key que almacena la versión instalada. */
 	const OPTION_KEY = 'atora_v5_schema_version';
@@ -38,7 +38,7 @@ class V5_Installer {
 			return;
 		}
 
-		if ( self::create_tables() && self::migrate_wp_post_id_nullable_columns() && self::migrate_rate_limit_indexes() && self::migrate_telegram_links_from_usermeta() && self::ensure_parity_tables() ) {
+		if ( self::create_tables() && self::migrate_wp_post_id_nullable_columns() && self::migrate_rate_limit_indexes() && self::migrate_telegram_links_from_usermeta() && self::ensure_parity_tables() && self::migrate_followup_plan_column() ) {
 			update_option( self::OPTION_KEY, self::SCHEMA_VERSION );
 		}
 	}
@@ -49,9 +49,54 @@ class V5_Installer {
 	 * @return void
 	 */
 	public static function force_install(): void {
-		if ( self::create_tables() && self::migrate_wp_post_id_nullable_columns() && self::migrate_rate_limit_indexes() && self::migrate_telegram_links_from_usermeta() && self::ensure_parity_tables() ) {
+		if ( self::create_tables() && self::migrate_wp_post_id_nullable_columns() && self::migrate_rate_limit_indexes() && self::migrate_telegram_links_from_usermeta() && self::ensure_parity_tables() && self::migrate_followup_plan_column() ) {
 			update_option( self::OPTION_KEY, self::SCHEMA_VERSION );
 		}
+	}
+
+	/**
+	 * PT-1.2 (6.6.0): agrega followup_plan_id (nullable) a
+	 * atora_calendar_events en instalaciones existentes — dbDelta() no
+	 * agrega de forma confiable una columna nueva a una tabla ya
+	 * creada en todos los casos (mismo criterio ya establecido para
+	 * índices vía migrate_add_index()), así que se verifica y agrega
+	 * explícitamente. Un evento manual del calendario actual queda con
+	 * este campo en NULL, sin ningún cambio de comportamiento — es
+	 * exactamente el valor por defecto que ya tendría en una tabla
+	 * recién creada por create_tables().
+	 *
+	 * @return bool
+	 */
+	private static function migrate_followup_plan_column(): bool {
+		global $wpdb;
+
+		$table = $wpdb->prefix . 'atora_calendar_events';
+		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) ) !== $table ) {
+			return false;
+		}
+
+		$has_column = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+				 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND COLUMN_NAME = 'followup_plan_id'",
+				$table
+			)
+		) > 0;
+
+		if ( ! $has_column ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$wpdb->query( "ALTER TABLE {$table} ADD COLUMN followup_plan_id BIGINT UNSIGNED NULL DEFAULT NULL AFTER recurrence_rule, ADD KEY followup_plan_id (followup_plan_id)" );
+		}
+
+		$has_column = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+				 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND COLUMN_NAME = 'followup_plan_id'",
+				$table
+			)
+		) > 0;
+
+		return $has_column;
 	}
 
 	/**
@@ -1440,6 +1485,63 @@ class V5_Installer {
 		) $charset_collate;" );
 		// ── /Fase IV S13 ──────────────────────────────────────────────────────
 
+		// ── PT-1 (6.6.0): Planes de seguimiento (CRM académico) ─────────────────
+		// section_ids/stage_filter como JSON en un LONGTEXT, no una tabla
+		// puente — el resto del esquema ya usa este mismo patrón para config
+		// de alcance acotado por fila propia (atora_sections.schedule_json/
+		// meta_json), y a diferencia de atora_crm_campaign_recipients (que sí
+		// necesita JOIN/agregación SQL por fila individual), acá el conjunto
+		// de secciones/etapas es config del plan mismo, leída siempre junto
+		// con el resto de la fila — no hay necesidad de JOIN.
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_followup_plans (
+			id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			teacher_id      BIGINT UNSIGNED NOT NULL,
+			name            VARCHAR(190)    NOT NULL DEFAULT '',
+			template_key    VARCHAR(60)              DEFAULT NULL,
+			section_ids     LONGTEXT                 DEFAULT NULL,
+			stage_filter    LONGTEXT                 DEFAULT NULL,
+			recurrence_rule VARCHAR(255)    NOT NULL DEFAULT '',
+			action_type     VARCHAR(30)     NOT NULL DEFAULT 'checkin',
+			active          TINYINT(1)      NOT NULL DEFAULT 1,
+			end_date        DATE                     DEFAULT NULL,
+			created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			KEY teacher_id (teacher_id),
+			KEY active     (active)
+		) $charset_collate;" );
+
+		// Estado propio de UNA ocurrencia puntual (fila de
+		// atora_calendar_events con followup_plan_id poblado) — saltar una
+		// ocurrencia o excluir un estudiante de ella nunca toca el plan ni
+		// la serie completa, solo esta fila.
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_followup_occurrence_state (
+			id                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			event_id          BIGINT UNSIGNED NOT NULL,
+			skipped           TINYINT(1)      NOT NULL DEFAULT 0,
+			excluded_user_ids LONGTEXT                 DEFAULT NULL,
+			created_at        DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at        DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			UNIQUE KEY event_id (event_id)
+		) $charset_collate;" );
+
+		// Registro de "marcado como contactado" por estudiante/ocurrencia —
+		// deliberadamente SIN ninguna columna de etapa: registrar un
+		// contacto acá nunca mueve al estudiante en Student_Followup_Service,
+		// ver el principio de separación de responsabilidades de la OT.
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_followup_contacts (
+			id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			event_id     BIGINT UNSIGNED NOT NULL,
+			user_id      BIGINT UNSIGNED NOT NULL,
+			contacted_by BIGINT UNSIGNED NOT NULL,
+			contacted_at DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			UNIQUE KEY event_user (event_id, user_id),
+			KEY user_id (user_id)
+		) $charset_collate;" );
+		// ── /PT-1 (6.6.0) ────────────────────────────────────────────────────
+
 		return self::all_tables_exist();
 	}
 
@@ -1484,6 +1586,10 @@ class V5_Installer {
 			"{$wpdb->prefix}atora_calendar_events",
 			"{$wpdb->prefix}atora_calendar_bookings",
 			"{$wpdb->prefix}atora_calendar_sync",
+			// Planes de seguimiento (PT-1, 6.6.0).
+			"{$wpdb->prefix}atora_followup_plans",
+			"{$wpdb->prefix}atora_followup_occurrence_state",
+			"{$wpdb->prefix}atora_followup_contacts",
 			// Email Engine.
 			"{$wpdb->prefix}atora_email_queue",
 			"{$wpdb->prefix}atora_email_templates",
