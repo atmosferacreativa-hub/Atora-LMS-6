@@ -15,7 +15,7 @@ class DB_Service {
 	/**
 	 * Versión del esquema CRM v2.
 	 */
-	const SCHEMA_VERSION = '2.2.0'; // Bug #4 fix: bump para forzar creación de tablas Fases 6-11
+	const SCHEMA_VERSION = '2.3.0'; // PT-6 (6.5.10): bump para crear las 4 tablas huérfanas de Sequence_Service
 
 	/**
 	 * Option key de versión instalada.
@@ -42,6 +42,30 @@ class DB_Service {
 		$needs_columns = version_compare( $columns_version, self::SCHEMA_VERSION, '<' );
 		$needs_schema  = version_compare( $current_version, self::SCHEMA_VERSION, '<' ) || ! empty( $missing_tables );
 
+		// PT-6 (6.5.10): ensure_runtime_columns() corría ANTES del bloque de
+		// creación de tablas de abajo. En el mismo deploy donde una tabla se
+		// crea por primera vez (needs_columns Y needs_schema ambos true a la
+		// vez, el caso típico de un bump de SCHEMA_VERSION), esa tabla
+		// todavía no existía cuando ensure_runtime_columns() la revisaba —
+		// se saltaba silenciosamente (table_exists() → false) — pero
+		// $columns_option igual se marcaba como actualizado, así que esa
+		// tabla nunca más recibía sus columnas agregadas (academy_id, etc.)
+		// en ningún request posterior. Se invierte el orden: primero crear
+		// lo que falte, después revisar columnas — así toda tabla recién
+		// creada en este mismo request ya existe cuando le toca su chequeo
+		// de columnas.
+		if ( $needs_schema ) {
+			require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+
+			$charset_collate = $wpdb->get_charset_collate();
+			$prefix          = $wpdb->prefix;
+
+			$schema_statements = self::get_schema_statements( $prefix, $charset_collate, false );
+			foreach ( $schema_statements as $statement ) {
+				dbDelta( $statement );
+			}
+		}
+
 		if ( $needs_columns ) {
 			self::ensure_runtime_columns();
 			update_option( $columns_option, self::SCHEMA_VERSION, false );
@@ -49,16 +73,6 @@ class DB_Service {
 
 		if ( ! $needs_schema ) {
 			return;
-		}
-
-		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
-
-		$charset_collate = $wpdb->get_charset_collate();
-		$prefix          = $wpdb->prefix;
-
-		$schema_statements = self::get_schema_statements( $prefix, $charset_collate, false );
-		foreach ( $schema_statements as $statement ) {
-			dbDelta( $statement );
 		}
 
 		$missing_after_install = self::get_missing_tables( $required_tables );
@@ -108,6 +122,13 @@ class DB_Service {
 			"{$prefix}atora_crm_campaign_recipients",
 			"{$prefix}atora_crm_contact_fields",
 			"{$prefix}atora_crm_contact_field_values",
+			// PT-6 (6.5.10): sin estas cuatro en la lista, get_missing_tables()
+			// nunca las detectaba como faltantes -- needs_schema solo se
+			// disparaba por el version_compare(), nunca por su ausencia real.
+			"{$prefix}atora_email_sequences",
+			"{$prefix}atora_email_sequence_steps",
+			"{$prefix}atora_email_sequence_enrollments",
+			"{$prefix}atora_email_suppression",
 		);
 	}
 
@@ -520,6 +541,64 @@ class DB_Service {
 				UNIQUE KEY contact_field (contact_id, field_key),
 				KEY contact_id (contact_id),
 				KEY field_key (field_key)
+			) {$charset};",
+			// PT-6 (6.5.10): las cuatro tablas de Sequence_Service (Fase 6,
+			// 5.28.0 — secuencias de email drip) nunca tuvieron un CREATE
+			// TABLE en ningún instalador — un hallazgo distinto del de
+			// atora_lms_parity_reads (PT-3) pero de la misma clase de raíz
+			// ("tabla huérfana en runtime"), encontrado por el mismo
+			// inventario tabla-por-tabla. Sequence_Service ya comprueba
+			// table_exists() antes de cada operación, así que esto nunca
+			// causó un fatal — la funcionalidad de secuencias simplemente
+			// estuvo inactiva en silencio en cualquier instalación. Columnas
+			// inferidas de los propios usos reales en
+			// modules/crm-v2/services/class-sequence-service.php (inserts/
+			// updates/selects), no de un diseño nuevo.
+			"{$prefix}atora_email_sequences" => "{$create_kw} {$prefix}atora_email_sequences (
+				id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+				name VARCHAR(190) NOT NULL DEFAULT '',
+				description TEXT NULL,
+				status VARCHAR(20) NOT NULL DEFAULT 'draft',
+				created_by BIGINT UNSIGNED NOT NULL DEFAULT 0,
+				created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				PRIMARY KEY (id),
+				KEY status (status)
+			) {$charset};",
+			"{$prefix}atora_email_sequence_steps" => "{$create_kw} {$prefix}atora_email_sequence_steps (
+				id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+				sequence_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+				step_order SMALLINT UNSIGNED NOT NULL DEFAULT 1,
+				delay_hours INT UNSIGNED NOT NULL DEFAULT 24,
+				send_condition VARCHAR(20) NOT NULL DEFAULT 'always',
+				template_key VARCHAR(80) NOT NULL DEFAULT 'crm_campaign',
+				subject VARCHAR(255) NOT NULL DEFAULT '',
+				message LONGTEXT NULL,
+				cta_url VARCHAR(500) NOT NULL DEFAULT '',
+				identity VARCHAR(40) NOT NULL DEFAULT 'academia',
+				PRIMARY KEY (id),
+				KEY sequence_order (sequence_id, step_order)
+			) {$charset};",
+			"{$prefix}atora_email_sequence_enrollments" => "{$create_kw} {$prefix}atora_email_sequence_enrollments (
+				id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+				sequence_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+				contact_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+				current_step SMALLINT UNSIGNED NOT NULL DEFAULT 1,
+				status VARCHAR(20) NOT NULL DEFAULT 'active',
+				next_run_at DATETIME NULL,
+				enrolled_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				PRIMARY KEY (id),
+				UNIQUE KEY sequence_contact (sequence_id, contact_id),
+				KEY status_next_run (status, next_run_at),
+				KEY contact_id (contact_id)
+			) {$charset};",
+			"{$prefix}atora_email_suppression" => "{$create_kw} {$prefix}atora_email_suppression (
+				id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+				email VARCHAR(190) NOT NULL DEFAULT '',
+				reason VARCHAR(20) NOT NULL DEFAULT 'manual',
+				contact_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+				created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				PRIMARY KEY (id),
+				UNIQUE KEY email (email)
 			) {$charset};",
 		);
 	}
