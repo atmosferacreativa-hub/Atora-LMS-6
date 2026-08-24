@@ -467,7 +467,10 @@ class Contact_Actions_REST_Controller {
 		$summary = '';
 		if ( class_exists( 'CLMS_AI_Manager' ) ) {
 			try {
-				$ai      = new CLMS_AI_Manager();
+				// PT-1 (6.5.10): CLMS_AI_Manager es global; este archivo vive
+				// bajo namespace ATORA\CRM_V2\Rest — sin backslash se
+				// resuelve a ATORA\CRM_V2\Rest\CLMS_AI_Manager (inexistente).
+				$ai      = new \CLMS_AI_Manager();
 				$summary = $ai->complete( $prompt );
 			} catch ( \Throwable $e ) {
 				return self::fail( __( 'Error IA: ', 'atora-lms' ) . esc_html( $e->getMessage() ), 500 );

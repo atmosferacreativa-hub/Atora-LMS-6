@@ -279,7 +279,10 @@ class LMS_Parity {
 		$legacy_result = false;
 
 		if ( class_exists( 'CLMS_Helper' ) && method_exists( 'CLMS_Helper', 'get_course_lessons' ) ) {
-			$lesson_ids = array_values( array_filter( array_map( 'absint', (array) CLMS_Helper::get_course_lessons( $wp_course_id ) ) ) );
+			// PT-1 (6.5.10): CLMS_Helper es global; este archivo vive bajo
+			// namespace ATORA\LMS — sin el backslash, PHP resuelve esto a
+			// ATORA\LMS\CLMS_Helper (inexistente) y produce un fatal.
+			$lesson_ids = array_values( array_filter( array_map( 'absint', (array) \CLMS_Helper::get_course_lessons( $wp_course_id ) ) ) );
 			$legacy_result = ! empty( $lesson_ids )
 				&& count( array_intersect( $lesson_ids, $completed_ids ) ) === count( $lesson_ids );
 		}

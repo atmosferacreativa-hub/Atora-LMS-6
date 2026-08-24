@@ -315,8 +315,12 @@ class Live_Streaming {
 			return;
 		}
 
+		// PT-1 (6.5.10): CLMS_Helper es global; este archivo vive bajo
+		// namespace ATORA\LiveStreaming — sin backslash se resuelve a
+		// ATORA\LiveStreaming\CLMS_Helper (inexistente), fatal en el cron
+		// de recordatorios (atora_live_reminders_cron).
 		$students = class_exists( 'CLMS_Helper' ) && method_exists( 'CLMS_Helper', 'get_course_students' )
-			? (array) CLMS_Helper::get_course_students( $course_id )
+			? (array) \CLMS_Helper::get_course_students( $course_id )
 			: array();
 
 		$lesson_title = get_the_title( $lesson_id );

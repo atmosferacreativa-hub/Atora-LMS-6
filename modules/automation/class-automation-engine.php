@@ -842,7 +842,10 @@ class Automation_Engine {
 
 			case 'enroll_course':
 				if ( class_exists( 'CLMS_Helper' ) ) {
-					$success = (bool) CLMS_Helper::enroll_user_in_course( $user_id, absint( $action['course_id'] ?? 0 ) );
+					// PT-1 (6.5.10): CLMS_Helper es global; este archivo vive
+					// bajo namespace ATORA\Automation — sin backslash se
+					// resuelve a ATORA\Automation\CLMS_Helper (inexistente).
+					$success = (bool) \CLMS_Helper::enroll_user_in_course( $user_id, absint( $action['course_id'] ?? 0 ) );
 				}
 				break;
 

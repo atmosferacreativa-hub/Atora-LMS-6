@@ -409,7 +409,11 @@ class Section_Service {
 
 		// DC-3: garantizar matrícula vía API canónica (nunca escribir atora_enrollments directamente)
 		if ( $wp_course_id && class_exists( 'CLMS_Helper' ) && method_exists( 'CLMS_Helper', 'enroll_user_in_course' ) ) {
-			CLMS_Helper::enroll_user_in_course( $user_id, $wp_course_id );
+			// PT-1 (6.5.10): CLMS_Helper es global; este archivo vive bajo
+			// namespace ATORA\LMS — una referencia sin calificar se
+			// resuelve a ATORA\LMS\CLMS_Helper (inexistente), causando un
+			// fatal en cuanto se ejecuta esta rama.
+			\CLMS_Helper::enroll_user_in_course( $user_id, $wp_course_id );
 		}
 
 		$status = sanitize_key( $status );

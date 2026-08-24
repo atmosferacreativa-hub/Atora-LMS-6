@@ -234,8 +234,16 @@ class V5_Modules {
 		// función) porque no tiene sentido registrar sus listeners si
 		// el módulo de mensajería está apagado.
 		self::require_file( ATORA_LMS_DIR . 'includes/academic/class-academic-messaging-bridge.php' );
-		if ( class_exists( 'CLMS_Academic_Messaging_Bridge' ) ) {
-			CLMS_Academic_Messaging_Bridge::init();
+		// PT-1 (6.5.10): esta clase es GLOBAL (sin namespace), pero este
+		// archivo vive en `namespace ATORA;` — una referencia estática sin
+		// calificar se resuelve en tiempo de compilación a
+		// `ATORA\CLMS_Academic_Messaging_Bridge`, que no existe. La
+		// comprobación class_exists() de arriba pasaba igual (un string
+		// literal no se resuelve por namespace), enmascarando el fatal
+		// hasta la llamada real. Requiere el backslash inicial para
+		// apuntar al namespace global explícitamente.
+		if ( class_exists( '\CLMS_Academic_Messaging_Bridge' ) ) {
+			\CLMS_Academic_Messaging_Bridge::init();
 		}
 	}
 
