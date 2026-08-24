@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.4
 Requires PHP: 8.1
-Stable tag: 6.5.9
+Stable tag: 6.5.10
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,15 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.5.10 =
+* Fixed legacy messaging bridge namespace resolution.
+* Fixed invalid external access to protected loader path resolution.
+* Ensured required LMS parity tables are created during install/upgrade.
+* Improved MySQL/MariaDB utf8mb4 index compatibility.
+* Centralized Atora WP-Cron schedule registration.
+* Improved schema migration idempotency.
+* Added regression tests for fresh install and 6.5.9 upgrade paths.
+* Preserved existing security hardening and intended functional behavior.
 = 6.5.9 =
 * Security: two-factor login verification (the actual POST form used by the login flow, not just its AJAX counterpart) is now rate-limited per pending login, covering both regular and backup codes through a single shared quota.
 * Security: the X-Real-IP forwarded header now requires its own explicit proxy authorization, separate from generic trusted-proxy trust, closing a spoofing path under certain reverse-proxy configurations.
@@ -115,6 +124,8 @@ Translation files are loaded from the `/languages` directory.
 * Major release aligned with ATORA_v5 architecture and modules.
 
 == Upgrade Notice ==
+= 6.5.10 =
+* Production stability hotfix: fixes a fatal on messaging bridge load, a fatal on instructor profile template resolution, missing LMS parity tables, a MySQL/MariaDB index-length error on course taxonomy terms, and unreliable custom WP-Cron interval registration. No new features; all prior security hardening preserved. Recommended update — includes a database schema change.
 = 6.5.9 =
 * Static security closure: 2FA login rate limiting, tighter proxy header trust, Telegram CRM source-of-truth alignment, and atomic (race-free) throttling for enrollment and WhatsApp verification. Recommended update.
 = 6.5.8 =
