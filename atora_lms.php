@@ -119,6 +119,56 @@ add_filter( 'cron_schedules', static function ( array $schedules ): array {
 	return $schedules;
 } );
 
+// PT-3 (6.5.11): flush-de-reescritura versionado, de una sola vez.
+//
+// register_activation_hook()/register_deactivation_hook() eran, hasta
+// este sprint, los ÚNICOS dos puntos donde flush_rewrite_rules() se
+// llamaba en todo el plugin — ambos son eventos explícitos de
+// activar/desactivar en wp-admin. Una actualización de plugin normal
+// en producción (reemplazar los archivos vía FTP/SFTP, un gestor de
+// releases, o el propio "Actualizar ahora" de WordPress) NO dispara
+// ninguno de los dos hooks — WordPress no desactiva-y-reactiva el
+// plugin al actualizar sus archivos. El resultado: si en CUALQUIER
+// punto de la historia de este plugin cambió un slug/estructura de
+// reescritura de un CPT (curso, docente, programa, etc.), cualquier
+// sitio en producción que se actualizó por reemplazo de archivos
+// (el camino normal, no una reactivación manual) se quedó para
+// siempre con la caché de rewrite_rules vieja en la BD — de ahí URLs
+// de curso y de perfil de docente devolviendo 404 aunque el registro
+// de post types/rewrite rules en el código esté (y siempre haya
+// estado) correcto: CLMS_Loader::boot() (más abajo, en el 'init' de
+// prioridad 1) instancia tanto CLMS_CPT como CLMS_Instructor en cada
+// request normal, y ambos enganchan su propio registro a 'init' con
+// prioridad por defecto — WordPress SÍ ejecuta callbacks agregados a
+// un hook mientras ese mismo hook está corriendo, siempre que su
+// prioridad sea mayor a la que se está procesando (comportamiento
+// núcleo de WP_Hook::add_filter()/resort_active_iterations(), no
+// específico de este plugin) — así que el registro en sí nunca fue el
+// problema; la caché de reglas nunca se refrescaba.
+//
+// Fix: una versión de reescritura separada de ATORA_LMS_VERSION (no
+// cada bump de versión debe forzar un flush — sería el mismo
+// antipatrón "flush en cada request" que este mismo hotfix prohíbe,
+// solo que a nivel de deploy en vez de a nivel de request). Se
+// comprueba en 'wp_loaded' — después de que 'init' completó del todo,
+// garantizando que CLMS_CPT/CLMS_Instructor ya registraron sus reglas
+// para este mismo request — y solo si la versión de reescritura
+// guardada es anterior a esta, se hace UN flush suave (sin reescribir
+// .htaccess) y se persiste la nueva versión para que ningún request
+// futuro repita el flush.
+define( 'ATORA_LMS_REWRITE_VERSION', '6.5.11-1' );
+
+add_action( 'wp_loaded', static function () {
+	$stored = (string) get_option( 'atora_lms_rewrite_version', '' );
+
+	if ( '' !== $stored && version_compare( $stored, ATORA_LMS_REWRITE_VERSION, '>=' ) ) {
+		return;
+	}
+
+	flush_rewrite_rules( false );
+	update_option( 'atora_lms_rewrite_version', ATORA_LMS_REWRITE_VERSION, false );
+}, 20 );
+
 // Bug #4 fix: limpiar opciones de versión del schema cuando el plugin se actualiza,
 // para forzar que maybe_install_schema() cree las tablas nuevas de Fases 6-11.
 add_action( 'plugins_loaded', static function() {
@@ -985,6 +1035,13 @@ function atora_lms_activate(): void {
 
 	flush_rewrite_rules( false );
 	update_option( 'atora_lms_activated', current_time( 'mysql' ) );
+	// PT-3 (6.5.11): la activación ya hizo su propio flush arriba —
+	// marcar la versión de reescritura acá para que el chequeo de
+	// 'wp_loaded' no repita un segundo flush innecesario en el
+	// siguiente request tras una activación fresca.
+	if ( defined( 'ATORA_LMS_REWRITE_VERSION' ) ) {
+		update_option( 'atora_lms_rewrite_version', ATORA_LMS_REWRITE_VERSION, false );
+	}
 }
 
 register_activation_hook( ATORA_LMS_FILE, 'atora_lms_activate' );
