@@ -1,0 +1,321 @@
+/**
+ * ATORA LMS — CRM v2, Planes de seguimiento (PT-4, sprint 6.6.0)
+ *
+ * Mobile-first: estilos base para pantalla angosta, min-width media
+ * queries agregan comodidades de escritorio (no al revés). Reutiliza
+ * los tokens --atora-* ya definidos en assets/admin/atora-admin.css
+ * (cargado como dependencia de atora-crm-v2-ui) — nunca colores
+ * hardcodeados de una paleta genérica de calendario.
+ *
+ * §UX de la OT: objetivos táctiles de 44px mínimo, contraste AA,
+ * cero scroll horizontal, todo en una pantalla (el asistente es una
+ * capa/modal sobre la misma vista, no una página aparte).
+ *
+ * @package ATORA_LMS\CRM_V2
+ * @since   6.6.0
+ */
+
+.atora-followup-wrap {
+	max-width: 100%;
+	overflow-x: hidden;
+	padding-bottom: 2rem;
+}
+
+.atora-fu-header {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	margin: 1rem 0 1.25rem;
+}
+
+.atora-fu-subtitle {
+	color: var(--atora-text-secondary, #475569);
+	margin: 0.25rem 0 0;
+}
+
+.atora-fu-new-plan {
+	min-height: 44px;
+	padding: 0 1.25rem;
+	border-radius: var(--atora-radius-md, 12px);
+}
+
+.atora-fu-empty-state {
+	background: var(--atora-surface, #fff);
+	border: 1px solid var(--atora-border, #e2e8f0);
+	border-radius: var(--atora-radius-lg, 16px);
+	padding: 1.5rem;
+	text-align: center;
+}
+
+.atora-fu-calendar-mount {
+	background: var(--atora-surface, #fff);
+	border: 1px solid var(--atora-border, #e2e8f0);
+	border-radius: var(--atora-radius-lg, 16px);
+	padding: 0.5rem;
+	box-shadow: var(--atora-shadow-sm, 0 1px 3px rgba(0, 0, 0, .06));
+	max-width: 100%;
+	overflow-x: auto;
+}
+
+/* FullCalendar: eventos con altura táctil razonable en mobile */
+.atora-fu-calendar-mount .fc-daygrid-event {
+	min-height: 30px;
+	padding: 2px 4px;
+	cursor: pointer;
+}
+.atora-fu-calendar-mount .fc-daygrid-day-number {
+	min-width: 32px;
+	min-height: 32px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+/* ── Panel lateral / modal del asistente — mismo esqueleto para ambos ── */
+
+.atora-fu-panel,
+.atora-fu-wizard {
+	position: fixed;
+	inset: 0;
+	z-index: 100000;
+}
+
+.atora-fu-panel-backdrop {
+	position: absolute;
+	inset: 0;
+	background: rgba(15, 23, 42, .45);
+}
+
+.atora-fu-panel-sheet,
+.atora-fu-wizard-sheet {
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	max-height: 88vh;
+	overflow-y: auto;
+	background: var(--atora-surface, #fff);
+	border-radius: var(--atora-radius-xl, 20px) var(--atora-radius-xl, 20px) 0 0;
+	padding: 1.25rem 1.25rem 2rem;
+	box-shadow: var(--atora-shadow-md, 0 4px 12px rgba(0, 0, 0, .08));
+}
+
+.atora-fu-panel-close {
+	position: absolute;
+	top: 0.75rem;
+	right: 0.75rem;
+	width: 44px;
+	height: 44px;
+	border: none;
+	background: var(--atora-bg, #f8fafc);
+	border-radius: 999px;
+	font-size: 22px;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.atora-fu-panel-date {
+	color: var(--atora-text-secondary, #475569);
+	margin-top: -0.25rem;
+}
+
+.atora-fu-panel-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	margin: 1rem 0;
+}
+.atora-fu-panel-actions .button {
+	min-height: 44px;
+	flex: 1 1 auto;
+}
+
+.atora-fu-student-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	padding: 0.75rem 0;
+	border-bottom: 1px solid var(--atora-border-soft, #f1f5f9);
+}
+.atora-fu-student-row.is-contacted {
+	opacity: 0.6;
+}
+.atora-fu-student-info {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+.atora-fu-student-name {
+	font-weight: 600;
+	color: var(--atora-text-primary, #0f172a);
+}
+.atora-fu-student-stage {
+	font-size: 12px;
+	color: var(--atora-text-muted, #94a3b8);
+}
+.atora-fu-student-actions {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	flex-shrink: 0;
+}
+.atora-fu-btn-contact {
+	min-height: 44px;
+	white-space: nowrap;
+}
+.atora-fu-btn-exclude {
+	min-height: 44px;
+	color: var(--atora-danger, #E24B4A);
+}
+
+.atora-fu-empty-occurrence {
+	text-align: center;
+	color: var(--atora-text-secondary, #475569);
+	padding: 1.5rem 0;
+}
+
+/* ── Asistente de 4 pasos ── */
+
+.atora-fu-wizard-steps {
+	display: flex;
+	gap: 0.4rem;
+	margin: 0.75rem 0 1.25rem;
+}
+.atora-fu-step-dot {
+	width: 10px;
+	height: 10px;
+	border-radius: 999px;
+	background: var(--atora-border, #e2e8f0);
+}
+.atora-fu-step-dot.is-active {
+	background: var(--atora-blue-700, #1d4ed8);
+}
+
+.atora-fu-template-grid {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 0.75rem;
+	margin-bottom: 0.75rem;
+}
+.atora-fu-template-card {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+	text-align: left;
+	padding: 1rem;
+	min-height: 44px;
+	border: 1px solid var(--atora-border, #e2e8f0);
+	border-radius: var(--atora-radius-md, 12px);
+	background: var(--atora-surface, #fff);
+	cursor: pointer;
+}
+.atora-fu-template-card:hover,
+.atora-fu-template-card:focus-visible {
+	border-color: var(--atora-blue-500, #3b82f6);
+	outline: 2px solid var(--atora-blue-100, #dbeafe);
+}
+.atora-fu-template-card span {
+	color: var(--atora-text-secondary, #475569);
+	font-size: 13px;
+}
+
+.atora-fu-blank-option {
+	min-height: 44px;
+}
+
+.atora-fu-preview-box {
+	background: var(--atora-blue-50, #eff6ff);
+	border-radius: var(--atora-radius-md, 12px);
+	padding: 1rem;
+}
+.atora-fu-preview-count {
+	font-size: 16px;
+}
+
+.atora-fu-field-label {
+	display: block;
+	font-weight: 600;
+	margin: 1rem 0 0.5rem;
+}
+
+.atora-fu-chip-group {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+}
+.atora-fu-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	min-height: 44px;
+	padding: 0 0.9rem;
+	border: 1px solid var(--atora-border, #e2e8f0);
+	border-radius: 999px;
+	cursor: pointer;
+	font-size: 14px;
+}
+.atora-fu-chip:has(input:checked) {
+	background: var(--atora-blue-100, #dbeafe);
+	border-color: var(--atora-blue-500, #3b82f6);
+}
+.atora-fu-chip--block {
+	width: 100%;
+	border-radius: var(--atora-radius-md, 12px);
+	margin-top: 1rem;
+}
+
+.atora-fu-text-input {
+	width: 100%;
+	min-height: 44px;
+	padding: 0 0.9rem;
+	border: 1px solid var(--atora-border, #e2e8f0);
+	border-radius: var(--atora-radius-md, 12px);
+	font-size: 16px; /* evita zoom automático en iOS */
+}
+
+.atora-fu-wizard-nav {
+	display: flex;
+	justify-content: space-between;
+	gap: 0.75rem;
+	margin-top: 1.5rem;
+	position: sticky;
+	bottom: 0;
+	background: var(--atora-surface, #fff);
+	padding-top: 0.75rem;
+}
+.atora-fu-wizard-nav .button {
+	min-height: 44px;
+	flex: 1 1 auto;
+}
+
+/* ── Escritorio: el panel/modal deja de ser hoja de fondo completo ── */
+@media (min-width: 782px) {
+	.atora-fu-panel-sheet,
+	.atora-fu-wizard-sheet {
+		left: auto;
+		right: 0;
+		top: 0;
+		bottom: 0;
+		width: 420px;
+		max-height: none;
+		border-radius: 0;
+	}
+
+	.atora-fu-wizard-sheet {
+		left: 50%;
+		right: auto;
+		top: 50%;
+		bottom: auto;
+		transform: translate(-50%, -50%);
+		width: 560px;
+		max-height: 80vh;
+		border-radius: var(--atora-radius-xl, 20px);
+	}
+
+	.atora-fu-template-grid {
+		grid-template-columns: 1fr 1fr;
+	}
+}

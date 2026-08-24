@@ -137,7 +137,12 @@ class CRM_V2_App {
 	 */
 	public static function enqueue_admin_assets( string $hook ): void {
 		$page = isset( $_GET['page'] ) ? sanitize_key( (string) wp_unslash( $_GET['page'] ) ) : '';
-		$is_crm_v2_page = false !== strpos( $page, 'atora-crm-v2' ) || false !== strpos( $page, 'atora-crm-' ) || 'clms-crm-hub' === $page;
+		// PT-4 (6.6.0): atora-followup-plans se agrega acá — mismo REST
+		// namespace (atora-crm/v2) y mismo objeto localizado atoraCrmV2
+		// que el resto de CRM v2, así que necesita el mismo bootstrap de
+		// assets. Condición puramente aditiva: ninguna página existente
+		// deja de matchear por este cambio.
+		$is_crm_v2_page = false !== strpos( $page, 'atora-crm-v2' ) || false !== strpos( $page, 'atora-crm-' ) || 'clms-crm-hub' === $page || 'atora-followup-plans' === $page;
 		if ( ! $is_crm_v2_page ) {
 			return;
 		}
@@ -199,6 +204,23 @@ class CRM_V2_App {
 			$ver,
 			true
 		);
+
+		// ── CSS/JS Planes de seguimiento (PT-4, 6.6.0) — solo en su propia
+		// pantalla, reutilizando el mismo pipeline de FullCalendar
+		// (handles fullcalendar-*) ya registrado arriba para el
+		// calendario CRM — no se vuelve a cargar la librería.
+		if ( 'atora-followup-plans' === $page ) {
+			if ( file_exists( ATORA_LMS_MODULES_DIR . 'crm-v2/assets/followup-plans.css' ) ) {
+				wp_enqueue_style( 'atora-followup-plans-ui', ATORA_LMS_MODULES_URL . 'crm-v2/assets/followup-plans.css', array( 'atora-crm-v2-ui' ), $ver );
+			}
+			wp_enqueue_script(
+				'atora-followup-plans',
+				ATORA_LMS_MODULES_URL . 'crm-v2/assets/followup-plans.js',
+				array( 'atora-crm-v2-ui', 'fullcalendar-interaction', 'fullcalendar-list', 'fullcalendar-locale-es' ),
+				$ver,
+				true
+			);
+		}
 
 		// ── CSS Campaign Builder (Fase 3) ──────────────────────────────────
 		if ( file_exists( ATORA_LMS_MODULES_DIR . 'crm-v2/assets/crm-campaigns.css' ) ) {

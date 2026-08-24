@@ -829,6 +829,23 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 			);
 		}
 
+		// ── Planes de seguimiento (oculta) — PT-4 (6.6.0), calendario de
+		// seguimiento del docente. Cap 'read' + gate propio en el render
+		// (can_access_academic_calendar(), el mismo ya usado para el
+		// resto del calendario académico) — solo docentes/staff
+		// académico, no cualquier usuario logueado (a diferencia del
+		// calendario general, que sí es visible para todos).
+		if ( ! class_exists( 'CLMS_Module_Registry' ) || CLMS_Module_Registry::is_active( 'crm' ) ) {
+			add_submenu_page(
+				'',
+				__( 'Planes de seguimiento', 'atora-lms' ),
+				__( 'Planes de seguimiento', 'atora-lms' ),
+				'read',
+				'atora-followup-plans',
+				array( $this, 'render_followup_plans_page' )
+			);
+		}
+
 		// ── Comunicación — hub visible: mensajería, calendario, email ─────────
 		add_submenu_page(
 			'clms-dashboard',
@@ -1854,6 +1871,24 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 
 		echo '<div class="wrap"><h1>' . esc_html__( 'Calendario', 'atora-lms' ) . '</h1>'
 			. '<p>' . esc_html__( 'Módulo de calendario no disponible.', 'atora-lms' ) . '</p></div>';
+	}
+
+	/**
+	 * PT-4 (6.6.0): calendario de planes de seguimiento del docente.
+	 */
+	public function render_followup_plans_page(): void {
+		if ( ! $this->can_access_academic_calendar() ) {
+			wp_die( esc_html__( 'No tienes permisos.', 'atora-lms' ) );
+		}
+
+		$view = defined( 'ATORA_LMS_MODULES_DIR' ) ? ATORA_LMS_MODULES_DIR . 'crm-v2/views/followup-plans.php' : '';
+		if ( $view && file_exists( $view ) ) {
+			require $view;
+			return;
+		}
+
+		echo '<div class="wrap"><h1>' . esc_html__( 'Planes de seguimiento', 'atora-lms' ) . '</h1>'
+			. '<p>' . esc_html__( 'Módulo no disponible.', 'atora-lms' ) . '</p></div>';
 	}
 
 	/**
