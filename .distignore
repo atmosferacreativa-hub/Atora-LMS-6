@@ -20,6 +20,7 @@ SECURITY-REPORT-*.md
 RUNTIME-REPORT-*.md
 ROUTING-REPORT-*.md
 CACHE-REPORT-*.md
+FEATURE-REPORT-*.md
 .DS_Store
 *.log
 *.sql
