@@ -338,8 +338,13 @@ class CLMS_Instructor {
 			$custom = '';
 			if ( class_exists( 'CLMS_Helper' ) && method_exists( 'CLMS_Helper', 'module' ) ) {
 				$loader = clms_core('CLMS_Loader');
-				if ( $loader && method_exists( $loader, 'resolve_file_path' ) ) {
-					$custom = $loader->resolve_file_path( 'templates/instructor-profile.php' );
+				// PT-2 (6.5.10): resolve_file_path() es protected en
+				// CLMS_Loader — llamarlo desde acá (una clase distinta)
+				// es un fatal "Call to protected method", no evitable
+				// con method_exists() (no distingue visibilidad). Usa el
+				// wrapper público get_template_path() en su lugar.
+				if ( $loader && method_exists( $loader, 'get_template_path' ) ) {
+					$custom = $loader->get_template_path( 'templates/instructor-profile.php' );
 				}
 			}
 
@@ -359,8 +364,10 @@ class CLMS_Instructor {
 		$custom = '';
 		if ( class_exists( 'CLMS_Helper' ) && method_exists( 'CLMS_Helper', 'module' ) ) {
 			$loader = clms_core('CLMS_Loader');
-			if ( $loader && method_exists( $loader, 'resolve_file_path' ) ) {
-				$custom = $loader->resolve_file_path( 'templates/instructor-profile.php' );
+			// PT-2 (6.5.10): ver el bloque equivalente arriba — mismo fix,
+			// usa el wrapper público get_template_path().
+			if ( $loader && method_exists( $loader, 'get_template_path' ) ) {
+				$custom = $loader->get_template_path( 'templates/instructor-profile.php' );
 			}
 		}
 

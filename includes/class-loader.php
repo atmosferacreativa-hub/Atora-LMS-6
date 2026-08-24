@@ -109,6 +109,25 @@ class CLMS_Loader {
 	}
 
 	/**
+	 * PT-2 (6.5.10): wrapper público estrecho sobre resolve_file_path()
+	 * (protected, declarado en CLMS_Loader_Modules_Trait). Consumidores
+	 * externos (p.ej. CLMS_Instructor::maybe_load_profile_template())
+	 * obtenían la instancia del loader vía clms_core('CLMS_Loader') y
+	 * llamaban a resolve_file_path() directamente — un fatal
+	 * "Call to protected method" en cuanto PHP evalúa la visibilidad,
+	 * no evitable con method_exists() (que no distingue visibilidad).
+	 * Este wrapper es la única superficie pública necesaria: resolver
+	 * la ruta de un archivo de plantilla sobrescribible por el tema
+	 * activo. No se cambia la visibilidad del método interno.
+	 *
+	 * @param string $file Ruta relativa del template (p.ej. 'templates/instructor-profile.php').
+	 * @return string|false
+	 */
+	public function get_template_path( $file ) {
+		return $this->resolve_file_path( $file );
+	}
+
+	/**
 	 * Static factory method for easy initialization
 	 * Allows calling: CLMS_Loader::boot();
 	 */
