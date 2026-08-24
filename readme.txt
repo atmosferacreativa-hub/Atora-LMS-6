@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.4
 Requires PHP: 8.1
-Stable tag: 6.5.13
+Stable tag: 6.6.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,13 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.6.0 =
+* Added followup plans: teachers can set up their own contact rhythm with at-risk students on a visual monthly calendar (Planes de seguimiento).
+* Four starter templates ("Chequeo semanal", "Alta atención", "Antes del cierre", "Solo hitos"), editable and saveable as the teacher's own reusable variants.
+* Each occurrence resolves its student list live against the existing academic followup board at the moment it's viewed — a plan never freezes a student list, and marking a student as contacted never changes their followup stage.
+* Drag an occurrence to reprogram it, pause a plan without losing its history, skip a single occurrence, or exclude one student from one occurrence — all from the same calendar screen, no separate settings page.
+* Teachers get a notice on the day of an occurrence with students to review; empty occurrences never send a notice.
+* No changes to the existing calendar or followup board behavior for installs that don't create a followup plan.
 = 6.5.13 =
 * Fixed course and instructor profile links still returning 404 after 6.5.12's automatic rewrite-rule refresh, on sites running a page-caching plugin.
 * The plugin now purges known page-caching plugins (LiteSpeed Cache, WP Rocket, W3 Total Cache, WP Super Cache, WP Fastest Cache, SiteGround Optimizer) after refreshing its rewrite rules.
@@ -144,6 +151,8 @@ Translation files are loaded from the `/languages` directory.
 * Major release aligned with ATORA_v5 architecture and modules.
 
 == Upgrade Notice ==
+= 6.6.0 =
+* New feature: followup plans on the teacher's calendar — a visual, non-technical way to schedule contact rhythm with at-risk students, built on top of the existing calendar and CRM followup board without changing their default behavior. Includes a new database table and a nullable column added to the existing calendar events table. Recommended update.
 = 6.5.13 =
 * Fixes course/instructor links still 404ing after 6.5.12 on sites using a page-caching plugin (LiteSpeed, WP Rocket, W3TC, etc.) -- the rewrite-rule refresh now also purges page cache. Recommended update.
 = 6.5.12 =
