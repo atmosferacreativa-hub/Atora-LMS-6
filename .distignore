@@ -17,6 +17,7 @@ CHANGELOG.md
 CHANGELOG-*.md
 SECURITY-AUDIT.md
 SECURITY-REPORT-*.md
+RUNTIME-REPORT-*.md
 .DS_Store
 *.log
 *.sql
