@@ -61,6 +61,16 @@ class CRM_V2_App {
 		add_action( 'set_user_role',                    array( __CLASS__, 'flush_crm_scope_cache_by_user' ), 10, 1 );
 		add_action( 'add_user_role',                    array( __CLASS__, 'flush_crm_scope_cache_by_user' ), 10, 1 );
 
+		// PT-1.3/PT-4.5 (6.6.0) — mantenimiento diario de planes de
+		// seguimiento: extiende la ventana de ocurrencias materializadas
+		// de cada plan activo, y desactiva (sin borrar) los planes sin
+		// end_date propio cuyas secciones ya cerraron su período. Mismo
+		// hook diario ya usado por Calendar/2FA/Abandoned_Cart_Service —
+		// no se crea un cron nuevo.
+		if ( class_exists( 'ATORA\CRM_V2\Services\Followup_Plan_Service' ) ) {
+			add_action( 'atora_daily_cron', array( '\ATORA\CRM_V2\Services\Followup_Plan_Service', 'run_daily_maintenance' ) );
+		}
+
 		self::$booted = true;
 	}
 

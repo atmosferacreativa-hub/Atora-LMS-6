@@ -44,6 +44,81 @@ class CLMS_Academic_Messaging_Bridge {
 		// CLMS_Notifications (10) y CLMS_Messaging (20), mismo hook,
 		// tercer listener independiente.
 		add_action( 'transition_post_status', array( __CLASS__, 'on_lesson_published' ), 30, 3 );
+
+		// PT-5 (6.6.0) — aviso al docente el día de una ocurrencia de un
+		// plan de seguimiento. Mismo hook diario ya usado por el resto
+		// del plugin (Calendar::cleanup_old_events(), 2FA, Abandoned
+		// Cart) — modules/calendar/ en sí no envía recordatorios propios
+		// hoy (confirmado: ningún Messaging_Router::send() en ese
+		// árbol), así que no hay un canal de "recordatorio de
+		// calendario" existente que extender; este puente de mensajería
+		// académica es el punto de integración correcto y ya
+		// establecido para el resto de las señales académicas.
+		add_action( 'atora_daily_cron', array( __CLASS__, 'on_followup_occurrences_due_today' ) );
+	}
+
+	/**
+	 * PT-5.1/5.2: recorre las ocurrencias de planes de seguimiento
+	 * programadas para HOY y avisa a cada docente cuántos estudiantes
+	 * le tocan y de qué secciones — nunca si la ocurrencia queda vacía
+	 * (PT-5.2, criterio de aceptación explícito: "ningún aviso se
+	 * dispara para una ocurrencia sin destinatarios").
+	 *
+	 * @return void
+	 */
+	public static function on_followup_occurrences_due_today(): void {
+		if ( ! \ATORA\Messaging\Messaging_Router::is_academic_routing_enabled() ) { return; }
+		if ( ! class_exists( '\ATORA\CRM_V2\Services\Followup_Plan_Resolver' ) ) { return; }
+
+		global $wpdb;
+		$today = current_time( 'Y-m-d' );
+		$events_table = $wpdb->prefix . 'atora_calendar_events';
+
+		$occurrences = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT id, followup_plan_id, user_id AS teacher_id, title
+				 FROM {$events_table}
+				 WHERE followup_plan_id IS NOT NULL AND DATE(start_datetime) = %s",
+				$today
+			),
+			ARRAY_A
+		); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+
+		foreach ( (array) $occurrences as $occurrence ) {
+			$event_id   = absint( $occurrence['id'] ?? 0 );
+			$plan_id    = absint( $occurrence['followup_plan_id'] ?? 0 );
+			$teacher_id = absint( $occurrence['teacher_id'] ?? 0 );
+			if ( ! $event_id || ! $plan_id || ! $teacher_id ) { continue; }
+
+			$resolution = \ATORA\CRM_V2\Services\Followup_Plan_Resolver::resolve_recipients( $plan_id, $today, $event_id );
+			$students   = (array) ( $resolution['students'] ?? array() );
+
+			// PT-5.2: ocurrencia vacía -> sin aviso, sin excepción.
+			if ( empty( $students ) ) { continue; }
+
+			if ( ! \ATORA\Messaging\Messaging_Router::under_recipient_cap( $teacher_id ) ) { continue; }
+
+			$section_names = array_values( array_unique( array_map(
+				static fn( $s ) => (string) ( $s['title'] ?? '' ),
+				(array) ( $resolution['sections'] ?? array() )
+			) ) );
+
+			\ATORA\Messaging\Messaging_Router::send(
+				$teacher_id,
+				'followup_occurrence_due',
+				'atora_followup_occurrence_due',
+				array(
+					'teacher_name'  => self::display_name( $teacher_id ),
+					'student_count' => count( $students ),
+					'section_names' => implode( ', ', array_filter( $section_names ) ),
+					'button_url'    => admin_url( 'admin.php?page=atora-followup-plans&event_id=' . $event_id ),
+				),
+				array(
+					'dedupe_key'            => "followup_occurrence_due_{$event_id}",
+					'dedupe_window_minutes' => 24 * 60,
+				)
+			);
+		}
 	}
 
 	/**
