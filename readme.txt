@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.4
 Requires PHP: 8.1
-Stable tag: 6.5.10
+Stable tag: 6.5.11
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,14 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.5.11 =
+* Restored course permalink routing after 6.5.10.
+* Restored instructor profile routing.
+* Added controlled one-time rewrite migration behavior.
+* Removed expensive admin-menu diagnostics from normal runtime.
+* Reduced production log noise.
+* Added rewrite and runtime-performance regression checks.
+* Preserved 6.5.10 security and database hardening.
 = 6.5.10 =
 * Fixed legacy messaging bridge namespace resolution.
 * Fixed invalid external access to protected loader path resolution.
@@ -124,6 +132,8 @@ Translation files are loaded from the `/languages` directory.
 * Major release aligned with ATORA_v5 architecture and modules.
 
 == Upgrade Notice ==
+= 6.5.11 =
+* Runtime stability hotfix: fixes course and instructor profile links returning 404 after a normal update (stale rewrite-rules cache, now refreshed automatically once on upgrade), and removes an admin-menu diagnostic that was scanning and logging noise about other plugins' pages on every wp-admin page load. No new features; all 6.5.10 security and database hardening preserved. Recommended update.
 = 6.5.10 =
 * Production stability hotfix: fixes a fatal on messaging bridge load, a fatal on instructor profile template resolution, missing LMS parity tables, a MySQL/MariaDB index-length error on course taxonomy terms, and unreliable custom WP-Cron interval registration. No new features; all prior security hardening preserved. Recommended update — includes a database schema change.
 = 6.5.9 =
