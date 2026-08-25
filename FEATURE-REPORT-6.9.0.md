@@ -172,3 +172,11 @@ prioridad en la próxima revisión de seguridad general, no como un ítem más d
 
 `FEATURE-REPORT-*.md` ya estaba excluido de `.distignore` desde 6.6.0 — no fue necesario ningún
 cambio antes de construir el ZIP.
+
+- **Archivo:** `dist/atora-lms-6.9.0.zip`
+- **SHA-256:** `7b4fa914fc6a11c3a78876fd5f47e9ad88064bfe5c1b36f09cc8d5407258bb14`
+- **Auditoría del contenido extraído:** sin archivos de desarrollo en la raíz del paquete;
+  cadenas de versión consistentes en `6.9.0`; `assets/shared/` (tokens, panel, búsqueda) y los
+  cuatro archivos PHP nuevos de `includes/ui/`/`includes/today/` presentes; escaneo de patrones
+  de credenciales sin hallazgos reales — mismo match ya disclosed en 6.6.0-6.8.0 (variable de
+  formulario JS existente, no una credencial embebida).
