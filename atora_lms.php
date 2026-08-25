@@ -379,7 +379,6 @@ function atora_lms_build_probe_manifest(): array {
 		'includes/class-loader.php',
 		'includes/class-access.php',
 		'includes/class-lms-compatibility-layer.php',
-		'includes/class-atora-gamification-public.php',
 		'includes/class-cpt.php',
 		'includes/class-enrollment-manager.php',
 		'includes/commerce/class-abandoned-cart-service.php',
@@ -1040,8 +1039,11 @@ add_action( 'init', static function () {
 		}
 	}, 10, 2 );
 
-	// ── Fase III S9: Gamificación pública (leaderboard shortcode) ─────────────
-	atora_lms_require_module_if_active( 'gamification', 'includes/class-atora-gamification-public.php' );
+	// PT-1 (6.10.0): el leaderboard público (Fase III S9) se eliminó por
+	// decisión de producto -- competía con la filosofía de "seguimiento,
+	// no competencia" que ya rige el CRM académico (6.6.0+). Ver
+	// includes/gamification/class-student-badge-service.php (PT-2) por
+	// lo que lo reemplaza: insignias individuales, no comparativas.
 
 	// ── Fase II S4: Scoring predictivo ───────────────────────────────────────
 	if ( atora_lms_require_module_if_active( 'crm', 'modules/crm-v2/services/class-scoring-service.php' ) ) {

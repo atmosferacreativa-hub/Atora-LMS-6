@@ -213,9 +213,17 @@ class CLMS_Module_Registry {
 				'tables'              => array(),
 				'core'                => false,
 			),
+			// PT-1/PT-2 (6.10.0): el ranking público competitivo se
+			// eliminó por decisión de producto. Lo que queda es
+			// individual, no comparativo entre estudiantes: puntos/
+			// niveles personales en el panel del propio estudiante, e
+			// insignias por curso (sobresaliente/destacado/aplicado/
+			// regular/en atención) según puntualidad, promedio e
+			// interacción -- sin shortcode ni página propia, se
+			// muestran dentro del panel de estudiante ya existente.
 			'gamification'   => array(
 				'label'               => 'Gamificación',
-				'description'         => 'Puntos, insignias, reglas de gamificación.',
+				'description'         => 'Puntos e insignias individuales del estudiante (sin ranking comparativo) — puntualidad, promedio e interacción por curso.',
 				'group'               => 'experience',
 				'requires'            => array( 'lms' ),
 				'provides_pages'      => array(),

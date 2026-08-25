@@ -47,10 +47,12 @@ class ATORA_MCP_Module {
 			'get_contact', 'list_contacts', 'search_contacts',
 			'get_pipeline_summary', 'get_campaign_stats',
 			'enroll_in_sequence', 'add_tag', 'get_automation_log',
-			// Fase IV S14 — 8 nuevos
+			// Fase IV S14 — 7 nuevos (get_leaderboard retirado en PT-1,
+			// 6.10.0 -- el leaderboard público que respaldaba se eliminó
+			// por decisión de producto, ver atora_lms.php)
 			'get_enrollment', 'list_automations', 'trigger_automation',
 			'send_campaign', 'get_course_progress', 'get_analytics_summary',
-			'list_certificates', 'get_leaderboard',
+			'list_certificates',
 		);
 
 		foreach ( $tools as $tool ) {
@@ -147,7 +149,6 @@ class ATORA_MCP_Module {
 			array( 'name' => 'get_course_progress',   'description' => 'Progreso de un usuario en un curso. Input: {user_id, course_id}',                 'scope' => 'read'  ),
 			array( 'name' => 'get_analytics_summary', 'description' => 'Resumen de analytics. Input: {period?=30}',                                      'scope' => 'read'  ),
 			array( 'name' => 'list_certificates',     'description' => 'Certificados de un usuario. Input: {user_id}',                                   'scope' => 'read'  ),
-			array( 'name' => 'get_leaderboard',       'description' => 'Top estudiantes de un curso. Input: {course_id, limit?=10}',                     'scope' => 'read'  ),
 		);
 	}
 
@@ -358,31 +359,11 @@ class ATORA_MCP_Module {
 		return array( 'user_id' => $user_id, 'certificates' => $certs, 'count' => count( $certs ) );
 	}
 
-	private static function tool_get_leaderboard( array $input ): array {
-		$course_id = absint( $input['course_id'] ?? 0 );
-		$limit     = min( 50, absint( $input['limit'] ?? 10 ) );
-		if ( ! $course_id ) { return array( 'error' => 'course_id requerido.' ); }
-
-		if ( class_exists( 'ATORA_Gamification_Public' ) ) {
-			// Reutilizar query interna
-			global $wpdb;
-			$enroll_table = $wpdb->prefix . 'atora_enrollments';
-			$rows = (array) $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-				$wpdb->prepare(
-					"SELECT e.user_id, u.display_name, e.progress_pct,
-					 COALESCE((SELECT CAST(JSON_EXTRACT(um.meta_value,'$.points') AS UNSIGNED)
-					  FROM {$wpdb->usermeta} um WHERE um.user_id=e.user_id AND um.meta_key='_clms_gamification_summary' LIMIT 1),0) AS total_points
-					 FROM {$enroll_table} e
-					 LEFT JOIN {$wpdb->users} u ON u.ID=e.user_id
-					 WHERE e.course_id=%d ORDER BY total_points DESC LIMIT %d",
-					$course_id, $limit
-				),
-				ARRAY_A
-			);
-			return array( 'course_id' => $course_id, 'leaderboard' => $rows );
-		}
-		return array( 'error' => 'Leaderboard no disponible.' );
-	}
+	// tool_get_leaderboard() retirado en PT-1 (6.10.0) junto con el
+	// shortcode público que respaldaba (includes/class-atora-gamification-public.php,
+	// eliminado) -- decisión de producto: el leaderboard competitivo se
+	// reemplaza por insignias individuales no comparativas (ver
+	// includes/gamification/class-student-badge-service.php).
 
 	// ── OpenAPI 3.0 Schema ───────────────────────────────────────────────────
 
