@@ -1,5 +1,6 @@
 /**
- * ATORA LMS — "Hoy" (PT-3, sprint 6.8.0)
+ * ATORA LMS — "Hoy" / "Actividad" (PT-3, 6.8.0; pestaña de Actividad
+ * y tono positivo agregados en PT-3, 6.9.0)
  *
  * Reutiliza los tokens --atora-* ya definidos en atora-admin.css
  * (dependencia declarada al encolar) — mismo criterio ya establecido
@@ -18,6 +19,30 @@
 
 .atora-hoy-header {
 	margin: 1rem 0 1.5rem;
+}
+
+/* PT-3.4 (6.9.0): "Hoy" y "Actividad", mismo punto de entrada, dos
+   pestañas -- nunca mezcladas en una sola lista. */
+.atora-hoy-tabs {
+	display: flex;
+	gap: 0.5rem;
+	margin: 0 0 1.25rem;
+	border-bottom: 1px solid var(--atora-border, #e2e8f0);
+}
+.atora-hoy-tab {
+	min-height: 44px;
+	display: inline-flex;
+	align-items: center;
+	padding: 0 0.25rem;
+	margin-bottom: -1px;
+	border-bottom: 2px solid transparent;
+	text-decoration: none;
+	color: var(--atora-text-secondary, #475569);
+	font-weight: 600;
+}
+.atora-hoy-tab.is-active {
+	color: var(--atora-blue-700, #1d4ed8);
+	border-bottom-color: var(--atora-blue-700, #1d4ed8);
 }
 
 .atora-hoy-subtitle {
@@ -95,6 +120,13 @@
 }
 .atora-hoy-item--baja .atora-hoy-item-link {
 	border-left-color: var(--atora-blue-700, #1d4ed8);
+}
+/* PT-3.2/3.4 (6.9.0): tono positivo de "Actividad" -- perceptiblemente
+   distinto del resto (verde en vez de rojo/ámbar/azul) sin depender de
+   texto adicional para transmitirlo. Sin insignias, sin animación
+   (§UX: "sin caer en gamificación"). */
+.atora-hoy-item--positivo .atora-hoy-item-link {
+	border-left-color: var(--atora-success, #1D9E75);
 }
 
 .atora-hoy-item-title {

@@ -219,6 +219,11 @@ trait CLMS_Loader_Module_Groups_Trait {
 					'dependencies' => array( 'CLMS_Helper' ),
 				),
 				array(
+					'file'         => 'includes/today/class-activity-feed-service.php',
+					'class'        => 'CLMS_UI_Activity_Feed_Service',
+					'dependencies' => array( 'CLMS_Helper' ),
+				),
+				array(
 					'file'         => 'includes/speedgrade/class-speedgrade-context-service.php',
 					'class'        => 'CLMS_Speedgrade_Context_Service',
 					'dependencies' => array( 'CLMS_Helper', 'CLMS_Academic_Status_Service', 'CLMS_Improvement_Plan_Service' ),

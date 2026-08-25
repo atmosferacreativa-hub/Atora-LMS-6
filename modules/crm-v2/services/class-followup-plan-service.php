@@ -790,6 +790,79 @@ class Followup_Plan_Service {
 		return $occurrences;
 	}
 
+	/**
+	 * PT-3.1 (6.9.0, feed de "Actividad"): contactos marcados por
+	 * $user_id en los últimos $days días — lectura puntual nueva sobre
+	 * atora_followup_contacts (la tabla que mark_contacted() ya
+	 * escribe desde 6.6.0, sin tocar ese método).
+	 *
+	 * @param int $user_id
+	 * @param int $days
+	 * @return array<int,array<string,mixed>>
+	 */
+	public static function get_recent_contacts_for_user( int $user_id, int $days = 7 ): array {
+		global $wpdb;
+
+		$user_id = absint( $user_id );
+		if ( ! $user_id ) {
+			return array();
+		}
+
+		$contacts_table = $wpdb->prefix . 'atora_followup_contacts';
+		$events_table   = $wpdb->prefix . 'atora_calendar_events';
+		if ( ! self::table_exists( $contacts_table ) || ! self::table_exists( $events_table ) ) {
+			return array();
+		}
+
+		$cutoff = gmdate( 'Y-m-d H:i:s', strtotime( '-' . max( 1, absint( $days ) ) . ' days', current_time( 'timestamp', true ) ) );
+
+		$rows = (array) $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT fc.user_id, fc.contacted_at, fc.event_id, ce.title, ce.followup_plan_id
+				 FROM {$contacts_table} fc
+				 INNER JOIN {$events_table} ce ON ce.id = fc.event_id
+				 WHERE fc.contacted_by = %d AND fc.contacted_at >= %s
+				 ORDER BY fc.contacted_at DESC",
+				$user_id,
+				$cutoff
+			),
+			ARRAY_A
+		);
+
+		$results = array();
+		foreach ( $rows as $row ) {
+			$plan_id   = absint( $row['followup_plan_id'] ?? 0 );
+			$plan      = $plan_id ? self::get_plan( $plan_id ) : null;
+			$domain    = $plan ? $plan['domain'] : 'academic';
+			$entity_id = absint( $row['user_id'] ?? 0 );
+
+			// El "user_id" de atora_followup_contacts es, según el
+			// dominio del plan, un WP user_id real (académico) o un
+			// contact_id de atora_contacts (comercial, ver
+			// Commercial_Domain_Provider) -- no es lo mismo en ambos
+			// casos, así que el nombre se resuelve distinto.
+			$entity_name = '';
+			if ( 'commercial' === $domain ) {
+				$contacts_table = $wpdb->prefix . 'atora_contacts';
+				$entity_name    = (string) $wpdb->get_var( $wpdb->prepare( "SELECT name FROM {$contacts_table} WHERE id = %d", $entity_id ) );
+			} else {
+				$user = $entity_id ? get_userdata( $entity_id ) : null;
+				$entity_name = $user ? (string) $user->display_name : '';
+			}
+
+			$results[] = array(
+				'entity_id'    => $entity_id,
+				'entity_name'  => sanitize_text_field( $entity_name ),
+				'domain'       => $domain,
+				'event_id'     => absint( $row['event_id'] ?? 0 ),
+				'title'        => sanitize_text_field( (string) ( $row['title'] ?? '' ) ),
+				'contacted_at' => sanitize_text_field( (string) ( $row['contacted_at'] ?? '' ) ),
+			);
+		}
+
+		return $results;
+	}
+
 	// ── Helpers ───────────────────────────────────────────────────────────────
 
 	/**
