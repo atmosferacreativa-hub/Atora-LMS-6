@@ -771,11 +771,28 @@ CSS;
 	protected function get_login_hub_url_for_user( WP_User $user ): string {
 		$role = $this->get_frontend_role_context_for_user( $user );
 
-		if ( 'admin' === $role || 'instructor' === $role ) {
+		// PT-4.1 (6.8.0): "Hoy" es la landing por defecto para
+		// docente/vendedor -- no un ítem más de menú que hay que
+		// descubrir. Admin queda explícitamente sin cambios (PT-4.2):
+		// separado del bucket 'instructor' que compartía antes.
+		if ( 'admin' === $role ) {
 			return admin_url( 'admin.php?page=clms-dashboard' );
 		}
 
+		if ( 'instructor' === $role ) {
+			return admin_url( 'admin.php?page=atora-hoy' );
+		}
+
 		if ( 'collaborator' === $role ) {
+			// clms_access_crm_view es la misma capacidad que 6.7.0 ya usa
+			// como señal canónica de "vendedor con planes comerciales"
+			// (can_access_followup_plans()) -- distinta del bucket más
+			// amplio 'collaborator' de este método, que también incluye
+			// roles de comercio sin CRM. Solo quien realmente tiene CRM
+			// aterriza en "Hoy"; el resto sigue su destino de siempre.
+			if ( user_can( $user, 'clms_access_crm_view' ) ) {
+				return admin_url( 'admin.php?page=atora-hoy' );
+			}
 			if ( user_can( $user, 'clms_manage_commerce' ) || user_can( $user, 'manage_options' ) ) {
 				return admin_url( 'admin.php?page=clms-commercial-hub' );
 			}
