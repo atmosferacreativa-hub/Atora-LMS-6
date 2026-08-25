@@ -714,3 +714,68 @@ PT-2.3.
 de "Cuenta clave" superpuestos sin darse cuenta, agregar un aviso
 suave en el paso 3 ("N de estos contactos ya están en otro plan tuyo")
 antes de aplicar.
+
+## Vista de coordinador — explícitamente diferida (PT-5, 6.8.0)
+
+La OT de 6.8.0 es explícita: "Hoy" no puede mostrarle nada a un
+coordinador porque los indicadores de sección que esa vista
+necesitaría dependen del sprint de seguimiento académico (6.5.0), que
+nunca se construyó — no hay una fuente de datos real de la que leer.
+
+**Por qué la estructura ya está preparada para esa fuente futura:**
+`CLMS_Today_Aggregator_Service::get_today()` construye su lista con
+`collect_*()` privados que se mezclan con `array_merge()` y se ordenan
+al final por `sort_by_urgency()` — el shape homogéneo de PT-1.2 no
+distingue por rol ni por dominio más allá del campo `source`. Agregar
+una tercera fuente (`collect_coordinator_items()`) el día que 6.5.0 se
+construya no debería requerir tocar `sort_by_urgency()` ni el shape
+público, solo agregar un `collect_*()` más y llamarlo desde
+`get_today()` guardado detrás de su propio chequeo de rol (mismo
+patrón que `user_has_academic_access()`/`user_has_commercial_access()`).
+
+**Propuesta:** cuando 6.5.0 (o su equivalente) exista, agregar
+`collect_coordinator_items()` siguiendo exactamente el mismo patrón
+que `collect_followup_items()`/`collect_task_items()` — sin
+refactorizar el agregador.
+
+## Ítems de digest académico (grading/inactivity/quiz) sin distinción de antigüedad excepto calificación
+
+PT-1/PT-2 (6.8.0): de las tres fuentes que lee de
+`CLMS_Teacher_Digest_Service`, solo `grading` usa el nuevo método
+consciente de antigüedad (`get_stale_submission_count_for_teacher()`,
+48h). `inactivity` y `quiz` usan los conteos ya existentes de
+`get_pending_counts_for_teacher()`, que no distinguen antigüedad —
+ambos siempre caen en el nivel 3 de urgencia (PT-2.1) sin importar
+cuánto tiempo llevan pendientes.
+
+**Por qué no se construyó el mismo tratamiento para las tres:** la OT
+solo menciona explícitamente el umbral de 48h para "entregas y
+calificaciones pendientes" (PT-2.1, nivel 3) — extender el mismo
+criterio a inactividad y quizzes era una inferencia, no un requisito
+explícito, y `get_pending_counts_for_teacher()` ya cubre razonablemente
+bien el caso sin necesitar una tercera query nueva por antigüedad.
+
+**Propuesta:** si retroalimentación real muestra que "estudiante
+inactivo hace 3 meses" y "estudiante inactivo desde ayer" deberían
+verse distinto en "Hoy", agregar un método de antigüedad equivalente
+para esas dos fuentes, mismo patrón que `get_stale_submission_count_for_teacher()`.
+
+## Enlace de tarea sin contacto asociado cae al hub de crecimiento, no a una vista de la tarea en sí
+
+PT-1 (6.8.0): `CLMS_Today_Aggregator_Service::build_task_item()`
+enlaza a `atora-crm-v2-contacts&contact_id=X` cuando la tarea tiene un
+contacto asociado (mismo patrón que `modules/crm-v2/views/hub.php` ya
+usa) — pero si la tarea no tiene `contact_id` (una tarea puramente
+interna, sin relación a un contacto), el enlace cae a
+`atora-growth-hub`, un hub general, no la tarea puntual en sí, porque
+no existe hoy una vista de "una tarea individual" a la que enlazar.
+
+**Por qué no se construyó esa vista:** está fuera del alcance de este
+sprint (§0.2 — agregador, no reescritura de `Task_Service` ni de su
+UI); construir una vista de detalle de tarea es trabajo de otro
+sprint si se decide que hace falta.
+
+**Propuesta:** si aparece una vista de detalle de tarea en un sprint
+futuro, actualizar `build_task_item()` para enlazar ahí en el caso sin
+`contact_id` — cambio de una línea, no requiere tocar el resto del
+agregador.
