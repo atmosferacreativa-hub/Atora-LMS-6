@@ -779,3 +779,50 @@ sprint si se decide que hace falta.
 futuro, actualizar `build_task_item()` para enlazar ahí en el caso sin
 `contact_id` — cambio de una línea, no requiere tocar el resto del
 agregador.
+
+## Sin ficha dedicada de estudiante/sección — búsqueda y Actividad caen al hub general
+
+PT-2/PT-3 (6.9.0): tanto `CLMS_UI_Search_Service` (resultados de
+estudiante/sección) como `CLMS_UI_Activity_Feed_Service` (mejoras de
+etapa académicas) enlazan a `admin.php?page=atora-students-hub` en vez
+de una ficha puntual — verificado antes de decidir (grep exhaustivo
+por un patrón `student_id=`/`section_id=` en URLs de admin_url() en
+todo el árbol) que **no existe hoy ninguna vista de detalle de un solo
+estudiante o una sola sección** en el plugin. El caso comercial
+equivalente (contacto) sí tiene una ficha real (`atora-crm-v2-contacts&contact_id=N`,
+contact-360) y la usa correctamente.
+
+**Por qué no se construyó una ficha nueva:** está fuera del alcance de
+un sprint de búsqueda/actividad — construir una vista de perfil de
+estudiante es un sprint en sí mismo (probablemente relacionado con la
+"vista de coordinador" ya diferida desde 6.5.0/6.8.0, que comparte la
+misma dependencia de datos).
+
+**Propuesta:** cuando exista una ficha de estudiante/sección, es un
+cambio de una línea en `search_students()`/`search_sections()`
+(`class-ui-search-service.php`) y en
+`collect_stage_improvement_items()` (`class-activity-feed-service.php`)
+— ambos ya calculan el `id` correcto, solo cambia el `url` construido.
+
+## Asistente de 4 pasos (`#atora-fu-wizard`) deliberadamente fuera del retrofit de PT-1
+
+PT-1.4 (6.9.0): el componente compartido `Followup_Panel`/
+`Followup_List_Row` no tocó el asistente de aplicar un plan (4 pasos,
+6.6.0 PT-4.2) — es un formulario de varios pasos con su propia
+navegación (plantilla → vista previa → ajustes → nombrar), no una
+lista de personas con una acción, así que no encaja en el shape del
+componente compartido. Sus clases CSS propias
+(`.atora-fu-panel-backdrop`/`.atora-fu-panel-close`/`.atora-fu-wizard-sheet`)
+se dejaron intactas en `followup-plans.css` a propósito — ver el
+comentario ahí mismo.
+
+**Por qué no se generalizó también:** forzar un formulario
+multi-paso dentro del shape de "lista + acción" sería la clase de
+reescritura que §0.2 de la OT de 6.9.0 explícitamente no pide — el
+sprint pide extraer el panel de lista+acción, no unificar CUALQUIER
+superficie con backdrop+sheet del plugin.
+
+**Propuesta:** si un sprint futuro necesita un segundo asistente de
+varios pasos en otro lugar del plugin, ahí sí valdría la pena extraer
+un componente `Followup_Wizard` separado — no antes, por la misma
+regla de "no alcance libre" de toda esta serie.

@@ -95,3 +95,41 @@ de `tokens.css` para la razón de por qué conviven dos capas de token.
   6.6.0/6.7.0) migrado a `Followup_Panel`/`Followup_List_Row`.
 - 6.9.0 PT-1.5: el panel de ocurrencia de "Hoy" (6.8.0) usa el mismo
   componente desde su primera versión con panel en línea.
+
+## PT-4 — verificación del "loop" único (6.9.0)
+
+Confirmado, un punto de entrada a la vez:
+
+- **Calendario académico/comercial** (bloque → clic → panel): abre
+  `AtoraUI.Panel` en `#atora-fu-panel` (`followup-plans.js`).
+- **"Hoy"** (ítem de followup → clic → panel en línea): abre
+  `AtoraUI.Panel` en `#atora-hoy-panel` (`assets/admin/today.js`), sin
+  navegar.
+- **"Actividad"** (ítem de "contactaste a X" → clic): navega a
+  `atora-followup-plans&event_id=N` — la MISMA página de calendario,
+  cuyo propio bootstrap ya lee `?event_id=` de la URL (deep-link
+  agregado en PT-3.2 de 6.8.0, ver `followup-plans.js`) y abre
+  `AtoraUI.Panel` automáticamente al cargar. Resultado idéntico al de
+  abrir el panel en línea, solo que vía una recarga de página en vez
+  de sin ella — variación aceptada, no una tercera implementación.
+- **Búsqueda** (resultado → clic): navega DIRECTO a la ficha/hub
+  correspondiente (`Followup_List_Row` con `url`, sin `actions`) — un
+  resultado de búsqueda es una entidad puntual, no una ocurrencia con
+  una lista de personas adentro, así que no hay panel que abrir ahí;
+  el criterio correcto para ese caso es el enlace directo de PT-2.4,
+  no forzar el shape de panel donde no aplica.
+
+**Deliberadamente NO retrofiteado** (documentado, no un descuido):
+el asistente de 4 pasos (`#atora-fu-wizard`, PT-4.2 de 6.6.0) sigue
+con su propio marcado — es un formulario de varios pasos, no una
+lista de personas con una acción, así que no encaja en el shape de
+`Followup_Panel`/`Followup_List_Row` y forzarlo ahí sería la clase de
+"reescritura" que la regla §0.2 de este sprint no pide.
+
+**Criterio de aceptación de PT-4** ("un docente/vendedor que aprendió
+el panel en un lugar puede predecir su comportamiento en cualquier
+otro"): cumplido para los cuatro casos donde de verdad hay un panel
+que abrir. Donde no hay panel (búsqueda, fichas de "Actividad" sin
+`event_id`), el comportamiento esperado es un enlace directo, no un
+panel — ver `docs/DEUDA-TECNICA.md` para los casos donde esa ficha
+directa todavía no existe (estudiante/sección) y cae a un hub general.
