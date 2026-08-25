@@ -214,6 +214,11 @@ trait CLMS_Loader_Module_Groups_Trait {
 					'dependencies' => array( 'CLMS_Helper' ),
 				),
 				array(
+					'file'         => 'includes/today/class-today-aggregator-service.php',
+					'class'        => 'CLMS_Today_Aggregator_Service',
+					'dependencies' => array( 'CLMS_Helper' ),
+				),
+				array(
 					'file'         => 'includes/speedgrade/class-speedgrade-context-service.php',
 					'class'        => 'CLMS_Speedgrade_Context_Service',
 					'dependencies' => array( 'CLMS_Helper', 'CLMS_Academic_Status_Service', 'CLMS_Improvement_Plan_Service' ),

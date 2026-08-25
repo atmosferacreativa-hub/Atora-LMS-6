@@ -709,6 +709,87 @@ class Followup_Plan_Service {
 		);
 	}
 
+	/**
+	 * PT-1 (6.8.0, agregador "Hoy"): ocurrencias de un usuario con fecha
+	 * hoy o anterior, sin importar el dominio del plan que las generó.
+	 * Lectura puntual — no agrega lógica nueva, solo une filas de
+	 * `atora_calendar_events` con `Followup_Plan_Resolver::resolve_recipients()`,
+	 * el mismo par de piezas que ya usa `get_calendar_events()` del REST
+	 * controller. Se agrega acá (en el service, no ahí) porque ese
+	 * callback REST está atado a un `WP_REST_Request` y no es
+	 * reutilizable como lectura programática desde otro código PHP.
+	 *
+	 * @param int    $user_id      Dueño de las ocurrencias (docente o vendedor).
+	 * @param string $through_date Y-m-d, inclusive. '' = hoy.
+	 * @return array<int,array<string,mixed>> {event_id, plan_id, domain, plan_name, date, is_overdue, title, students, total, contacted, uncontacted, empty_reason}
+	 */
+	public static function get_due_occurrences_for_user( int $user_id, string $through_date = '' ): array {
+		global $wpdb;
+
+		$user_id = absint( $user_id );
+		if ( ! $user_id || ! self::table_exists( $wpdb->prefix . 'atora_calendar_events' ) ) {
+			return array();
+		}
+
+		$through_date = self::sanitize_date_or_null( $through_date ) ?: gmdate( 'Y-m-d' );
+		$today        = gmdate( 'Y-m-d' );
+		$events_table = $wpdb->prefix . 'atora_calendar_events';
+
+		$rows = (array) $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT id, title, start_datetime, followup_plan_id FROM {$events_table}
+				 WHERE followup_plan_id IS NOT NULL AND user_id = %d AND DATE(start_datetime) <= %s
+				 ORDER BY start_datetime ASC",
+				$user_id,
+				$through_date
+			),
+			ARRAY_A
+		);
+
+		$occurrences = array();
+		foreach ( $rows as $row ) {
+			$event_id = absint( $row['id'] ?? 0 );
+			$plan_id  = absint( $row['followup_plan_id'] ?? 0 );
+			$plan     = self::get_plan( $plan_id );
+			if ( ! $event_id || ! $plan ) {
+				continue;
+			}
+
+			$date          = gmdate( 'Y-m-d', strtotime( (string) $row['start_datetime'] ) );
+			$resolution    = Followup_Plan_Resolver::resolve_recipients( $plan_id, $date, $event_id );
+			$contacted     = self::get_contacted_students( $event_id );
+			$contacted_ids = array_map( static fn( $c ) => $c['user_id'], $contacted );
+
+			$students = array_map(
+				static function ( $student ) use ( $contacted_ids ) {
+					$student['contacted'] = in_array( (int) $student['user_id'], $contacted_ids, true );
+					return $student;
+				},
+				(array) $resolution['students']
+			);
+
+			$total       = count( $students );
+			$uncontacted = count( array_filter( $students, static fn( $s ) => empty( $s['contacted'] ) ) );
+
+			$occurrences[] = array(
+				'event_id'     => $event_id,
+				'plan_id'      => $plan_id,
+				'domain'       => $plan['domain'],
+				'plan_name'    => $plan['name'],
+				'date'         => $date,
+				'is_overdue'   => $date < $today,
+				'title'        => sanitize_text_field( (string) $row['title'] ),
+				'students'     => $students,
+				'total'        => $total,
+				'contacted'    => $total - $uncontacted,
+				'uncontacted'  => $uncontacted,
+				'empty_reason' => (string) $resolution['empty_reason'],
+			);
+		}
+
+		return $occurrences;
+	}
+
 	// ── Helpers ───────────────────────────────────────────────────────────────
 
 	/**

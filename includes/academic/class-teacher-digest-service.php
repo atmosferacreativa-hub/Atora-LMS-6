@@ -98,6 +98,75 @@ class CLMS_Teacher_Digest_Service {
 	}
 
 	/**
+	 * PT-1 (6.8.0, agregador "Hoy"): envoltorio público de
+	 * get_pending_counts() — ese método sigue siendo protected y sin
+	 * ningún cambio de comportamiento; esto solo permite que otro
+	 * servicio de lectura lo consulte sin llamar a un método protected
+	 * desde afuera (mismo criterio ya usado en 6.5.10 PT-2 para
+	 * get_db_stats()).
+	 *
+	 * @param int $teacher_id
+	 * @return array{submissions_pending:int, students_inactive:int, quizzes_pending:int}
+	 */
+	public function get_pending_counts_for_teacher( $teacher_id ) {
+		return $this->get_pending_counts( $teacher_id );
+	}
+
+	/**
+	 * PT-1 (6.8.0, agregador "Hoy"): entregas sin calificar con más de
+	 * $hours horas de espera — get_pending_counts() no distingue por
+	 * antigüedad, así que este es un método de lectura puntual nuevo,
+	 * no una modificación de ese método. Reutiliza la misma resolución
+	 * de sección → estudiantes que get_pending_counts() ya hace (no se
+	 * factoriza a un helper compartido para no arriesgar el
+	 * comportamiento ya en producción de ese método — ver docblock de
+	 * la clase, principio general de este archivo).
+	 *
+	 * @param int $teacher_id
+	 * @param int $hours Antigüedad mínima en horas. Default 48 (PT-2.1 de 6.8.0).
+	 * @return int
+	 */
+	public function get_stale_submission_count_for_teacher( $teacher_id, $hours = 48 ) {
+		global $wpdb;
+		$teacher_id = absint( $teacher_id );
+		$hours      = max( 1, absint( $hours ) );
+
+		$section_ids = $wpdb->get_col( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$wpdb->prepare( "SELECT section_id FROM {$wpdb->prefix}atora_section_teachers WHERE user_id = %d", $teacher_id )
+		);
+		$section_ids = array_values( array_filter( array_map( 'absint', (array) $section_ids ) ) );
+		if ( empty( $section_ids ) || ! class_exists( '\ATORA\LMS\Section_Service' ) ) {
+			return 0;
+		}
+
+		$student_ids = array();
+		foreach ( $section_ids as $section_id ) {
+			if ( method_exists( '\ATORA\LMS\Section_Service', 'get_section_student_ids' ) ) {
+				$student_ids = array_merge( $student_ids, \ATORA\LMS\Section_Service::get_section_student_ids( $section_id ) );
+			}
+		}
+		$student_ids = array_values( array_unique( array_filter( array_map( 'absint', $student_ids ) ) ) );
+		if ( empty( $student_ids ) ) {
+			return 0;
+		}
+
+		$placeholders = implode( ',', array_fill( 0, count( $student_ids ), '%d' ) );
+		$cutoff       = gmdate( 'Y-m-d H:i:s', strtotime( "-{$hours} hours", current_time( 'timestamp', true ) ) );
+
+		return (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM {$wpdb->posts} p
+				 INNER JOIN {$wpdb->postmeta} pm_user ON pm_user.post_id = p.ID AND pm_user.meta_key = '_clms_submission_user_id'
+				 WHERE p.post_type = 'clms_submission' AND p.post_status = 'publish'
+				   AND p.post_date <= %s
+				   AND pm_user.meta_value IN ({$placeholders})
+				   AND NOT EXISTS ( SELECT 1 FROM {$wpdb->postmeta} pg WHERE pg.post_id = p.ID AND pg.meta_key = '_clms_submission_grade' AND pg.meta_value != '' )",
+				array_merge( array( $cutoff ), $student_ids )
+			)
+		);
+	}
+
+	/**
 	 * @param int $teacher_id
 	 * @return array{submissions_pending:int, students_inactive:int, quizzes_pending:int}
 	 */
