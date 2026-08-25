@@ -49,6 +49,14 @@ trait CLMS_Loader_Module_Groups_Trait {
 					'dependencies' => array(),
 				),
 				array(
+					// PT-1 (6.11.0): sin condicionamiento a ningún módulo --
+					// carga siempre, sea cual sea el estado del módulo 'crm'.
+					// Ver el docblock de la clase para el porqué.
+					'file'         => 'includes/contacts-core/class-contacts-core-service.php',
+					'class'        => 'CLMS_Contacts_Core_Service',
+					'dependencies' => array( 'CLMS_Helper' ),
+				),
+				array(
 					'file'         => 'includes/class-clms-grading-engine.php',
 					'class'        => 'CLMS_Grading_Engine',
 					'dependencies' => array( 'CLMS_Helper', 'CLMS_Assessment_Engine' ),

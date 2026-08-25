@@ -14,46 +14,11 @@ trait CRM_Access_Trait {
 	 * @return bool
 	 */
 	public static function can_access_crm( int $user_id = 0 ): bool {
-		$user_id = absint( $user_id ?: get_current_user_id() );
-		if ( ! $user_id ) {
-			return false;
-		}
-
-		$is_super_admin = function_exists( 'is_super_admin' ) && is_super_admin( $user_id );
-		if ( user_can( $user_id, 'manage_options' ) || $is_super_admin ) {
-			return true;
-		}
-
-		$allowed_caps = array(
-			'manage_options',
-			// Fase 5 — caps CRM granulares (reemplazan edit_posts como puerta)
-			'clms_access_crm_view',
-			'clms_manage_crm',
-			// Caps LMS que implican acceso al CRM
-			'clms_access_admin',
-			'clms_manage_commerce',
-			'clms_manage_courses',
-			'clms_manage_lessons',
-			'clms_view_teacher_dashboard',
-			'clms_grade_submissions',
-		);
-
-		$can_access = false;
-		foreach ( $allowed_caps as $capability ) {
-			if ( user_can( $user_id, $capability ) ) {
-				$can_access = true;
-				break;
-			}
-		}
-
-		/**
-		 * Filtra el acceso operativo al CRM.
-		 *
-		 * @param bool  $can_access   Si el usuario puede acceder.
-		 * @param int   $user_id      ID de usuario evaluado.
-		 * @param array $allowed_caps Capacidades consideradas por defecto.
-		 */
-		return (bool) apply_filters( 'atora_crm_can_access_user', $can_access, $user_id, $allowed_caps );
+		// PT-1 (6.11.0): implementación real movida a
+		// CLMS_Contacts_Core_Service (includes/contacts-core/) -- ver su
+		// docblock. Este método queda como delegado para no romper los
+		// ~40 call sites existentes de CRM::.
+		return clms_core( 'CLMS_Contacts_Core_Service' )->can_access_crm( $user_id );
 	}
 
 	/**
@@ -63,8 +28,8 @@ trait CRM_Access_Trait {
 	 * @return bool
 	 */
 	public static function can_manage_crm( int $user_id = 0 ): bool {
-		$user_id = absint( $user_id ?: get_current_user_id() );
-		return $user_id && ( user_can( $user_id, 'clms_manage_crm' ) || user_can( $user_id, 'manage_options' ) );
+		// PT-1 (6.11.0): ver can_access_crm() arriba.
+		return clms_core( 'CLMS_Contacts_Core_Service' )->can_manage_crm( $user_id );
 	}
 
 	/**
@@ -77,42 +42,10 @@ trait CRM_Access_Trait {
 	 * @return bool
 	 */
 	public static function has_global_contact_scope( int $user_id = 0 ): bool {
-		$user_id = absint( $user_id ?: get_current_user_id() );
-		if ( ! $user_id ) {
-			return false;
-		}
-
-		if ( ! self::can_access_crm( $user_id ) ) {
-			return false;
-		}
-
-		$is_super_admin = function_exists( 'is_super_admin' ) && is_super_admin( $user_id );
-		if ( user_can( $user_id, 'manage_options' ) || $is_super_admin ) {
-			return true;
-		}
-
-		// PT-1.3 (6.5.1): clms_manage_courses/clms_manage_lessons son caps
-		// docentes — cualquier lms_instructor las tiene y no debía heredar
-		// alcance global de contactos por eso (hallazgo de la auditoría).
-		// clms_access_admin también salió de aquí: solo significa "puede
-		// entrar al panel ATORA" (CLMS_Access::can_access_admin()), y el
-		// rol lms_instructor la tiene igual — dejarla habría vuelto a abrir
-		// el mismo agujero por otra puerta. Alcance global operativo queda
-		// solo para clms_manage_commerce (shop_manager, sin caps docentes).
-		if ( user_can( $user_id, 'clms_manage_commerce' ) ) {
-			return true;
-		}
-
-		// Colaborador WP (edit_posts) pero no docente: visibilidad operativa completa.
-		if (
-			user_can( $user_id, 'edit_posts' )
-			&& ! user_can( $user_id, 'clms_view_teacher_dashboard' )
-			&& ! user_can( $user_id, 'clms_grade_submissions' )
-		) {
-			return true;
-		}
-
-		return false;
+		// PT-1 (6.11.0): ver can_access_crm() arriba. El criterio PT-1.3
+		// (6.5.1) sobre qué caps otorgan alcance global vive ahora en
+		// CLMS_Contacts_Core_Service::has_global_contact_scope().
+		return clms_core( 'CLMS_Contacts_Core_Service' )->has_global_contact_scope( $user_id );
 	}
 
 	/**
@@ -122,68 +55,8 @@ trait CRM_Access_Trait {
 	 * @return array<int,int>
 	 */
 	public static function get_accessible_contact_user_ids( int $user_id = 0 ): array {
-		$user_id = absint( $user_id ?: get_current_user_id() );
-		if ( ! $user_id ) {
-			return array();
-		}
-
-		if ( self::can_manage_crm( $user_id ) ) {
-			return array();
-		}
-
-		if ( ! self::can_access_crm( $user_id ) ) {
-			return array();
-		}
-
-		if ( self::has_global_contact_scope( $user_id ) ) {
-			return array();
-		}
-
-		$student_ids = array();
-		$messaging   = null;
-
-		if ( class_exists( '\CLMS_Helper' ) && method_exists( '\CLMS_Helper', 'module' ) ) {
-			$messaging = \clms_core('CLMS_Messaging');
-		}
-		if ( ! $messaging && class_exists( '\CLMS_Messaging' ) ) {
-			$messaging = new \CLMS_Messaging();
-		}
-
-		if ( $messaging && method_exists( $messaging, 'get_compose_context_for_user' ) ) {
-			$context     = (array) $messaging->get_compose_context_for_user( $user_id );
-			$student_ids = array_map( 'absint', array_keys( (array) ( $context['students'] ?? array() ) ) );
-		}
-
-		if ( empty( $student_ids ) && class_exists( '\CLMS_Helper' ) && method_exists( '\CLMS_Helper', 'get_enrolled_student_ids' ) ) {
-			$course_ids = get_posts(
-				array(
-					'post_type'              => 'lm_course',
-					'post_status'            => array( 'publish', 'private', 'draft' ),
-					'author'                 => $user_id,
-					'fields'                 => 'ids',
-					'posts_per_page'         => 200,
-					'no_found_rows'          => true,
-					'update_post_meta_cache' => false,
-					'update_post_term_cache' => false,
-				)
-			);
-
-			foreach ( (array) $course_ids as $course_id ) {
-				foreach ( (array) \CLMS_Helper::get_enrolled_student_ids( absint( $course_id ) ) as $student_id ) {
-					$student_ids[] = absint( $student_id );
-				}
-			}
-		}
-
-		$student_ids = array_values(
-			array_unique(
-				array_filter(
-					array_map( 'absint', $student_ids )
-				)
-			)
-		);
-
-		return $student_ids;
+		// PT-1 (6.11.0): ver can_access_crm() arriba.
+		return clms_core( 'CLMS_Contacts_Core_Service' )->get_accessible_contact_user_ids( $user_id );
 	}
 
 	/**

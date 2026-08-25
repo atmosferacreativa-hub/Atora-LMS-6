@@ -134,18 +134,10 @@ trait CRM_Contacts_Trait {
 	 * @return object|null
 	 */
 	public static function get_contact( int $user_id ): ?object {
-		global $wpdb;
-		$contacts_table = "{$wpdb->prefix}atora_contacts";
-
-		$user_id = absint( $user_id );
-		if ( $user_id <= 0 || ! self::table_exists( $contacts_table ) ) {
-			return null;
-		}
-
-		return $wpdb->get_row( $wpdb->prepare(
-			"SELECT * FROM {$contacts_table} WHERE user_id = %d LIMIT 1",
-			$user_id
-		) ) ?: null;
+		// PT-1 (6.11.0): implementación real movida a
+		// CLMS_Contacts_Core_Service (includes/contacts-core/) -- ver su
+		// docblock. Delegado para no romper los call sites existentes.
+		return clms_core( 'CLMS_Contacts_Core_Service' )->get_contact( $user_id );
 	}
 
 	// ── Timeline de actividad ────────────────────────────────────────────────
@@ -159,45 +151,12 @@ trait CRM_Contacts_Trait {
 	 * @return void
 	 */
 	public static function log_activity( int $user_id, string $activity_type, array $data = array() ): void {
-		global $wpdb;
-		$activities_table = "{$wpdb->prefix}atora_contact_activities";
-
-		if ( ! self::table_exists( $activities_table ) ) {
-			return;
-		}
-
-		// Obtener o crear el contacto.
-		$contact = self::get_contact( $user_id );
-		if ( ! $contact ) {
-			$user = get_userdata( $user_id );
-			if ( ! $user ) { return; }
-			self::upsert_contact( array( 'user_id' => $user_id, 'email' => $user->user_email, 'name' => $user->display_name ) );
-			$contact = self::get_contact( $user_id );
-		}
-
-		if ( ! $contact ) { return; }
-
-		$activity_type = sanitize_key( $activity_type );
-		$inserted      = $wpdb->insert(
-			$activities_table,
-			array(
-				'contact_id'    => $contact->id,
-				'activity_type' => $activity_type,
-				'activity_data' => wp_json_encode( $data ),
-				'created_by'    => get_current_user_id(),
-			),
-			array( '%d', '%s', '%s', '%d' )
-		);
-
-		if ( $inserted ) {
-			do_action(
-				'atora/crm/activity_logged',
-				(int) $contact->id,
-				$activity_type,
-				$data,
-				$user_id
-			);
-		}
+		// PT-1 (6.11.0): ver get_contact() arriba. Nota: el servicio
+		// neutro usa una creación de contacto más simple que
+		// upsert_contact() (sin matching por teléfono) cuando el usuario
+		// todavía no tiene contacto CRM -- ver
+		// CLMS_Contacts_Core_Service::ensure_contact_for_user().
+		clms_core( 'CLMS_Contacts_Core_Service' )->log_activity( $user_id, $activity_type, $data );
 	}
 
 	/**
@@ -208,22 +167,8 @@ trait CRM_Contacts_Trait {
 	 * @return array
 	 */
 	public static function get_timeline( int $contact_id, int $limit = 50 ): array {
-		global $wpdb;
-		$activities_table = "{$wpdb->prefix}atora_contact_activities";
-
-		$contact_id = absint( $contact_id );
-		$limit      = max( 1, absint( $limit ) );
-		if ( $contact_id <= 0 || ! self::table_exists( $activities_table ) ) {
-			return array();
-		}
-
-		return (array) $wpdb->get_results( $wpdb->prepare(
-			"SELECT * FROM {$activities_table}
-			 WHERE contact_id = %d
-			 ORDER BY created_at DESC
-			 LIMIT %d",
-			$contact_id, $limit
-		) );
+		// PT-1 (6.11.0): ver get_contact() arriba.
+		return clms_core( 'CLMS_Contacts_Core_Service' )->get_timeline( $contact_id, $limit );
 	}
 
 	// ── Tagging ───────────────────────────────────────────────────────────────
