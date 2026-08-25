@@ -28,17 +28,26 @@ class Followup_Plan_Service {
 	const EVENT_TYPE = 'followup_checkin';
 
 	/**
-	 * PT-3.1: cuatro plantillas de arranque, ancladas a etapas reales
-	 * de Student_Followup_Service::get_stages() — no se inventan
-	 * etapas nuevas. Registro estático (no una fila de BD): por
-	 * construcción, ningún docente puede editar esta lista para el
-	 * resto de la instalación (PT-3.3) — solo puede aplicar una
-	 * plantilla y guardar SU COPIA ajustada como un plan propio
-	 * (guardado real, editable, en atora_followup_plans).
+	 * PT-3.1 (6.6.0) / PT-2.1 (6.7.0): cuatro plantillas de arranque
+	 * por dominio, ancladas a etapas reales de get_stages() del
+	 * dominio correspondiente — no se inventan etapas nuevas. Registro
+	 * estático (no una fila de BD): por construcción, nadie puede
+	 * editar esta lista para el resto de la instalación (PT-3.3) —
+	 * solo puede aplicar una plantilla y guardar SU COPIA ajustada
+	 * como un plan propio (guardado real, editable, en
+	 * atora_followup_plans, con template_key preservando el origen).
 	 *
+	 * @param string $domain 'academic' (default, comportamiento idéntico a 6.6.0) o 'commercial'.
 	 * @return array<string,array<string,mixed>>
 	 */
-	public static function get_templates(): array {
+	public static function get_templates( string $domain = 'academic' ): array {
+		return 'commercial' === self::sanitize_domain( $domain ) ? self::get_commercial_templates() : self::get_academic_templates();
+	}
+
+	/**
+	 * @return array<string,array<string,mixed>>
+	 */
+	private static function get_academic_templates(): array {
 		$active_stages = array_values( array_filter(
 			array_keys( Student_Followup_Service::get_stages() ),
 			static fn( $s ) => ! in_array( $s, array( 'graduated', 'completed', 'inactive' ), true )
@@ -51,6 +60,7 @@ class Followup_Plan_Service {
 				'stage_filter'    => array( 'low_progress', 'at_risk' ),
 				'recurrence_rule' => 'WEEKLY;BYDAY=MO',
 				'action_type'     => 'checkin',
+				'domain_config'   => array(),
 			),
 			'high_attention' => array(
 				'name'            => __( 'Alta atención', 'atora-lms' ),
@@ -58,6 +68,7 @@ class Followup_Plan_Service {
 				'stage_filter'    => array( 'intervention', 'needs_support' ),
 				'recurrence_rule' => 'DAILY;INTERVAL=3',
 				'action_type'     => 'checkin',
+				'domain_config'   => array(),
 			),
 			'before_closing' => array(
 				'name'            => __( 'Antes del cierre', 'atora-lms' ),
@@ -65,6 +76,7 @@ class Followup_Plan_Service {
 				'stage_filter'    => $active_stages,
 				'recurrence_rule' => 'WEEKLY;BYDAY=MO;INTENSIFY_DAYS=14',
 				'action_type'     => 'checkin',
+				'domain_config'   => array(),
 			),
 			'milestones_only' => array(
 				'name'            => __( 'Solo hitos', 'atora-lms' ),
@@ -72,6 +84,63 @@ class Followup_Plan_Service {
 				'stage_filter'    => array_keys( Student_Followup_Service::get_stages() ),
 				'recurrence_rule' => 'FIXED;DATES=',
 				'action_type'     => 'checkin',
+				'domain_config'   => array(),
+			),
+		);
+	}
+
+	/**
+	 * PT-2.1 (6.7.0): cuatro plantillas comerciales, ancladas a
+	 * Deal_Service::get_stages() (9 etapas reales del pipeline, sin
+	 * inventar ninguna).
+	 *
+	 * "Nutrir leads fríos" usa DAILY;INTERVAL=14 como equivalente de
+	 * "quincenal" — Followup_Recurrence no tiene un FREQ=WEEKLY con
+	 * INTERVAL (solo BYDAY), y §0.2 de la OT prohíbe tocar el motor de
+	 * recurrencia en este sprint; DAILY;INTERVAL=14 es la primitiva más
+	 * simple ya existente que se acerca a "cada dos semanas" sin
+	 * modificar Followup_Recurrence. Documentado en
+	 * docs/DEUDA-TECNICA.md como una mejora futura si hace falta un
+	 * patrón semanal-con-intervalo real.
+	 *
+	 * @return array<string,array<string,mixed>>
+	 */
+	private static function get_commercial_templates(): array {
+		$stages        = class_exists( '\ATORA\CRM_V2\Services\Deal_Service' ) ? array_keys( Deal_Service::get_stages() ) : array();
+		$active_stages = array_values( array_diff( $stages, array( 'won', 'lost' ) ) );
+
+		return array(
+			'stalled_deals' => array(
+				'name'            => __( 'Deals estancados', 'atora-lms' ),
+				'description'     => __( 'Contactos sin movimiento reciente en etapas clave del pipeline.', 'atora-lms' ),
+				'stage_filter'    => array( 'contacted', 'interested', 'proposal_sent' ),
+				'recurrence_rule' => 'WEEKLY;BYDAY=MO',
+				'action_type'     => 'checkin',
+				'domain_config'   => array( 'min_stalled_days' => 5 ),
+			),
+			'cold_leads' => array(
+				'name'            => __( 'Nutrir leads fríos', 'atora-lms' ),
+				'description'     => __( 'Leads nuevos o recién contactados con score de conversión bajo.', 'atora-lms' ),
+				'stage_filter'    => array( 'new_lead', 'contacted' ),
+				'recurrence_rule' => 'DAILY;INTERVAL=14',
+				'action_type'     => 'checkin',
+				'domain_config'   => array( 'score_max' => 39 ),
+			),
+			'before_month_end' => array(
+				'name'            => __( 'Antes del cierre de mes', 'atora-lms' ),
+				'description'     => __( 'Revisión semanal de todo el pipeline activo, más frecuente cerca del cierre.', 'atora-lms' ),
+				'stage_filter'    => $active_stages,
+				'recurrence_rule' => 'WEEKLY;BYDAY=MO;INTENSIFY_DAYS=5',
+				'action_type'     => 'checkin',
+				'domain_config'   => array(),
+			),
+			'key_accounts' => array(
+				'name'            => __( 'Cuenta clave', 'atora-lms' ),
+				'description'     => __( 'Elegís vos mismo a quién seguir, sin filtro automático de etapa.', 'atora-lms' ),
+				'stage_filter'    => array(),
+				'recurrence_rule' => 'WEEKLY;BYDAY=MO',
+				'action_type'     => 'checkin',
+				'domain_config'   => array(),
 			),
 		);
 	}

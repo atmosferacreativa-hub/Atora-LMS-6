@@ -122,12 +122,16 @@ class Followup_Plans_REST_Controller {
 	}
 
 	/**
-	 * GET /followup-plans/templates — PT-3, biblioteca de plantillas.
+	 * GET /followup-plans/templates — PT-3 (6.6.0) / PT-2 (6.7.0),
+	 * biblioteca de plantillas. ?domain=academic|commercial, default
+	 * 'academic' — comportamiento idéntico a 6.6.0 si no se pasa.
 	 *
+	 * @param \WP_REST_Request $request Request.
 	 * @return \WP_REST_Response
 	 */
-	public static function get_templates(): \WP_REST_Response {
-		return rest_ensure_response( array( 'success' => true, 'templates' => Followup_Plan_Service::get_templates() ) );
+	public static function get_templates( \WP_REST_Request $request ): \WP_REST_Response {
+		$domain = sanitize_key( (string) ( $request->get_param( 'domain' ) ?: 'academic' ) );
+		return rest_ensure_response( array( 'success' => true, 'templates' => Followup_Plan_Service::get_templates( $domain ) ) );
 	}
 
 	/**
