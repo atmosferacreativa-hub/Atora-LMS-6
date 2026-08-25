@@ -315,6 +315,7 @@ class CLMS_Metabox_Cohort {
 		echo '<th>' . esc_html__( 'Curso', 'atora-lms' ) . '</th>';
 		echo '<th>' . esc_html__( 'Estado', 'atora-lms' ) . '</th>';
 		echo '<th>' . esc_html__( 'Profesor lead', 'atora-lms' ) . '</th>';
+		echo '<th>' . esc_html__( 'Coordinador', 'atora-lms' ) . '</th>';
 		echo '<th>' . esc_html__( 'Alumnos', 'atora-lms' ) . '</th>';
 		echo '<th>' . esc_html__( 'Revisión', 'atora-lms' ) . '</th>';
 		echo '</tr></thead><tbody>';
@@ -326,6 +327,13 @@ class CLMS_Metabox_Cohort {
 			$lead_name    = $lead_id ? ( get_user_by( 'id', $lead_id )->display_name ?? "ID {$lead_id}" ) : '—';
 			$roster_count = count( \ATORA\LMS\Section_Service::get_section_student_ids( $section_id ) );
 
+			// PT-3 (6.11.0): antes no había ninguna forma de ver/asignar
+			// coordinador desde el admin -- solo un INSERT manual (ver
+			// docs/DEUDA-TECNICA.md, PT-3.4).
+			$coordinator_id   = \ATORA\LMS\Section_Service::get_coordinator( $section_id );
+			$coordinator_name = $coordinator_id ? ( get_user_by( 'id', $coordinator_id )->display_name ?? "ID {$coordinator_id}" ) : '—';
+			$assign_url       = admin_url( 'admin.php?page=atora-section-coordinator&section_id=' . $section_id );
+
 			$meta        = json_decode( (string) $section['meta_json'], true );
 			$needs_review = ! empty( $meta['needs_review'] );
 
@@ -334,6 +342,7 @@ class CLMS_Metabox_Cohort {
 			echo '<td>' . esc_html( $course_title ) . '</td>';
 			echo '<td>' . esc_html( $section['status'] ) . '</td>';
 			echo '<td>' . esc_html( $lead_name ) . '</td>';
+			echo '<td>' . esc_html( $coordinator_name ) . ' <a href="' . esc_url( $assign_url ) . '">(' . esc_html__( 'asignar', 'atora-lms' ) . ')</a></td>';
 			echo '<td>' . esc_html( (string) $roster_count ) . '</td>';
 			echo '<td>' . ( $needs_review ? '<span style="color:#b91c1c;font-weight:600">' . esc_html__( 'Requiere revisión', 'atora-lms' ) . '</span>' : '<span style="color:#065f46">' . esc_html__( 'OK', 'atora-lms' ) . '</span>' ) . '</td>';
 			echo '</tr>';

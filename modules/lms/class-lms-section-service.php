@@ -37,16 +37,24 @@ class Section_Service {
 	const STATUS_CLOSED    = 'closed';
 	const STATUS_CANCELLED = 'cancelled';
 
-	const ROLE_LEAD      = 'lead';
-	const ROLE_ASSISTANT = 'assistant';
-	const ROLE_GUEST     = 'guest';
+	const ROLE_LEAD        = 'lead';
+	const ROLE_ASSISTANT   = 'assistant';
+	const ROLE_GUEST       = 'guest';
+	const ROLE_COORDINATOR = 'coordinator';
 
 	public static function get_allowed_statuses(): array {
 		return array( self::STATUS_SCHEDULED, self::STATUS_ACTIVE, self::STATUS_CLOSED, self::STATUS_CANCELLED );
 	}
 
 	public static function get_allowed_teacher_roles(): array {
-		return array( self::ROLE_LEAD, self::ROLE_ASSISTANT, self::ROLE_GUEST );
+		// PT-3 (6.11.0): 'coordinator' ya existía como valor real en la
+		// tabla (get_coordinator() lo lee desde 6.4.0), pero
+		// add_teacher() lo degradaba en silencio a 'lead' porque esta
+		// lista no lo incluía -- no había ningún camino de escritura que
+		// pudiera asignarlo salvo un INSERT manual (ver
+		// docs/DEUDA-TECNICA.md, PT-3.4). set_coordinator() (más abajo)
+		// es el único método pensado para escribirlo.
+		return array( self::ROLE_LEAD, self::ROLE_ASSISTANT, self::ROLE_GUEST, self::ROLE_COORDINATOR );
 	}
 
 	public static function get_allowed_student_statuses(): array {
@@ -381,6 +389,69 @@ class Section_Service {
 		);
 
 		return $id ? (int) $id : null;
+	}
+
+	/**
+	 * PT-3 (6.11.0): asigna (o reemplaza) el coordinador de una sección.
+	 * A diferencia de add_teacher() genérico, garantiza que quede como
+	 * máximo un coordinador por sección -- coherente con que
+	 * get_coordinator() usa LIMIT 1 sin ORDER BY, así que dos filas con
+	 * role='coordinator' en la misma sección darían un resultado
+	 * indeterminado. Nota: si $user_id ya tenía otro rol en esta sección
+	 * (p. ej. lead), add_teacher() lo reemplaza por 'coordinator' -- la
+	 * tabla solo admite un rol por (sección, usuario), limitación previa
+	 * del esquema, no algo nuevo de este método.
+	 *
+	 * @param int $section_id
+	 * @param int $user_id
+	 * @return bool
+	 */
+	public static function set_coordinator( int $section_id, int $user_id ): bool {
+		global $wpdb;
+
+		if ( ! $section_id || ! $user_id ) {
+			return false;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		$wpdb->query(
+			$wpdb->prepare(
+				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				"DELETE FROM {$wpdb->prefix}" . self::TABLE_SECTION_TEACHERS . " WHERE section_id = %d AND role = 'coordinator' AND user_id != %d",
+				$section_id,
+				$user_id
+			)
+		);
+
+		return self::add_teacher( $section_id, $user_id, self::ROLE_COORDINATOR );
+	}
+
+	/**
+	 * PT-3 (6.11.0): secciones donde el usuario es coordinador. Mismo
+	 * patrón JOIN que get_sections_by_teacher(), filtrado a role =
+	 * 'coordinator' -- usado por el gate de acceso a la vista de
+	 * coordinador (CLMS_Today_Aggregator_Service::user_has_coordinator_access()).
+	 *
+	 * @param int $user_id
+	 * @return array<int,int> IDs de sección.
+	 */
+	public static function get_coordinator_section_ids( int $user_id ): array {
+		global $wpdb;
+
+		if ( ! $user_id ) {
+			return array();
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		$ids = $wpdb->get_col(
+			$wpdb->prepare(
+				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				"SELECT section_id FROM {$wpdb->prefix}" . self::TABLE_SECTION_TEACHERS . " WHERE user_id = %d AND role = 'coordinator'",
+				$user_id
+			)
+		);
+
+		return array_map( 'absint', (array) $ids );
 	}
 
 	// ── Asignación de estudiantes ─────────────────────────────────────────────

@@ -104,6 +104,14 @@ class CLMS_Today_Aggregator_Service {
 			$items = array_merge( $items, $this->collect_academic_digest_items( $user_id ) );
 		}
 
+		// PT-3 (6.11.0): antes no había ninguna fuente de coordinador acá
+		// -- ver docs/DEUDA-TECNICA.md, "Vista de coordinador — explícitamente
+		// diferida". Gate propio (no has_academic/has_commercial): un
+		// coordinador puede no tener ninguna de esas dos caps.
+		if ( $this->user_has_coordinator_access( $user_id ) ) {
+			$items = array_merge( $items, $this->collect_coordinator_items( $user_id ) );
+		}
+
 		$items = array_merge( $items, $this->collect_task_items( $user_id, $has_academic, $has_commercial ) );
 
 		return $this->sort_by_urgency( $items );
@@ -201,6 +209,23 @@ class CLMS_Today_Aggregator_Service {
 			return false;
 		}
 		return user_can( $user_id, 'clms_access_crm_view' ) || user_can( $user_id, 'manage_options' );
+	}
+
+	/**
+	 * PT-3 (6.11.0): true si el usuario coordina al menos una sección
+	 * (Section_Service::get_coordinator_section_ids()) — gate de
+	 * collect_coordinator_items(), mismo patrón que
+	 * user_has_academic_access()/user_has_commercial_access().
+	 *
+	 * @param int $user_id
+	 * @return bool
+	 */
+	protected function user_has_coordinator_access( $user_id ) {
+		$user_id = absint( $user_id );
+		if ( ! $user_id || ! class_exists( '\ATORA\LMS\Section_Service' ) ) {
+			return false;
+		}
+		return ! empty( \ATORA\LMS\Section_Service::get_coordinator_section_ids( $user_id ) );
 	}
 
 	/**
@@ -382,6 +407,70 @@ class CLMS_Today_Aggregator_Service {
 		}
 
 		return $items;
+	}
+
+	/**
+	 * PT-3 (6.11.0): primera fuente real de datos para un coordinador --
+	 * cuenta cuántos estudiantes de las secciones que coordina recibieron
+	 * una alerta 'academic_at_risk_alert' (ver
+	 * CLMS_Academic_Messaging_Bridge::on_at_risk_signal(), PT-2 del mismo
+	 * sprint) en los últimos 7 días. Deliberadamente NO recalcula
+	 * get_student_course_status() por cada estudiante del roster -- ver
+	 * CLMS_Contacts_Core_Service::count_recent_activity_for_users(), una
+	 * sola consulta con JOIN. Promedio agregado por sección y conteo de
+	 * entregas pendientes por sección quedan fuera de este sprint --
+	 * requerirían agregación nueva que hoy no existe ni de forma barata
+	 * (documentado en el reporte de cierre).
+	 *
+	 * @param int $user_id
+	 * @return array
+	 */
+	protected function collect_coordinator_items( $user_id ) {
+		if ( ! class_exists( '\ATORA\LMS\Section_Service' ) || ! function_exists( 'atora_lms' ) ) {
+			return array();
+		}
+
+		$user_id      = absint( $user_id );
+		$section_ids  = \ATORA\LMS\Section_Service::get_coordinator_section_ids( $user_id );
+		if ( empty( $section_ids ) ) {
+			return array();
+		}
+
+		$student_ids = array();
+		foreach ( $section_ids as $section_id ) {
+			foreach ( (array) \ATORA\LMS\Section_Service::get_section_student_ids( $section_id ) as $student_id ) {
+				$student_ids[] = absint( $student_id );
+			}
+		}
+		$student_ids = array_values( array_unique( array_filter( $student_ids ) ) );
+		if ( empty( $student_ids ) ) {
+			return array();
+		}
+
+		$contacts_core = atora_lms( 'CLMS_Contacts_Core_Service' );
+		if ( ! $contacts_core || ! method_exists( $contacts_core, 'count_recent_activity_for_users' ) ) {
+			return array();
+		}
+
+		$at_risk_count = $contacts_core->count_recent_activity_for_users( $student_ids, 'academic_at_risk_alert', 7 );
+		if ( $at_risk_count <= 0 ) {
+			return array();
+		}
+
+		return array(
+			array(
+				'source'             => 'coordinator_at_risk',
+				'title'              => sprintf(
+					_n( '%d estudiante en riesgo en tus secciones (últimos 7 días)', '%d estudiantes en riesgo en tus secciones (últimos 7 días)', $at_risk_count, 'atora-lms' ),
+					$at_risk_count
+				),
+				'count'              => $at_risk_count,
+				'urgency'            => 'alta',
+				'url'                => admin_url( 'admin.php?page=atora-hoy' ),
+				'_tier'              => 2,
+				'_has_specific_time' => false,
+			),
+		);
 	}
 
 	/**
