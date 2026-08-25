@@ -95,3 +95,7 @@ Ningún archivo de este sprint toca las superficies endurecidas en 6.5.x. El agr
 ## 8. Empaquetado
 
 `FEATURE-REPORT-*.md` ya estaba excluido de `.distignore` desde 6.6.0 — no fue necesario ningún cambio antes de construir el ZIP.
+
+- **Archivo:** `dist/atora-lms-6.8.0.zip`
+- **SHA-256:** `57a7554f0f7680b788476dccc865198ba36603969b3bc4fab6e3880d9cbee24a`
+- **Auditoría del contenido extraído:** sin archivos de desarrollo en la raíz del paquete; cadenas de versión consistentes en `6.8.0`; `includes/today/` (servicio + vista) y `assets/admin/atora-hoy.css` presentes; escaneo de patrones de credenciales sin hallazgos reales — mismo match ya disclosed en 6.6.0/6.7.0 (variable de formulario JS existente, no una credencial embebida).
