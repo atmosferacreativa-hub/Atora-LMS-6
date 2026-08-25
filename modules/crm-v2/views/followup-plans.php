@@ -67,21 +67,12 @@ $default_domain = $can_academic ? 'academic' : 'commercial';
 		<div id="atora-fu-mount" class="atora-fu-calendar-mount"></div>
 	<?php endif; ?>
 
-	<!-- Panel lateral de ocurrencia (PT-4.4) -->
-	<div id="atora-fu-panel" class="atora-fu-panel" hidden aria-hidden="true">
-		<div class="atora-fu-panel-backdrop" id="atora-fu-panel-backdrop"></div>
-		<div class="atora-fu-panel-sheet" role="dialog" aria-modal="true" aria-labelledby="atora-fu-panel-title">
-			<button type="button" class="atora-fu-panel-close" id="atora-fu-panel-close" aria-label="<?php esc_attr_e( 'Cerrar', 'atora-lms' ); ?>">&times;</button>
-			<h2 id="atora-fu-panel-title"></h2>
-			<p class="atora-fu-panel-date"></p>
-			<div class="atora-fu-panel-actions">
-				<button type="button" class="button" id="atora-fu-panel-postpone"><?php esc_html_e( 'Posponer un día', 'atora-lms' ); ?></button>
-				<button type="button" class="button" id="atora-fu-panel-skip"><?php esc_html_e( 'Saltar esta vez', 'atora-lms' ); ?></button>
-				<button type="button" class="button button-primary" id="atora-fu-panel-contact-all"><?php esc_html_e( 'Marcar a todos contactados', 'atora-lms' ); ?></button>
-			</div>
-			<div class="atora-fu-panel-students" id="atora-fu-panel-students"></div>
-		</div>
-	</div>
+	<!-- Panel lateral de ocurrencia (PT-4.4, 6.6.0/6.7.0) — retrofit a
+	     Followup_Panel compartido (PT-1.4, 6.9.0). El shell queda vacío
+	     acá; followup-plans.js lo llena vía AtoraUI.Panel.open() con
+	     los datos de cada ocurrencia (título, filas de estudiantes/
+	     contactos, acciones) después del fetch a REST. -->
+	<?php echo CLMS_UI_Followup_Panel::render_shell( 'atora-fu-panel' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- ya escapado adentro. ?>
 
 	<!-- Asistente de 4 pasos (PT-4.2), en modal -->
 	<div id="atora-fu-wizard" class="atora-fu-wizard" hidden aria-hidden="true">

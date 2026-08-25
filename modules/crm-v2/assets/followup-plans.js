@@ -225,35 +225,17 @@
 	}
 
 	/* ============================================================
-	 *  PANEL LATERAL DE OCURRENCIA (PT-4.4)
+	 *  PANEL LATERAL DE OCURRENCIA (PT-4.4, 6.6.0/6.7.0)
+	 *  Retrofit a Followup_Panel/Followup_List_Row compartidos
+	 *  (PT-1.4, 6.9.0, includes/ui/assets/followup-panel.js) — este
+	 *  archivo ya no construye el marcado de filas a mano, solo
+	 *  arma la config (items/actions/onAction) y AtoraUI.Panel la
+	 *  renderiza. El comportamiento (abrir, cerrar, marcar
+	 *  contactado, excluir, saltar, posponer, lote) es idéntico al
+	 *  de antes del retrofit.
 	 * ============================================================ */
 	var currentOccurrenceId = null;
-
-	function openPanel(eventId) {
-		currentOccurrenceId = eventId;
-		var panel = document.getElementById('atora-fu-panel');
-		if (!panel) { return; }
-
-		panel.hidden = false;
-		panel.setAttribute('aria-hidden', 'false');
-		document.getElementById('atora-fu-panel-students').innerHTML = '<p>Cargando…</p>';
-
-		api('followup-plans/occurrence/' + eventId).then(function (data) {
-			document.getElementById('atora-fu-panel-title').textContent = data.title || 'Ocurrencia';
-			document.getElementById('atora-fu-panel-date').textContent = data.date || '';
-			renderStudents(data);
-		}).catch(function (err) {
-			toast(err.message || 'No se pudo cargar la ocurrencia.', 'error');
-		});
-	}
-
-	function closePanel() {
-		var panel = document.getElementById('atora-fu-panel');
-		if (!panel) { return; }
-		panel.hidden = true;
-		panel.setAttribute('aria-hidden', 'true');
-		currentOccurrenceId = null;
-	}
+	var currentOccurrenceData = null;
 
 	var EMPTY_REASONS = {
 		sin_configuracion: 'Este plan todavía no tiene a quién seguir configurado.',
@@ -265,66 +247,94 @@
 		crm_no_disponible: 'El CRM comercial no está disponible ahora.'
 	};
 
-	function scoreBadgeClass(scoreLabel) {
-		var s = (scoreLabel || '').toLowerCase();
-		if (s.indexOf('alta') !== -1) { return 'is-score-high'; }
-		if (s.indexOf('media') !== -1) { return 'is-score-medium'; }
-		return 'is-score-low';
+	function scoreBadgeLabel(meta) {
+		if (!meta || !meta.score_label) { return null; }
+		return meta.score_label + ' (' + meta.score + ')';
 	}
 
-	function renderStudents(data) {
-		var container = document.getElementById('atora-fu-panel-students');
-		var students = data.students || [];
-		var domain = data.domain || 'academic';
+	function studentToRowItem(s, domain) {
+		var meta = s.meta || {};
+		var badges = [];
+		var urgency;
 
-		var notice = '';
-		if (data.filtered_out_count > 0) {
-			notice = '<p class="atora-fu-filtered-notice">' + data.filtered_out_count +
-				' contacto' + (data.filtered_out_count === 1 ? '' : 's') +
-				' más está' + (data.filtered_out_count === 1 ? '' : 'n') +
-				' en secuencia automática y no se muestra' + (data.filtered_out_count === 1 ? '' : 'n') + ' acá.</p>';
-		}
-
-		if (!students.length) {
-			container.innerHTML = notice + '<p class="atora-fu-empty-occurrence">' +
-				(EMPTY_REASONS[data.empty_reason] || 'No hay nadie para esta ocurrencia hoy.') + '</p>';
-			return;
-		}
-
-		container.innerHTML = notice + students.map(function (s) {
-			var contactedClass = s.contacted ? ' is-contacted' : '';
-			var meta = s.meta || {};
-			var extra = '';
-
-			if ('commercial' === domain) {
-				if (meta.score_label) {
-					extra += '<span class="atora-fu-score-badge ' + scoreBadgeClass(meta.score_label) + '">' + escapeHtml(meta.score_label) + ' (' + meta.score + ')</span>';
-				}
-				if (meta.sequence && meta.sequence.active) {
-					extra += '<span class="atora-fu-sequence-tag" title="' + escapeHtml(meta.sequence.sequence_name) + '">' +
-						'✉ ' + escapeHtml(meta.sequence.sequence_name) + ' · paso ' + meta.sequence.current_step + '/' + meta.sequence.total_steps +
-						'</span>';
-				}
-				if (typeof meta.days_stalled === 'number' && meta.days_stalled > 0) {
-					extra += '<span class="atora-fu-stalled-tag">' + meta.days_stalled + ' días sin avanzar</span>';
-				}
+		if ('commercial' === domain) {
+			var score = typeof meta.score === 'number' ? meta.score : 100;
+			urgency = score <= 39 ? 'alta' : (score < 70 ? 'media' : 'baja');
+			var scoreBadge = scoreBadgeLabel(meta);
+			if (scoreBadge) { badges.push(scoreBadge); }
+			if (meta.sequence && meta.sequence.active) {
+				badges.push('✉ ' + meta.sequence.sequence_name + ' · paso ' + meta.sequence.current_step + '/' + meta.sequence.total_steps);
 			}
+			if (typeof meta.days_stalled === 'number' && meta.days_stalled > 0) {
+				badges.push(meta.days_stalled + ' días sin avanzar');
+			}
+		} else {
+			urgency = ['at_risk', 'intervention', 'needs_support'].indexOf(s.stage) !== -1 ? 'alta' : 'media';
+		}
 
-			return '' +
-				'<div class="atora-fu-student-row' + contactedClass + '" data-user-id="' + s.user_id + '">' +
-					'<div class="atora-fu-student-info">' +
-						'<span class="atora-fu-student-name">' + escapeHtml(s.display_name) + '</span>' +
-						'<span class="atora-fu-student-stage">' + escapeHtml(s.stage_label) + '</span>' +
-						(extra ? '<div class="atora-fu-student-meta">' + extra + '</div>' : '') +
-					'</div>' +
-					'<div class="atora-fu-student-actions">' +
-						'<button type="button" class="button atora-fu-btn-contact" data-user-id="' + s.user_id + '">' +
-							(s.contacted ? '✓ Contactado' : 'Marcar contactado') +
-						'</button>' +
-						'<button type="button" class="button-link atora-fu-btn-exclude" data-user-id="' + s.user_id + '" title="Excluir de esta ocurrencia">Excluir</button>' +
-					'</div>' +
-				'</div>';
-		}).join('');
+		return {
+			id: s.user_id,
+			name: s.display_name,
+			meta: s.stage_label,
+			urgency: urgency,
+			badges: badges,
+			done: !!s.contacted,
+			actions: [
+				{ label: 'Marcar contactado', done_label: '✓ Contactado', action_id: 'contact' },
+				{ label: 'Excluir', action_id: 'exclude' }
+			]
+		};
+	}
+
+	function onOccurrencePanelAction(actionId, itemId) {
+		if ('contact' === actionId) { return markContacted(itemId); }
+		if ('exclude' === actionId) { return excludeStudent(itemId); }
+		if ('postpone' === actionId) { return postponeOccurrence(); }
+		if ('skip' === actionId) { return skipOccurrence(); }
+		if ('contact_all' === actionId) { return markAllContacted(); }
+	}
+
+	function renderOccurrencePanel(data) {
+		currentOccurrenceData = data;
+		var domain = data.domain || 'academic';
+		var items = (data.students || []).map(function (s) { return studentToRowItem(s, domain); });
+
+		window.AtoraUI.Panel.open('atora-fu-panel', {
+			title: data.title || 'Ocurrencia',
+			subtitle: data.date || '',
+			items: items,
+			notice: data.filtered_out_count > 0
+				? (data.filtered_out_count + ' contacto' + (data.filtered_out_count === 1 ? '' : 's') +
+					' más está' + (data.filtered_out_count === 1 ? '' : 'n') +
+					' en secuencia automática y no se muestra' + (data.filtered_out_count === 1 ? '' : 'n') + ' acá.')
+				: '',
+			emptyTitle: EMPTY_REASONS[data.empty_reason] || 'No hay nadie para esta ocurrencia hoy.',
+			actions: [
+				{ label: 'Posponer un día', action_id: 'postpone', scope: 'bulk' },
+				{ label: 'Saltar esta vez', action_id: 'skip', scope: 'bulk' },
+				{ label: 'Marcar a todos contactados', action_id: 'contact_all', scope: 'bulk' },
+				{ label: 'Marcar contactado', action_id: 'contact', scope: 'item' },
+				{ label: 'Excluir', action_id: 'exclude', scope: 'item' }
+			],
+			onAction: onOccurrencePanelAction,
+			onClose: function () { currentOccurrenceId = null; currentOccurrenceData = null; }
+		});
+	}
+
+	function openPanel(eventId) {
+		currentOccurrenceId = eventId;
+		api('followup-plans/occurrence/' + eventId).then(function (data) {
+			renderOccurrencePanel(data);
+		}).catch(function (err) {
+			toast(err.message || 'No se pudo cargar la ocurrencia.', 'error');
+		});
+	}
+
+	function closePanel() {
+		window.AtoraUI.Panel.close('atora-fu-panel', function () {
+			currentOccurrenceId = null;
+			currentOccurrenceData = null;
+		});
 	}
 
 	function markContacted(userId) {
@@ -384,15 +394,14 @@
 	}
 
 	function markAllContacted() {
-		var rows = document.querySelectorAll('#atora-fu-panel-students .atora-fu-student-row:not(.is-contacted)');
-		if (!rows.length) { toast('Ya están todos contactados.', 'info'); return; }
-		var promises = [];
-		rows.forEach(function (row) {
-			var userId = row.getAttribute('data-user-id');
-			promises.push(api('followup-plans/occurrence/' + currentOccurrenceId + '/contact', {
+		var students = (currentOccurrenceData && currentOccurrenceData.students) || [];
+		var uncontacted = students.filter(function (s) { return !s.contacted; });
+		if (!uncontacted.length) { toast('Ya están todos contactados.', 'info'); return; }
+		var promises = uncontacted.map(function (s) {
+			return api('followup-plans/occurrence/' + currentOccurrenceId + '/contact', {
 				method: 'POST',
-				body: { user_id: userId }
-			}));
+				body: { user_id: s.user_id }
+			});
 		});
 		Promise.all(promises).then(function () {
 			toast('Todos marcados como contactados.', 'success');
@@ -759,27 +768,11 @@
 			});
 		}
 
-		var panelClose = document.getElementById('atora-fu-panel-close');
-		var panelBackdrop = document.getElementById('atora-fu-panel-backdrop');
-		if (panelClose) { panelClose.addEventListener('click', closePanel); }
-		if (panelBackdrop) { panelBackdrop.addEventListener('click', closePanel); }
-
-		var skipBtn = document.getElementById('atora-fu-panel-skip');
-		var postponeBtn = document.getElementById('atora-fu-panel-postpone');
-		var contactAllBtn = document.getElementById('atora-fu-panel-contact-all');
-		if (skipBtn) { skipBtn.addEventListener('click', skipOccurrence); }
-		if (postponeBtn) { postponeBtn.addEventListener('click', postponeOccurrence); }
-		if (contactAllBtn) { contactAllBtn.addEventListener('click', markAllContacted); }
-
-		var studentsContainer = document.getElementById('atora-fu-panel-students');
-		if (studentsContainer) {
-			studentsContainer.addEventListener('click', function (e) {
-				var contactBtn = e.target.closest('.atora-fu-btn-contact');
-				var excludeBtn = e.target.closest('.atora-fu-btn-exclude');
-				if (contactBtn) { markContacted(contactBtn.getAttribute('data-user-id')); }
-				if (excludeBtn) { excludeStudent(excludeBtn.getAttribute('data-user-id')); }
-			});
-		}
+		// PT-1.4 (6.9.0): abrir/cerrar, acciones en lote y por fila del
+		// panel de ocurrencia ya no se cablean acá a mano -- las maneja
+		// AtoraUI.Panel internamente (wireOnce() para cerrar/backdrop,
+		// un listener delegado por open() para las acciones). Ver
+		// renderOccurrencePanel()/onOccurrencePanelAction() más arriba.
 
 		// PT-3.2 (6.8.0, "Hoy"): un enlace con ?event_id=N (el que ya
 		// construye CLMS_Academic_Messaging_Bridge desde 6.6.0 y ahora

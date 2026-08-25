@@ -211,12 +211,15 @@ class CRM_V2_App {
 		// calendario CRM — no se vuelve a cargar la librería.
 		if ( 'atora-followup-plans' === $page ) {
 			if ( file_exists( ATORA_LMS_MODULES_DIR . 'crm-v2/assets/followup-plans.css' ) ) {
-				wp_enqueue_style( 'atora-followup-plans-ui', ATORA_LMS_MODULES_URL . 'crm-v2/assets/followup-plans.css', array( 'atora-crm-v2-ui' ), $ver );
+				wp_enqueue_style( 'atora-followup-plans-ui', ATORA_LMS_MODULES_URL . 'crm-v2/assets/followup-plans.css', array( 'atora-crm-v2-ui', 'atora-ui-followup-panel' ), $ver );
 			}
 			wp_enqueue_script(
 				'atora-followup-plans',
 				ATORA_LMS_MODULES_URL . 'crm-v2/assets/followup-plans.js',
-				array( 'atora-crm-v2-ui', 'fullcalendar-interaction', 'fullcalendar-list', 'fullcalendar-locale-es' ),
+				// PT-1.4 (6.9.0): depende de atora-ui-followup-panel (el
+				// AtoraUI.Panel compartido) -- el retrofit del panel de
+				// ocurrencia ya no construye su propio marcado de filas.
+				array( 'atora-crm-v2-ui', 'atora-ui-followup-panel', 'fullcalendar-interaction', 'fullcalendar-list', 'fullcalendar-locale-es' ),
 				$ver,
 				true
 			);

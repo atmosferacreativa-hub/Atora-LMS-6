@@ -1,0 +1,72 @@
+/**
+ * ATORA LMS — Tokens de diseño compartidos (PT-1.1, sprint 6.9.0)
+ *
+ * Decisión registrada acá porque este archivo mezcla DOS capas
+ * distintas de token, a propósito, no por descuido:
+ *
+ * 1. IDENTIDAD DE MARCA (--atora-brand-*): ink #0d0d0b, cream #f7f3ec,
+ *    atora-blue #1769f6, atora-gold #f4b21b, white. Verificado antes
+ *    de escribir este archivo: no existe ningún theme.json en este
+ *    repositorio (es un plugin, no un tema) — los únicos lugares
+ *    donde estos valores exactos aparecen hoy son plantillas de
+ *    bloques de una landing/blog específica (includes/ui/class-ui-editor-templates.php,
+ *    contenido de "Academia Atmósfera Creativa"), como estilos
+ *    inline, no como variables reutilizables. El plugin no puede
+ *    asumir que ese tema/sitio está activo en toda instalación, así
+ *    que estos son los DEFAULTS DEL PLUGIN (esos mismos valores),
+ *    documentados acá una sola vez — no una lectura obligatoria de un
+ *    theme.json externo que no existe. Uso previsto: elementos donde
+ *    la identidad visual del sitio importa (p. ej. el shortcode
+ *    [atora_hoy]/búsqueda si se incrusta en una página pública).
+ *
+ * 2. TOKENS OPERATIVOS/ADMIN (--atora-*, sin prefijo "brand"): los
+ *    mismos --atora-blue-700/--atora-warning/--atora-danger/
+ *    --atora-success/--atora-radius-*/--atora-surface/etc. que
+ *    assets/admin/atora-admin.css ya define y que TODA la serie
+ *    6.6.0-6.8.0 usó para paneles, badges de urgencia y calendarios.
+ *    Se re-declaran acá (mismos valores, cero cambio) para que
+ *    includes/ui/ (que no depende de que atora-admin.css esté
+ *    encolado) tenga una sola fuente propia — pero la semántica
+ *    "urgencia alta/media/baja" sigue usando ESTOS tokens operativos,
+ *    no los de marca: gold/cream no tienen un significado de urgencia
+ *    inherente, y cambiar esa asociación ahora sería una regresión
+ *    visual real para tres sprints de paneles ya en uso (§0.5 lo
+ *    prohíbe explícitamente). Ambas capas conviven sin conflicto
+ *    porque resuelven necesidades distintas: marca vs. semántica de
+ *    estado.
+ *
+ * @package ATORA_LMS
+ * @since   6.9.0
+ */
+
+:root {
+	/* ── Identidad de marca (PT-1.1) ── */
+	--atora-brand-ink:   #0d0d0b;
+	--atora-brand-cream: #f7f3ec;
+	--atora-brand-blue:  #1769f6;
+	--atora-brand-gold:  #f4b21b;
+	--atora-brand-white: #ffffff;
+
+	--atora-brand-font-body:    'Instrument Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+	--atora-brand-font-display: 'Playfair Display', Georgia, serif;
+	--atora-brand-font-mono:    'DM Mono', ui-monospace, monospace;
+
+	/* ── Tokens operativos (ya establecidos en assets/admin/atora-admin.css, 6.6.0-6.8.0) ── */
+	--atora-blue-950: #0f172a; --atora-blue-900: #1e3a8a; --atora-blue-700: #1d4ed8;
+	--atora-blue-500: #3b82f6; --atora-blue-100: #dbeafe; --atora-blue-50:  #eff6ff;
+	--atora-amber-500: #f59e0b; --atora-amber-100: #fef3c7;
+	--atora-success: #1D9E75; --atora-warning: #BA7517; --atora-danger: #E24B4A;
+	--atora-info: #378ADD; --atora-muted: #64748b;
+	--atora-bg: #f8fafc; --atora-surface: #ffffff;
+	--atora-border: #e2e8f0; --atora-border-soft: #f1f5f9;
+	--atora-text-primary: #0f172a; --atora-text-secondary: #475569; --atora-text-muted: #94a3b8;
+	--atora-radius-sm: 8px; --atora-radius-md: 12px; --atora-radius-lg: 16px; --atora-radius-xl: 20px;
+	--atora-shadow-sm: 0 1px 3px rgba(0,0,0,.06); --atora-shadow-md: 0 4px 12px rgba(0,0,0,.08);
+
+	/* ── Urgencia (PT-1.1, usado por Followup_List_Row) — mapea a los
+	   tokens operativos de arriba, un solo lugar que lo declara. ── */
+	--atora-urgency-alta:  var(--atora-danger);
+	--atora-urgency-media: var(--atora-warning);
+	--atora-urgency-baja:  var(--atora-blue-700);
+	--atora-tone-positivo: var(--atora-success);
+}

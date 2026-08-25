@@ -256,12 +256,19 @@ class CLMS_Today_Aggregator_Service {
 				);
 			}
 
+			$event_id = absint( $occurrence['event_id'] ?? 0 );
 			$items[] = array(
 				'source'                => 'commercial' === $domain ? 'followup_commercial' : 'followup_academic',
 				'title'                 => $title,
 				'count'                 => $uncontacted,
 				'urgency'               => $tier <= 2 ? 'alta' : 'media',
-				'url'                   => admin_url( 'admin.php?page=atora-followup-plans&event_id=' . absint( $occurrence['event_id'] ?? 0 ) ),
+				'url'                   => admin_url( 'admin.php?page=atora-followup-plans&event_id=' . $event_id ),
+				// PT-1.5/PT-4.1 (6.9.0): today.js intercepta el clic en
+				// filas con este atributo y abre el panel compartido en
+				// línea en vez de navegar -- el href de arriba sigue
+				// funcionando como respaldo (JS deshabilitado, clic
+				// derecho "abrir en pestaña nueva", etc.).
+				'event_id'              => $event_id,
 				'_tier'                 => $tier,
 				'_has_specific_time'    => false, // las ocurrencias se materializan a una hora fija (08:00), no una hora real elegida.
 			);
@@ -531,8 +538,20 @@ class CLMS_Today_Aggregator_Service {
 			$html .= '<h2 class="atora-hoy-group-title">' . esc_html( $group['label'] ) . '</h2>';
 			$html .= '<ul class="atora-hoy-items">';
 			foreach ( $group['items'] as $item ) {
+				$source   = sanitize_key( (string) ( $item['source'] ?? '' ) );
+				$event_id = absint( $item['event_id'] ?? 0 );
+				// PT-1.5/PT-4.1 (6.9.0): un ítem de followup lleva
+				// data-event-id -- today.js lo intercepta para abrir el
+				// panel compartido en línea en vez de navegar a otra
+				// página. El resto de fuentes (grading/inactivity/quiz/
+				// task) no tiene un panel equivalente todavía (ver
+				// docs/DEUDA-TECNICA.md) y sigue navegando normal.
+				$data_attr = ( in_array( $source, array( 'followup_academic', 'followup_commercial' ), true ) && $event_id )
+					? ' data-event-id="' . esc_attr( (string) $event_id ) . '"'
+					: '';
+
 				$html .= '<li class="atora-hoy-item atora-hoy-item--' . esc_attr( $urgency ) . '">';
-				$html .= '<a class="atora-hoy-item-link" href="' . esc_url( (string) ( $item['url'] ?? '#' ) ) . '">';
+				$html .= '<a class="atora-hoy-item-link" href="' . esc_url( (string) ( $item['url'] ?? '#' ) ) . '"' . $data_attr . '>';
 				$html .= '<span class="atora-hoy-item-title">' . esc_html( (string) ( $item['title'] ?? '' ) ) . '</span>';
 				$html .= '<span class="atora-hoy-item-arrow" aria-hidden="true">→</span>';
 				$html .= '</a></li>';

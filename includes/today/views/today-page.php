@@ -36,4 +36,11 @@ $items   = ( $service && method_exists( $service, 'get_today' ) ) ? $service->ge
 			<p class="atora-hoy-empty-sub"><?php esc_html_e( 'Buen momento para adelantar algo, o simplemente respirar.', 'atora-lms' ); ?></p>
 		</div>
 	<?php endif; ?>
+
+	<!-- PT-1.5/PT-4.1 (6.9.0): mismo panel compartido que el calendario
+	     académico/comercial -- un ítem de followup se abre acá mismo,
+	     sin navegar a otra página. -->
+	<?php if ( class_exists( 'CLMS_UI_Followup_Panel' ) ) : ?>
+		<?php echo CLMS_UI_Followup_Panel::render_shell( 'atora-hoy-panel' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- ya escapado adentro. ?>
+	<?php endif; ?>
 </div>

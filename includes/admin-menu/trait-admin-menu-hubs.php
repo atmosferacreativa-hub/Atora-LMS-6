@@ -16,6 +16,17 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 		$ver = defined( 'ATORA_LMS_VERSION' ) ? ATORA_LMS_VERSION : '1.0';
 		wp_enqueue_style( 'atora-admin-ds', ATORA_LMS_URL . 'assets/admin/atora-admin.css', array(), $ver );
 
+		// PT-1 (6.9.0): tokens y componentes compartidos (panel + fila de
+		// lista) -- livianos, se cargan en toda página atora-*/clms-* como
+		// ya hace atora-admin-ds, así que calendario, "Hoy", búsqueda y
+		// Actividad (todos en páginas distintas) siempre los tienen
+		// disponibles sin que cada uno tenga que declarar la dependencia
+		// por separado. Registrados acá; cada página que además necesita
+		// el JS del panel lo enqueue con dependencia en 'atora-ui-followup-panel'.
+		wp_enqueue_style( 'atora-ui-tokens', ATORA_LMS_URL . 'assets/shared/tokens.css', array(), $ver );
+		wp_enqueue_style( 'atora-ui-followup-panel', ATORA_LMS_URL . 'assets/shared/followup-panel.css', array( 'atora-ui-tokens' ), $ver );
+		wp_register_script( 'atora-ui-followup-panel', ATORA_LMS_URL . 'assets/shared/followup-panel.js', array(), $ver, true );
+
 		// PT-3 (6.8.0): hoja propia de "Hoy" -- reutiliza los mismos
 		// tokens --atora-* que atora-admin-ds ya define, así que solo se
 		// carga en su propia página, no globalmente. Vive en assets/admin/
@@ -25,6 +36,20 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 			$css_file = ATORA_LMS_DIR . 'assets/admin/atora-hoy.css';
 			if ( file_exists( $css_file ) ) {
 				wp_enqueue_style( 'atora-hoy', ATORA_LMS_URL . 'assets/admin/atora-hoy.css', array( 'atora-admin-ds' ), $ver );
+			}
+
+			// PT-1.5/PT-4.1 (6.9.0): today.js abre el panel de ocurrencia en
+			// línea -- necesita el mismo REST namespace (atora-crm/v2) que
+			// followup-plans.js, pero un objeto localizado propio
+			// (atoraToday, no atoraCrmV2) para no arrastrar el bootstrap
+			// pesado de CRM v2 (kanban/FullCalendar) a esta pantalla.
+			$js_file = ATORA_LMS_DIR . 'assets/admin/today.js';
+			if ( file_exists( $js_file ) ) {
+				wp_enqueue_script( 'atora-today', ATORA_LMS_URL . 'assets/admin/today.js', array( 'atora-ui-followup-panel' ), $ver, true );
+				wp_localize_script( 'atora-today', 'atoraToday', array(
+					'restBase' => esc_url_raw( rest_url( 'atora-crm/v2' ) ),
+					'nonce'    => wp_create_nonce( 'wp_rest' ),
+				) );
 			}
 		}
 	}

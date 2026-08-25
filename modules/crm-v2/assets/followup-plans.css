@@ -143,115 +143,17 @@
 	cursor: pointer;
 }
 
-.atora-fu-panel-date {
-	color: var(--atora-text-secondary, #475569);
-	margin-top: -0.25rem;
-}
-
-.atora-fu-panel-actions {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 0.5rem;
-	margin: 1rem 0;
-}
-.atora-fu-panel-actions .button {
-	min-height: 44px;
-	flex: 1 1 auto;
-}
-
-.atora-fu-student-row {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 0.75rem;
-	padding: 0.75rem 0;
-	border-bottom: 1px solid var(--atora-border-soft, #f1f5f9);
-}
-.atora-fu-student-row.is-contacted {
-	opacity: 0.6;
-}
-.atora-fu-student-info {
-	display: flex;
-	flex-direction: column;
-	min-width: 0;
-}
-.atora-fu-student-name {
-	font-weight: 600;
-	color: var(--atora-text-primary, #0f172a);
-}
-.atora-fu-student-stage {
-	font-size: 12px;
-	color: var(--atora-text-muted, #94a3b8);
-}
-.atora-fu-student-actions {
-	display: flex;
-	align-items: center;
-	gap: 0.5rem;
-	flex-shrink: 0;
-}
-.atora-fu-btn-contact {
-	min-height: 44px;
-	white-space: nowrap;
-}
-.atora-fu-btn-exclude {
-	min-height: 44px;
-	color: var(--atora-danger, #E24B4A);
-}
-
-.atora-fu-empty-occurrence {
-	text-align: center;
-	color: var(--atora-text-secondary, #475569);
-	padding: 1.5rem 0;
-}
-
-.atora-fu-filtered-notice {
-	background: var(--atora-blue-50, #eff6ff);
-	border-radius: var(--atora-radius-md, 12px);
-	padding: 0.65rem 0.9rem;
-	font-size: 13px;
-	color: var(--atora-text-secondary, #475569);
-	margin: 0 0 0.75rem;
-}
-
-/* ── Comercial (6.7.0): score, secuencia, días estancado — un vistazo, no un párrafo ── */
-.atora-fu-student-meta {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 0.4rem;
-	margin-top: 0.35rem;
-}
-.atora-fu-score-badge,
-.atora-fu-sequence-tag,
-.atora-fu-stalled-tag {
-	display: inline-flex;
-	align-items: center;
-	font-size: 11px;
-	font-weight: 600;
-	padding: 0.15rem 0.55rem;
-	border-radius: 999px;
-	white-space: nowrap;
-}
-.atora-fu-score-badge.is-score-high {
-	background: color-mix(in srgb, var(--atora-success, #1D9E75) 15%, transparent);
-	color: var(--atora-success, #1D9E75);
-}
-.atora-fu-score-badge.is-score-medium {
-	background: color-mix(in srgb, var(--atora-warning, #BA7517) 15%, transparent);
-	color: var(--atora-warning, #BA7517);
-}
-.atora-fu-score-badge.is-score-low {
-	background: color-mix(in srgb, var(--atora-danger, #E24B4A) 15%, transparent);
-	color: var(--atora-danger, #E24B4A);
-}
-.atora-fu-sequence-tag {
-	background: var(--atora-blue-50, #eff6ff);
-	color: var(--atora-blue-700, #1d4ed8);
-}
-.atora-fu-stalled-tag {
-	background: var(--atora-bg, #f8fafc);
-	color: var(--atora-text-muted, #94a3b8);
-	font-weight: 500;
-}
+/* PT-1.4 (6.9.0): el panel de ocurrencia (título, subtítulo, acciones,
+   filas de estudiante) fue retrofiteado a los componentes
+   compartidos — ver assets/shared/followup-panel.css para las clases
+   "atora-ui-panel" y "atora-ui-row". Las reglas para las clases viejas
+   (panel-date, panel-actions, student-row, student-info, student-name,
+   student-stage, student-actions, btn-contact, btn-exclude,
+   empty-occurrence, filtered-notice, score-badge, sequence-tag,
+   stalled-tag) que vivían acá se eliminaron — el marcado que las usaba
+   ya no existe. Las clases panel-backdrop y panel-close (arriba) y
+   wizard-sheet (abajo) SÍ quedan: el asistente de 4 pasos sigue
+   reutilizando esas clases y no fue tocado por este retrofit. */
 
 /* ── Buscador de contactos ("Cuenta clave", comercial) ── */
 .atora-fu-contact-search-results {

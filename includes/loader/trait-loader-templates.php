@@ -25,6 +25,9 @@ trait CLMS_Loader_Templates_Trait {
 			'includes/ui/class-ui-blocks.php',
 			'includes/ui/class-ui-shortcode-blocks.php',
 			'includes/ui/class-ui-editor-templates.php',
+			// PT-1 (6.9.0) — componentes compartidos de lista+panel.
+			'includes/ui/class-ui-list-row.php',
+			'includes/ui/class-ui-followup-panel.php',
 		);
 
 		foreach ( $ui_files as $file ) {
