@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.4
 Requires PHP: 8.1
-Stable tag: 6.10.0
+Stable tag: 6.11.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,11 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.11.0 =
+* Added a real student intervention timeline: at-risk alerts (inactivity/low-grade) and manual notes from teachers/coordinators are now recorded on a per-student history, viewable from a new student profile screen.
+* Added the ability to assign a section coordinator from the existing cohort screen — previously this required a direct database edit and had no admin UI at all.
+* "Today" now surfaces a real count of at-risk students for anyone assigned as a section coordinator, instead of showing nothing.
+* Internal: extracted the CRM's core contact primitives (access checks, activity log, timeline) into a standalone service that no longer requires the CRM module to be active — existing CRM behavior is unchanged.
 = 6.10.0 =
 * Removed the public student leaderboard — competitive ranking doesn't fit the "support, not competition" approach the rest of the platform already follows.
 * Added individual student badges per course, shown right on the student's own dashboard (no shortcode, no separate page): Estudiante sobresaliente, destacado, aplicado, regular, or en atención, based on punctuality, grade average, and course participation — each student is judged only against their own work, never compared to classmates.
@@ -175,6 +180,8 @@ Translation files are loaded from the `/languages` directory.
 * Major release aligned with ATORA_v5 architecture and modules.
 
 == Upgrade Notice ==
+= 6.11.0 =
+* New: student intervention timeline and a student profile screen (reachable from at-risk notifications), plus the ability to assign section coordinators from the existing cohort screen. No database schema changes — reuses the existing CRM contact/activity tables. No changes to existing CRM/CRM v2 behavior. Recommended update.
 = 6.10.0 =
 * Product change: the public leaderboard shortcode is removed, replaced by individual (non-comparative) per-course student badges on the existing student dashboard. If you embedded [atora_leaderboard] anywhere, that block will stop rendering — no other screen changes. Recommended update.
 = 6.9.1 =
