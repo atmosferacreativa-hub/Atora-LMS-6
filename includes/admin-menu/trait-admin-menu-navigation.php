@@ -661,6 +661,21 @@ trait CLMS_Admin_Menu_Navigation_Trait {
 			|| current_user_can( 'edit_posts' );
 	}
 
+	/**
+	 * PT-5.1 (6.7.0): planes de seguimiento ahora sirve tanto al
+	 * dominio académico como al comercial (Followup_Plan_Resolver por
+	 * `domain`) — el gate de la página no puede seguir siendo SOLO
+	 * can_access_academic_calendar(), o un vendedor sin ningún rol
+	 * académico quedaría afuera de sus propios planes comerciales.
+	 * Amplía con la misma capacidad ya usada para el hub Crecimiento
+	 * (clms_access_crm_view) — no inventa una capacidad nueva.
+	 */
+	protected function can_access_followup_plans(): bool {
+		return $this->can_access_academic_calendar()
+			|| current_user_can( 'clms_access_crm_view' )
+			|| current_user_can( 'manage_options' );
+	}
+
 	protected function can_access_settings_hub(): bool {
 		return current_user_can( 'clms_access_admin' ) || current_user_can( 'manage_options' );
 	}

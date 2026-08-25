@@ -139,16 +139,23 @@ class Followup_Plans_REST_Controller {
 	 * de FullCalendar para esta pantalla. Solo ocurrencias del docente
 	 * actual (o de todos, si puede gestionar CRM globalmente).
 	 *
-	 * @param \WP_REST_Request $request Params: start, end (ISO8601, provistos por FullCalendar).
+	 * ?domain=academic|commercial (PT-5.1, 6.7.0): filtra por el
+	 * dominio del plan dueño de cada ocurrencia — el selector de
+	 * dominio de la UI, para quien tiene planes de ambos tipos. Sin el
+	 * parámetro, devuelve todas las ocurrencias del usuario sin filtrar
+	 * — comportamiento idéntico a 6.6.0.
+	 *
+	 * @param \WP_REST_Request $request Params: start, end (ISO8601, provistos por FullCalendar), domain?.
 	 * @return \WP_REST_Response
 	 */
 	public static function get_calendar_events( \WP_REST_Request $request ): \WP_REST_Response {
 		global $wpdb;
 
-		$start = sanitize_text_field( (string) $request->get_param( 'start' ) );
-		$end   = sanitize_text_field( (string) $request->get_param( 'end' ) );
-		$user_id = get_current_user_id();
-		$table = $wpdb->prefix . 'atora_calendar_events';
+		$start        = sanitize_text_field( (string) $request->get_param( 'start' ) );
+		$end          = sanitize_text_field( (string) $request->get_param( 'end' ) );
+		$domain_filter = sanitize_key( (string) ( $request->get_param( 'domain' ) ?: '' ) );
+		$user_id      = get_current_user_id();
+		$table        = $wpdb->prefix . 'atora_calendar_events';
 
 		$can_manage = CRM_REST_Controller::can_manage();
 
@@ -190,9 +197,16 @@ class Followup_Plans_REST_Controller {
 			// del rango visible actual salvo que el llamador los pida.
 			$plan_id = (int) $wpdb->get_var( $wpdb->prepare( "SELECT followup_plan_id FROM {$table} WHERE id = %d", $event_id ) );
 			if ( $plan_id && class_exists( '\ATORA\CRM_V2\Services\Followup_Plan_Resolver' ) ) {
+				$plan   = Followup_Plan_Service::get_plan( $plan_id );
+				$domain = $plan ? $plan['domain'] : 'academic';
+
+				if ( '' !== $domain_filter && $domain_filter !== $domain ) {
+					continue; // fuera del dominio pedido por el selector de la UI.
+				}
+
 				$resolution = \ATORA\CRM_V2\Services\Followup_Plan_Resolver::resolve_recipients( $plan_id, $date, $event_id );
-				$plan       = Followup_Plan_Service::get_plan( $plan_id );
-				$domain     = $plan ? $plan['domain'] : 'academic';
+			} elseif ( '' !== $domain_filter && 'academic' !== $domain_filter ) {
+				continue; // ocurrencia sin plan resoluble: tratada como académica por default, se omite si se pidió otro dominio.
 			}
 
 			$students       = $resolution ? (array) $resolution['students'] : array();

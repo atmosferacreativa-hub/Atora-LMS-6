@@ -1877,7 +1877,7 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 	 * PT-4 (6.6.0): calendario de planes de seguimiento del docente.
 	 */
 	public function render_followup_plans_page(): void {
-		if ( ! $this->can_access_academic_calendar() ) {
+		if ( ! $this->can_access_followup_plans() ) {
 			wp_die( esc_html__( 'No tienes permisos.', 'atora-lms' ) );
 		}
 

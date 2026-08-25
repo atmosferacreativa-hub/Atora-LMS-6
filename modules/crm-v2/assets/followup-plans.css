@@ -1,11 +1,15 @@
 /**
- * ATORA LMS — CRM v2, Planes de seguimiento (PT-4, sprint 6.6.0)
+ * ATORA LMS — CRM v2, Planes de seguimiento (PT-4, sprint 6.6.0;
+ * extendido a dos dominios — académico y comercial — en 6.7.0)
  *
  * Mobile-first: estilos base para pantalla angosta, min-width media
  * queries agregan comodidades de escritorio (no al revés). Reutiliza
  * los tokens --atora-* ya definidos en assets/admin/atora-admin.css
  * (cargado como dependencia de atora-crm-v2-ui) — nunca colores
- * hardcodeados de una paleta genérica de calendario.
+ * hardcodeados de una paleta genérica de calendario, y para score
+ * comercial reutiliza los mismos tres tokens semánticos (success/
+ * warning/danger) que ya usa el resto del sistema, no una paleta
+ * nueva de "score" (PT-3.2 de 6.7.0: "reutilizar, no redefinir").
  *
  * §UX de la OT: objetivos táctiles de 44px mínimo, contraste AA,
  * cero scroll horizontal, todo en una pantalla (el asistente es una
@@ -33,6 +37,29 @@
 .atora-fu-subtitle {
 	color: var(--atora-text-secondary, #475569);
 	margin: 0.25rem 0 0;
+}
+
+/* PT-5.1 (6.7.0): selector de dominio — solo se renderiza (ver vista)
+   para quien tiene planes académicos Y comerciales. */
+.atora-fu-domain-tabs {
+	display: flex;
+	gap: 0.5rem;
+	margin: 0 0 1rem;
+}
+.atora-fu-domain-tab {
+	min-height: 44px;
+	padding: 0 1.1rem;
+	border: 1px solid var(--atora-border, #e2e8f0);
+	border-radius: 999px;
+	background: var(--atora-surface, #fff);
+	color: var(--atora-text-secondary, #475569);
+	font-weight: 600;
+	cursor: pointer;
+}
+.atora-fu-domain-tab.is-active {
+	background: var(--atora-blue-700, #1d4ed8);
+	border-color: var(--atora-blue-700, #1d4ed8);
+	color: #fff;
 }
 
 .atora-fu-new-plan {
@@ -175,6 +202,112 @@
 	text-align: center;
 	color: var(--atora-text-secondary, #475569);
 	padding: 1.5rem 0;
+}
+
+.atora-fu-filtered-notice {
+	background: var(--atora-blue-50, #eff6ff);
+	border-radius: var(--atora-radius-md, 12px);
+	padding: 0.65rem 0.9rem;
+	font-size: 13px;
+	color: var(--atora-text-secondary, #475569);
+	margin: 0 0 0.75rem;
+}
+
+/* ── Comercial (6.7.0): score, secuencia, días estancado — un vistazo, no un párrafo ── */
+.atora-fu-student-meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem;
+	margin-top: 0.35rem;
+}
+.atora-fu-score-badge,
+.atora-fu-sequence-tag,
+.atora-fu-stalled-tag {
+	display: inline-flex;
+	align-items: center;
+	font-size: 11px;
+	font-weight: 600;
+	padding: 0.15rem 0.55rem;
+	border-radius: 999px;
+	white-space: nowrap;
+}
+.atora-fu-score-badge.is-score-high {
+	background: color-mix(in srgb, var(--atora-success, #1D9E75) 15%, transparent);
+	color: var(--atora-success, #1D9E75);
+}
+.atora-fu-score-badge.is-score-medium {
+	background: color-mix(in srgb, var(--atora-warning, #BA7517) 15%, transparent);
+	color: var(--atora-warning, #BA7517);
+}
+.atora-fu-score-badge.is-score-low {
+	background: color-mix(in srgb, var(--atora-danger, #E24B4A) 15%, transparent);
+	color: var(--atora-danger, #E24B4A);
+}
+.atora-fu-sequence-tag {
+	background: var(--atora-blue-50, #eff6ff);
+	color: var(--atora-blue-700, #1d4ed8);
+}
+.atora-fu-stalled-tag {
+	background: var(--atora-bg, #f8fafc);
+	color: var(--atora-text-muted, #94a3b8);
+	font-weight: 500;
+}
+
+/* ── Buscador de contactos ("Cuenta clave", comercial) ── */
+.atora-fu-contact-search-results {
+	position: relative;
+	background: var(--atora-surface, #fff);
+	border: 1px solid var(--atora-border, #e2e8f0);
+	border-radius: var(--atora-radius-md, 12px);
+	margin-top: 0.4rem;
+	max-height: 220px;
+	overflow-y: auto;
+}
+.atora-fu-search-result {
+	display: block;
+	width: 100%;
+	min-height: 44px;
+	text-align: left;
+	padding: 0 0.9rem;
+	border: none;
+	border-bottom: 1px solid var(--atora-border-soft, #f1f5f9);
+	background: transparent;
+	cursor: pointer;
+	font-size: 14px;
+}
+.atora-fu-search-result:last-child {
+	border-bottom: none;
+}
+.atora-fu-search-result:hover,
+.atora-fu-search-result:focus-visible {
+	background: var(--atora-bg, #f8fafc);
+}
+.atora-fu-search-empty {
+	padding: 0.75rem 0.9rem;
+	color: var(--atora-text-muted, #94a3b8);
+	font-size: 13px;
+}
+.atora-fu-chip--removable {
+	padding-right: 0.4rem;
+}
+.atora-fu-chip-remove {
+	border: none;
+	background: transparent;
+	color: inherit;
+	font-size: 16px;
+	line-height: 1;
+	cursor: pointer;
+	padding: 0 0.2rem;
+	min-width: 24px;
+	min-height: 24px;
+}
+.atora-fu-scope-hint {
+	color: var(--atora-text-muted, #94a3b8);
+	font-size: 13px;
+	margin: 0.5rem 0 1rem;
+}
+.atora-fu-domain-block[hidden] {
+	display: none;
 }
 
 /* ── Asistente de 4 pasos ── */

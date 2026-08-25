@@ -1,5 +1,6 @@
 /**
- * ATORA LMS — CRM v2, Planes de seguimiento (PT-4, sprint 6.6.0)
+ * ATORA LMS — CRM v2, Planes de seguimiento (PT-4, sprint 6.6.0;
+ * generalizado a dos dominios — académico y comercial — en 6.7.0)
  *
  * followup-plans.js
  *
@@ -13,15 +14,24 @@
  * Responsabilidades:
  *   1. Calendario mensual con bloques por plan de seguimiento
  *      (PT-4.1) — color por urgencia usando los tokens del sistema de
- *      diseño (--atora-blue-700 programado, --atora-warning
+ *      diseño. Académico: --atora-blue-700 programado, --atora-warning
  *      pendiente con estudiantes sin contactar, --atora-success
- *      completado) — nunca una paleta genérica de librería.
+ *      completado. Comercial (PT-3, 6.7.0): color por score del
+ *      contacto de mayor urgencia en la ocurrencia — mismos tokens,
+ *      nunca una paleta nueva.
  *   2. Arrastrar para reprogramar (PT-4.3) → POST .../reschedule
- *   3. Panel lateral al click en un bloque (PT-4.4): estudiantes de
- *      esa ocurrencia, marcar contactado individual/lote, posponer,
- *      saltar, excluir.
+ *   3. Panel lateral al click en un bloque (PT-4.4): estudiantes/
+ *      contactos de esa ocurrencia, marcar contactado individual/lote,
+ *      posponer, saltar, excluir. En comercial, cada fila muestra su
+ *      score y, si corresponde, su indicación de secuencia automática
+ *      activa (PT-4.2 de 6.7.0 — coordina, nunca oculta).
  *   4. Asistente de 4 pasos para aplicar un plan (PT-4.2), con vista
- *      previa en vivo (PT-2.2) antes de guardar.
+ *      previa en vivo (PT-2.2) antes de guardar. El paso 3 muestra
+ *      controles distintos según el dominio actual: secciones+etapas
+ *      académicas, o etapas de pipeline (+ filtro de secuencia) o un
+ *      buscador de contactos para "Cuenta clave" en comercial.
+ *   5. Selector de dominio (PT-5.1, 6.7.0) — pestañas simples, solo
+ *      visibles para quien tiene planes académicos Y comerciales.
  *
  * @package ATORA_LMS\CRM_V2
  * @since   6.6.0
@@ -33,10 +43,23 @@
 	var REST  = (typeof cfg.restBase === 'string' ? cfg.restBase : '').replace(/\/+$/, '');
 	var NONCE = typeof cfg.nonce === 'string' ? cfg.nonce : '';
 
+	var appEl = document.getElementById('atora-fu-app');
+	var currentDomain = (appEl && appEl.getAttribute('data-default-domain')) || 'academic';
+	var canAcademic   = !appEl || appEl.getAttribute('data-can-academic') !== '0';
+	var canCommercial = !!appEl && appEl.getAttribute('data-can-commercial') === '1';
+
 	var STAGE_COLORS = {
-		completed_all: 'var(--atora-success, #1D9E75)',
-		pending:       'var(--atora-blue-700, #1d4ed8)',
-		pending_uncontacted: 'var(--atora-warning, #BA7517)'
+		completed_all:       'var(--atora-success, #1D9E75)',
+		pending:             'var(--atora-blue-700, #1d4ed8)',
+		pending_uncontacted: 'var(--atora-warning, #BA7517)',
+		urgency_high:        'var(--atora-danger, #E24B4A)',
+		urgency_medium:      'var(--atora-warning, #BA7517)',
+		urgency_low:         'var(--atora-success, #1D9E75)'
+	};
+
+	var DOMAIN_LABELS = {
+		academic:   { subtitle: 'Tu ritmo de contacto con estudiantes en riesgo, en un calendario.', entity: 'estudiante', entityPlural: 'estudiantes' },
+		commercial: { subtitle: 'Tu ritmo de contacto con contactos y deals, en un calendario.', entity: 'contacto', entityPlural: 'contactos' }
 	};
 
 	/* ============================================================
@@ -104,12 +127,40 @@
 		};
 	}
 
+	function escapeHtml(str) {
+		var div = document.createElement('div');
+		div.textContent = str || '';
+		return div.innerHTML;
+	}
+
+	/* ============================================================
+	 *  SELECTOR DE DOMINIO (PT-5.1, 6.7.0)
+	 * ============================================================ */
+	function setDomain(domain) {
+		currentDomain = domain;
+
+		document.querySelectorAll('.atora-fu-domain-tab').forEach(function (tab) {
+			var active = tab.getAttribute('data-domain') === domain;
+			tab.classList.toggle('is-active', active);
+			tab.setAttribute('aria-selected', active ? 'true' : 'false');
+		});
+
+		var subtitleEl = document.getElementById('atora-fu-subtitle');
+		if (subtitleEl && DOMAIN_LABELS[domain]) { subtitleEl.textContent = DOMAIN_LABELS[domain].subtitle; }
+
+		if (calendar) { calendar.refetchEvents(); }
+	}
+
 	/* ============================================================
 	 *  CALENDARIO
 	 * ============================================================ */
 	var calendar = null;
 
 	function eventColor(props) {
+		if (props.domain === 'commercial' && props.urgency) {
+			if (props.empty) { return STAGE_COLORS.completed_all; }
+			return STAGE_COLORS['urgency_' + props.urgency] || STAGE_COLORS.pending;
+		}
 		if (props.empty) { return STAGE_COLORS.completed_all; }
 		if (props.all_contacted) { return STAGE_COLORS.completed_all; }
 		if (props.any_uncontacted) { return STAGE_COLORS.pending_uncontacted; }
@@ -132,9 +183,9 @@
 			dayMaxEvents: 3,
 
 			events: function (info, successCb, failureCb) {
-				api('followup-plans/calendar-events', {
-					params: { start: info.startStr, end: info.endStr }
-				}).then(function (data) {
+				var params = { start: info.startStr, end: info.endStr };
+				if (canAcademic && canCommercial) { params.domain = currentDomain; }
+				api('followup-plans/calendar-events', { params: params }).then(function (data) {
 					successCb((data.events || []).map(function (ev) {
 						ev.color = eventColor(ev.extendedProps || {});
 						return ev;
@@ -204,29 +255,67 @@
 		currentOccurrenceId = null;
 	}
 
+	var EMPTY_REASONS = {
+		sin_configuracion: 'Este plan todavía no tiene a quién seguir configurado.',
+		sin_estudiantes_en_secciones: 'No hay estudiantes activos en las secciones de este plan.',
+		nadie_en_esas_etapas_hoy: 'Nadie está en las etapas de este plan hoy — buena señal.',
+		nadie_cumple_el_filtro_hoy: 'Nadie cumple el filtro de este plan hoy.',
+		todos_en_secuencia_activa: 'Todos los contactos de hoy ya están en una secuencia automática — nada que revisar a mano.',
+		dominio_no_disponible: 'Este plan pertenece a un módulo que no está disponible ahora.',
+		crm_no_disponible: 'El CRM comercial no está disponible ahora.'
+	};
+
+	function scoreBadgeClass(scoreLabel) {
+		var s = (scoreLabel || '').toLowerCase();
+		if (s.indexOf('alta') !== -1) { return 'is-score-high'; }
+		if (s.indexOf('media') !== -1) { return 'is-score-medium'; }
+		return 'is-score-low';
+	}
+
 	function renderStudents(data) {
 		var container = document.getElementById('atora-fu-panel-students');
 		var students = data.students || [];
+		var domain = data.domain || 'academic';
+
+		var notice = '';
+		if (data.filtered_out_count > 0) {
+			notice = '<p class="atora-fu-filtered-notice">' + data.filtered_out_count +
+				' contacto' + (data.filtered_out_count === 1 ? '' : 's') +
+				' más está' + (data.filtered_out_count === 1 ? '' : 'n') +
+				' en secuencia automática y no se muestra' + (data.filtered_out_count === 1 ? '' : 'n') + ' acá.</p>';
+		}
 
 		if (!students.length) {
-			var reasons = {
-				sin_configuracion: 'Este plan todavía no tiene secciones o etapas configuradas.',
-				sin_estudiantes_en_secciones: 'No hay estudiantes activos en las secciones de este plan.',
-				nadie_en_esas_etapas_hoy: 'Nadie está en las etapas de este plan hoy — buena señal.',
-				nadie_cumple_el_filtro_hoy: 'Nadie cumple el filtro de este plan hoy.'
-			};
-			container.innerHTML = '<p class="atora-fu-empty-occurrence">' +
-				(reasons[data.empty_reason] || 'No hay estudiantes para esta ocurrencia hoy.') + '</p>';
+			container.innerHTML = notice + '<p class="atora-fu-empty-occurrence">' +
+				(EMPTY_REASONS[data.empty_reason] || 'No hay nadie para esta ocurrencia hoy.') + '</p>';
 			return;
 		}
 
-		container.innerHTML = students.map(function (s) {
+		container.innerHTML = notice + students.map(function (s) {
 			var contactedClass = s.contacted ? ' is-contacted' : '';
+			var meta = s.meta || {};
+			var extra = '';
+
+			if ('commercial' === domain) {
+				if (meta.score_label) {
+					extra += '<span class="atora-fu-score-badge ' + scoreBadgeClass(meta.score_label) + '">' + escapeHtml(meta.score_label) + ' (' + meta.score + ')</span>';
+				}
+				if (meta.sequence && meta.sequence.active) {
+					extra += '<span class="atora-fu-sequence-tag" title="' + escapeHtml(meta.sequence.sequence_name) + '">' +
+						'✉ ' + escapeHtml(meta.sequence.sequence_name) + ' · paso ' + meta.sequence.current_step + '/' + meta.sequence.total_steps +
+						'</span>';
+				}
+				if (typeof meta.days_stalled === 'number' && meta.days_stalled > 0) {
+					extra += '<span class="atora-fu-stalled-tag">' + meta.days_stalled + ' días sin avanzar</span>';
+				}
+			}
+
 			return '' +
 				'<div class="atora-fu-student-row' + contactedClass + '" data-user-id="' + s.user_id + '">' +
 					'<div class="atora-fu-student-info">' +
 						'<span class="atora-fu-student-name">' + escapeHtml(s.display_name) + '</span>' +
 						'<span class="atora-fu-student-stage">' + escapeHtml(s.stage_label) + '</span>' +
+						(extra ? '<div class="atora-fu-student-meta">' + extra + '</div>' : '') +
 					'</div>' +
 					'<div class="atora-fu-student-actions">' +
 						'<button type="button" class="button atora-fu-btn-contact" data-user-id="' + s.user_id + '">' +
@@ -236,12 +325,6 @@
 					'</div>' +
 				'</div>';
 		}).join('');
-	}
-
-	function escapeHtml(str) {
-		var div = document.createElement('div');
-		div.textContent = str || '';
-		return div.innerHTML;
 	}
 
 	function markContacted(userId) {
@@ -259,15 +342,15 @@
 
 	function excludeStudent(userId) {
 		if (!currentOccurrenceId) { return; }
-		if (!window.confirm('¿Excluir a este estudiante solo de esta ocurrencia?')) { return; }
+		if (!window.confirm('¿Excluir de esta ocurrencia?')) { return; }
 		api('followup-plans/occurrence/' + currentOccurrenceId + '/exclude', {
 			method: 'POST',
 			body: { user_id: userId }
 		}).then(function () {
-			toast('Estudiante excluido de esta ocurrencia.', 'success');
+			toast('Excluido de esta ocurrencia.', 'success');
 			openPanel(currentOccurrenceId);
 		}).catch(function (err) {
-			toast(err.message || 'No se pudo excluir al estudiante.', 'error');
+			toast(err.message || 'No se pudo excluir.', 'error');
 		});
 	}
 
@@ -322,14 +405,41 @@
 	/* ============================================================
 	 *  ASISTENTE DE 4 PASOS (PT-4.2)
 	 * ============================================================ */
-	var wizardState = { step: 1, template_key: null, section_ids: [], stage_filter: [], recurrence_rule: 'WEEKLY;BYDAY=MO' };
+	function freshWizardState() {
+		return {
+			step: 1,
+			domain: currentDomain,
+			template_key: null,
+			manual_mode: false,
+			section_ids: [],
+			stage_filter: [],
+			domain_config: {},
+			recurrence_rule: 'WEEKLY;BYDAY=MO',
+			selected_contacts: []
+		};
+	}
+	var wizardState = freshWizardState();
+
+	function applyDomainBlocks() {
+		var academicBlock   = document.getElementById('atora-fu-academic-scope');
+		var commercialBlock = document.getElementById('atora-fu-commercial-scope');
+		var manualBlock     = document.getElementById('atora-fu-commercial-manual');
+
+		var isCommercial = wizardState.domain === 'commercial';
+		if (academicBlock)   { academicBlock.hidden = isCommercial; }
+		if (commercialBlock) { commercialBlock.hidden = !isCommercial || wizardState.manual_mode; }
+		if (manualBlock)     { manualBlock.hidden = !isCommercial || !wizardState.manual_mode; }
+	}
 
 	function openWizard() {
-		wizardState = { step: 1, template_key: null, section_ids: [], stage_filter: [], recurrence_rule: 'WEEKLY;BYDAY=MO' };
+		wizardState = freshWizardState();
 		var wizard = document.getElementById('atora-fu-wizard');
 		if (!wizard) { return; }
 		wizard.hidden = false;
 		wizard.setAttribute('aria-hidden', 'false');
+		document.getElementById('atora-fu-selected-contacts').innerHTML = '';
+		document.getElementById('atora-fu-exclude-sequence').checked = false;
+		applyDomainBlocks();
 		loadTemplates();
 		goToStep(1);
 	}
@@ -344,7 +454,7 @@
 	function loadTemplates() {
 		var grid = document.getElementById('atora-fu-template-grid');
 		if (!grid) { return; }
-		api('followup-plans/templates').then(function (data) {
+		api('followup-plans/templates', { params: { domain: wizardState.domain } }).then(function (data) {
 			var templates = data.templates || {};
 			grid.innerHTML = Object.keys(templates).map(function (key) {
 				var t = templates[key];
@@ -361,6 +471,9 @@
 					wizardState.template_key = key;
 					wizardState.stage_filter = t.stage_filter || [];
 					wizardState.recurrence_rule = t.recurrence_rule || 'WEEKLY;BYDAY=MO';
+					wizardState.domain_config = t.domain_config || {};
+					wizardState.manual_mode = wizardState.domain === 'commercial' && (t.stage_filter || []).length === 0;
+					applyDomainBlocks();
 					applyStageSelectionToChips();
 					goToStep(2);
 					updatePreview();
@@ -372,12 +485,15 @@
 	}
 
 	function applyStageSelectionToChips() {
-		document.querySelectorAll('#atora-fu-stage-chips input[type="checkbox"]').forEach(function (cb) {
+		var chipSelector = wizardState.domain === 'commercial' ? '#atora-fu-deal-stage-chips' : '#atora-fu-stage-chips';
+		document.querySelectorAll(chipSelector + ' input[type="checkbox"]').forEach(function (cb) {
 			cb.checked = wizardState.stage_filter.indexOf(cb.value) !== -1;
 		});
 		document.querySelectorAll('#atora-fu-frequency-chips input[type="radio"]').forEach(function (radio) {
 			radio.checked = radio.value === wizardState.recurrence_rule;
 		});
+		var excludeSeq = document.getElementById('atora-fu-exclude-sequence');
+		if (excludeSeq) { excludeSeq.checked = !!wizardState.domain_config.exclude_active_sequence; }
 	}
 
 	function collectSelectedSections() {
@@ -387,19 +503,51 @@
 	}
 
 	function collectSelectedStages() {
+		var chipSelector = wizardState.domain === 'commercial' ? '#atora-fu-deal-stage-chips' : '#atora-fu-stage-chips';
 		var stages = [];
-		document.querySelectorAll('#atora-fu-stage-chips input:checked').forEach(function (cb) { stages.push(cb.value); });
+		document.querySelectorAll(chipSelector + ' input:checked').forEach(function (cb) { stages.push(cb.value); });
 		return stages;
+	}
+
+	function collectDomainConfig() {
+		var config = Object.assign({}, wizardState.domain_config);
+		if (wizardState.domain === 'commercial') {
+			var excludeSeq = document.getElementById('atora-fu-exclude-sequence');
+			config.exclude_active_sequence = !!(excludeSeq && excludeSeq.checked);
+		}
+		return config;
+	}
+
+	function currentEntityScopeIds() {
+		if (wizardState.domain === 'commercial') {
+			return wizardState.manual_mode ? wizardState.selected_contacts.map(function (c) { return c.id; }) : [];
+		}
+		return collectSelectedSections();
+	}
+
+	function currentStageFilter() {
+		if (wizardState.domain === 'commercial' && wizardState.manual_mode) { return []; }
+		return wizardState.stage_filter.length ? wizardState.stage_filter : collectSelectedStages();
 	}
 
 	function updatePreview() {
 		var box = document.getElementById('atora-fu-preview-box');
 		if (!box) { return; }
 
-		var sectionIds = collectSelectedSections();
-		var stageFilter = wizardState.stage_filter.length ? wizardState.stage_filter : collectSelectedStages();
+		var entityScopeIds = currentEntityScopeIds();
+		var stageFilter = currentStageFilter();
+		var isManual = wizardState.domain === 'commercial' && wizardState.manual_mode;
+		var isCommercialByStage = wizardState.domain === 'commercial' && !wizardState.manual_mode;
 
-		if (!sectionIds.length || !stageFilter.length) {
+		if (isManual && !entityScopeIds.length) {
+			box.innerHTML = '<p>Buscá y elegí al menos un contacto para ver la vista previa.</p>';
+			return;
+		}
+		if (isCommercialByStage && !stageFilter.length) {
+			box.innerHTML = '<p>Elegí al menos una etapa para ver la vista previa.</p>';
+			return;
+		}
+		if (!isManual && !isCommercialByStage && (!entityScopeIds.length || !stageFilter.length)) {
 			box.innerHTML = '<p>Elegí al menos una sección y una etapa para ver la vista previa.</p>';
 			return;
 		}
@@ -407,11 +555,19 @@
 		box.innerHTML = '<p>Calculando…</p>';
 		api('followup-plans/preview', {
 			method: 'POST',
-			body: { section_ids: sectionIds, stage_filter: stageFilter }
+			body: {
+				section_ids: entityScopeIds,
+				stage_filter: stageFilter,
+				domain: wizardState.domain,
+				domain_config: collectDomainConfig()
+			}
 		}).then(function (data) {
+			var labels = DOMAIN_LABELS[wizardState.domain] || DOMAIN_LABELS.academic;
+			var entityWord = data.count === 1 ? labels.entity : labels.entityPlural;
+			var scopeWord = wizardState.domain === 'commercial' ? '' :
+				' en ' + data.sections.length + ' sección' + (data.sections.length === 1 ? '' : 'es');
 			box.innerHTML = '<p class="atora-fu-preview-count"><strong>Hoy esto tocaría a ' + data.count +
-				' estudiante' + (data.count === 1 ? '' : 's') + '</strong> en ' + data.sections.length +
-				' sección' + (data.sections.length === 1 ? '' : 'es') + '.</p>';
+				' ' + entityWord + '</strong>' + scopeWord + '.</p>';
 		}).catch(function (err) {
 			box.innerHTML = '<p>No se pudo calcular la vista previa.</p>';
 			toast(err.message || 'Error al calcular la vista previa.', 'error');
@@ -430,19 +586,80 @@
 		document.getElementById('atora-fu-wizard-next').hidden = step === 4;
 		document.getElementById('atora-fu-wizard-apply').hidden = step !== 4;
 
-		if (step === 3) { updatePreview(); }
+		if (step === 3) { applyDomainBlocks(); updatePreview(); }
+	}
+
+	/* ── Buscador de contactos ("Cuenta clave", comercial) ────────── */
+	var _contactSearchTimer = null;
+
+	function renderSelectedContacts() {
+		var wrap = document.getElementById('atora-fu-selected-contacts');
+		if (!wrap) { return; }
+		wrap.innerHTML = wizardState.selected_contacts.map(function (c) {
+			return '<span class="atora-fu-chip atora-fu-chip--removable" data-contact-id="' + c.id + '">' +
+				escapeHtml(c.name) + ' <button type="button" class="atora-fu-chip-remove" data-contact-id="' + c.id + '" aria-label="Quitar">&times;</button>' +
+				'</span>';
+		}).join('');
+	}
+
+	function addSelectedContact(id, name) {
+		id = parseInt(id, 10);
+		if (!id || wizardState.selected_contacts.some(function (c) { return c.id === id; })) { return; }
+		wizardState.selected_contacts.push({ id: id, name: name });
+		renderSelectedContacts();
+		if (wizardState.step === 3) { updatePreview(); }
+	}
+
+	function removeSelectedContact(id) {
+		id = parseInt(id, 10);
+		wizardState.selected_contacts = wizardState.selected_contacts.filter(function (c) { return c.id !== id; });
+		renderSelectedContacts();
+		if (wizardState.step === 3) { updatePreview(); }
+	}
+
+	function searchContacts(term) {
+		var results = document.getElementById('atora-fu-contact-search-results');
+		if (!results) { return; }
+		if (!term) { results.hidden = true; results.innerHTML = ''; return; }
+
+		api('contacts/search', { params: { q: term, limit: 8 } }).then(function (data) {
+			var items = data.items || [];
+			if (!items.length) {
+				results.innerHTML = '<p class="atora-fu-search-empty">Sin resultados.</p>';
+				results.hidden = false;
+				return;
+			}
+			results.innerHTML = items.map(function (c) {
+				return '<button type="button" class="atora-fu-search-result" data-contact-id="' + c.id + '" data-contact-name="' + escapeHtml(c.name || '') + '">' +
+					escapeHtml(c.name || '(sin nombre)') + (c.email ? ' — ' + escapeHtml(c.email) : '') +
+					'</button>';
+			}).join('');
+			results.hidden = false;
+		}).catch(function () {
+			results.hidden = true;
+		});
 	}
 
 	function applyPlan() {
 		var name = document.getElementById('atora-fu-plan-name').value.trim();
 		if (!name) { toast('Ponele un nombre al plan.', 'error'); return; }
 
-		var sectionIds = collectSelectedSections();
-		var stageFilter = wizardState.stage_filter.length ? wizardState.stage_filter : collectSelectedStages();
+		var entityScopeIds = currentEntityScopeIds();
+		var stageFilter = currentStageFilter();
+		var isManual = wizardState.domain === 'commercial' && wizardState.manual_mode;
+		var isCommercialByStage = wizardState.domain === 'commercial' && !wizardState.manual_mode;
 		var frequencyInput = document.querySelector('#atora-fu-frequency-chips input:checked');
 		var recurrenceRule = frequencyInput ? frequencyInput.value : wizardState.recurrence_rule;
 
-		if (!sectionIds.length || !stageFilter.length) {
+		if (isManual && !entityScopeIds.length) {
+			toast('Elegí al menos un contacto.', 'error');
+			return;
+		}
+		if (isCommercialByStage && !stageFilter.length) {
+			toast('Falta elegir a quién seguir.', 'error');
+			return;
+		}
+		if (!isManual && !isCommercialByStage && (!entityScopeIds.length || !stageFilter.length)) {
 			toast('Faltan secciones o etapas.', 'error');
 			return;
 		}
@@ -451,10 +668,12 @@
 		api('followup-plans', {
 			method: 'POST',
 			body: {
+				domain: wizardState.domain,
 				name: name,
 				template_key: wizardState.template_key,
-				section_ids: sectionIds,
+				section_ids: entityScopeIds,
 				stage_filter: stageFilter,
+				domain_config: collectDomainConfig(),
 				recurrence_rule: recurrenceRule,
 				action_type: 'checkin'
 			}
@@ -475,6 +694,10 @@
 	document.addEventListener('DOMContentLoaded', function () {
 		initCalendar();
 
+		document.querySelectorAll('.atora-fu-domain-tab').forEach(function (tab) {
+			tab.addEventListener('click', function () { setDomain(tab.getAttribute('data-domain')); });
+		});
+
 		var openBtn = document.getElementById('atora-fu-open-wizard');
 		if (openBtn) { openBtn.addEventListener('click', openWizard); }
 
@@ -488,6 +711,8 @@
 			blankBtn.addEventListener('click', function () {
 				wizardState.template_key = null;
 				wizardState.stage_filter = [];
+				wizardState.manual_mode = false;
+				applyDomainBlocks();
 				goToStep(3);
 			});
 		}
@@ -499,11 +724,40 @@
 		if (backBtn) { backBtn.addEventListener('click', function () { goToStep(Math.max(1, wizardState.step - 1)); }); }
 		if (applyBtn) { applyBtn.addEventListener('click', applyPlan); }
 
-		document.querySelectorAll('#atora-fu-section-chips input, #atora-fu-stage-chips input').forEach(function (input) {
+		document.querySelectorAll('#atora-fu-section-chips input, #atora-fu-stage-chips input, #atora-fu-deal-stage-chips input, #atora-fu-exclude-sequence').forEach(function (input) {
 			input.addEventListener('change', function () {
 				if (wizardState.step === 3) { updatePreview(); }
 			});
 		});
+
+		var contactSearchInput = document.getElementById('atora-fu-contact-search');
+		if (contactSearchInput) {
+			contactSearchInput.addEventListener('input', function () {
+				var term = contactSearchInput.value.trim();
+				if (_contactSearchTimer) { clearTimeout(_contactSearchTimer); }
+				_contactSearchTimer = setTimeout(function () { searchContacts(term); }, 300);
+			});
+		}
+
+		var contactResults = document.getElementById('atora-fu-contact-search-results');
+		if (contactResults) {
+			contactResults.addEventListener('click', function (e) {
+				var btn = e.target.closest('.atora-fu-search-result');
+				if (!btn) { return; }
+				addSelectedContact(btn.getAttribute('data-contact-id'), btn.getAttribute('data-contact-name'));
+				contactSearchInput.value = '';
+				contactResults.hidden = true;
+				contactResults.innerHTML = '';
+			});
+		}
+
+		var selectedContactsWrap = document.getElementById('atora-fu-selected-contacts');
+		if (selectedContactsWrap) {
+			selectedContactsWrap.addEventListener('click', function (e) {
+				var btn = e.target.closest('.atora-fu-chip-remove');
+				if (btn) { removeSelectedContact(btn.getAttribute('data-contact-id')); }
+			});
+		}
 
 		var panelClose = document.getElementById('atora-fu-panel-close');
 		var panelBackdrop = document.getElementById('atora-fu-panel-backdrop');
