@@ -1228,6 +1228,13 @@ class CRM_V2_App {
 			$base . '/rest/class-sequence-rest-controller.php',
 			$base . '/rest/class-abandoned-carts-rest-controller.php',
 			// PT-1/PT-2/PT-3/PT-4 (6.6.0) — Planes de seguimiento
+			// PT-1 (6.7.0): la interfaz de dominio y sus dos
+			// implementaciones deben cargarse ANTES que el resolver — los
+			// proveedores usan `implements Followup_Domain_Provider`, que
+			// PHP resuelve en el momento en que declara la clase.
+			$base . '/services/class-followup-domain-provider-interface.php',
+			$base . '/services/class-academic-domain-provider.php',
+			$base . '/services/class-commercial-domain-provider.php',
 			$base . '/services/class-followup-recurrence.php',
 			$base . '/services/class-followup-plan-resolver.php',
 			$base . '/services/class-followup-plan-service.php',

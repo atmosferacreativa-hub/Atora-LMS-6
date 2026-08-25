@@ -178,14 +178,17 @@ class Followup_Plans_REST_Controller {
 			$event_id = absint( $row['id'] ?? 0 );
 			$date     = gmdate( 'Y-m-d', strtotime( (string) $row['start_datetime'] ) );
 
-			$contacted = Followup_Plan_Service::get_contacted_students( $event_id );
+			$contacted  = Followup_Plan_Service::get_contacted_students( $event_id );
 			$resolution = null;
+			$domain     = 'academic';
 			// Resolución completa solo si hace falta clasificar el color
 			// (contactados vs. pendientes) — se evita para eventos fuera
 			// del rango visible actual salvo que el llamador los pida.
 			$plan_id = (int) $wpdb->get_var( $wpdb->prepare( "SELECT followup_plan_id FROM {$table} WHERE id = %d", $event_id ) );
 			if ( $plan_id && class_exists( '\ATORA\CRM_V2\Services\Followup_Plan_Resolver' ) ) {
 				$resolution = \ATORA\CRM_V2\Services\Followup_Plan_Resolver::resolve_recipients( $plan_id, $date, $event_id );
+				$plan       = Followup_Plan_Service::get_plan( $plan_id );
+				$domain     = $plan ? $plan['domain'] : 'academic';
 			}
 
 			$students       = $resolution ? (array) $resolution['students'] : array();
@@ -193,15 +196,36 @@ class Followup_Plans_REST_Controller {
 			$total          = count( $students );
 			$contacted_cnt  = count( array_intersect( array_map( static fn( $s ) => (int) $s['user_id'], $students ), $contacted_ids ) );
 
+			// PT-3.1: en el dominio comercial, el bloque refleja el score
+			// del contacto de MAYOR urgencia incluido — reutiliza los
+			// mismos umbrales que Scoring_Service::get_score_label()
+			// (score bajo = lead frío = necesita atención = urgente),
+			// nunca una segunda categorización de score paralela.
+			$urgency = null;
+			if ( 'commercial' === $domain && $total > 0 ) {
+				$lowest_score = null;
+				foreach ( $students as $s ) {
+					$score = (int) ( $s['meta']['score'] ?? 100 );
+					if ( null === $lowest_score || $score < $lowest_score ) {
+						$lowest_score = $score;
+					}
+				}
+				if ( null !== $lowest_score ) {
+					$urgency = $lowest_score > 70 ? 'low' : ( $lowest_score >= 40 ? 'medium' : 'high' );
+				}
+			}
+
 			$events[] = array(
 				'id'    => $event_id,
 				'title' => sanitize_text_field( (string) $row['title'] ),
 				'start' => $date,
 				'extendedProps' => array(
 					'event_id'         => $event_id,
+					'domain'           => $domain,
 					'empty'            => 0 === $total,
 					'all_contacted'    => $total > 0 && $contacted_cnt === $total,
 					'any_uncontacted'  => $total > 0 && $contacted_cnt < $total,
+					'urgency'          => $urgency,
 				),
 			);
 		}
@@ -211,38 +235,54 @@ class Followup_Plans_REST_Controller {
 
 	/**
 	 * POST /followup-plans/preview — PT-2.2/PT-4.2 paso 2: vista
-	 * previa "hoy esto tocaría a N estudiantes" contra una definición
-	 * TODAVÍA NO GUARDADA.
+	 * previa "hoy esto tocaría a N estudiantes/contactos" contra una
+	 * definición TODAVÍA NO GUARDADA.
 	 *
-	 * @param \WP_REST_Request $request Body: section_ids[], stage_filter[].
+	 * @param \WP_REST_Request $request Body: section_ids[], stage_filter[], domain?, domain_config?.
 	 * @return \WP_REST_Response
 	 */
 	public static function preview_recipients( \WP_REST_Request $request ): \WP_REST_Response {
-		$section_ids  = array_map( 'absint', (array) $request->get_param( 'section_ids' ) );
-		$stage_filter = array_map( 'sanitize_key', (array) $request->get_param( 'stage_filter' ) );
+		$section_ids   = array_map( 'absint', (array) $request->get_param( 'section_ids' ) );
+		$stage_filter  = array_map( 'sanitize_key', (array) $request->get_param( 'stage_filter' ) );
+		$domain        = sanitize_key( (string) ( $request->get_param( 'domain' ) ?: 'academic' ) );
+		$domain_config = (array) ( $request->get_param( 'domain_config' ) ?: array() );
 
-		$result = Followup_Plan_Resolver::resolve_for_definition( $section_ids, $stage_filter );
+		$result = Followup_Plan_Resolver::resolve_for_definition(
+			$section_ids,
+			$stage_filter,
+			0,
+			'',
+			$domain,
+			$domain_config,
+			get_current_user_id()
+		);
 
 		return rest_ensure_response( array(
-			'success'      => true,
-			'sections'     => array_values( $result['sections'] ),
-			'students'     => $result['students'],
-			'count'        => count( $result['students'] ),
-			'empty_reason' => $result['empty_reason'],
+			'success'             => true,
+			'sections'            => array_values( $result['sections'] ),
+			'students'            => $result['students'],
+			'count'               => count( $result['students'] ),
+			'empty_reason'        => $result['empty_reason'],
+			'filtered_out_count'  => $result['filtered_out_count'] ?? 0,
 		) );
 	}
 
 	/**
-	 * GET /followup-plans — planes del docente actual (o de todos, si
-	 * puede gestionar CRM globalmente y pasa ?all=1).
+	 * GET /followup-plans — planes del docente/vendedor actual. Filtro
+	 * opcional ?domain=academic|commercial (PT-5.1: el selector de
+	 * dominio de la UI, relevante solo para quien tiene planes de
+	 * ambos). Sin el parámetro, devuelve todos los dominios del usuario
+	 * — comportamiento idéntico a 6.6.0 para instalaciones sin CRM
+	 * comercial o sin planes comerciales todavía.
 	 *
 	 * @param \WP_REST_Request $request Request.
 	 * @return \WP_REST_Response
 	 */
 	public static function list_plans( \WP_REST_Request $request ): \WP_REST_Response {
 		$teacher_id = get_current_user_id();
+		$domain     = sanitize_key( (string) ( $request->get_param( 'domain' ) ?: '' ) );
 
-		$plans = Followup_Plan_Service::get_plans_for_teacher( $teacher_id );
+		$plans = Followup_Plan_Service::get_plans_for_teacher( $teacher_id, $domain );
 
 		return rest_ensure_response( array( 'success' => true, 'plans' => $plans ) );
 	}
@@ -256,10 +296,12 @@ class Followup_Plans_REST_Controller {
 	public static function create_plan( \WP_REST_Request $request ) {
 		$data = array(
 			'teacher_id'      => get_current_user_id(),
+			'domain'          => (string) ( $request->get_param( 'domain' ) ?: 'academic' ),
 			'name'            => (string) $request->get_param( 'name' ),
 			'template_key'    => $request->get_param( 'template_key' ),
 			'section_ids'     => (array) $request->get_param( 'section_ids' ),
 			'stage_filter'    => (array) $request->get_param( 'stage_filter' ),
+			'domain_config'   => (array) ( $request->get_param( 'domain_config' ) ?: array() ),
 			'recurrence_rule' => (string) $request->get_param( 'recurrence_rule' ),
 			'action_type'     => (string) ( $request->get_param( 'action_type' ) ?: 'checkin' ),
 			'end_date'        => $request->get_param( 'end_date' ),
@@ -322,6 +364,7 @@ class Followup_Plans_REST_Controller {
 		}
 
 		$plan_id      = (int) $event['followup_plan_id'];
+		$plan         = Followup_Plan_Service::get_plan( $plan_id );
 		$date         = gmdate( 'Y-m-d', strtotime( (string) $event['start_datetime'] ) );
 		$resolution   = Followup_Plan_Resolver::resolve_recipients( $plan_id, $date, $event_id );
 		$contacted    = Followup_Plan_Service::get_contacted_students( $event_id );
@@ -336,14 +379,16 @@ class Followup_Plans_REST_Controller {
 		);
 
 		return rest_ensure_response( array(
-			'success'      => true,
-			'event_id'     => $event_id,
-			'plan_id'      => $plan_id,
-			'date'         => $date,
-			'title'        => sanitize_text_field( (string) $event['title'] ),
-			'sections'     => array_values( $resolution['sections'] ),
-			'students'     => $students,
-			'empty_reason' => $resolution['empty_reason'],
+			'success'             => true,
+			'event_id'            => $event_id,
+			'plan_id'             => $plan_id,
+			'domain'              => $plan ? $plan['domain'] : 'academic',
+			'date'                => $date,
+			'title'               => sanitize_text_field( (string) $event['title'] ),
+			'sections'            => array_values( $resolution['sections'] ),
+			'students'            => $students,
+			'empty_reason'        => $resolution['empty_reason'],
+			'filtered_out_count'  => $resolution['filtered_out_count'] ?? 0,
 		) );
 	}
 

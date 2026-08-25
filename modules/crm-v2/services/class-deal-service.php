@@ -189,9 +189,33 @@ class Deal_Service {
 	}
 
 	/**
-	 * Deals recientes por contacto.
+	 * El deal más reciente (no ganado/perdido con preferencia, pero
+	 * cualquiera si no hay otro) de cada contacto pedido — usado por
+	 * Commercial_Domain_Provider para la plantilla "Cuenta clave"
+	 * (PT-2.1, sprint 6.7.0), donde el vendedor selecciona contactos a
+	 * mano en vez de filtrar por etapa. Reutiliza get_contact_deals()
+	 * por contacto en vez de una query nueva — N contactos de "Cuenta
+	 * clave" es una lista corta seleccionada a mano, no un roster masivo.
 	 *
-	 * @param int $contact_id Contacto.
+	 * @param array<int,int> $contact_ids IDs de contacto.
+	 * @return array<int,array<string,mixed>> Un deal normalizado por contact_id (el más reciente), en el mismo orden de $contact_ids.
+	 */
+	public static function get_latest_deal_per_contact( array $contact_ids ): array {
+		$deals = array();
+		foreach ( array_unique( array_map( 'absint', $contact_ids ) ) as $contact_id ) {
+			if ( ! $contact_id ) {
+				continue;
+			}
+			$contact_deals = self::get_contact_deals( $contact_id, 1 );
+			if ( ! empty( $contact_deals ) ) {
+				$deals[ $contact_id ] = $contact_deals[0];
+			}
+		}
+		return $deals;
+	}
+
+	/**
+	 * @param int $contact_id
 	 * @param int $limit      Límite.
 	 * @return array<int,array<string,mixed>>
 	 */

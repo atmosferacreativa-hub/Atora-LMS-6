@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class V5_Installer {
 
 	/** Versión del esquema. Incrementar para forzar re-instalación. */
-	const SCHEMA_VERSION = '5.1.8-followup-plans';
+	const SCHEMA_VERSION = '5.1.9-followup-plan-domains';
 
 	/** Option key que almacena la versión instalada. */
 	const OPTION_KEY = 'atora_v5_schema_version';
@@ -38,7 +38,7 @@ class V5_Installer {
 			return;
 		}
 
-		if ( self::create_tables() && self::migrate_wp_post_id_nullable_columns() && self::migrate_rate_limit_indexes() && self::migrate_telegram_links_from_usermeta() && self::ensure_parity_tables() && self::migrate_followup_plan_column() ) {
+		if ( self::create_tables() && self::migrate_wp_post_id_nullable_columns() && self::migrate_rate_limit_indexes() && self::migrate_telegram_links_from_usermeta() && self::ensure_parity_tables() && self::migrate_followup_plan_column() && self::migrate_followup_plan_domain_columns() ) {
 			update_option( self::OPTION_KEY, self::SCHEMA_VERSION );
 		}
 	}
@@ -49,7 +49,7 @@ class V5_Installer {
 	 * @return void
 	 */
 	public static function force_install(): void {
-		if ( self::create_tables() && self::migrate_wp_post_id_nullable_columns() && self::migrate_rate_limit_indexes() && self::migrate_telegram_links_from_usermeta() && self::ensure_parity_tables() && self::migrate_followup_plan_column() ) {
+		if ( self::create_tables() && self::migrate_wp_post_id_nullable_columns() && self::migrate_rate_limit_indexes() && self::migrate_telegram_links_from_usermeta() && self::ensure_parity_tables() && self::migrate_followup_plan_column() && self::migrate_followup_plan_domain_columns() ) {
 			update_option( self::OPTION_KEY, self::SCHEMA_VERSION );
 		}
 	}
@@ -97,6 +97,57 @@ class V5_Installer {
 		) > 0;
 
 		return $has_column;
+	}
+
+	/**
+	 * PT-1.3 (6.7.0): agrega `domain` y `domain_config` a
+	 * atora_followup_plans en instalaciones existentes — mismo criterio
+	 * que migrate_followup_plan_column(): ALTER TABLE explícito
+	 * verificado vía INFORMATION_SCHEMA, dbDelta() no es confiable para
+	 * agregar columnas a una tabla ya creada.
+	 *
+	 * `domain` default 'academic': todo plan creado antes de 6.7.0 (el
+	 * único dominio que existía) sigue resolviendo exactamente igual —
+	 * Followup_Plan_Resolver despacha al Academic_Domain_Provider por
+	 * default. `domain_config` nullable: ningún plan académico existente
+	 * usaba configuración extra, así que NULL es un no-op para ellos.
+	 *
+	 * @return bool
+	 */
+	private static function migrate_followup_plan_domain_columns(): bool {
+		global $wpdb;
+
+		$table = $wpdb->prefix . 'atora_followup_plans';
+		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) ) !== $table ) {
+			return false;
+		}
+
+		$existing_columns = (array) $wpdb->get_col(
+			$wpdb->prepare(
+				"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+				 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND COLUMN_NAME IN ('domain','domain_config')",
+				$table
+			)
+		);
+
+		if ( ! in_array( 'domain', $existing_columns, true ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$wpdb->query( "ALTER TABLE {$table} ADD COLUMN domain VARCHAR(20) NOT NULL DEFAULT 'academic' AFTER teacher_id, ADD KEY domain (domain)" );
+		}
+		if ( ! in_array( 'domain_config', $existing_columns, true ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$wpdb->query( "ALTER TABLE {$table} ADD COLUMN domain_config LONGTEXT NULL DEFAULT NULL AFTER stage_filter" );
+		}
+
+		$final_columns = (array) $wpdb->get_col(
+			$wpdb->prepare(
+				"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+				 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND COLUMN_NAME IN ('domain','domain_config')",
+				$table
+			)
+		);
+
+		return in_array( 'domain', $final_columns, true ) && in_array( 'domain_config', $final_columns, true );
 	}
 
 	/**
@@ -1496,10 +1547,12 @@ class V5_Installer {
 		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_followup_plans (
 			id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 			teacher_id      BIGINT UNSIGNED NOT NULL,
+			domain          VARCHAR(20)     NOT NULL DEFAULT 'academic',
 			name            VARCHAR(190)    NOT NULL DEFAULT '',
 			template_key    VARCHAR(60)              DEFAULT NULL,
 			section_ids     LONGTEXT                 DEFAULT NULL,
 			stage_filter    LONGTEXT                 DEFAULT NULL,
+			domain_config   LONGTEXT                 DEFAULT NULL,
 			recurrence_rule VARCHAR(255)    NOT NULL DEFAULT '',
 			action_type     VARCHAR(30)     NOT NULL DEFAULT 'checkin',
 			active          TINYINT(1)      NOT NULL DEFAULT 1,
@@ -1508,7 +1561,8 @@ class V5_Installer {
 			updated_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 			PRIMARY KEY (id),
 			KEY teacher_id (teacher_id),
-			KEY active     (active)
+			KEY active     (active),
+			KEY domain     (domain)
 		) $charset_collate;" );
 
 		// Estado propio de UNA ocurrencia puntual (fila de

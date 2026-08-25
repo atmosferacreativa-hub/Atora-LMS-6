@@ -1,18 +1,26 @@
 <?php
 /**
- * Followup_Plan_Resolver — PT-2 (sprint 6.6.0).
+ * Followup_Plan_Resolver — PT-2 (sprint 6.6.0), generalizado por
+ * dominio en PT-1 (sprint 6.7.0).
  *
- * Resuelve, EN VIVO, a qué estudiantes le toca una ocurrencia de un
- * plan de seguimiento. Nunca lee ni escribe una lista congelada —
- * cada llamada vuelve a consultar Student_Followup_Service (que a su
- * vez hace su propio sync_from_lms()) y Section_Service, así que el
- * mismo plan puede devolver estudiantes distintos hoy que ayer.
+ * Resuelve, EN VIVO, a qué entidades le toca una ocurrencia de un
+ * plan de seguimiento. Nunca lee ni escribe una lista congelada — cada
+ * llamada vuelve a despachar al proveedor de dominio correspondiente
+ * (Academic_Domain_Provider / Commercial_Domain_Provider), que a su
+ * vez consulta el tablero en vivo de su dominio, así que el mismo plan
+ * puede devolver entidades distintas hoy que ayer.
  *
- * Principio central de la OT: un plan programa CUÁNDO revisar y
- * filtra DINÁMICAMENTE por etapa en el momento de cada ocurrencia —
- * nunca congela una lista al crearse. Este archivo es la única pieza
- * del sprint responsable de esa resolución; PT-4 (UI) y PT-5
- * (notificaciones) lo consumen, nunca reimplementan el filtro.
+ * Principio central de la OT (repetido acá porque gobierna todo este
+ * archivo, ambos sprints): un plan programa CUÁNDO revisar y filtra
+ * DINÁMICAMENTE por etapa en el momento de cada ocurrencia — nunca
+ * congela una lista al crearse.
+ *
+ * PT-1 de 6.7.0 (regla central de ese sprint, criterio de aceptación
+ * explícito): este archivo NO tiene ninguna referencia directa a
+ * Student_Followup_Service ni a Deal_Service — toda esa lógica vive
+ * en los proveedores de dominio; acá solo queda el despacho por
+ * `domain`, la fusión de ocurrencias (PT-2.3) y las exclusiones
+ * puntuales (PT-4.7), que son genéricas a cualquier dominio.
  *
  * @package ATORA_LMS\CRM_V2
  */
@@ -26,9 +34,22 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Followup_Plan_Resolver {
 
 	/**
+	 * Dominios soportados → clase del proveedor. Mapa estático simple
+	 * (no un registro dinámico) — dos dominios es todo lo que este
+	 * sprint construye; un tercero (ver "fuera de alcance" de la OT)
+	 * solo agrega una entrada acá el día que exista.
+	 *
+	 * @var array<string,string>
+	 */
+	private const DOMAIN_PROVIDERS = array(
+		'academic'   => '\ATORA\CRM_V2\Services\Academic_Domain_Provider',
+		'commercial' => '\ATORA\CRM_V2\Services\Commercial_Domain_Provider',
+	);
+
+	/**
 	 * Resuelve los destinatarios reales de una ocurrencia de un plan,
-	 * a la fecha indicada — consulta el estado ACTUAL de
-	 * Student_Followup_Service, nunca una copia guardada.
+	 * a la fecha indicada — consulta el estado ACTUAL del dominio del
+	 * plan, nunca una copia guardada.
 	 *
 	 * @param int    $plan_id         ID del plan.
 	 * @param string $occurrence_date Fecha Y-m-d de la ocurrencia (referencia únicamente —
@@ -39,19 +60,22 @@ class Followup_Plan_Resolver {
 	 * @param int    $exclude_event_id ID de la ocurrencia (fila de atora_calendar_events) cuyas
 	 *                                exclusiones puntuales (PT-4.7) deben respetarse, o 0 si
 	 *                                todavía no existe una fila real (vista previa antes de guardar).
-	 * @return array{sections:array<int,array>, students:array<int,array>, empty_reason:string}
+	 * @return array{sections:array<int,array>, students:array<int,array>, empty_reason:string, filtered_out_count:int}
 	 */
 	public static function resolve_recipients( int $plan_id, string $occurrence_date, int $exclude_event_id = 0 ): array {
 		$plan = Followup_Plan_Service::get_plan( $plan_id );
 		if ( ! $plan ) {
-			return array( 'sections' => array(), 'students' => array(), 'empty_reason' => 'plan_not_found' );
+			return array( 'sections' => array(), 'students' => array(), 'empty_reason' => 'plan_not_found', 'filtered_out_count' => 0 );
 		}
 
 		return self::resolve_for_definition(
 			(array) $plan['section_ids'],
 			(array) $plan['stage_filter'],
 			$exclude_event_id,
-			$occurrence_date
+			$occurrence_date,
+			(string) ( $plan['domain'] ?? 'academic' ),
+			(array) ( $plan['domain_config'] ?? array() ),
+			(int) $plan['teacher_id']
 		);
 	}
 
@@ -59,109 +83,96 @@ class Followup_Plan_Resolver {
 	 * Misma resolución que resolve_recipients(), pero a partir de una
 	 * definición todavía no guardada — usada por la vista previa del
 	 * asistente de 4 pasos (PT-4.2.2), que evalúa secciones/etapas tal
-	 * como el docente las está ajustando, antes de aplicar el plan.
+	 * como el docente/vendedor las está ajustando, antes de aplicar el
+	 * plan.
 	 *
-	 * @param array<int,int>    $section_ids  IDs de sección.
-	 * @param array<int,string> $stage_filter Claves de etapa de Student_Followup_Service::get_stages().
-	 * @param int               $exclude_event_id Ver resolve_recipients().
-	 * @param string            $occurrence_date  Ver resolve_recipients().
-	 * @return array{sections:array<int,array>, students:array<int,array>, empty_reason:string}
+	 * @param array<int,int>      $entity_scope_ids IDs del agrupador del dominio (secciones en académico; ver
+	 *                                               docblock de Commercial_Domain_Provider para el comercial).
+	 * @param array<int,string>   $stage_filter     Claves de etapa del dominio. Vacío = selección manual pura (solo comercial).
+	 * @param int                 $exclude_event_id Ver resolve_recipients().
+	 * @param string              $occurrence_date  Ver resolve_recipients().
+	 * @param string              $domain           'academic' (default, preserva el comportamiento de 6.6.0) o 'commercial'.
+	 * @param array<string,mixed> $domain_config    Parámetros propios de plantilla (min_stalled_days, score_max, exclude_active_sequence…).
+	 * @param int                 $owner_id         Dueño del plan (docente o vendedor) — usado por el dominio comercial para acotar a su cartera.
+	 * @return array{sections:array<int,array>, students:array<int,array>, empty_reason:string, filtered_out_count:int}
 	 */
-	public static function resolve_for_definition( array $section_ids, array $stage_filter, int $exclude_event_id = 0, string $occurrence_date = '' ): array {
+	public static function resolve_for_definition(
+		array $entity_scope_ids,
+		array $stage_filter,
+		int $exclude_event_id = 0,
+		string $occurrence_date = '',
+		string $domain = 'academic',
+		array $domain_config = array(),
+		int $owner_id = 0
+	): array {
 		unset( $occurrence_date ); // reservado para filtros futuros dependientes de fecha — ver docblock de arriba.
 
-		$section_ids  = array_values( array_unique( array_filter( array_map( 'absint', $section_ids ) ) ) );
-		$stage_filter = array_values( array_unique( array_filter( array_map( 'sanitize_key', $stage_filter ) ) ) );
-
-		if ( empty( $section_ids ) || empty( $stage_filter ) ) {
-			return array( 'sections' => array(), 'students' => array(), 'empty_reason' => 'sin_configuracion' );
+		$provider = self::get_domain_provider( $domain );
+		if ( ! $provider ) {
+			return array( 'sections' => array(), 'students' => array(), 'empty_reason' => 'dominio_no_disponible', 'filtered_out_count' => 0 );
 		}
 
-		if ( ! class_exists( '\ATORA\LMS\Section_Service' ) ) {
-			return array( 'sections' => array(), 'students' => array(), 'empty_reason' => 'lms_no_disponible' );
-		}
+		$entity_scope_ids = array_values( array_unique( array_filter( array_map( 'absint', $entity_scope_ids ) ) ) );
+		$stage_filter     = array_values( array_unique( array_filter( array_map( 'sanitize_key', $stage_filter ) ) ) );
 
-		// 1. Roster en vivo de las secciones del plan (solo estudiantes
-		// activos en la sección — un estudiante retirado no debe seguir
-		// apareciendo en el checklist de un docente).
-		$section_meta      = array();
-		$student_to_sections = array();
-		foreach ( $section_ids as $section_id ) {
-			$section = \ATORA\LMS\Section_Service::get( $section_id );
-			if ( ! $section ) {
-				continue;
-			}
-			$section_meta[ $section_id ] = array(
-				'id'    => $section_id,
-				'title' => sanitize_text_field( (string) ( $section['title'] ?? '' ) ),
+		$context             = $domain_config;
+		$context['owner_id'] = absint( $owner_id );
+
+		$resolved   = $provider::resolve_entities_in_stages( $entity_scope_ids, $stage_filter, $context );
+		$entities   = (array) ( $resolved['entities'] ?? array() );
+		$scope_meta = (array) ( $resolved['scope_meta'] ?? array() );
+		$filtered_out_count = absint( $resolved['filtered_out_count'] ?? 0 );
+
+		if ( empty( $entities ) ) {
+			return array(
+				'sections'           => $scope_meta,
+				'students'           => array(),
+				'empty_reason'       => (string) ( $resolved['empty_reason'] ?? 'nadie_cumple_el_filtro_hoy' ),
+				'filtered_out_count' => $filtered_out_count,
 			);
-
-			$roster = \ATORA\LMS\Section_Service::get_section_roster( $section_id );
-			foreach ( $roster as $entry ) {
-				if ( 'active' !== ( $entry['status'] ?? '' ) ) {
-					continue;
-				}
-				$user_id = (int) $entry['user_id'];
-				if ( ! $user_id ) {
-					continue;
-				}
-				$student_to_sections[ $user_id ][] = $section_id;
-			}
 		}
 
-		if ( empty( $student_to_sections ) ) {
-			return array( 'sections' => $section_meta, 'students' => array(), 'empty_reason' => 'sin_estudiantes_en_secciones' );
-		}
-
-		// 2. Etapa ACTUAL en vivo — sync_from_lms() adentro de get_board()
-		// garantiza que no se lee una copia potencialmente vieja.
-		$board          = Student_Followup_Service::get_board();
-		$stage_by_user  = array();
-		foreach ( $stage_filter as $stage_key ) {
-			foreach ( (array) ( $board['items'][ $stage_key ] ?? array() ) as $item ) {
-				$user_id = (int) ( $item['user_id'] ?? 0 );
-				if ( $user_id ) {
-					$stage_by_user[ $user_id ] = $item;
-				}
-			}
-		}
-
-		if ( empty( $stage_by_user ) ) {
-			return array( 'sections' => $section_meta, 'students' => array(), 'empty_reason' => 'nadie_en_esas_etapas_hoy' );
-		}
-
-		// 3. Exclusiones puntuales de ESTA ocurrencia (PT-4.7) — nunca
+		// Exclusiones puntuales de ESTA ocurrencia (PT-4.7) — nunca
 		// afectan al plan ni a otras ocurrencias de la misma serie.
+		// Genérico a cualquier dominio: opera sobre entity_id, no sabe
+		// ni le importa si es un user_id académico o un contact_id
+		// comercial.
 		$excluded = $exclude_event_id > 0 ? Followup_Plan_Service::get_excluded_students( $exclude_event_id ) : array();
 
-		// 4. Intersección: estudiante de una sección del plan, en una
-		// etapa del filtro, no excluido puntualmente de esta ocurrencia.
 		$students = array();
-		foreach ( $student_to_sections as $user_id => $sections_for_user ) {
-			if ( ! isset( $stage_by_user[ $user_id ] ) ) {
-				continue;
-			}
-			if ( in_array( $user_id, $excluded, true ) ) {
+		foreach ( $entities as $entity ) {
+			$entity_id = (int) ( $entity['entity_id'] ?? 0 );
+			if ( ! $entity_id || in_array( $entity_id, $excluded, true ) ) {
 				continue;
 			}
 
-			$item               = $stage_by_user[ $user_id ];
-			$user               = get_userdata( $user_id );
-			$students[ $user_id ] = array(
-				'user_id'      => $user_id,
-				'display_name' => $user ? sanitize_text_field( (string) $user->display_name ) : '',
-				'stage'        => (string) ( $item['stage'] ?? '' ),
-				'stage_label'  => (string) ( $item['stage_label'] ?? '' ),
-				'section_ids'  => array_values( array_unique( $sections_for_user ) ),
-				'risk_level'   => (string) ( $item['risk_level'] ?? 'normal' ),
+			$meta                  = (array) ( $entity['meta'] ?? array() );
+			$students[ $entity_id ] = array(
+				'user_id'      => $entity_id,
+				'display_name' => (string) ( $entity['display_name'] ?? '' ),
+				'stage'        => (string) ( $entity['stage'] ?? '' ),
+				'stage_label'  => (string) ( $entity['stage_label'] ?? '' ),
+				'section_ids'  => array_values( (array) ( $entity['scope_ids'] ?? array() ) ),
+				'risk_level'   => (string) ( $meta['risk_level'] ?? 'normal' ),
+				'meta'         => $meta,
 			);
 		}
 
 		if ( empty( $students ) ) {
-			return array( 'sections' => $section_meta, 'students' => array(), 'empty_reason' => 'nadie_cumple_el_filtro_hoy' );
+			return array( 'sections' => $scope_meta, 'students' => array(), 'empty_reason' => 'nadie_cumple_el_filtro_hoy', 'filtered_out_count' => $filtered_out_count );
 		}
 
-		return array( 'sections' => $section_meta, 'students' => array_values( $students ), 'empty_reason' => '' );
+		return array( 'sections' => $scope_meta, 'students' => array_values( $students ), 'empty_reason' => '', 'filtered_out_count' => $filtered_out_count );
+	}
+
+	/**
+	 * @param string $domain
+	 * @return string|null Nombre completo de la clase proveedora, o null si el dominio no existe/no está disponible.
+	 */
+	private static function get_domain_provider( string $domain ): ?string {
+		$domain = sanitize_key( $domain );
+		$class  = self::DOMAIN_PROVIDERS[ $domain ] ?? null;
+		return ( $class && class_exists( $class ) ) ? $class : null;
 	}
 
 	/**

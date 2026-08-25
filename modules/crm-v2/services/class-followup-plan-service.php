@@ -96,10 +96,12 @@ class Followup_Plan_Service {
 	}
 
 	/**
-	 * @param int $teacher_id
+	 * @param int    $teacher_id
+	 * @param string $domain Opcional: 'academic'|'commercial' para filtrar. '' (default) = todos los dominios del usuario —
+	 *                       PT-5.1: quien tiene planes de ambos dominios los ve todos acá, el selector de dominio de la UI filtra client-side.
 	 * @return array<int,array<string,mixed>>
 	 */
-	public static function get_plans_for_teacher( int $teacher_id ): array {
+	public static function get_plans_for_teacher( int $teacher_id, string $domain = '' ): array {
 		global $wpdb;
 
 		$table = $wpdb->prefix . 'atora_followup_plans';
@@ -107,10 +109,19 @@ class Followup_Plan_Service {
 			return array();
 		}
 
-		$rows = (array) $wpdb->get_results(
-			$wpdb->prepare( "SELECT * FROM {$table} WHERE teacher_id = %d ORDER BY active DESC, name ASC", $teacher_id ),
-			ARRAY_A
-		);
+		$domain = self::sanitize_domain( $domain, '' );
+
+		if ( '' !== $domain ) {
+			$rows = (array) $wpdb->get_results(
+				$wpdb->prepare( "SELECT * FROM {$table} WHERE teacher_id = %d AND domain = %s ORDER BY active DESC, name ASC", $teacher_id, $domain ),
+				ARRAY_A
+			);
+		} else {
+			$rows = (array) $wpdb->get_results(
+				$wpdb->prepare( "SELECT * FROM {$table} WHERE teacher_id = %d ORDER BY active DESC, name ASC", $teacher_id ),
+				ARRAY_A
+			);
+		}
 
 		return array_map( array( __CLASS__, 'normalize_plan_row' ), $rows );
 	}
@@ -130,32 +141,52 @@ class Followup_Plan_Service {
 		}
 
 		$teacher_id      = absint( $data['teacher_id'] ?? get_current_user_id() );
+		$domain          = self::sanitize_domain( (string) ( $data['domain'] ?? 'academic' ) );
 		$name            = sanitize_text_field( (string) ( $data['name'] ?? '' ) );
 		$section_ids     = array_values( array_unique( array_filter( array_map( 'absint', (array) ( $data['section_ids'] ?? array() ) ) ) ) );
 		$stage_filter    = array_values( array_unique( array_filter( array_map( 'sanitize_key', (array) ( $data['stage_filter'] ?? array() ) ) ) ) );
+		$domain_config   = is_array( $data['domain_config'] ?? null ) ? $data['domain_config'] : array();
 		$recurrence_rule = sanitize_text_field( (string) ( $data['recurrence_rule'] ?? '' ) );
 		$template_key    = isset( $data['template_key'] ) ? sanitize_key( (string) $data['template_key'] ) : null;
 		$action_type     = sanitize_key( (string) ( $data['action_type'] ?? 'checkin' ) ) ?: 'checkin';
 		$end_date        = self::sanitize_date_or_null( $data['end_date'] ?? null );
 
-		if ( ! $teacher_id || '' === $name || empty( $section_ids ) || empty( $stage_filter ) || '' === $recurrence_rule ) {
-			return new \WP_Error( 'datos_incompletos', __( 'Faltan datos para crear el plan (nombre, secciones, etapas o frecuencia).', 'atora-lms' ) );
+		// Validación de alcance por dominio (PT-1.5):
+		//   - academic (comportamiento idéntico a 6.6.0): section_ids y
+		//     stage_filter son AMBOS obligatorios.
+		//   - commercial, modo por-etapa: section_ids puede ir vacío —
+		//     el alcance implícito es la cartera completa del vendedor
+		//     (Commercial_Domain_Provider la acota por owner_id); solo
+		//     stage_filter es obligatorio.
+		//   - commercial, modo selección manual ("Cuenta clave", sin
+		//     stage_filter): section_ids es obligatorio — ahí SON los
+		//     contact_ids elegidos a mano, no un agrupador.
+		if ( 'commercial' === $domain ) {
+			$scope_ok = ! empty( $stage_filter ) || ! empty( $section_ids );
+		} else {
+			$scope_ok = ! empty( $section_ids ) && ! empty( $stage_filter );
+		}
+
+		if ( ! $teacher_id || '' === $name || ! $scope_ok || '' === $recurrence_rule ) {
+			return new \WP_Error( 'datos_incompletos', __( 'Faltan datos para crear el plan (nombre, alcance, etapas o frecuencia).', 'atora-lms' ) );
 		}
 
 		$inserted = $wpdb->insert(
 			$table,
 			array(
 				'teacher_id'      => $teacher_id,
+				'domain'          => $domain,
 				'name'            => $name,
 				'template_key'    => $template_key,
 				'section_ids'     => wp_json_encode( $section_ids ),
 				'stage_filter'    => wp_json_encode( $stage_filter ),
+				'domain_config'   => empty( $domain_config ) ? null : wp_json_encode( $domain_config ),
 				'recurrence_rule' => $recurrence_rule,
 				'action_type'     => $action_type,
 				'active'          => 1,
 				'end_date'        => $end_date,
 			),
-			array( '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s' )
+			array( '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s' )
 		);
 
 		if ( ! $inserted ) {
@@ -262,16 +293,25 @@ class Followup_Plan_Service {
 				continue;
 			}
 
-			$section_titles = array();
-			foreach ( (array) $plan['section_ids'] as $section_id ) {
-				if ( class_exists( '\ATORA\LMS\Section_Service' ) ) {
-					$section = \ATORA\LMS\Section_Service::get( (int) $section_id );
-					if ( $section ) {
-						$section_titles[] = sanitize_text_field( (string) $section['title'] );
+			// El título con secciones anexadas es una noción académica
+			// (section_ids ahí SON secciones); en comercial, section_ids
+			// puede ser vacío (cartera completa) o una lista de
+			// contact_ids ("Cuenta clave") — ninguno de los dos es un
+			// título legible, así que ese dominio usa solo el nombre del
+			// plan. Comportamiento académico sin cambios (6.6.0).
+			$title = $plan['name'];
+			if ( 'academic' === $plan['domain'] ) {
+				$section_titles = array();
+				foreach ( (array) $plan['section_ids'] as $section_id ) {
+					if ( class_exists( '\ATORA\LMS\Section_Service' ) ) {
+						$section = \ATORA\LMS\Section_Service::get( (int) $section_id );
+						if ( $section ) {
+							$section_titles[] = sanitize_text_field( (string) $section['title'] );
+						}
 					}
 				}
+				$title = $plan['name'] . ( $section_titles ? ' — ' . implode( ', ', $section_titles ) : '' );
 			}
-			$title = $plan['name'] . ( $section_titles ? ' — ' . implode( ', ', $section_titles ) : '' );
 
 			$inserted = $wpdb->insert(
 				$events_table,
@@ -333,20 +373,27 @@ class Followup_Plan_Service {
 	}
 
 	/**
-	 * PT-1.3: si el plan no tiene end_date propio, se apaga solo
-	 * cuando NINGUNA de sus secciones sigue con el período abierto —
-	 * reutiliza la señal de cierre que el LMS ya tiene
+	 * PT-1.3 (6.6.0): si el plan no tiene end_date propio, se apaga
+	 * solo cuando NINGUNA de sus secciones sigue con el período
+	 * abierto — reutiliza la señal de cierre que el LMS ya tiene
 	 * (Section_Service::get()['status']/'end_date'), no inventa una
 	 * nueva. Una sección sin end_date (abierta indefinidamente)
 	 * mantiene el plan activo por esa sola sección.
+	 *
+	 * Solo aplica al dominio académico (6.7.0): el pipeline comercial
+	 * no tiene un concepto de "cierre de período" que reutilizar — un
+	 * plan comercial sin end_date sigue generando ocurrencias
+	 * indefinidamente hasta que el vendedor lo pausa a mano. Documentado
+	 * en docs/DEUDA-TECNICA.md como una simplificación deliberada, no
+	 * una omisión.
 	 *
 	 * @param int $plan_id
 	 * @return bool true si el plan se desactivó en esta llamada.
 	 */
 	private static function maybe_deactivate_on_section_closure( int $plan_id ): bool {
 		$plan = self::get_plan( $plan_id );
-		if ( ! $plan || ! $plan['active'] || $plan['end_date'] ) {
-			return false; // tiene end_date propio — ese manda, no esta regla.
+		if ( ! $plan || ! $plan['active'] || $plan['end_date'] || 'academic' !== $plan['domain'] ) {
+			return false; // tiene end_date propio, o no es del dominio académico — esta regla no aplica.
 		}
 
 		if ( ! class_exists( '\ATORA\LMS\Section_Service' ) || empty( $plan['section_ids'] ) ) {
@@ -600,16 +647,19 @@ class Followup_Plan_Service {
 	 * @return array<string,mixed>
 	 */
 	private static function normalize_plan_row( array $row ): array {
-		$section_ids  = json_decode( (string) ( $row['section_ids'] ?? '' ), true );
-		$stage_filter = json_decode( (string) ( $row['stage_filter'] ?? '' ), true );
+		$section_ids   = json_decode( (string) ( $row['section_ids'] ?? '' ), true );
+		$stage_filter  = json_decode( (string) ( $row['stage_filter'] ?? '' ), true );
+		$domain_config = json_decode( (string) ( $row['domain_config'] ?? '' ), true );
 
 		return array(
 			'id'              => absint( $row['id'] ?? 0 ),
 			'teacher_id'      => absint( $row['teacher_id'] ?? 0 ),
+			'domain'          => self::sanitize_domain( (string) ( $row['domain'] ?? 'academic' ) ),
 			'name'            => sanitize_text_field( (string) ( $row['name'] ?? '' ) ),
 			'template_key'    => $row['template_key'] ? sanitize_key( (string) $row['template_key'] ) : null,
 			'section_ids'     => is_array( $section_ids ) ? array_values( array_map( 'absint', $section_ids ) ) : array(),
 			'stage_filter'    => is_array( $stage_filter ) ? array_values( array_map( 'sanitize_key', $stage_filter ) ) : array(),
+			'domain_config'   => is_array( $domain_config ) ? $domain_config : array(),
 			'recurrence_rule' => sanitize_text_field( (string) ( $row['recurrence_rule'] ?? '' ) ),
 			'action_type'     => sanitize_key( (string) ( $row['action_type'] ?? 'checkin' ) ),
 			'active'          => ! empty( $row['active'] ),
@@ -617,6 +667,18 @@ class Followup_Plan_Service {
 			'created_at'      => sanitize_text_field( (string) ( $row['created_at'] ?? '' ) ),
 			'updated_at'      => sanitize_text_field( (string) ( $row['updated_at'] ?? '' ) ),
 		);
+	}
+
+	/**
+	 * @param string $domain
+	 * @param string $default Valor de respaldo si $domain no es uno de los dominios soportados. '' es un valor
+	 *                         válido de $default (usado por get_plans_for_teacher() para significar "sin filtrar").
+	 * @return string
+	 */
+	private static function sanitize_domain( string $domain, string $default = 'academic' ): string {
+		$domain  = sanitize_key( $domain );
+		$allowed = array( 'academic', 'commercial' );
+		return in_array( $domain, $allowed, true ) ? $domain : $default;
 	}
 
 	/**
