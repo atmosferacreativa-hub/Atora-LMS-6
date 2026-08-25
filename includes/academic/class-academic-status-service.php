@@ -102,6 +102,91 @@ class CLMS_Academic_Status_Service {
 	}
 
 	/**
+	 * PT-2 (6.10.0, insignias de estudiante): tasa de entregas a tiempo
+	 * de un estudiante en un curso — 0-100, o null si no tiene ninguna
+	 * entrega con fecha límite todavía (no hay base para calcular, no
+	 * es lo mismo que "0% puntual"). Mismo criterio de "a tiempo" que
+	 * ya usa `count_late_submissions_by_course()` en
+	 * CLMS_Academic_Report_Service (comparar post_date_gmt de la
+	 * entrega contra _clms_due_date de la lección, hasta las 23:59:59
+	 * del día límite) — no se reimplementa el criterio, solo se
+	 * recorta a un estudiante en vez de agregar por curso.
+	 *
+	 * Método nuevo, sibling de get_student_course_status() — no toca
+	 * ese método existente.
+	 *
+	 * @param int $user_id
+	 * @param int $course_id
+	 * @return int|null
+	 */
+	public function get_on_time_rate_for_student( $user_id, $course_id ) {
+		global $wpdb;
+
+		$user_id   = absint( $user_id );
+		$course_id = absint( $course_id );
+		if ( ! $user_id || ! $course_id ) {
+			return null;
+		}
+
+		$query = new WP_Query(
+			array(
+				'post_type'      => 'clms_submission',
+				'post_status'    => array( 'publish', 'private' ),
+				'posts_per_page' => 200,
+				'fields'         => 'ids',
+				'no_found_rows'  => true,
+				'meta_query'     => array(
+					'relation' => 'AND',
+					array(
+						'key'   => '_clms_submission_user_id',
+						'value' => $user_id,
+						'type'  => 'NUMERIC',
+					),
+					array(
+						'key'   => '_clms_submission_course_id',
+						'value' => $course_id,
+						'type'  => 'NUMERIC',
+					),
+				),
+			)
+		);
+
+		if ( empty( $query->posts ) ) {
+			return null;
+		}
+
+		$with_due_date = 0;
+		$on_time       = 0;
+
+		foreach ( $query->posts as $submission_id ) {
+			$submission_id = absint( $submission_id );
+			$lesson_id     = absint( get_post_meta( $submission_id, '_clms_submission_lesson_id', true ) );
+			$due_raw       = $lesson_id ? (string) get_post_meta( $lesson_id, '_clms_due_date', true ) : '';
+			if ( '' === trim( $due_raw ) ) {
+				continue; // sin fecha límite -- no cuenta para puntualidad, no penaliza ni beneficia.
+			}
+
+			$due_ts     = strtotime( $due_raw . ' 23:59:59' );
+			$created    = get_post_field( 'post_date_gmt', $submission_id );
+			$created_ts = $created ? strtotime( (string) $created ) : 0;
+			if ( ! $due_ts || ! $created_ts ) {
+				continue;
+			}
+
+			++$with_due_date;
+			if ( $created_ts <= $due_ts ) {
+				++$on_time;
+			}
+		}
+
+		if ( 0 === $with_due_date ) {
+			return null;
+		}
+
+		return (int) round( ( $on_time / $with_due_date ) * 100 );
+	}
+
+	/**
 	 * Estado base.
 	 *
 	 * @return array<string,mixed>

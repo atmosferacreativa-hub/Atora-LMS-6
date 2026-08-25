@@ -496,6 +496,13 @@ trait CLMS_Dashboard_Data_Trait {
 				);
 
 				$items[] = array(
+					// PT-2 (6.10.0): course_id agregado -- campo aditivo,
+					// no cambia ningún campo existente. Permite que un
+					// listener del filtro modular 'dashboard_course_cards'
+					// (p. ej. CLMS_Student_Badge_Service) correlacione
+					// cada card con su curso sin depender de que el orden
+					// de $items coincida con $course_ids.
+					'course_id'    => $course_id,
 					'title'        => get_the_title( $course_id ),
 					'course_url'   => get_permalink( $course_id ),
 					'continue_url' => ! empty( $continue_item['url'] ) ? $continue_item['url'] : '',

@@ -766,6 +766,17 @@ body:is(.post-type-lm_course, .post-type-lm_program)
 .clms-sd-badge.is-info   { background: rgba(96,165,250,.14);  color: #60a5fa; }
 .clms-sd-badge.is-muted  { background: var(--clms-bg-soft);   color: var(--clms-muted); }
 
+/* PT-2 (6.10.0): insignias individuales por curso -- mismos tokens
+   --clms-badge-*/--clms-accent* ya definidos arriba, ningún color
+   nuevo. Estado, no ranking: cada estudiante se lee contra sí mismo,
+   nunca contra otro (por eso no hay un "#1"/"#2" ni orden implícito
+   entre estas clases). */
+.clms-sd-badge--tier-sobresaliente { background: var(--clms-accent-lt);       color: var(--clms-accent); }
+.clms-sd-badge--tier-destacado     { background: var(--clms-badge-green-bg);  color: var(--clms-badge-green-ink); }
+.clms-sd-badge--tier-aplicado      { background: var(--clms-badge-gray-bg);   color: var(--clms-badge-gray-ink); }
+.clms-sd-badge--tier-regular       { background: var(--clms-badge-yellow-bg); color: var(--clms-badge-yellow-ink); }
+.clms-sd-badge--tier-en-atencion   { background: var(--clms-badge-red-bg);    color: var(--clms-badge-red-ink); }
+
 .clms-sd-chip { background: var(--clms-accent-lt); color: var(--clms-accent); }
 
 .clms-sd-progress { background: var(--clms-bg-raised); }

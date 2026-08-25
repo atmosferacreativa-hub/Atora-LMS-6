@@ -416,6 +416,15 @@ trait CLMS_Dashboard_Render_Trait {
 											<span class="clms-sd-badge <?php echo esc_attr( $item['status_class'] ); ?>">
 												<?php echo esc_html( $item['status_label'] ); ?>
 											</span>
+											<?php if ( ! empty( $item['badge_tier'] ) && ! empty( $item['badge_label'] ) ) : ?>
+												<!-- PT-2 (6.10.0): insignia individual del estudiante en este
+												     curso -- agregada por CLMS_Student_Badge_Service vía el
+												     filtro modular 'dashboard_course_cards', no forma parte de
+												     get_course_cards() en sí. -->
+												<span class="clms-sd-badge clms-sd-badge--tier-<?php echo esc_attr( str_replace( '_', '-', $item['badge_tier'] ) ); ?>">
+													<?php echo esc_html( $item['badge_label'] ); ?>
+												</span>
+											<?php endif; ?>
 										</div>
 									</div>
 									<div class="clms-sd-module__progress">

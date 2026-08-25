@@ -261,6 +261,12 @@ trait CLMS_Loader_Module_Groups_Trait {
 					'dependencies' => array( 'CLMS_Gamification_Rules' ),
 					'condition'    => 'module:gamification',
 				),
+				array(
+					'file'         => 'includes/gamification/class-student-badge-service.php',
+					'class'        => 'CLMS_Student_Badge_Service',
+					'dependencies' => array( 'CLMS_Helper', 'CLMS_Academic_Status_Service' ),
+					'condition'    => 'module:gamification',
+				),
 			),
 
 			'experience' => array(
