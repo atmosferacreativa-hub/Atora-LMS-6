@@ -75,7 +75,66 @@ class CLMS_Today_Aggregator_Service {
 
 		$items = array_merge( $items, $this->collect_task_items( $user_id, $has_academic, $has_commercial ) );
 
-		return $items;
+		return $this->sort_by_urgency( $items );
+	}
+
+	/**
+	 * PT-2: ordena por la regla de urgencia real de la OT.
+	 *
+	 * Nivel 1 (2.1): rango interno `_tier` (1-5, asignado por cada
+	 * collect_*()) — 1/2 mapean a urgency='alta', 3/4 a 'media', 5 a
+	 * 'baja' (PT-2.1). Ordenar por `_tier` garantiza estructuralmente
+	 * que ningún ítem de baja urgencia puede aparecer antes que uno de
+	 * alta: los tiers de 'alta' (1,2) son siempre numéricamente menores
+	 * que los de 'media' (3,4), que a su vez son menores que el de
+	 * 'baja' (5) — ver criterio de aceptación de PT-2.
+	 *
+	 * Nivel 2 (2.3): dentro del mismo tier, gana quien tiene una hora
+	 * límite específica (`_has_specific_time`) sobre quien solo tiene
+	 * "hoy" como granularidad.
+	 *
+	 * Nivel 3 (2.2): dentro de lo anterior, por volumen (`count`)
+	 * descendente — más estudiantes/contactos afectados primero.
+	 *
+	 * Las claves internas `_tier`/`_has_specific_time` se descartan
+	 * antes de devolver — no forman parte del shape público de PT-1.2.
+	 *
+	 * @param array<int,array<string,mixed>> $items
+	 * @return array<int,array<string,mixed>>
+	 */
+	protected function sort_by_urgency( array $items ) {
+		usort(
+			$items,
+			static function ( $a, $b ) {
+				$tier_a = absint( $a['_tier'] ?? 4 );
+				$tier_b = absint( $b['_tier'] ?? 4 );
+				if ( $tier_a !== $tier_b ) {
+					return $tier_a <=> $tier_b;
+				}
+
+				$specific_a = ! empty( $a['_has_specific_time'] );
+				$specific_b = ! empty( $b['_has_specific_time'] );
+				if ( $specific_a !== $specific_b ) {
+					return $specific_a ? -1 : 1;
+				}
+
+				$count_a = absint( $a['count'] ?? 0 );
+				$count_b = absint( $b['count'] ?? 0 );
+				if ( $count_a !== $count_b ) {
+					return $count_b <=> $count_a;
+				}
+
+				return 0;
+			}
+		);
+
+		return array_map(
+			static function ( $item ) {
+				unset( $item['_tier'], $item['_has_specific_time'] );
+				return $item;
+			},
+			$items
+		);
 	}
 
 	/**
