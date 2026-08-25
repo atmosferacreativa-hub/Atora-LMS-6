@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.4
 Requires PHP: 8.1
-Stable tag: 6.7.0
+Stable tag: 6.8.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,13 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.8.0 =
+* Added "Hoy" (Today): a single entry screen that crosses academic followup occurrences, commercial followup occurrences, pending grading/inactive-students/quizzes, and overdue/upcoming tasks into one list, ordered by real urgency — no more deciding where to start.
+* Every item links directly to the specific action (an occurrence's side panel, a contact, a task) instead of a generic listing you have to search through again.
+* "Hoy" is now the default landing page after login for teachers and salespeople; administrators keep their existing flow unchanged.
+* The existing daily digest message now links straight to "Hoy" instead of the general students hub.
+* A calm, specific message appears when there's nothing urgent — never a blank screen.
+* No changes to the academic followup plans, commercial followup plans, teacher panel, or CRM — "Hoy" only reads from them, it doesn't replace any of them.
 = 6.7.0 =
 * Added commercial followup plans: the same followup-plans engine built for teachers now serves salespeople on the commercial pipeline, with its own vocabulary and four starter templates (Deals estancados, Nutrir leads fríos, Antes del cierre de mes, Cuenta clave).
 * Calendar blocks in the commercial view color by the conversion score of the most urgent contact in that occurrence — same design tokens as the rest of the site, no new palette.
@@ -157,6 +164,8 @@ Translation files are loaded from the `/languages` directory.
 * Major release aligned with ATORA_v5 architecture and modules.
 
 == Upgrade Notice ==
+= 6.8.0 =
+* New feature: "Hoy", a single urgency-ordered entry screen crossing academic/commercial followup plans, grading, and tasks — no database schema changes, no changes to any existing screen. Teachers and salespeople now land on it after login by default; admins are unaffected. Recommended update.
 = 6.7.0 =
 * New feature: commercial followup plans for the sales pipeline, reusing the followup-plans engine built in 6.6.0 — no changes to existing academic plans or the teacher calendar. Includes two new nullable/default-backfilled columns on the existing followup-plans table. Recommended update.
 = 6.6.0 =
