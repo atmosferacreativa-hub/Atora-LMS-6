@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.4
 Requires PHP: 8.1
-Stable tag: 6.9.1
+Stable tag: 6.10.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,10 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.10.0 =
+* Removed the public student leaderboard — competitive ranking doesn't fit the "support, not competition" approach the rest of the platform already follows.
+* Added individual student badges per course, shown right on the student's own dashboard (no shortcode, no separate page): Estudiante sobresaliente, destacado, aplicado, regular, or en atención, based on punctuality, grade average, and course participation — each student is judged only against their own work, never compared to classmates.
+* No changes to personal points/levels already shown on the student dashboard, or to any other screen.
 = 6.9.1 =
 * Fixed: the rubric listing endpoint let any instructor see every other instructor's rubrics, not just their own — the individual-rubric endpoints already scoped correctly, only the list didn't.
 = 6.9.0 =
@@ -171,6 +175,8 @@ Translation files are loaded from the `/languages` directory.
 * Major release aligned with ATORA_v5 architecture and modules.
 
 == Upgrade Notice ==
+= 6.10.0 =
+* Product change: the public leaderboard shortcode is removed, replaced by individual (non-comparative) per-course student badges on the existing student dashboard. If you embedded [atora_leaderboard] anywhere, that block will stop rendering — no other screen changes. Recommended update.
 = 6.9.1 =
 * Security fix: instructors could list rubrics belonging to other instructors (read-only, no student data involved). Recommended update.
 = 6.9.0 =
