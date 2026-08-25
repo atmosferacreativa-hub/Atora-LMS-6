@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.4
 Requires PHP: 8.1
-Stable tag: 6.6.0
+Stable tag: 6.7.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,12 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.7.0 =
+* Added commercial followup plans: the same followup-plans engine built for teachers now serves salespeople on the commercial pipeline, with its own vocabulary and four starter templates (Deals estancados, Nutrir leads fríos, Antes del cierre de mes, Cuenta clave).
+* Calendar blocks in the commercial view color by the conversion score of the most urgent contact in that occurrence — same design tokens as the rest of the site, no new palette.
+* The side panel now shows each contact's active email-sequence enrollment (if any) so a salesperson always knows a contact is already being worked by an automated sequence — visible by default, never hidden without an explicit opt-in filter, and never altered automatically.
+* A simple domain switch (Estudiantes/Ventas) appears only for users who have both academic and commercial plans — everyone else sees exactly what they saw before.
+* No changes to existing academic followup plans, the teacher calendar, or the CRM followup board for installs that don't create a commercial plan.
 = 6.6.0 =
 * Added followup plans: teachers can set up their own contact rhythm with at-risk students on a visual monthly calendar (Planes de seguimiento).
 * Four starter templates ("Chequeo semanal", "Alta atención", "Antes del cierre", "Solo hitos"), editable and saveable as the teacher's own reusable variants.
@@ -151,6 +157,8 @@ Translation files are loaded from the `/languages` directory.
 * Major release aligned with ATORA_v5 architecture and modules.
 
 == Upgrade Notice ==
+= 6.7.0 =
+* New feature: commercial followup plans for the sales pipeline, reusing the followup-plans engine built in 6.6.0 — no changes to existing academic plans or the teacher calendar. Includes two new nullable/default-backfilled columns on the existing followup-plans table. Recommended update.
 = 6.6.0 =
 * New feature: followup plans on the teacher's calendar — a visual, non-technical way to schedule contact rhythm with at-risk students, built on top of the existing calendar and CRM followup board without changing their default behavior. Includes a new database table and a nullable column added to the existing calendar events table. Recommended update.
 = 6.5.13 =
