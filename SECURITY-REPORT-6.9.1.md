@@ -66,7 +66,16 @@ no solo cambia el nombre de la capability que falla de la misma manera.
 | `php -l` / `phpcs` / `phpunit` | NO EJECUTADOS — sin intérprete PHP en este entorno, mismo disclosure que toda sesión anterior |
 | Regresión a otros endpoints de rúbricas | Ninguna — `get_rubric()`/`update_rubric()`/`delete_rubric()`/`create_rubric()` no fueron tocados |
 
-## 6. Residual risk
+## 6. Empaquetado
+
+- **Archivo:** `dist/atora-lms-6.9.1.zip`
+- **SHA-256:** `8af378d8a4e1eef7d05f847b4dbb3141e1957373399d43bef721a5d33ffacfcd`
+- **Auditoría del contenido extraído:** sin archivos de desarrollo en la raíz;
+  cadena de versión consistente en `6.9.1`; el fix (`edit_others_lm_courses`)
+  presente en el `class-rest-extensions-controller.php` empaquetado; escaneo de
+  patrones de credenciales sin hallazgos.
+
+## 7. Residual risk
 
 Ninguno nuevo introducido. El hallazgo en sí queda cerrado para el caso
 `instructor`. No se auditó el resto de `class-rest-extensions-controller.php`
