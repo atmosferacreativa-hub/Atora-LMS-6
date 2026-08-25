@@ -118,11 +118,22 @@ class CLMS_REST_Extensions_Controller {
 			'order'          => 'DESC',
 		);
 
-		$can_access_admin = class_exists( 'CLMS_Access' ) && method_exists( 'CLMS_Access', 'can_access_admin' )
-			? CLMS_Access::can_access_admin()
-			: current_user_can( 'manage_options' );
+		// PT-1 (6.9.1): CLMS_Access's "can access admin" check (usado acá
+		// antes) solo verifica 'clms_access_admin', una capacidad que el rol
+		// instructor tiene por defecto (ver class-access.php) -- no
+		// significa "puede ver el contenido de otros", solo "puede
+		// entrar al panel ATORA". Con ese chequeo, todo instructor
+		// listaba las rúbricas de TODOS los instructores, aunque
+		// get_rubric()/update_rubric()/delete_rubric() (más abajo en
+		// este mismo archivo) sí verifican propiedad real vía
+		// current_user_can_manage_post_resource(). Mismo criterio de
+		// alcance amplio que el resto del LMS ya usa para "ve todo, no
+		// solo lo propio" (ver tests/LMS/LMSCourseVisibilityTest.php):
+		// edit_others_lm_courses o manage_options -- ninguno de los
+		// dos lo tiene un instructor por defecto.
+		$can_see_all = current_user_can( 'edit_others_lm_courses' ) || current_user_can( 'manage_options' );
 
-		if ( ! $can_access_admin ) {
+		if ( ! $can_see_all ) {
 			$args['author'] = get_current_user_id();
 		}
 
