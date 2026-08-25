@@ -626,3 +626,91 @@ error y necesitan revertir, agregar una sección colapsable "N
 estudiantes excluidos de este día" al panel lateral, con un botón de
 "volver a incluir" por estudiante — reutilizando
 `get_excluded_students()`, que ya existe y ya se usa para el filtro.
+
+## `Followup_Recurrence` sin `WEEKLY;INTERVAL=N` — "quincenal" aproximado con `DAILY;INTERVAL=14`
+
+PT-2.1 (6.7.0): la plantilla comercial "Nutrir leads fríos" pide
+frecuencia quincenal. El motor de recurrencia (`Followup_Recurrence`,
+construido en 6.6.0) solo soporta `WEEKLY;BYDAY=...` (día(s) fijo(s)
+de la semana, sin intervalo) y `DAILY;INTERVAL=N` — no existe un
+`WEEKLY` con intervalo de semanas. Se usó `DAILY;INTERVAL=14` como
+aproximación (cada 14 días desde el inicio del rango solicitado), que
+en la práctica cae en el mismo día de la semana que la primera
+ocurrencia, pero no está anclado a un día elegido explícitamente como
+sí lo están las demás plantillas.
+
+**Por qué no se agregó `WEEKLY;INTERVAL=N` ahora:** §0.2 de la OT es
+explícito — la tarea central del sprint es generalizar la capa de
+origen de datos, no tocar el motor de recurrencia. Agregar un nuevo
+FREQ/parámetro era exactamente el tipo de expansión de alcance que la
+regla prohíbe sin necesidad real más allá de esta única plantilla.
+
+**Propuesta:** si aparece una segunda necesidad real de "cada N
+semanas, un día fijo" (no solo esta plantilla), agregar
+`INTERVAL` como parámetro opcional de `expand_weekly()` — el intervalo
+se contaría en semanas completas desde `range_start`, mismo patrón que
+ya usa `expand_daily()`.
+
+## Pipeline comercial sin señal de "cierre de período" — PT-1.3 no aplica
+
+PT-1.2/1.3 (6.7.0): la auto-desactivación de un plan sin `end_date`
+propio cuando su sección cierra (PT-1.3 de 6.6.0) reutilizaba
+`Section_Service`, un concepto exclusivamente académico. El pipeline
+comercial no tiene un equivalente real — un deal no "cierra su
+período", sigue abierto hasta que se marca ganado/perdido o el
+vendedor pausa el plan a mano.
+
+**Por qué no se inventó una señal nueva:** la OT no la pide, y el
+diagnóstico de partida es explícito en que este sprint reutiliza
+señales existentes, no inventa. `maybe_deactivate_on_section_closure()`
+ahora solo se ejecuta para `domain === 'academic'` (ver
+`class-followup-plan-service.php`); un plan comercial sin `end_date`
+simplemente corre indefinidamente hasta que el vendedor lo pausa.
+
+**Propuesta:** si en el futuro el CRM comercial adopta un concepto de
+"cierre de cartera" o "fin de campaña", extender
+`Commercial_Domain_Provider` (o un método equivalente) con su propia
+señal de cierre, sin tocar la regla académica.
+
+## Selector de urgencia comercial (PT-3.1) usa solo el score más bajo, no un compuesto
+
+PT-3.1 (6.7.0): el color del bloque de calendario comercial se decide
+por el score de conversión más bajo entre los contactos de la
+ocurrencia (`get_calendar_events()` en el REST controller). No
+combina ese score con otras señales disponibles en
+`Commercial_Domain_Provider` (días estancado, si ya hay contactos sin
+marcar) en un índice de urgencia compuesto.
+
+**Por qué no se combinó ahora:** la OT pide explícitamente "el score
+del contacto/deal de mayor urgencia", sin especificar una fórmula
+compuesta — el criterio más simple que cumple el requisito literal es
+el score más bajo. Inventar una ponderación score+días-estancado+
+pendientes-de-contactar es una decisión de producto que no tiene un
+criterio claro en la OT.
+
+**Propuesta:** si retroalimentación real de vendedores pide que una
+ocurrencia con muchos días estancados se vea más urgente aunque el
+score no sea el más bajo, definir la fórmula compuesta como una
+decisión de producto explícita, no una inferencia de este sprint.
+
+## Selector de contactos de "Cuenta clave" sin deduplicar entre planes
+
+PT-2.1/PT-5.2 (6.7.0): el buscador de contactos del asistente (paso 3,
+modo selección manual) no evita que un vendedor arme dos planes
+distintos de "Cuenta clave" con contactos superpuestos — cada plan
+guarda su propia lista independiente en `section_ids`. Si eso ocurre,
+PT-2.3 (fusión de ocurrencias que coinciden en fecha/sección) igual
+deduplica correctamente al momento de mostrar el calendario
+(`Followup_Plan_Resolver::merge_resolutions()`), así que no es un bug
+de datos — es solo que el asistente no avisa de la superposición al
+armar el plan.
+
+**Por qué no se construyó un aviso ahora:** no estaba en el alcance
+explícito de PT-2/PT-5, y el caso ya queda cubierto correctamente en
+el momento en que importa (la vista del calendario), por diseño de
+PT-2.3.
+
+**Propuesta:** si el uso real muestra que los vendedores arman planes
+de "Cuenta clave" superpuestos sin darse cuenta, agregar un aviso
+suave en el paso 3 ("N de estos contactos ya están en otro plan tuyo")
+antes de aplicar.
