@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.4
 Requires PHP: 8.1
-Stable tag: 6.9.0
+Stable tag: 6.9.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,8 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.9.1 =
+* Fixed: the rubric listing endpoint let any instructor see every other instructor's rubrics, not just their own — the individual-rubric endpoints already scoped correctly, only the list didn't.
 = 6.9.0 =
 * Added a persistent search icon, visible in the same place on every ATORA admin screen — find a student, section, or contact directly, scoped to exactly what you'd already see by navigating normally.
 * Added "Actividad" (Activity): a simple, calm feed of what you've already resolved this week — contacts marked, students who improved — right next to "Hoy", never mixed into it.
@@ -169,6 +171,8 @@ Translation files are loaded from the `/languages` directory.
 * Major release aligned with ATORA_v5 architecture and modules.
 
 == Upgrade Notice ==
+= 6.9.1 =
+* Security fix: instructors could list rubrics belonging to other instructors (read-only, no student data involved). Recommended update.
 = 6.9.0 =
 * New: persistent search and an "Actividad" feed, plus an internal consolidation of the panel/list components used by the academic calendar, commercial calendar, and "Hoy" — no database schema changes, no visible change to existing screens beyond the new search icon. Recommended update.
 = 6.8.0 =
