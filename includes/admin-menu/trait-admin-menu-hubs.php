@@ -872,6 +872,30 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 		// la misma lógica de capability que tenían — regla del sprint,
 		// ninguna página se elimina, solo se reubica.
 
+		// ── Ficha de estudiante (oculta, PT-2 6.11.0) — cap de piso 'read',
+		// el gate real (edit_others_lm_courses/manage_options o
+		// docente/coordinador efectivo del estudiante+curso) se aplica
+		// dentro de render_student_profile_page() porque depende de los
+		// parámetros student_id/course_id, no expresable como capability.
+		add_submenu_page(
+			'',
+			__( 'Ficha de estudiante', 'atora-lms' ),
+			__( 'Ficha de estudiante', 'atora-lms' ),
+			'read',
+			'atora-student-profile',
+			array( $this, 'render_student_profile_page' )
+		);
+
+		// ── Asignar coordinador de sección (oculta, PT-3 6.11.0) ──────────────
+		add_submenu_page(
+			'',
+			__( 'Asignar coordinador', 'atora-lms' ),
+			__( 'Asignar coordinador', 'atora-lms' ),
+			'manage_options',
+			'atora-section-coordinator',
+			array( $this, 'render_section_coordinator_page' )
+		);
+
 		// ── CRM (oculta) — si el módulo 'crm' está activo ─────────────────────
 		if ( ( current_user_can( 'clms_access_crm_view' ) || current_user_can( 'manage_options' ) )
 			&& ( ! class_exists( 'CLMS_Module_Registry' ) || CLMS_Module_Registry::is_active( 'crm' ) ) ) {

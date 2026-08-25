@@ -210,6 +210,26 @@ class CLMS_Academic_Messaging_Bridge {
 			? sprintf( '%d días de inactividad', absint( $payload['days_inactive'] ) )
 			: __( 'promedio bajo', 'atora-lms' );
 
+		// PT-2 (6.11.0): deja un registro real y persistido en el timeline
+		// del estudiante -- hasta ahora "en riesgo" era puramente efímero
+		// (ver docs/DEUDA-TECNICA.md, "at_risk_flagged usa las alertas de
+		// IA existentes"). Se registra aunque no haya destinatarios a
+		// quienes avisar más abajo (ficha de estudiante e historial
+		// completos, independiente de si hay docente/coordinador
+		// asignado); igual que el resto del puente, no corre si el
+		// routing académico está desactivado (mismo guard de la línea 196
+		// — cero cambio de comportamiento hasta que se active el flag).
+		if ( class_exists( 'CLMS_Helper' ) ) {
+			clms_core( 'CLMS_Contacts_Core_Service' )->log_activity(
+				$student_id,
+				'academic_at_risk_alert',
+				array(
+					'course_id' => $course_id,
+					'reason'    => isset( $payload['days_inactive'] ) ? 'inactivity' : 'low_grade',
+				)
+			);
+		}
+
 		// Resolución correcta de docente (Section_Service), no el
 		// post_author ingenuo que usa CLMS_AI_Alerts::run_daily_check()
 		// para su propio digest (ese código no se toca en este sprint).
@@ -231,7 +251,10 @@ class CLMS_Academic_Messaging_Bridge {
 			'student_name' => self::display_name( $student_id ),
 			'course_title' => sanitize_text_field( (string) get_the_title( $course_id ) ),
 			'reason'       => $reason,
-			'button_url'   => admin_url( 'admin.php?page=clms-academic-content&student_id=' . $student_id ),
+			// PT-2 (6.11.0): antes apuntaba a clms-academic-content, que
+			// nunca leyó el parámetro student_id (enlace muerto en la
+			// práctica) -- ahora va a la ficha de estudiante real.
+			'button_url'   => admin_url( 'admin.php?page=atora-student-profile&student_id=' . $student_id . '&course_id=' . $course_id ),
 		);
 
 		foreach ( $recipients as $recipient_id ) {
