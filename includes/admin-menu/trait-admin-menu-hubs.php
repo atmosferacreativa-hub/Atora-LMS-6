@@ -13,7 +13,20 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 		$page = sanitize_key( (string) wp_unslash( $_GET['page'] ) );
 		if ( ! str_starts_with( $page, 'clms-' ) && ! str_starts_with( $page, 'atora-' ) ) { return; }
 		if ( ! defined( 'ATORA_LMS_URL' ) ) { return; }
-		wp_enqueue_style( 'atora-admin-ds', ATORA_LMS_URL . 'assets/admin/atora-admin.css', array(), defined( 'ATORA_LMS_VERSION' ) ? ATORA_LMS_VERSION : '1.0' );
+		$ver = defined( 'ATORA_LMS_VERSION' ) ? ATORA_LMS_VERSION : '1.0';
+		wp_enqueue_style( 'atora-admin-ds', ATORA_LMS_URL . 'assets/admin/atora-admin.css', array(), $ver );
+
+		// PT-3 (6.8.0): hoja propia de "Hoy" -- reutiliza los mismos
+		// tokens --atora-* que atora-admin-ds ya define, así que solo se
+		// carga en su propia página, no globalmente. Vive en assets/admin/
+		// junto a atora-admin.css -- includes/ nunca sirvió un asset
+		// estático directamente en este plugin, no se rompe esa convención acá.
+		if ( 'atora-hoy' === $page ) {
+			$css_file = ATORA_LMS_DIR . 'assets/admin/atora-hoy.css';
+			if ( file_exists( $css_file ) ) {
+				wp_enqueue_style( 'atora-hoy', ATORA_LMS_URL . 'assets/admin/atora-hoy.css', array( 'atora-admin-ds' ), $ver );
+			}
+		}
 	}
 
 	/**
@@ -739,6 +752,21 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 			'read',
 			'clms-dashboard',
 			array( $this, 'render_escritorio_page' )
+		);
+
+		// ── Hoy (PT-3/PT-4, 6.8.0) — punto de entrada, no reemplaza nada.
+		// Visible para todos con 'read' (igual que Panel); el propio
+		// render decide si mostrar contenido o no según rol — un
+		// administrador que la visita ve una lista vacía con estado
+		// positivo, no un error, pero su landing por defecto no cambia
+		// (ver get_login_hub_url_for_user()), solo el acceso manual.
+		add_submenu_page(
+			'clms-dashboard',
+			__( 'Hoy', 'atora-lms' ),
+			__( '☀️ Hoy', 'atora-lms' ),
+			'read',
+			'atora-hoy',
+			array( $this, 'render_today_page' )
 		);
 
 		// ── Academia ──────────────────────────────────────────────────────────────
@@ -1888,6 +1916,25 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 		}
 
 		echo '<div class="wrap"><h1>' . esc_html__( 'Planes de seguimiento', 'atora-lms' ) . '</h1>'
+			. '<p>' . esc_html__( 'Módulo no disponible.', 'atora-lms' ) . '</p></div>';
+	}
+
+	/**
+	 * PT-3 (6.8.0): pantalla "Hoy" — agregador de urgencia real. Visible
+	 * a cualquier usuario logueado (cap 'read', igual que Panel); el
+	 * contenido en sí depende de qué tenga CLMS_Today_Aggregator_Service
+	 * para ese usuario, no de un gate adicional acá — un rol sin nada
+	 * que mostrar simplemente ve el estado vacío positivo (PT-3.3), no
+	 * un wp_die().
+	 */
+	public function render_today_page(): void {
+		$view = ATORA_LMS_INCLUDES_DIR . 'today/views/today-page.php';
+		if ( file_exists( $view ) ) {
+			require $view;
+			return;
+		}
+
+		echo '<div class="wrap"><h1>' . esc_html__( 'Hoy', 'atora-lms' ) . '</h1>'
 			. '<p>' . esc_html__( 'Módulo no disponible.', 'atora-lms' ) . '</p></div>';
 	}
 

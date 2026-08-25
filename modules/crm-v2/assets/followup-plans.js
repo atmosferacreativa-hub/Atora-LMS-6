@@ -780,5 +780,13 @@
 				if (excludeBtn) { excludeStudent(excludeBtn.getAttribute('data-user-id')); }
 			});
 		}
+
+		// PT-3.2 (6.8.0, "Hoy"): un enlace con ?event_id=N (el que ya
+		// construye CLMS_Academic_Messaging_Bridge desde 6.6.0 y ahora
+		// también el agregador "Hoy") debe abrir directo el panel de esa
+		// ocurrencia -- "clic lleva a la acción específica", no solo a
+		// esta pantalla para que el usuario tenga que volver a buscar.
+		var deepLinkEventId = parseInt((new URLSearchParams(window.location.search)).get('event_id'), 10);
+		if (deepLinkEventId) { openPanel(deepLinkEventId); }
 	});
 })();

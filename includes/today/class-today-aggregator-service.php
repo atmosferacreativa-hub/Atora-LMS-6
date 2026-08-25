@@ -42,6 +42,37 @@ class CLMS_Today_Aggregator_Service {
 
 	public function __construct() {
 		add_shortcode( 'atora_hoy', array( $this, 'render_shortcode' ) );
+		add_action( 'wp_enqueue_scripts', array( $this, 'maybe_enqueue_frontend_styles' ) );
+	}
+
+	/**
+	 * El CSS de "Hoy" (assets/admin/atora-hoy.css) se encola en
+	 * wp-admin vía enqueue_atora_admin_styles() (trait-admin-menu-hubs.php),
+	 * gateado a esa página — pero el shortcode [atora_hoy] puede
+	 * incrustarse en una página normal de WordPress, fuera de
+	 * wp-admin, donde ese hook no corre. Este método cubre ese caso.
+	 *
+	 * @return void
+	 */
+	public function maybe_enqueue_frontend_styles() {
+		if ( ! is_singular() ) {
+			return;
+		}
+		$post = get_post();
+		if ( ! $post || ! has_shortcode( (string) $post->post_content, 'atora_hoy' ) ) {
+			return;
+		}
+		if ( ! defined( 'ATORA_LMS_URL' ) || ! defined( 'ATORA_LMS_DIR' ) ) {
+			return;
+		}
+
+		$ver = defined( 'ATORA_LMS_VERSION' ) ? ATORA_LMS_VERSION : '1.0';
+		wp_enqueue_style( 'atora-admin-ds', ATORA_LMS_URL . 'assets/admin/atora-admin.css', array(), $ver );
+
+		$css_file = ATORA_LMS_DIR . 'assets/admin/atora-hoy.css';
+		if ( file_exists( $css_file ) ) {
+			wp_enqueue_style( 'atora-hoy', ATORA_LMS_URL . 'assets/admin/atora-hoy.css', array( 'atora-admin-ds' ), $ver );
+		}
 	}
 
 	/**
@@ -438,13 +469,78 @@ class CLMS_Today_Aggregator_Service {
 	}
 
 	/**
-	 * [atora_hoy] — PT-3.1. Placeholder mínimo hasta que PT-3 agregue
-	 * el render real; se registra el shortcode ya en PT-1 para que el
-	 * hook exista desde el primer commit del sprint.
+	 * [atora_hoy] (PT-3.1) — mismo render que la página de admin
+	 * (includes/today/views/today-page.php), para no duplicar el
+	 * marcado en dos lugares. Usuario no logueado: nada que mostrar,
+	 * mismo criterio que el resto de shortcodes de cuenta del plugin
+	 * (atora_preferencias, atora_affiliate_dashboard).
 	 *
 	 * @return string
 	 */
 	public function render_shortcode() {
-		return '';
+		$user_id = get_current_user_id();
+		if ( ! $user_id ) {
+			return '';
+		}
+
+		ob_start();
+		echo '<div class="atora-hoy-shortcode">';
+		echo $this->render_items_html( $this->get_today( $user_id ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- ya escapado adentro.
+		echo '</div>';
+		return (string) ob_get_clean();
+	}
+
+	/**
+	 * PT-3.1/3.2/3.3: marcado de la lista de "Hoy", agrupada
+	 * visualmente por urgencia (no por fuente — el docente/vendedor no
+	 * necesita saber de dónde viene un ítem). Compartido entre la
+	 * página de admin y el shortcode — un solo lugar que mantiene el
+	 * HTML.
+	 *
+	 * @param array<int,array<string,mixed>> $items Resultado de get_today().
+	 * @return string HTML ya escapado.
+	 */
+	public function render_items_html( array $items ) {
+		if ( empty( $items ) ) {
+			// PT-3.3: estado vacío positivo, con tono cálido -- nunca una
+			// lista en blanco sin contexto, misma regla que rige todos
+			// los estados vacíos de la serie 6.6.0/6.7.0.
+			return '<div class="atora-hoy-empty">'
+				. '<p class="atora-hoy-empty-title">' . esc_html__( '✨ Nada urgente por ahora.', 'atora-lms' ) . '</p>'
+				. '<p class="atora-hoy-empty-sub">' . esc_html__( 'Buen momento para adelantar algo, o simplemente respirar.', 'atora-lms' ) . '</p>'
+				. '</div>';
+		}
+
+		$groups = array(
+			'alta'  => array( 'label' => __( 'Necesita tu atención ahora', 'atora-lms' ), 'items' => array() ),
+			'media' => array( 'label' => __( 'Para revisar hoy', 'atora-lms' ), 'items' => array() ),
+			'baja'  => array( 'label' => __( 'Próximos días', 'atora-lms' ), 'items' => array() ),
+		);
+
+		foreach ( $items as $item ) {
+			$urgency = isset( $groups[ $item['urgency'] ?? '' ] ) ? $item['urgency'] : 'media';
+			$groups[ $urgency ]['items'][] = $item;
+		}
+
+		$html = '<div class="atora-hoy-list">';
+		foreach ( $groups as $urgency => $group ) {
+			if ( empty( $group['items'] ) ) {
+				continue;
+			}
+			$html .= '<section class="atora-hoy-group atora-hoy-group--' . esc_attr( $urgency ) . '">';
+			$html .= '<h2 class="atora-hoy-group-title">' . esc_html( $group['label'] ) . '</h2>';
+			$html .= '<ul class="atora-hoy-items">';
+			foreach ( $group['items'] as $item ) {
+				$html .= '<li class="atora-hoy-item atora-hoy-item--' . esc_attr( $urgency ) . '">';
+				$html .= '<a class="atora-hoy-item-link" href="' . esc_url( (string) ( $item['url'] ?? '#' ) ) . '">';
+				$html .= '<span class="atora-hoy-item-title">' . esc_html( (string) ( $item['title'] ?? '' ) ) . '</span>';
+				$html .= '<span class="atora-hoy-item-arrow" aria-hidden="true">→</span>';
+				$html .= '</a></li>';
+			}
+			$html .= '</ul></section>';
+		}
+		$html .= '</div>';
+
+		return $html;
 	}
 }

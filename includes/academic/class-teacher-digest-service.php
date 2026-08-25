@@ -67,7 +67,15 @@ class CLMS_Teacher_Digest_Service {
 					'submissions_pending'  => $counts['submissions_pending'],
 					'students_inactive'    => $counts['students_inactive'],
 					'quizzes_pending'      => $counts['quizzes_pending'],
-					'button_url'           => admin_url( 'admin.php?page=atora-students-hub' ),
+					// PT-3.4 (6.8.0): apunta a "Hoy" en vez del hub genérico
+					// -- el docente llega directo a la lista priorizada en
+					// vez de un listado donde todavía tiene que buscar.
+					// La plantilla aprobada (atora_daily_digest_teacher,
+					// ver docs/PLANTILLAS-WHATSAPP.md) usa {{4}} como
+					// variable posicional genérica ("Ver panel"), no un
+					// texto fijo describiendo el destino -- el cambio es
+					// transparente para el mensaje ya aprobado.
+					'button_url'           => admin_url( 'admin.php?page=atora-hoy' ),
 				),
 				array(
 					'dedupe_key'            => 'teacher_digest_' . $teacher_id . '_' . current_time( 'Y-m-d' ),

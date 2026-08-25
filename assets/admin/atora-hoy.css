@@ -1,0 +1,115 @@
+/**
+ * ATORA LMS — "Hoy" (PT-3, sprint 6.8.0)
+ *
+ * Reutiliza los tokens --atora-* ya definidos en atora-admin.css
+ * (dependencia declarada al encolar) — mismo criterio ya establecido
+ * en 6.6.0/6.7.0: nada de un sistema visual nuevo para esta pantalla.
+ * Mobile-first, objetivos táctiles de 44px, sin scroll horizontal.
+ *
+ * @package ATORA_LMS
+ * @since   6.8.0
+ */
+
+.atora-hoy-wrap {
+	max-width: 720px;
+	margin: 0 auto;
+	padding-bottom: 2rem;
+}
+
+.atora-hoy-header {
+	margin: 1rem 0 1.5rem;
+}
+
+.atora-hoy-subtitle {
+	color: var(--atora-text-secondary, #475569);
+	margin: 0.25rem 0 0;
+}
+
+.atora-hoy-empty {
+	background: var(--atora-surface, #fff);
+	border: 1px solid var(--atora-border, #e2e8f0);
+	border-radius: var(--atora-radius-lg, 16px);
+	padding: 2.5rem 1.5rem;
+	text-align: center;
+}
+.atora-hoy-empty-title {
+	font-size: 18px;
+	font-weight: 600;
+	color: var(--atora-text-primary, #0f172a);
+	margin: 0 0 0.4rem;
+}
+.atora-hoy-empty-sub {
+	color: var(--atora-text-secondary, #475569);
+	margin: 0;
+}
+
+.atora-hoy-list {
+	display: flex;
+	flex-direction: column;
+	gap: 1.5rem;
+}
+
+.atora-hoy-group-title {
+	font-size: 14px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.03em;
+	color: var(--atora-text-secondary, #475569);
+	margin: 0 0 0.6rem;
+}
+
+.atora-hoy-items {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+.atora-hoy-item-link {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	min-height: 52px;
+	padding: 0.75rem 1rem;
+	background: var(--atora-surface, #fff);
+	border: 1px solid var(--atora-border, #e2e8f0);
+	border-left-width: 4px;
+	border-radius: var(--atora-radius-md, 12px);
+	text-decoration: none;
+	color: var(--atora-text-primary, #0f172a);
+}
+.atora-hoy-item-link:hover,
+.atora-hoy-item-link:focus-visible {
+	background: var(--atora-bg, #f8fafc);
+	outline: 2px solid var(--atora-blue-100, #dbeafe);
+}
+
+.atora-hoy-item--alta .atora-hoy-item-link {
+	border-left-color: var(--atora-danger, #E24B4A);
+}
+.atora-hoy-item--media .atora-hoy-item-link {
+	border-left-color: var(--atora-warning, #BA7517);
+}
+.atora-hoy-item--baja .atora-hoy-item-link {
+	border-left-color: var(--atora-blue-700, #1d4ed8);
+}
+
+.atora-hoy-item-title {
+	font-size: 15px;
+	line-height: 1.4;
+}
+
+.atora-hoy-item-arrow {
+	flex-shrink: 0;
+	color: var(--atora-text-muted, #94a3b8);
+	font-size: 18px;
+}
+
+/* Shortcode de frontend -- mismo marcado, solo el contenedor cambia. */
+.atora-hoy-shortcode {
+	max-width: 720px;
+	margin: 0 auto;
+}
