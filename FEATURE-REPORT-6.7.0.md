@@ -184,3 +184,16 @@ revisión de seguridad general del proyecto.
 
 `FEATURE-REPORT-*.md` ya estaba excluido de `.distignore` desde 6.6.0 —
 no fue necesario agregar un patrón nuevo antes de construir el ZIP.
+
+- **Archivo:** `dist/atora-lms-6.7.0.zip`
+- **SHA-256:** `91c29623b5d5dd464d8f607cba3a4bef48c58d48107841e8544a4636aa66dfc0`
+- **Auditoría del contenido extraído:** sin archivos de desarrollo
+  (`tests/`, `docs/`, `.git*`, `scripts/`, `.claude/`, `FEATURE-REPORT-*.md`)
+  en la raíz del paquete; cadenas de versión (`Version:`,
+  `ATORA_LMS_VERSION`, `Stable tag`) consistentes en `6.7.0`; los tres
+  archivos nuevos del dominio (`class-followup-domain-provider-interface.php`,
+  `class-academic-domain-provider.php`, `class-commercial-domain-provider.php`)
+  presentes; escaneo de patrones de credenciales sin hallazgos reales —
+  el único match fue la misma variable de formulario JS ya existente
+  (`&password=`) de la contraseña de acceso a matrícula, disclosed
+  también en el reporte de 6.6.0.
