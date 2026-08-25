@@ -52,6 +52,46 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 				) );
 			}
 		}
+
+		// PT-2.1 (6.9.0): búsqueda persistente -- misma posición visible
+		// en toda página atora-*/clms-*, cargada acá junto al resto del
+		// design system, no en cada vista por separado.
+		wp_enqueue_style( 'atora-ui-search', ATORA_LMS_URL . 'assets/shared/search.css', array( 'atora-ui-tokens', 'atora-ui-followup-panel' ), $ver );
+		wp_enqueue_script( 'atora-ui-search', ATORA_LMS_URL . 'assets/shared/search.js', array( 'atora-ui-followup-panel' ), $ver, true );
+		wp_localize_script( 'atora-ui-search', 'atoraSearch', array(
+			'restBase' => esc_url_raw( rest_url( 'clms/v1' ) ),
+			'nonce'    => wp_create_nonce( 'wp_rest' ),
+		) );
+	}
+
+	/**
+	 * PT-2.1 (6.9.0): marcado de la búsqueda persistente — un ícono de
+	 * lupa fijo, siempre en la misma posición (justo debajo de la barra
+	 * de admin de WordPress, antes del contenido de cualquier página
+	 * atora-*/clms-*). search.js maneja el resto (expandir, buscar,
+	 * mostrar resultados).
+	 *
+	 * @return void
+	 */
+	public function render_atora_search_bar(): void {
+		if ( ! isset( $_GET['page'] ) ) {
+			return;
+		}
+		$page = sanitize_key( (string) wp_unslash( $_GET['page'] ) );
+		if ( ! str_starts_with( $page, 'clms-' ) && ! str_starts_with( $page, 'atora-' ) ) {
+			return;
+		}
+		?>
+		<div id="atora-ui-search" class="atora-ui-search">
+			<button type="button" class="atora-ui-search-toggle" id="atora-ui-search-toggle" aria-expanded="false" aria-label="<?php esc_attr_e( 'Buscar', 'atora-lms' ); ?>">
+				<span aria-hidden="true">🔎</span>
+			</button>
+			<div class="atora-ui-search-box" id="atora-ui-search-box" hidden>
+				<input type="text" id="atora-ui-search-input" class="atora-ui-search-input" placeholder="<?php esc_attr_e( 'Buscar un estudiante, sección o contacto…', 'atora-lms' ); ?>" autocomplete="off" />
+				<div class="atora-ui-search-results" id="atora-ui-search-results" hidden></div>
+			</div>
+		</div>
+		<?php
 	}
 
 	/**

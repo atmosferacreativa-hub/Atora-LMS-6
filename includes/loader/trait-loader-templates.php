@@ -28,6 +28,7 @@ trait CLMS_Loader_Templates_Trait {
 			// PT-1 (6.9.0) — componentes compartidos de lista+panel.
 			'includes/ui/class-ui-list-row.php',
 			'includes/ui/class-ui-followup-panel.php',
+			'includes/ui/class-ui-search-service.php',
 		);
 
 		foreach ( $ui_files as $file ) {
@@ -52,6 +53,10 @@ trait CLMS_Loader_Templates_Trait {
 			'CLMS_UI_Blocks',
 			'CLMS_UI_Shortcode_Blocks',
 			'CLMS_UI_Editor_Templates',
+			// PT-2 (6.9.0): registra su propia ruta REST en el constructor
+			// (rest_api_init) -- necesita instanciarse, no es estática
+			// como List_Row/Followup_Panel.
+			'CLMS_UI_Search_Service',
 		);
 
 		foreach ( $instantiable as $class ) {

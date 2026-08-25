@@ -1065,6 +1065,20 @@ add_action( 'init', static function () {
 		}
 	} );
 
+	// PT-2.1 (6.9.0): búsqueda persistente -- misma posición visible en
+	// toda página atora-*/clms-*, nunca un elemento que aparece y
+	// desaparece según la pantalla. Mismo patrón de hook que el design
+	// system de arriba (CLMS_Core::instance(), gate por página adentro
+	// del método) — no un mecanismo nuevo.
+	add_action( 'in_admin_header', function() {
+		if ( class_exists( 'CLMS_Core' ) && method_exists( 'CLMS_Core', 'instance' ) ) {
+			$core = CLMS_Core::instance();
+			if ( method_exists( $core, 'render_atora_search_bar' ) ) {
+				$core->render_atora_search_bar();
+			}
+		}
+	} );
+
 	// ── Fase 10: Abandoned Cart Service (WooCommerce) ─────────────────────────
 	atora_lms_require_module_if_active( 'commerce', 'includes/commerce/class-abandoned-cart-service.php', static function() {
 		ATORA_Abandoned_Cart_Service::init();
