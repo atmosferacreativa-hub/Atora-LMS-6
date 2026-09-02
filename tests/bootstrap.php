@@ -632,3 +632,8 @@ foreach ( array( 'class-module-registry.php', 'class-install-profiles.php', 'cla
 		require_once $path;
 	}
 }
+
+$token_crypto_file = __DIR__ . '/../includes/security/class-token-crypto.php';
+if ( file_exists( $token_crypto_file ) ) {
+	require_once $token_crypto_file;
+}

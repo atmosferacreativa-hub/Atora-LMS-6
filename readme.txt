@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.4
 Requires PHP: 8.1
-Stable tag: 6.11.0
+Stable tag: 6.13.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,31 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.13.3 =
+* Fixed Zoom attendance for students whose connection drops and reconnects mid-class — previously each reconnection was scored separately against the full class duration, so a student present the whole class could be marked "partial" instead of "present." Attendance is now aggregated per person before scoring, and duration is summed instead of overwritten by the last reconnection.
+* Version housekeeping: the plugin version constant, header, and changelog now match the actual release history (they had been stuck at 6.11.0 since 6.12.0). This constant also gates cache-busting for enqueued scripts/styles and the data sent to the licensing server, so keeping it accurate matters beyond cosmetics.
+= 6.13.2 =
+* Fixed Zoom attendance silently dropping unidentified/guest participants — Zoom now records guests the same way Google Meet already did, instead of discarding them.
+* Fixed the schema migration permanently losing the link to who organized a Google Meet session if that session's data was never fully saved — the safety option is now kept (and logged) instead of deleted.
+* Fixed Google Drive attachment permissions so a teacher or admin can attach material to their own course even when they aren't personally enrolled in it.
+= 6.13.1 =
+* Added the live-class screen for lesson editing (provider selection, schedule, join link, and an attendance panel) — previously there was no admin screen at all for setting up a live class or reviewing who attended.
+* Fixed several Google Meet attendance cases: multiple unidentified/guest participants in the same class no longer collapse into one attendance record, and the screen now explains clearly when a Meet class was created outside ATORA and therefore can never have automatic attendance.
+* Fixed an open-registration gap: signing in with Google could create new accounts even when self-registration was supposed to be disabled for the Institution profile.
+* Fixed a permissions gap letting any logged-in user attach a Google Drive file reference to another student's submission or an unrelated lesson.
+* Hardened Google sign-in against abuse (rate limiting, stricter token checks) and against a silent failure if the encryption key protecting connected Google accounts is rotated — the account now shows "needs reauthorization" instead of just failing.
+* Fixed the "N consecutive absences" alert using the order attendance was entered instead of the order the classes actually happened, and made it open a follow-up case for a student who never had one instead of only updating existing cases.
+= 6.13.0 =
+* Added persistent storage for live-class sessions and attendance (previously only kept as scattered post/user metadata, not queryable or reportable).
+* Added Google Meet as a live-class provider alongside Zoom — creation, join links, and attendance tracking (including unidentified guests, shown as such rather than silently ignored).
+* Added Google sign-in/registration, Google Calendar sync improvements, and Google Drive integration for course materials and submissions, all using your own Google Cloud project (no shared app to wait on for verification) and the least-privileged Drive access level available.
+* Added an automated audit trail (who enrolled whom, who changed a grade, who exported data) and a dedicated Institution profile screen surfacing it alongside cohort and gradebook-export shortcuts.
+* Connected attendance to the rest of the platform: repeated absences now surface in the teacher's follow-up queue and in the "Today" panel.
+* Encrypted stored Google connection tokens at rest (previously stored in plain text).
+= 6.12.0 =
+* Replaced the three installation profiles with four clearer ones — Teacher, Institution, Creators, Academy — each a better fit for a specific kind of school, with no change to existing installs on upgrade.
+* REST API routes belonging to a disabled module are no longer registered at all, closing a gap where deactivating a module in the admin screen didn't actually stop its API from responding.
+* New installations now only create the database tables their chosen profile needs, instead of always creating every table upfront.
 = 6.11.0 =
 * Added a real student intervention timeline: at-risk alerts (inactivity/low-grade) and manual notes from teachers/coordinators are now recorded on a per-student history, viewable from a new student profile screen.
 * Added the ability to assign a section coordinator from the existing cohort screen — previously this required a direct database edit and had no admin UI at all.

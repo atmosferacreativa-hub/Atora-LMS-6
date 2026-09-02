@@ -41,7 +41,10 @@ class Email_Engine {
 		}
 
 		// Webhooks entrantes de todos los providers.
-		add_action( 'rest_api_init', array( __CLASS__, 'register_webhook_routes' ) );
+		// P2 (6.12.0): gateado por módulo 'email-engine'.
+		if ( ! class_exists( '\CLMS_Module_Registry' ) || \CLMS_Module_Registry::is_active( 'email-engine' ) ) {
+			add_action( 'rest_api_init', array( __CLASS__, 'register_webhook_routes' ) );
+		}
 
 		// Endpoints de compliance (unsub, preferences).
 		add_action( 'init',          array( __CLASS__, 'register_compliance_endpoints' ) );

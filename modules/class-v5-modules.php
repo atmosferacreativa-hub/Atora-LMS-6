@@ -87,6 +87,13 @@ class V5_Modules {
 		if ( self::module_active( 'automation' ) ) {
 			self::load_automation();
 		}
+
+		// P10 (6.13.0): Google (login/registro, Meet, Drive) — carga
+		// amplia porque el botón de login vive en wp-login.php, fuera de
+		// cualquier contexto admin/rest/cron.
+		if ( self::module_active( 'google' ) ) {
+			self::load_google();
+		}
 	}
 
 	/**
@@ -102,6 +109,21 @@ class V5_Modules {
 	}
 
 	// ── Loaders ──────────────────────────────────────────────────────────────
+
+	/** @return void */
+	private static function load_google(): void {
+		$dir = ATORA_LMS_MODULES_DIR . 'google/';
+		self::require_file( $dir . 'class-google-module.php' );
+		self::require_file( $dir . 'class-google-identity.php' );
+		self::require_file( $dir . 'class-google-drive.php' );
+
+		if ( class_exists( 'ATORA\Google\Google_Module' ) ) {
+			\ATORA\Google\Google_Module::init();
+		}
+		if ( class_exists( 'ATORA\Google\Google_Identity' ) ) {
+			\ATORA\Google\Google_Identity::init();
+		}
+	}
 
 	/** @return void */
 	private static function load_licensing(): void {
@@ -163,9 +185,27 @@ class V5_Modules {
 	/** @return void */
 	private static function load_live_streaming(): void {
 		$dir = ATORA_LMS_MODULES_DIR . 'live-streaming/';
+		// P6/P7 (6.13.0): repositorio de escritura dual + contrato de
+		// providers — deben cargar antes que class-live-streaming.php,
+		// que ya los usa en save_metabox()/register_webhook_routes().
+		self::require_file( $dir . 'class-live-session-repository.php' );
+		self::require_file( $dir . 'providers/class-provider-interface.php' );
+		self::require_file( $dir . 'providers/class-provider-zoom.php' );
+		// P8 (6.13.0): Meet reusa el OAuth de Calendar — requiere que ese
+		// módulo ya esté cargado (gateado arriba, antes de live-streaming).
+		if ( class_exists( 'ATORA\Calendar\Calendar_Sync' ) ) {
+			self::require_file( $dir . 'providers/class-provider-meet.php' );
+		}
 		self::require_file( $dir . 'class-live-streaming.php' );
+		self::require_file( $dir . 'class-live-streaming-migrator.php' );
 		if ( class_exists( 'ATORA\LiveStreaming\Live_Streaming' ) ) {
 			\ATORA\LiveStreaming\Live_Streaming::init();
+		}
+		if ( defined( 'WP_CLI' ) && WP_CLI ) {
+			self::require_file( $dir . 'class-live-streaming-cli.php' );
+			if ( class_exists( 'ATORA\LiveStreaming\Live_Streaming_CLI' ) ) {
+				\ATORA\LiveStreaming\Live_Streaming_CLI::init();
+			}
 		}
 	}
 

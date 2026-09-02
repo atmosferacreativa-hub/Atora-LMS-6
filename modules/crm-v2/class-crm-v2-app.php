@@ -53,7 +53,10 @@ class CRM_V2_App {
 
 		DB_Service::maybe_install_schema();
 
-		add_action( 'rest_api_init', array( __CLASS__, 'register_rest_routes' ) );
+		// P2 (6.12.0): gateado por módulo 'crm'.
+		if ( ! class_exists( '\CLMS_Module_Registry' ) || \CLMS_Module_Registry::is_active( 'crm' ) ) {
+			add_action( 'rest_api_init', array( __CLASS__, 'register_rest_routes' ) );
+		}
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue_admin_assets' ) );
 		// ── Invalidar caché de scope CRM al cambiar matrículas (Fase 5) ───
 		add_action( 'clms_user_enrolled_in_course',     array( __CLASS__, 'flush_crm_scope_cache' ), 10, 2 );

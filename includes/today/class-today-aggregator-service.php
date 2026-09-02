@@ -102,6 +102,9 @@ class CLMS_Today_Aggregator_Service {
 
 		if ( $has_academic ) {
 			$items = array_merge( $items, $this->collect_academic_digest_items( $user_id ) );
+			// P9 (6.13.0): asistencia conectada al panel "Hoy" — estudiantes
+			// con N ausencias consecutivas en cursos del propio docente.
+			$items = array_merge( $items, $this->collect_attendance_items( $user_id ) );
 		}
 
 		// PT-3 (6.11.0): antes no había ninguna fuente de coordinador acá
@@ -236,6 +239,42 @@ class CLMS_Today_Aggregator_Service {
 	 * @param int $user_id
 	 * @return array<int,array<string,mixed>>
 	 */
+	/**
+	 * P9 (6.13.0): estudiantes con ausencias consecutivas en cursos del
+	 * docente — mismo shape de ítem que collect_followup_items().
+	 *
+	 * @param int $user_id
+	 * @return array<int,array<string,mixed>>
+	 */
+	protected function collect_attendance_items( $user_id ) {
+		if ( ! class_exists( 'CLMS_Attendance_Academic_Bridge' ) ) {
+			return array();
+		}
+
+		$at_risk = CLMS_Attendance_Academic_Bridge::get_at_risk_students_for_teacher( absint( $user_id ) );
+		$items   = array();
+
+		foreach ( $at_risk as $row ) {
+			$items[] = array(
+				'source'             => 'attendance',
+				'title'              => sprintf(
+					/* translators: 1: nombre del estudiante, 2: número de ausencias, 3: curso */
+					__( '%1$s lleva %2$d ausencias seguidas — %3$s', 'atora-lms' ),
+					get_userdata( $row['user_id'] ) ? get_userdata( $row['user_id'] )->display_name : sprintf( '#%d', $row['user_id'] ),
+					$row['absences'],
+					$row['course_title']
+				),
+				'count'              => $row['absences'],
+				'urgency'            => 'alta',
+				'url'                => admin_url( 'admin.php?page=clms-academic-hub&user_id=' . $row['user_id'] ),
+				'_tier'              => 2,
+				'_has_specific_time' => false,
+			);
+		}
+
+		return $items;
+	}
+
 	protected function collect_followup_items( $user_id ) {
 		if ( ! class_exists( '\ATORA\CRM_V2\Services\Followup_Plan_Service' ) ) {
 			return array();

@@ -21,13 +21,15 @@ class ModuleRegistryTest extends TestCase {
 
 	protected function tearDown(): void {
 		atora_test_reset_options();
+		atora_test_reset_filters( 'atora/profile/allowed_modules' );
 		\CLMS_Module_Registry::flush_cache();
 		parent::tearDown();
 	}
 
 	/** @test */
-	public function test_all_19_slugs_defined(): void {
-		$this->assertCount( 19, \CLMS_Module_Registry::get_modules() );
+	public function test_all_20_slugs_defined(): void {
+		// 6.13.0 (P10) añadió 'google' — 19 + 1.
+		$this->assertCount( 20, \CLMS_Module_Registry::get_modules() );
 	}
 
 	/** @test */
@@ -115,6 +117,41 @@ class ModuleRegistryTest extends TestCase {
 		\CLMS_Module_Registry::flush_cache();
 		$this->assertFalse( \CLMS_Module_Registry::is_active( 'crm' ) );
 
+		update_option( 'atora_active_modules', array( 'lms', 'academic', 'gradebook', 'security', 'crm' ) );
+		\CLMS_Module_Registry::flush_cache();
+		$this->assertTrue( \CLMS_Module_Registry::is_active( 'crm' ) );
+	}
+
+	/** @test */
+	public function test_allowed_modules_filter_can_restrict_active_set(): void {
+		// P4 (6.12.0): punto de enganche del sprint de licencias — inerte por
+		// defecto, pero disponible para restringir el set activo.
+		update_option( 'atora_active_modules', array( 'lms', 'academic', 'gradebook', 'security', 'crm' ) );
+		\CLMS_Module_Registry::flush_cache();
+		$this->assertTrue( \CLMS_Module_Registry::is_active( 'crm' ) );
+
+		add_filter( 'atora/profile/allowed_modules', static fn( $active ) => array_diff( $active, array( 'crm' ) ) );
+		\CLMS_Module_Registry::flush_cache();
+
+		$this->assertFalse( \CLMS_Module_Registry::is_active( 'crm' ) );
+	}
+
+	/** @test */
+	public function test_allowed_modules_filter_cannot_deactivate_core(): void {
+		// El filtro se aplica DESPUÉS de la unión con core: un filtro que
+		// intente vaciar el set no puede apagar los módulos núcleo.
+		update_option( 'atora_active_modules', array( 'lms', 'academic', 'gradebook', 'security' ) );
+		\CLMS_Module_Registry::flush_cache();
+
+		add_filter( 'atora/profile/allowed_modules', static fn( $active ) => array() );
+		\CLMS_Module_Registry::flush_cache();
+
+		$this->assertTrue( \CLMS_Module_Registry::is_active( 'lms' ) );
+		$this->assertTrue( \CLMS_Module_Registry::is_active( 'security' ) );
+	}
+
+	/** @test */
+	public function test_no_filter_attached_is_inert(): void {
 		update_option( 'atora_active_modules', array( 'lms', 'academic', 'gradebook', 'security', 'crm' ) );
 		\CLMS_Module_Registry::flush_cache();
 		$this->assertTrue( \CLMS_Module_Registry::is_active( 'crm' ) );

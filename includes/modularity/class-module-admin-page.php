@@ -123,7 +123,9 @@ class CLMS_Module_Admin_Page {
 					<input type="radio" name="install_profile" value="<?php echo esc_attr( $key ); ?>" <?php checked( $current, $key ); ?> style="margin-top:3px">
 					<span>
 						<strong><?php echo esc_html( $def['label'] ); ?></strong>
-						<?php echo $current === $key ? ' <span style="color:#16a34a;font-size:11px">(' . esc_html__( 'actual', 'atora-lms' ) . ')</span>' : ''; ?>
+						<?php if ( $current === $key ) : ?>
+							<span style="color:#16a34a;font-size:11px">(<?php echo CLMS_Install_Profiles::is_modified() ? esc_html__( 'actual, modificado', 'atora-lms' ) : esc_html__( 'actual', 'atora-lms' ); ?>)</span>
+						<?php endif; ?>
 						<br><span style="color:#64748b;font-size:12px"><?php echo esc_html( $def['description'] ); ?></span>
 					</span>
 				</label>
@@ -165,6 +167,11 @@ class CLMS_Module_Admin_Page {
 		if ( 'confirm' === $action ) {
 			$profile = sanitize_key( (string) wp_unslash( $_POST['confirm_profile'] ?? '' ) );
 			if ( CLMS_Install_Profiles::apply( $profile ) ) {
+				// P3 (6.12.0): el perfil nuevo puede activar módulos que no
+				// tenían tablas creadas todavía.
+				if ( class_exists( '\ATORA\V5_Installer' ) ) {
+					\ATORA\V5_Installer::ensure_active_module_tables();
+				}
 				$label = CLMS_Install_Profiles::get_profiles()[ $profile ]['label'] ?? $profile;
 				return array(
 					array( array( 'type' => 'success', 'message' => sprintf( __( 'Perfil "%s" aplicado.', 'atora-lms' ), $label ) ) ),
@@ -246,6 +253,14 @@ class CLMS_Module_Admin_Page {
 
 		update_option( 'atora_active_modules', array_values( array_unique( $final ) ) );
 		CLMS_Module_Registry::flush_cache();
+		if ( class_exists( 'CLMS_Install_Profiles' ) ) { CLMS_Install_Profiles::mark_modified(); }
+
+		// P3 (6.12.0): un módulo recién activado necesita sus tablas ya —
+		// no esperar a que cambie SCHEMA_VERSION. dbDelta() es idempotente,
+		// así que llamar a esto para módulos ya activos antes no hace nada.
+		if ( class_exists( '\ATORA\V5_Installer' ) ) {
+			\ATORA\V5_Installer::ensure_active_module_tables();
+		}
 
 		$notices[] = array(
 			'type'    => 'success',

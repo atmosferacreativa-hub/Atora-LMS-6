@@ -52,7 +52,10 @@ class Newsletter {
 		add_action( 'publish_post', array( __CLASS__, 'on_post_published' ) );
 
 		// REST API.
-		add_action( 'rest_api_init', array( __CLASS__, 'register_rest_routes' ) );
+		// P2 (6.12.0): gateado por módulo 'newsletter'.
+		if ( ! class_exists( '\CLMS_Module_Registry' ) || \CLMS_Module_Registry::is_active( 'newsletter' ) ) {
+			add_action( 'rest_api_init', array( __CLASS__, 'register_rest_routes' ) );
+		}
 
 		// Shortcode archivo público.
 		add_shortcode( 'atora_newsletter_archive', array( __CLASS__, 'render_archive_shortcode' ) );

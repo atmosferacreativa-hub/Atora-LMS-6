@@ -4,7 +4,7 @@
  * instalación como paso 1 desde 6.3.0 (PT-3.2).
  *
  * 5 pasos en admin para configuración inicial:
- *   Paso 1: Perfil de instalación (academia / institucional / corporativo)
+ *   Paso 1: Perfil de instalación (docente / institución / creadores / academia)
  *   Paso 2: Tu academia (nombre, logo, zona horaria)
  *   Paso 3: Email (provider SMTP/SES/SendGrid/Brevo)
  *   Paso 4: Primer contacto (importación manual)
@@ -128,6 +128,14 @@ class ATORA_Onboarding_Wizard {
 			$profile = 'academia';
 		}
 		CLMS_Install_Profiles::apply( $profile );
+
+		// P3 (6.12.0): el perfil elegido acá puede activar módulos que la
+		// activación (que ya aplicó 'docente' como default) no había
+		// creado todavía — dbDelta() es idempotente, así que esto no hace
+		// nada si el perfil elegido es 'docente'.
+		if ( class_exists( '\ATORA\V5_Installer' ) ) {
+			\ATORA\V5_Installer::ensure_active_module_tables();
+		}
 	}
 
 	/** Paso 2: academia. */

@@ -88,7 +88,10 @@ class Automation_Engine {
 		}
 
 		// REST API.
-		add_action( 'rest_api_init', array( __CLASS__, 'register_rest_routes' ) );
+		// P2 (6.12.0): gateado por módulo 'automation'.
+		if ( ! class_exists( '\CLMS_Module_Registry' ) || \CLMS_Module_Registry::is_active( 'automation' ) ) {
+			add_action( 'rest_api_init', array( __CLASS__, 'register_rest_routes' ) );
+		}
 
 		// Webhooks salientes.
 		if ( class_exists( 'ATORA\Automation\Outbound_Webhooks' ) ) {

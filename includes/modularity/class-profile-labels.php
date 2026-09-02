@@ -60,7 +60,7 @@ class CLMS_Profile_Labels {
 	 * @return string
 	 */
 	public static function label( string $key, string $default ): string {
-		if ( ! class_exists( 'CLMS_Install_Profiles' ) || 'institucional' !== CLMS_Install_Profiles::current() ) {
+		if ( ! class_exists( 'CLMS_Install_Profiles' ) || 'institucion' !== CLMS_Install_Profiles::current() ) {
 			return $default;
 		}
 		$map = self::get_institutional_map();

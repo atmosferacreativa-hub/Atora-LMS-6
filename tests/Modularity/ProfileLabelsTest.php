@@ -33,14 +33,14 @@ class ProfileLabelsTest extends TestCase {
 	}
 
 	/** @test */
-	public function test_corporativo_profile_returns_default_label(): void {
-		\CLMS_Install_Profiles::apply( 'corporativo' );
+	public function test_creadores_profile_returns_default_label(): void {
+		\CLMS_Install_Profiles::apply( 'creadores' );
 		$this->assertSame( 'Contactos', atora_profile_label( 'contacts', 'Contactos' ) );
 	}
 
 	/** @test */
 	public function test_institucional_profile_returns_academic_label(): void {
-		\CLMS_Install_Profiles::apply( 'institucional' );
+		\CLMS_Install_Profiles::apply( 'institucion' );
 		$this->assertSame( 'Estudiantes', atora_profile_label( 'contacts', 'Contactos' ) );
 		$this->assertSame( 'Programa de formación', atora_profile_label( 'product', 'Producto' ) );
 		$this->assertSame( 'Sección', atora_profile_label( 'cohort', 'Cohorte comercial' ) );
@@ -48,13 +48,13 @@ class ProfileLabelsTest extends TestCase {
 
 	/** @test */
 	public function test_institucional_unmapped_key_falls_back_to_default(): void {
-		\CLMS_Install_Profiles::apply( 'institucional' );
+		\CLMS_Install_Profiles::apply( 'institucion' );
 		$this->assertSame( 'Algo sin mapear', atora_profile_label( 'unmapped_key', 'Algo sin mapear' ) );
 	}
 
 	/** @test */
 	public function test_switching_back_to_academia_restores_default(): void {
-		\CLMS_Install_Profiles::apply( 'institucional' );
+		\CLMS_Install_Profiles::apply( 'institucion' );
 		$this->assertSame( 'Estudiantes', atora_profile_label( 'contacts', 'Contactos' ) );
 
 		\CLMS_Install_Profiles::apply( 'academia' );
@@ -63,7 +63,7 @@ class ProfileLabelsTest extends TestCase {
 
 	/** @test */
 	public function test_pt342_keys_present_in_institutional_map(): void {
-		\CLMS_Install_Profiles::apply( 'institucional' );
+		\CLMS_Install_Profiles::apply( 'institucion' );
 		foreach ( array( 'enrollment', 'program', 'section', 'teacher', 'coordinator' ) as $key ) {
 			$this->assertNotSame( 'default-fallback', atora_profile_label( $key, 'default-fallback' ), "clave '{$key}' debería estar mapeada" );
 		}

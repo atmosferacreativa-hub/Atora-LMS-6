@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class V5_Installer {
 
 	/** Versión del esquema. Incrementar para forzar re-instalación. */
-	const SCHEMA_VERSION = '5.1.9-followup-plan-domains';
+	const SCHEMA_VERSION = '5.2.0-attendance-schema-fixes';
 
 	/** Option key que almacena la versión instalada. */
 	const OPTION_KEY = 'atora_v5_schema_version';
@@ -38,7 +38,7 @@ class V5_Installer {
 			return;
 		}
 
-		if ( self::create_tables() && self::migrate_wp_post_id_nullable_columns() && self::migrate_rate_limit_indexes() && self::migrate_telegram_links_from_usermeta() && self::ensure_parity_tables() && self::migrate_followup_plan_column() && self::migrate_followup_plan_domain_columns() ) {
+		if ( self::create_tables() && self::migrate_wp_post_id_nullable_columns() && self::migrate_rate_limit_indexes() && self::migrate_telegram_links_from_usermeta() && self::ensure_parity_tables() && self::migrate_followup_plan_column() && self::migrate_followup_plan_domain_columns() && self::migrate_6131_schema_fixes() ) {
 			update_option( self::OPTION_KEY, self::SCHEMA_VERSION );
 		}
 	}
@@ -49,9 +49,35 @@ class V5_Installer {
 	 * @return void
 	 */
 	public static function force_install(): void {
-		if ( self::create_tables() && self::migrate_wp_post_id_nullable_columns() && self::migrate_rate_limit_indexes() && self::migrate_telegram_links_from_usermeta() && self::ensure_parity_tables() && self::migrate_followup_plan_column() && self::migrate_followup_plan_domain_columns() ) {
+		if ( self::create_tables() && self::migrate_wp_post_id_nullable_columns() && self::migrate_rate_limit_indexes() && self::migrate_telegram_links_from_usermeta() && self::ensure_parity_tables() && self::migrate_followup_plan_column() && self::migrate_followup_plan_domain_columns() && self::migrate_6131_schema_fixes() ) {
 			update_option( self::OPTION_KEY, self::SCHEMA_VERSION );
 		}
+	}
+
+	/**
+	 * C0 (6.13.1): ALTER TABLE explícitos que dbDelta() no puede aplicar
+	 * (no diffea columnas/índices en updates) — ver
+	 * CLMS_Migration_6131::maybe_run(), idempotente y versionada por su
+	 * propia option (atora_schema_version), independiente de
+	 * SCHEMA_VERSION de esta clase.
+	 *
+	 * @return bool
+	 */
+	private static function migrate_6131_schema_fixes(): bool {
+		if ( ! class_exists( 'CLMS_Migration_6131' ) ) {
+			$file = defined( 'ATORA_LMS_DIR' ) ? ATORA_LMS_DIR . 'includes/migrations/class-migration-6131.php' : '';
+			if ( $file && file_exists( $file ) ) {
+				require_once $file;
+			}
+		}
+
+		if ( ! class_exists( 'CLMS_Migration_6131' ) ) {
+			return true; // Archivo genuinamente ausente — no bloquear el resto del ciclo de instalación.
+		}
+
+		\CLMS_Migration_6131::maybe_run();
+
+		return true;
 	}
 
 	/**
@@ -319,10 +345,11 @@ class V5_Installer {
 
 		$table = $wpdb->prefix . $table_suffix;
 		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) ) !== $table ) {
-			// La tabla todavía no existe (create_tables() falló para
-			// esta en particular) — no hay nada que indexar, pero
-			// tampoco se puede confirmar éxito.
-			return false;
+			// P3 (6.12.0): la tabla puede no existir legítimamente porque
+			// pertenece a un módulo inactivo en el perfil actual — ya no es
+			// señal de que create_tables() falló. No hay nada que indexar,
+			// y no indexarla no es un fallo: éxito vacío.
+			return true;
 		}
 
 		if ( self::table_has_index( $table, $index_name ) ) {
@@ -381,7 +408,10 @@ class V5_Installer {
 
 		$table = $wpdb->prefix . 'atora_telegram_links';
 		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) ) !== $table ) {
-			return false;
+			// P3 (6.12.0): la tabla puede no existir legítimamente si el
+			// módulo 'messaging' está inactivo en el perfil actual — no
+			// hay nada que migrar, y eso no es un fallo.
+			return true;
 		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
@@ -460,6 +490,34 @@ class V5_Installer {
 	}
 
 	/**
+	 * P3 (6.12.0): true si las tablas del módulo `$slug` deben crearse —
+	 * módulo activo, o registry aún no cargado (fail-open, mismo criterio
+	 * que CLMS_Module_Registry::is_active() para slugs/estados no
+	 * resueltos). Los grupos de tablas de módulos core (lms, academic,
+	 * gradebook, security) no pasan por aquí — siempre se crean, porque
+	 * esos módulos nunca se pueden desactivar.
+	 *
+	 * @param string $slug Slug de CLMS_Module_Registry.
+	 * @return bool
+	 */
+	private static function module_wants_tables( string $slug ): bool {
+		return ! class_exists( 'CLMS_Module_Registry' ) || \CLMS_Module_Registry::is_active( $slug );
+	}
+
+	/**
+	 * Crea las tablas de los módulos actualmente activos que aún no
+	 * existan. dbDelta() es idempotente (nunca borra columnas ni tablas),
+	 * así que es seguro invocarlo de nuevo en cualquier momento — pensado
+	 * para llamarse justo después de activar un módulo desde ATORA →
+	 * Módulos (P3, 6.12.0), sin esperar a que cambie SCHEMA_VERSION.
+	 *
+	 * @return bool
+	 */
+	public static function ensure_active_module_tables(): bool {
+		return self::create_tables();
+	}
+
+	/**
 	 * Crea o actualiza las tablas v5 usando dbDelta().
 	 *
 	 * @return bool True cuando todas las tablas v5 esperadas existen.
@@ -503,7 +561,27 @@ class V5_Installer {
 			KEY expires_at (expires_at)
 		) $charset_collate;" );
 
+		// ── P5 (6.12.0): Log de auditoría institucional ─────────────────────────
+		// Core (parte de 'security', siempre activo) — quién matriculó, quién
+		// cambió una nota, quién exportó datos. Ver CLMS_Audit_Log_Service.
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_audit_log (
+			id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			actor_id    BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			action      VARCHAR(60)     NOT NULL DEFAULT '',
+			object_type VARCHAR(40)     NOT NULL DEFAULT '',
+			object_id   BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			details_json JSON,
+			created_at  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			KEY actor_id    (actor_id),
+			KEY action      (action),
+			KEY object      (object_type, object_id),
+			KEY created_at  (created_at)
+		) $charset_collate;" );
+
 		// ── Afiliados ──────────────────────────────────────────────────────────
+		// P3 (6.12.0): gateado por módulo 'affiliates'.
+		if ( self::module_wants_tables( 'affiliates' ) ) {
 
 		dbDelta( "CREATE TABLE {$wpdb->prefix}atora_affiliates (
 			id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -553,7 +631,11 @@ class V5_Installer {
 			KEY status       (status)
 		) $charset_collate;" );
 
+		} // /affiliates
+
 		// ── Sprint 3-4: Calendario ─────────────────────────────────────────────
+		// P3 (6.12.0): gateado por módulo 'calendar'.
+		if ( self::module_wants_tables( 'calendar' ) ) {
 
 		dbDelta( "CREATE TABLE {$wpdb->prefix}atora_calendar_events (
 			id               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -603,7 +685,11 @@ class V5_Installer {
 			UNIQUE KEY user_provider (user_id, provider)
 		) $charset_collate;" );
 
+		} // /calendar
+
 		// ── Sprint 5-6: Email Engine ──────────────────────────────────────────
+		// P3 (6.12.0): gateado por módulo 'email-engine'.
+		if ( self::module_wants_tables( 'email-engine' ) ) {
 
 		dbDelta( "CREATE TABLE {$wpdb->prefix}atora_email_queue (
 			id               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -710,7 +796,11 @@ class V5_Installer {
 			KEY queue_type (queue_id, event_type)
 		) $charset_collate;" );
 
+		} // /email-engine
+
 		// ── Sprint 7-8: Newsletter ────────────────────────────────────────────
+		// P3 (6.12.0): gateado por módulo 'newsletter'.
+		if ( self::module_wants_tables( 'newsletter' ) ) {
 
 		dbDelta( "CREATE TABLE {$wpdb->prefix}atora_newsletters (
 			id              INT UNSIGNED    NOT NULL AUTO_INCREMENT,
@@ -732,7 +822,11 @@ class V5_Installer {
 			KEY status (status)
 		) $charset_collate;" );
 
+		} // /newsletter
+
 		// ── Sprint 9-10: Analytics / Engagement ──────────────────────────────
+		// P3 (6.12.0): gateado por módulo 'analytics'.
+		if ( self::module_wants_tables( 'analytics' ) ) {
 
 		dbDelta( "CREATE TABLE {$wpdb->prefix}atora_user_engagement (
 			user_id          BIGINT UNSIGNED NOT NULL,
@@ -780,7 +874,12 @@ class V5_Installer {
 			KEY window_start (window_start)
 		) $charset_collate;" );
 
+		} // /analytics
+
 		// ── Sprint 11-12: Messaging / CRM ────────────────────────────────────
+		// P3 (6.12.0): gateado por módulo 'messaging' (colas de envío
+		// WhatsApp/Telegram/SMS/Email, no la bandeja CRM de abajo).
+		if ( self::module_wants_tables( 'messaging' ) ) {
 
 		dbDelta( "CREATE TABLE {$wpdb->prefix}atora_message_queue (
 			id                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -833,6 +932,11 @@ class V5_Installer {
 			UNIQUE KEY user_id (user_id),
 			UNIQUE KEY chat_id (chat_id)
 		) $charset_collate;" );
+
+		} // /messaging
+
+		// P3 (6.12.0): gateado por módulo 'crm' (bandeja omnicanal + contactos).
+		if ( self::module_wants_tables( 'crm' ) ) {
 
 		dbDelta( "CREATE TABLE {$wpdb->prefix}atora_conversations (
 			id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -935,7 +1039,11 @@ class V5_Installer {
 			KEY contact_id (contact_id)
 		) $charset_collate;" );
 
+		} // /crm (conversations + contactos)
+
 		// ── Sprint 13-14: Automatizaciones ────────────────────────────────────
+		// P3 (6.12.0): gateado por módulo 'automation'.
+		if ( self::module_wants_tables( 'automation' ) ) {
 
 		dbDelta( "CREATE TABLE {$wpdb->prefix}atora_automations (
 			id              INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -993,6 +1101,11 @@ class V5_Installer {
 			KEY executed_at   (executed_at)
 		) $charset_collate;" );
 
+		} // /automation
+
+		// P3 (6.12.0): gateado por módulo 'crm' (empresas y listas).
+		if ( self::module_wants_tables( 'crm' ) ) {
+
 		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_companies (
 			id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 			name            VARCHAR(200)    NOT NULL DEFAULT '',
@@ -1045,7 +1158,11 @@ class V5_Installer {
 			KEY status (status)
 		) $charset_collate;" );
 
+		} // /crm (empresas y listas)
+
 		// ── Fase 10: Carritos abandonados + URL tracking ──────────────────────
+		// P3 (6.12.0): gateado por módulo 'commerce'.
+		if ( self::module_wants_tables( 'commerce' ) ) {
 		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_abandoned_carts (
 			id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 			checkout_key    VARCHAR(64)     NOT NULL DEFAULT '',
@@ -1101,6 +1218,7 @@ class V5_Installer {
 			KEY contact_id  (contact_id),
 			KEY clicked_at  (clicked_at)
 		) $charset_collate;" );
+		} // /commerce
 		// ── /Fase 10 ───────────────────────────────────────────────────────────
 
 		// ── Fase 11: LMS — tablas propias (desacopla wp_posts) ───────────────
@@ -1370,6 +1488,8 @@ class V5_Installer {
 		// ── /Fase 11b ─────────────────────────────────────────────────────────
 
 		// ── Fase 12C: API Keys para MCP y acceso externo ─────────────────────
+		// P3 (6.12.0): gateado por módulo 'mcp'.
+		if ( self::module_wants_tables( 'mcp' ) ) {
 		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_api_keys (
 			id         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 			user_id    BIGINT UNSIGNED NOT NULL DEFAULT 0,
@@ -1405,6 +1525,7 @@ class V5_Installer {
 			UNIQUE KEY key_op_minute (key_id, operation, minute_key),
 			KEY minute_key (minute_key)
 		) $charset_collate;" );
+		} // /mcp
 		// ── /Fase 12C ─────────────────────────────────────────────────────────
 
 		// PT-6 (6.5.7): contador de rate limit genérico y reutilizable
@@ -1427,6 +1548,8 @@ class V5_Installer {
 		) $charset_collate;" );
 
 		// ── Fase III S9: Badges de gamificación ───────────────────────────────
+		// P3 (6.12.0): gateado por módulo 'gamification'.
+		if ( self::module_wants_tables( 'gamification' ) ) {
 		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}clms_badges (
 			id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 			slug        VARCHAR(80)     NOT NULL DEFAULT '',
@@ -1476,6 +1599,7 @@ class V5_Installer {
 				);
 			}
 		}
+		} // /gamification
 		// ── /Fase III S9 ──────────────────────────────────────────────────────
 
 		// ── Secciones académicas (atora-cohort-sections / DC-1) ──────────────
@@ -1523,6 +1647,8 @@ class V5_Installer {
 		// ── /Secciones académicas ─────────────────────────────────────────────
 
 		// ── Fase IV S13: Webhooks ─────────────────────────────────────────────
+		// P3 (6.12.0): gateado por módulo 'webhooks'.
+		if ( self::module_wants_tables( 'webhooks' ) ) {
 		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_webhooks (
 			id         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 			event_type VARCHAR(60)     NOT NULL DEFAULT '',
@@ -1534,7 +1660,90 @@ class V5_Installer {
 			KEY event_type (event_type),
 			KEY is_active  (is_active)
 		) $charset_collate;" );
+		} // /webhooks
 		// ── /Fase IV S13 ──────────────────────────────────────────────────────
+
+		// ── P6 (6.13.0): Live streaming — sesiones y asistencia ────────────────
+		// Gateado por módulo 'live-streaming'.
+		// C0.2 (6.13.1): external_id nullable — varios proveedores sin
+		// external_id (custom/YouTube/Teams sin webhook) deben poder
+		// coexistir bajo el UNIQUE KEY; MySQL permite varios NULL, no
+		// varios ''.
+		// C0.3 (6.13.1): created_by_user_id — necesario para Meet
+		// (restricción meetings.space.created); sustituye el
+		// update_option() por-clase que usaba Provider_Meet antes.
+		if ( self::module_wants_tables( 'live-streaming' ) ) {
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_live_sessions (
+			id                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			lesson_id           BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			course_id           BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			provider            VARCHAR(20)     NOT NULL DEFAULT 'zoom' COMMENT 'zoom|meet|teams|youtube|custom',
+			external_id         VARCHAR(120)    NULL     DEFAULT NULL,
+			join_url            VARCHAR(500)    NOT NULL DEFAULT '',
+			start_datetime      DATETIME                 DEFAULT NULL,
+			duration_minutes    INT UNSIGNED    NOT NULL DEFAULT 60,
+			timezone            VARCHAR(60)     NOT NULL DEFAULT 'UTC',
+			recording_url       VARCHAR(500)    NOT NULL DEFAULT '',
+			status              VARCHAR(20)     NOT NULL DEFAULT 'scheduled' COMMENT 'scheduled|live|ended|cancelled',
+			created_by_user_id  BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			created_at          DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			KEY lesson_id (lesson_id),
+			KEY course_id (course_id),
+			KEY start_datetime (start_datetime),
+			UNIQUE KEY provider_external (provider, external_id)
+		) $charset_collate;" );
+
+		// PT-6.12: no 'atora_live_attendance' — 'atora_attendance' a
+		// propósito, la columna `source` (zoom|meet|teams|manual|qr) es lo
+		// que permite reusar esta misma tabla para asistencia presencial
+		// más adelante sin migrar nada.
+		// C0.1 (6.13.1): external_participant_id (`participant` de Meet o
+		// UUID de Zoom) — clave estable de deduplicación si alguien se
+		// reconecta a mitad de clase, y lo que desbloquea que varios
+		// anónimos (user_id = 0) de la misma sesión no colapsen en una
+		// sola fila bajo el UNIQUE KEY. display_name para mostrar
+		// "No identificado — <nombre>" en el metabox (C4).
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_attendance (
+			id                       BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			user_id                  BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			session_id               BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			external_participant_id  VARCHAR(160)    NOT NULL DEFAULT '',
+			display_name             VARCHAR(200)    NOT NULL DEFAULT '',
+			course_id                BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			source                   VARCHAR(20)     NOT NULL DEFAULT 'manual' COMMENT 'zoom|meet|teams|manual|qr',
+			joined_at                DATETIME                 DEFAULT NULL,
+			left_at                  DATETIME                 DEFAULT NULL,
+			duration_seconds         INT UNSIGNED    NOT NULL DEFAULT 0,
+			status                   VARCHAR(20)     NOT NULL DEFAULT 'ausente' COMMENT 'presente|tarde|ausente|justificado',
+			recorded_by              BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			created_at               DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			KEY course_user (course_id, user_id),
+			UNIQUE KEY session_participant (session_id, user_id, external_participant_id)
+		) $charset_collate;" );
+		} // /live-streaming
+		// ── /P6 (6.13.0) ─────────────────────────────────────────────────────
+
+		// ── P10.4 (6.13.0): Google Drive — referencias de archivos ──────────────
+		// Gateado por módulo 'google'.
+		if ( self::module_wants_tables( 'google' ) ) {
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_google_drive_files (
+			id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			user_id       BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			context_type  VARCHAR(40)     NOT NULL DEFAULT '',
+			context_id    BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			file_id       VARCHAR(120)    NOT NULL DEFAULT '',
+			file_name     VARCHAR(255)    NOT NULL DEFAULT '',
+			mime_type     VARCHAR(120)    NOT NULL DEFAULT '',
+			web_view_link VARCHAR(500)    NOT NULL DEFAULT '',
+			created_at    DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			KEY context (context_type, context_id),
+			KEY user_id (user_id)
+		) $charset_collate;" );
+		} // /google
+		// ── /P10.4 (6.13.0) ──────────────────────────────────────────────────
 
 		// ── PT-1 (6.6.0): Planes de seguimiento (CRM académico) ─────────────────
 		// section_ids/stage_filter como JSON en un LONGTEXT, no una tabla
@@ -1607,8 +1816,20 @@ class V5_Installer {
 	private static function all_tables_exist(): bool {
 		global $wpdb;
 
-		$tables = self::get_tables();
-		foreach ( $tables as $table ) {
+		$prefix = (string) $wpdb->prefix;
+
+		foreach ( self::get_tables() as $table ) {
+			// P3 (6.12.0): una tabla de un módulo inactivo (perfil docente/
+			// institución sin CRM, comercio, etc.) legítimamente no existe
+			// todavía — no debe contar como esquema incompleto, o install()
+			// nunca marcaría SCHEMA_VERSION como al día y create_tables()
+			// se re-ejecutaría en cada carga.
+			$bare_name = 0 === strpos( $table, $prefix ) ? substr( $table, strlen( $prefix ) ) : $table;
+			$owner     = self::table_owner_module( $bare_name );
+			if ( null !== $owner && ! self::module_wants_tables( $owner ) ) {
+				continue;
+			}
+
 			$like = $wpdb->esc_like( $table );
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $like ) );
@@ -1618,6 +1839,43 @@ class V5_Installer {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Módulo dueño de una tabla (sin prefijo de $wpdb), para que
+	 * all_tables_exist() no exija tablas de módulos inactivos. null para
+	 * tablas core/no mapeadas — siempre se exigen, igual que antes de P3.
+	 *
+	 * @param string $bare_table Nombre de tabla sin el prefijo de $wpdb.
+	 * @return string|null
+	 */
+	private static function table_owner_module( string $bare_table ): ?string {
+		static $map = null;
+		if ( null === $map ) {
+			$map = array();
+			foreach ( array(
+				'affiliates'   => array( 'atora_affiliates', 'atora_affiliate_clicks', 'atora_affiliate_commissions' ),
+				'calendar'     => array( 'atora_calendar_events', 'atora_calendar_bookings', 'atora_calendar_sync' ),
+				'email-engine' => array( 'atora_email_queue', 'atora_email_templates', 'atora_email_preferences', 'atora_email_consent_log', 'atora_email_analytics', 'atora_email_events' ),
+				'newsletter'   => array( 'atora_newsletters' ),
+				'analytics'    => array( 'atora_user_engagement', 'atora_form_entries', 'atora_form_throttle' ),
+				'mcp'          => array( 'atora_api_keys', 'atora_api_rate_limit' ),
+				'messaging'    => array( 'atora_message_queue', 'atora_message_log', 'atora_telegram_links' ),
+				'crm'          => array( 'atora_conversations', 'atora_conversation_messages', 'atora_contacts', 'atora_contact_tags', 'atora_contact_activities', 'atora_contact_notes', 'atora_companies', 'atora_crm_lists', 'atora_contact_list_pivot' ),
+				'automation'   => array( 'atora_automations', 'atora_automation_queue', 'atora_automation_execution_log' ),
+				'commerce'     => array( 'atora_abandoned_carts', 'atora_url_store', 'atora_url_clicks' ),
+				'gamification'   => array( 'clms_badges' ),
+				'webhooks'       => array( 'atora_webhooks' ),
+				'live-streaming' => array( 'atora_live_sessions', 'atora_attendance' ),
+				'google'         => array( 'atora_google_drive_files' ),
+			) as $slug => $tables ) {
+				foreach ( $tables as $t ) {
+					$map[ $t ] = $slug;
+				}
+			}
+		}
+
+		return $map[ $bare_table ] ?? null;
 	}
 
 	/**

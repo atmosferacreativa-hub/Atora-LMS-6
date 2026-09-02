@@ -29,6 +29,10 @@ class CLMS_Gradebook_Export_Service {
 		$course_slug = $course_id ? sanitize_title( get_the_title( $course_id ) ) : 'gradebook';
 		$filename    = 'gradebook-' . $course_slug . '-' . gmdate( 'Ymd-His' ) . '.csv';
 
+		// P5 (6.12.0): punto de instrumentación para el log de auditoría
+		// institucional — quién exportó qué y cuándo.
+		do_action( 'atora/gradebook/exported', get_current_user_id(), $course_id, count( $rows ) );
+
 		$eligibility_service = class_exists( 'CLMS_Gradebook_Certificate_Eligibility_Service' )
 			? new CLMS_Gradebook_Certificate_Eligibility_Service()
 			: null;

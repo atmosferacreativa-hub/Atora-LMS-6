@@ -43,7 +43,10 @@ class Calendar {
 		add_action( 'clms_lesson_completed',        array( __CLASS__, 'maybe_update_progress' ), 10, 2 );
 
 		// REST API pública para el widget FullCalendar.
-		add_action( 'rest_api_init',               array( __CLASS__, 'register_rest_routes' ) );
+		// P2 (6.12.0): gateado por módulo 'calendar'.
+		if ( ! class_exists( '\CLMS_Module_Registry' ) || \CLMS_Module_Registry::is_active( 'calendar' ) ) {
+			add_action( 'rest_api_init',               array( __CLASS__, 'register_rest_routes' ) );
+		}
 
 		// Shortcode de calendario.
 		add_shortcode( 'atora_calendar',           array( __CLASS__, 'render_shortcode' ) );
@@ -322,6 +325,15 @@ class Calendar {
 		if ( ! empty( $args['type'] ) ) {
 			$where[]  = 'event_type = %s';
 			$params[] = sanitize_key( $args['type'] );
+		}
+
+		// P10.5 (6.13.0): filtro incremental — solo eventos creados o
+		// modificados desde la última sincronización, para que
+		// Calendar_Sync::sync_user_calendar() deje de reenviar a Google/
+		// Outlook eventos que no cambiaron en cada corrida del cron.
+		if ( ! empty( $args['updated_since'] ) ) {
+			$where[]  = 'updated_at > %s';
+			$params[] = sanitize_text_field( $args['updated_since'] );
 		}
 
 		$sql = "SELECT * FROM {$wpdb->prefix}atora_calendar_events WHERE " . implode( ' AND ', $where ) . ' ORDER BY start_datetime ASC';

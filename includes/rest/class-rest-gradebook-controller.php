@@ -151,6 +151,12 @@ class CLMS_REST_Gradebook_Controller {
 		$grid = $this->gradebook_service->build_grid( $course_id, $args );
 		$csv  = $this->export_service->build_csv_string( $grid, array( 'course_id' => $course_id ) );
 
+		// P5 (6.12.0): punto de instrumentación real para el log de
+		// auditoría institucional — esta es la ruta que de verdad usa el
+		// front-end para exportar, a diferencia de stream_csv() (sin
+		// llamadores activos hoy).
+		do_action( 'atora/gradebook/exported', get_current_user_id(), $course_id, count( $grid['rows'] ?? array() ) );
+
 		return new WP_REST_Response(
 			array(
 				'course_id' => $course_id,

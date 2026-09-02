@@ -86,6 +86,13 @@ $quick_links = array(
 ?>
 
 <div class="wrap atora-hub atora-hub--settings atora-security-hub">
+	<?php if ( class_exists( 'ATORA_Token_Crypto' ) && ! ATORA_Token_Crypto::has_dedicated_key() ) : ?>
+		<div class="notice notice-warning">
+			<p>
+				<?php esc_html_e( 'Los tokens OAuth (Calendar, Meet, Drive) se cifran con AUTH_KEY porque no hay una clave dedicada. Define ATORA_TOKEN_KEY en wp-config.php para una clave independiente de rotación.', 'atora-lms' ); ?>
+			</p>
+		</div>
+	<?php endif; ?>
 	<div class="atora-hub__header">
 		<div>
 			<span class="atora-hub__context"><?php esc_html_e( 'Hub ajustes', 'atora-lms' ); ?></span>

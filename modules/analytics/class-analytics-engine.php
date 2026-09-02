@@ -42,7 +42,10 @@ class Analytics_Engine {
 		}
 
 		// REST API para el dashboard.
-		add_action( 'rest_api_init', array( __CLASS__, 'register_rest_routes' ) );
+		// P2 (6.12.0): gateado por módulo 'analytics'.
+		if ( ! class_exists( '\CLMS_Module_Registry' ) || \CLMS_Module_Registry::is_active( 'analytics' ) ) {
+			add_action( 'rest_api_init', array( __CLASS__, 'register_rest_routes' ) );
+		}
 
 		// Actualizar score al abrir/clickar email.
 		add_action( 'atora/email/webhook_event', array( __CLASS__, 'on_email_event' ), 10, 3 );

@@ -28,7 +28,10 @@ class WhatsApp {
 	 */
 	public static function init(): void {
 		// Webhook entrante de Meta.
-		add_action( 'rest_api_init', array( __CLASS__, 'register_webhook_route' ) );
+		// P2 (6.12.0): gateado por módulo 'messaging'.
+		if ( ! class_exists( '\CLMS_Module_Registry' ) || \CLMS_Module_Registry::is_active( 'messaging' ) ) {
+			add_action( 'rest_api_init', array( __CLASS__, 'register_webhook_route' ) );
+		}
 	}
 
 	/**

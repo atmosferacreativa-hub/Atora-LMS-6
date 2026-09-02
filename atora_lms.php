@@ -3,7 +3,7 @@
  * Plugin Name:       ATORA LMS
  * Plugin URI:        https://atora-lms.com
  * Description:       El LMS más completo del mundo. LMS, Email Marketing, CRM, Calendario, Mensajería multi-canal, Afiliados, Live Streaming y más.
- * Version:           6.11.0
+ * Version:           6.13.3
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            @mundocap - 
@@ -52,7 +52,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * - Limpieza automática de notificaciones >90 días
  */
 if ( ! defined( 'ATORA_LMS_VERSION' ) ) {
-	define( 'ATORA_LMS_VERSION', '6.11.0' );
+	define( 'ATORA_LMS_VERSION', '6.13.3' );
 }
 
 if ( ! defined( 'ATORA_LMS_FILE' ) ) {
@@ -902,6 +902,25 @@ add_action( 'init', static function () {
 		ATORA_Security_Maintenance::init();
 	}
 
+	// P10.1 (6.13.0): cifrado de tokens OAuth — bloqueante, debe cargar
+	// antes que Calendar_Sync y cualquier proveedor Google (Meet/Drive).
+	require_once ATORA_LMS_DIR . 'includes/security/class-token-crypto.php';
+
+	// P5 (6.12.0): log de auditoría institucional — core, siempre activo
+	// (parte de 'security'), independiente del perfil elegido.
+	require_once ATORA_LMS_DIR . 'includes/security/class-audit-log-service.php';
+	if ( class_exists( 'CLMS_Audit_Log_Service' ) ) {
+		CLMS_Audit_Log_Service::init();
+	}
+
+	// P9 (6.13.0): asistencia conectada a seguimiento académico — core
+	// (parte de 'academic'), se activa sola si 'live-streaming' no está
+	// activo (do_action() sin listeners registrados es un no-op).
+	require_once ATORA_LMS_DIR . 'includes/academic/class-attendance-academic-bridge.php';
+	if ( class_exists( 'CLMS_Attendance_Academic_Bridge' ) ) {
+		CLMS_Attendance_Academic_Bridge::init();
+	}
+
 	// ── PT-2 (6.3.0): registro de módulos — debe cargar antes que cualquier
 	// sistema de carga (A/B/C) que lo consulte.
 	require_once ATORA_LMS_DIR . 'includes/modularity/class-module-registry.php';
@@ -909,8 +928,22 @@ add_action( 'init', static function () {
 	require_once ATORA_LMS_DIR . 'includes/modularity/class-module-admin-page.php';
 	require_once ATORA_LMS_DIR . 'includes/modularity/class-install-profiles.php';
 	require_once ATORA_LMS_DIR . 'includes/modularity/class-profile-labels.php';
+	require_once ATORA_LMS_DIR . 'includes/modularity/class-institucion-settings-page.php';
 	if ( class_exists( 'CLMS_Module_Guard' ) ) { CLMS_Module_Guard::init(); }
 	if ( class_exists( 'CLMS_Module_Admin_Page' ) ) { CLMS_Module_Admin_Page::init(); }
+	if ( class_exists( 'CLMS_Institucion_Settings_Page' ) ) { CLMS_Institucion_Settings_Page::init(); }
+
+	// P2.4 (6.12.0): comando WP-CLI `wp atora rest-audit`.
+	if ( defined( 'WP_CLI' ) && WP_CLI ) {
+		atora_lms_require_module( 'includes/modularity/class-rest-audit-cli.php', static function() {
+			if ( class_exists( 'CLMS_Rest_Audit_CLI' ) ) {
+				CLMS_Rest_Audit_CLI::init();
+			}
+		} );
+	}
+	// PT-1 (6.12.0): migra perfiles de instalación 6.3.0–6.11.0 (academia/
+	// institucional/corporativo) a los cuatro perfiles nuevos, una sola vez.
+	if ( class_exists( 'CLMS_Install_Profiles' ) ) { CLMS_Install_Profiles::maybe_migrate_legacy_profile(); }
 
 	// PT-4.2.4: red de seguridad contra slugs de menú admin duplicados (solo WP_DEBUG).
 	require_once ATORA_LMS_DIR . 'includes/admin-menu/class-menu-debug-guard.php';
@@ -1117,11 +1150,16 @@ add_action( 'init', static function () {
 			ATORA_MCP_Module::init();
 		}
 	}
-	add_action( 'rest_api_init', function() {
-		if ( class_exists( 'ATORA_API_Keys_REST_Controller' ) ) {
-			ATORA_API_Keys_REST_Controller::register_routes();
-		}
-	} );
+	// P2 (6.12.0): explícito además del guard de class_exists() de abajo
+	// (que ya lo hacía inerte si 'mcp' está inactivo) — así el audit de
+	// `wp atora rest-audit` puede listar esto como clasificado.
+	if ( ! class_exists( 'CLMS_Module_Registry' ) || CLMS_Module_Registry::is_active( 'mcp' ) ) {
+		add_action( 'rest_api_init', function() {
+			if ( class_exists( 'ATORA_API_Keys_REST_Controller' ) ) {
+				ATORA_API_Keys_REST_Controller::register_routes();
+			}
+		} );
+	}
 
 	do_action( 'atora_lms_loaded', $clms_loader_instance );
 }, 1 );
@@ -1192,6 +1230,28 @@ function atora_lms_activate(): void {
 	atora_lms_require_module( 'includes/class-enrollment-manager.php' );
 	if ( class_exists( 'CLMS_Enrollment_Manager' ) ) {
 		CLMS_Enrollment_Manager::install_db();
+	}
+
+	// P3 (6.12.0): en una activación genuinamente nueva (este sitio nunca
+	// tuvo ATORA LMS antes — 'atora_lms_activated' no existe todavía),
+	// aplicar el perfil 'docente' como default explícito ANTES de crear
+	// tablas. Sin esto, 'atora_active_modules' seguiría sin guardarse en
+	// este punto y CLMS_Module_Registry haría fail-open a "todo activo"
+	// (la instalación wizard, paso 1, corre recién en el siguiente
+	// request) — create_tables() crearía las 58 tablas de una instalación
+	// 'academia' antes de que el usuario elija perfil, violando el
+	// objetivo de "instalación limpia con perfil docente crea menos de la
+	// mitad de las tablas". El wizard, en su paso 1, puede aplicar
+	// después un perfil distinto — apply() + ensure_active_module_tables()
+	// ya crean entonces lo que falte. Una reactivación (el sitio ya tenía
+	// datos) no toca nada acá — regla de cero cambio de comportamiento
+	// por defecto para instalaciones existentes.
+	if ( ! get_option( 'atora_lms_activated', false ) ) {
+		atora_lms_require_module( 'includes/modularity/class-module-registry.php' );
+		atora_lms_require_module( 'includes/modularity/class-install-profiles.php' );
+		if ( class_exists( 'CLMS_Install_Profiles' ) && false === get_option( CLMS_Install_Profiles::OPTION, false ) ) {
+			CLMS_Install_Profiles::apply( 'docente' );
+		}
 	}
 
 	// Install v5 module tables (Security, Affiliates, …).

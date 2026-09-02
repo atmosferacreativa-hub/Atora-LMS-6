@@ -27,6 +27,9 @@ class CLMS_Module_Registry {
 	/** @var array<string,bool>|null Caché estático por request. */
 	private static ?array $active_cache = null;
 
+	/** @var array<string,bool> Slugs desconocidos ya registrados en el log en este request (P4, 6.12.0). */
+	private static array $unknown_slug_logged = array();
+
 	/**
 	 * Definición declarativa de los 19 módulos del plugin.
 	 *
@@ -37,6 +40,13 @@ class CLMS_Module_Registry {
 	 * que aporta — usados por CLMS_Module_Guard para bloquear acceso directo.
 	 * `provides_shortcodes`: tags de shortcode que aporta — usados por
 	 * CLMS_Module_Guard para registrar un stub inocuo cuando está inactivo.
+	 * `provides_rest`: prefijos de ruta REST (bajo su namespace, sin el
+	 * namespace) que aporta — P2 (6.12.0). Documentales: el gate real ya
+	 * ocurre en el add_action('rest_api_init', ...) de cada módulo; esto
+	 * es lo que `wp atora rest-audit` usa para clasificar una ruta
+	 * observada contra el módulo que se espera que la sirva. Una ruta no
+	 * cubierta por ningún prefijo queda "sin clasificar" en el audit —
+	 * fail-open, se registra igual, igual criterio que is_active().
 	 * `core`: si es true, nunca se puede desactivar.
 	 *
 	 * @return array<string,array>
@@ -50,6 +60,11 @@ class CLMS_Module_Registry {
 				'requires'            => array(),
 				'provides_pages'      => array( 'atora-lms-migration' ),
 				'provides_shortcodes' => array(),
+				// C8.2 (6.13.1): /build-probe (health check) y /migration
+				// (F1-F4) son core, sin gate de módulo — se clasifican acá
+				// para que el audit de rest-audit no los reporte como
+				// "sin clasificar" pese a estar correctamente siempre activos.
+				'provides_rest'       => array( '/courses', '/lessons', '/enrollments', '/build-probe', '/migration' ),
 				'tables'              => array( 'atora_courses', 'atora_lessons', 'atora_enrollments' ),
 				'core'                => true,
 			),
@@ -60,6 +75,7 @@ class CLMS_Module_Registry {
 				'requires'            => array( 'lms' ),
 				'provides_pages'      => array( 'clms-academic-hub', 'clms-academic-content', 'clms-instructor-profile', 'clms-academic-wizard', 'clms-academic-reports' ),
 				'provides_shortcodes' => array(),
+				'provides_rest'       => array(),
 				'tables'              => array(),
 				'core'                => true,
 			),
@@ -70,6 +86,7 @@ class CLMS_Module_Registry {
 				'requires'            => array( 'lms' ),
 				'provides_pages'      => array( 'clms-gradebook', 'clms-speedgrader' ),
 				'provides_shortcodes' => array(),
+				'provides_rest'       => array(),
 				'tables'              => array( 'atora_gradebook' ),
 				'core'                => true,
 			),
@@ -80,6 +97,7 @@ class CLMS_Module_Registry {
 				'requires'            => array( 'lms' ),
 				'provides_pages'      => array(),
 				'provides_shortcodes' => array( 'atora_my_certificates' ),
+				'provides_rest'       => array(),
 				'tables'              => array( 'atora_certificates' ),
 				'core'                => false,
 			),
@@ -90,7 +108,8 @@ class CLMS_Module_Registry {
 				'requires'            => array(),
 				'provides_pages'      => array( 'atora-crm-v2', 'atora-crm', 'clms-crm-hub' ),
 				'provides_shortcodes' => array(),
-				'tables'              => array(),
+				'provides_rest'       => array( '/contacts', '/companies', '/lists', '/campaigns', '/pipeline', '/tasks', '/inbox', '/reports', '/crm', '/messages', '/followup-plans', '/abandoned-carts', '/sequences', '/url' ),
+				'tables'              => array( 'atora_contacts', 'atora_contact_tags', 'atora_contact_activities', 'atora_contact_notes', 'atora_companies', 'atora_crm_lists', 'atora_contact_list_pivot', 'atora_conversations', 'atora_conversation_messages' ),
 				'core'                => false,
 			),
 			'email-engine'   => array(
@@ -100,7 +119,8 @@ class CLMS_Module_Registry {
 				'requires'            => array(),
 				'provides_pages'      => array( 'atora-emails' ),
 				'provides_shortcodes' => array(),
-				'tables'              => array(),
+				'provides_rest'       => array( '/webhooks/brevo', '/webhooks/sendgrid', '/webhooks/mailgun', '/webhooks/ses', '/webhooks/postmark' ),
+				'tables'              => array( 'atora_email_queue', 'atora_email_templates', 'atora_email_preferences', 'atora_email_consent_log', 'atora_email_analytics', 'atora_email_events' ),
 				'core'                => false,
 			),
 			'newsletter'     => array(
@@ -110,7 +130,8 @@ class CLMS_Module_Registry {
 				'requires'            => array( 'email-engine' ),
 				'provides_pages'      => array( 'atora-newsletter' ),
 				'provides_shortcodes' => array( 'atora_newsletter_archive' ),
-				'tables'              => array(),
+				'provides_rest'       => array( '/newsletters' ),
+				'tables'              => array( 'atora_newsletters' ),
 				'core'                => false,
 			),
 			'automation'     => array(
@@ -120,7 +141,8 @@ class CLMS_Module_Registry {
 				'requires'            => array(),
 				'provides_pages'      => array( 'atora-webhooks', 'atora-automations' ),
 				'provides_shortcodes' => array(),
-				'tables'              => array(),
+				'provides_rest'       => array( '/automations' ),
+				'tables'              => array( 'atora_automations', 'atora_automation_queue', 'atora_automation_execution_log' ),
 				'core'                => false,
 			),
 			'messaging'      => array(
@@ -130,7 +152,8 @@ class CLMS_Module_Registry {
 				'requires'            => array(),
 				'provides_pages'      => array( 'atora-messaging' ),
 				'provides_shortcodes' => array( 'atora_preferencias' ),
-				'tables'              => array(),
+				'provides_rest'       => array( '/webhooks/whatsapp', '/telegram/webhook' ),
+				'tables'              => array( 'atora_message_queue', 'atora_message_log', 'atora_telegram_links' ),
 				'core'                => false,
 			),
 			'calendar'       => array(
@@ -140,7 +163,10 @@ class CLMS_Module_Registry {
 				'requires'            => array(),
 				'provides_pages'      => array( 'atora-calendar' ),
 				'provides_shortcodes' => array( 'atora_calendar' ),
-				'tables'              => array(),
+				// C8.2 (6.13.1): /calendar/task es de la vista de tareas del
+				// calendario (crm-v2/rest/class-calendar-events-rest-controller.php).
+				'provides_rest'       => array( '/calendar/events', '/calendar/bookings', '/calendar/task' ),
+				'tables'              => array( 'atora_calendar_events', 'atora_calendar_bookings', 'atora_calendar_sync' ),
 				'core'                => false,
 			),
 			'commerce'       => array(
@@ -150,7 +176,8 @@ class CLMS_Module_Registry {
 				'requires'            => array( 'lms' ),
 				'provides_pages'      => array( 'clms-commercial-hub', 'clms-commercial-operations', 'clms-commerce-hub', 'clms-commerce-dashboard' ),
 				'provides_shortcodes' => array(),
-				'tables'              => array(),
+				'provides_rest'       => array(),
+				'tables'              => array( 'atora_abandoned_carts', 'atora_url_store', 'atora_url_clicks' ),
 				'core'                => false,
 			),
 			'affiliates'     => array(
@@ -160,7 +187,8 @@ class CLMS_Module_Registry {
 				'requires'            => array( 'commerce' ),
 				'provides_pages'      => array( 'atora-affiliates' ),
 				'provides_shortcodes' => array( 'atora_affiliate_dashboard', 'atora_affiliate_apply' ),
-				'tables'              => array(),
+				'provides_rest'       => array(),
+				'tables'              => array( 'atora_affiliates', 'atora_affiliate_clicks', 'atora_affiliate_commissions' ),
 				'core'                => false,
 			),
 			'analytics'      => array(
@@ -170,7 +198,8 @@ class CLMS_Module_Registry {
 				'requires'            => array(),
 				'provides_pages'      => array( 'atora-analytics-dashboard', 'atora-analytics', 'atora-popups', 'atora-forms' ),
 				'provides_shortcodes' => array( 'atora_form' ),
-				'tables'              => array(),
+				'provides_rest'       => array( '/analytics' ),
+				'tables'              => array( 'atora_user_engagement', 'atora_form_entries', 'atora_form_throttle' ),
 				'core'                => false,
 			),
 			'security'       => array(
@@ -180,7 +209,8 @@ class CLMS_Module_Registry {
 				'requires'            => array(),
 				'provides_pages'      => array( 'atora-security' ),
 				'provides_shortcodes' => array(),
-				'tables'              => array(),
+				'provides_rest'       => array(),
+				'tables'              => array( 'atora_audit_log' ),
 				'core'                => true,
 			),
 			'ai'             => array(
@@ -190,6 +220,7 @@ class CLMS_Module_Registry {
 				'requires'            => array( 'lms' ),
 				'provides_pages'      => array( 'clms-ai-hub', 'clms-ai-settings', 'clms-ai-exams' ),
 				'provides_shortcodes' => array(),
+				'provides_rest'       => array( '/ai' ),
 				'tables'              => array(),
 				'core'                => false,
 			),
@@ -200,7 +231,8 @@ class CLMS_Module_Registry {
 				'requires'            => array(),
 				'provides_pages'      => array(),
 				'provides_shortcodes' => array(),
-				'tables'              => array(),
+				'provides_rest'       => array( '/webhooks/zoom', '/live' ),
+				'tables'              => array( 'atora_live_sessions', 'atora_attendance' ),
 				'core'                => false,
 			),
 			'webhooks'       => array(
@@ -210,7 +242,8 @@ class CLMS_Module_Registry {
 				'requires'            => array(),
 				'provides_pages'      => array(),
 				'provides_shortcodes' => array(),
-				'tables'              => array(),
+				'provides_rest'       => array(),
+				'tables'              => array( 'atora_webhooks' ),
 				'core'                => false,
 			),
 			// PT-1/PT-2 (6.10.0): el ranking público competitivo se
@@ -228,7 +261,22 @@ class CLMS_Module_Registry {
 				'requires'            => array( 'lms' ),
 				'provides_pages'      => array(),
 				'provides_shortcodes' => array(),
-				'tables'              => array(),
+				'provides_rest'       => array(),
+				'tables'              => array( 'clms_badges' ),
+				'core'                => false,
+			),
+			// P10 (6.13.0): identidad, Calendar, Drive con Google — cada
+			// instalación crea su propio proyecto en Google Cloud (BYO
+			// client ID), ver modules/google/.
+			'google'         => array(
+				'label'               => 'Google',
+				'description'         => 'Login con Google, Meet y Drive (drive.file) — client ID propio por instalación.',
+				'group'               => 'integrations',
+				'requires'            => array(),
+				'provides_pages'      => array( 'atora-google' ),
+				'provides_shortcodes' => array(),
+				'provides_rest'       => array( '/google' ),
+				'tables'              => array( 'atora_google_drive_files' ),
 				'core'                => false,
 			),
 			'mcp'            => array(
@@ -238,7 +286,8 @@ class CLMS_Module_Registry {
 				'requires'            => array(),
 				'provides_pages'      => array(),
 				'provides_shortcodes' => array(),
-				'tables'              => array(),
+				'provides_rest'       => array( '/tools', '/openapi.json', '/api-keys' ),
+				'tables'              => array( 'atora_api_keys', 'atora_api_rate_limit' ),
 				'core'                => false,
 			),
 		);
@@ -260,8 +309,21 @@ class CLMS_Module_Registry {
 		}
 
 		// Los core siempre están, incluso si faltan en una option corrupta/vieja.
-		$core = array_keys( array_filter( self::get_modules(), static fn( $m ) => ! empty( $m['core'] ) ) );
-		return array_values( array_unique( array_merge( $core, array_intersect( $stored, $all ) ) ) );
+		$core   = array_keys( array_filter( self::get_modules(), static fn( $m ) => ! empty( $m['core'] ) ) );
+		$active = array_values( array_unique( array_merge( $core, array_intersect( $stored, $all ) ) ) );
+
+		/**
+		 * Filtro de enganche para el sprint de licencias (P4, 6.12.0): permite
+		 * restringir el set de módulos activos según el estado de licencia de
+		 * la instalación. Se aplica DESPUÉS de la unión con los módulos core
+		 * para que un filtro mal escrito no pueda apagar el núcleo. Inerte en
+		 * este release — nadie lo engancha todavía.
+		 *
+		 * @param string[] $active Slugs activos antes del filtro.
+		 */
+		$filtered = (array) apply_filters( 'atora/profile/allowed_modules', $active );
+
+		return array_values( array_unique( array_merge( $core, array_intersect( $filtered, $all ) ) ) );
 	}
 
 	/**
@@ -282,8 +344,16 @@ class CLMS_Module_Registry {
 		}
 
 		// Slug desconocido (módulo nuevo aún no registrado, typo, etc.):
-		// fail-open, igual que el fallthrough de module_condition_passes().
+		// fail-open, igual que el fallthrough de module_condition_passes(). Se
+		// mantiene el fail-open (P4, 6.12.0) pero se deja rastro en el log —
+		// un módulo futuro que se active solo en un despliegue institucional
+		// auditado debe quedar visible, una vez por request.
 		if ( ! isset( $modules[ $slug ] ) ) {
+			if ( empty( self::$unknown_slug_logged[ $slug ] ) ) {
+				self::$unknown_slug_logged[ $slug ] = true;
+				// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+				error_log( sprintf( '[ATORA] CLMS_Module_Registry::is_active() — slug de módulo desconocido: "%s" (fail-open)', $slug ) );
+			}
 			return true;
 		}
 

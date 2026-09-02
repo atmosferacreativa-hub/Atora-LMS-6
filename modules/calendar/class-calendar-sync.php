@@ -139,19 +139,41 @@ class Calendar_Sync {
 
 		// Refrescar token si ha expirado.
 		if ( time() > (int) $tokens['expires_at'] ) {
-			$tokens = self::refresh_tokens( $provider, $tokens['refresh_token'] );
-			if ( ! $tokens ) {
+			$refreshed = self::refresh_tokens( $provider, $tokens['refresh_token'] );
+			if ( ! $refreshed ) {
+				// P10.5 (6.13.0): antes esto simplemente devolvía sin
+				// avisar a nadie — el usuario veía su sync "activo" pero
+				// silenciosamente roto. Se marca sync_enabled=0 y se
+				// dispara una acción para que la UI pueda notificarlo.
+				$wpdb->update(
+					"{$wpdb->prefix}atora_calendar_sync",
+					array( 'sync_enabled' => 0 ),
+					array( 'user_id' => $user_id, 'provider' => $provider ),
+					array( '%d' ),
+					array( '%d', '%s' )
+				);
+				do_action( 'atora/calendar/refresh_failed', $user_id, $provider );
 				return;
 			}
+			$tokens = $refreshed;
 			self::save_tokens( $user_id, $provider, $tokens );
 		}
 
-		// Obtener eventos ATORA del usuario para el próximo mes.
-		$events = Calendar::get_events( array(
-			'start'   => current_time( 'Y-m-d H:i:s' ),
-			'end'     => gmdate( 'Y-m-d H:i:s', strtotime( '+30 days' ) ),
-			'user_id' => $user_id,
+		// Obtener eventos ATORA del usuario, próximo mes, incremental
+		// desde la última sincronización (P10.5, 6.13.0) — antes
+		// reenviaba la ventana completa de 30 días en cada corrida.
+		// Reusa last_sync_at, ya presente en atora_calendar_sync.
+		$last_sync_at = (string) $wpdb->get_var( $wpdb->prepare(
+			"SELECT last_sync_at FROM {$wpdb->prefix}atora_calendar_sync WHERE user_id = %d AND provider = %s",
+			$user_id, $provider
 		) );
+
+		$events = Calendar::get_events( array_filter( array(
+			'start'         => current_time( 'Y-m-d H:i:s' ),
+			'end'           => gmdate( 'Y-m-d H:i:s', strtotime( '+30 days' ) ),
+			'user_id'       => $user_id,
+			'updated_since' => $last_sync_at,
+		) ) );
 
 		foreach ( $events as $event ) {
 			self::push_event( $provider, $tokens['access_token'], $event, $user_id );
@@ -199,6 +221,54 @@ class Calendar_Sync {
 				self::push_event( $sync->provider, $tokens['access_token'], $event, $user_id );
 			}
 		}
+	}
+
+	/**
+	 * C4 (6.13.1): ¿este usuario conectó Google? Comprobación local, sin
+	 * llamada de red ni refresh — a diferencia de get_valid_access_token(),
+	 * segura de usar en el render de una pantalla admin (el metabox de
+	 * lecciones live la consulta en cada carga; un refresh en cada page
+	 * load sería un efecto secundario inaceptable ahí).
+	 *
+	 * @param int    $user_id
+	 * @param string $provider
+	 * @return bool
+	 */
+	public static function is_connected( int $user_id, string $provider = 'google' ): bool {
+		global $wpdb;
+
+		return (int) $wpdb->get_var( $wpdb->prepare(
+			"SELECT COUNT(*) FROM {$wpdb->prefix}atora_calendar_sync WHERE user_id = %d AND provider = %s AND sync_enabled = 1",
+			$user_id, $provider
+		) ) > 0;
+	}
+
+	/**
+	 * P8 (6.13.0): access token de Google válido para un usuario, con
+	 * refresh automático si expiró — reutilizado por Provider_Meet en vez
+	 * de duplicar el flujo OAuth de Calendar. null si el usuario no
+	 * conectó Google Calendar o el refresh falló.
+	 *
+	 * @param int    $user_id
+	 * @param string $provider 'google' (Meet no existe para Outlook).
+	 * @return string|null
+	 */
+	public static function get_valid_access_token( int $user_id, string $provider = 'google' ): ?string {
+		$tokens = self::get_tokens( $user_id, $provider );
+		if ( ! $tokens ) {
+			return null;
+		}
+
+		if ( time() > (int) $tokens['expires_at'] ) {
+			$refreshed = self::refresh_tokens( $provider, $tokens['refresh_token'] );
+			if ( ! $refreshed ) {
+				return null;
+			}
+			self::save_tokens( $user_id, $provider, $refreshed );
+			$tokens = $refreshed;
+		}
+
+		return $tokens['access_token'];
 	}
 
 	// ── API helpers ───────────────────────────────────────────────────────────
@@ -361,18 +431,28 @@ class Calendar_Sync {
 	private static function save_tokens( int $user_id, string $provider, array $tokens ): void {
 		global $wpdb;
 
+		// P10.1 (6.13.0): cifrado en reposo — antes se guardaba en texto
+		// plano. Cualquier escritura nueva (incluida un refresh normal)
+		// cifra, migrando de forma transparente las filas legadas.
 		$wpdb->replace(
 			"{$wpdb->prefix}atora_calendar_sync",
 			array(
 				'user_id'       => $user_id,
 				'provider'      => $provider,
-				'access_token'  => $tokens['access_token'],
-				'refresh_token' => $tokens['refresh_token'] ?? '',
+				'access_token'  => \ATORA_Token_Crypto::encrypt( (string) $tokens['access_token'] ),
+				'refresh_token' => \ATORA_Token_Crypto::encrypt( (string) ( $tokens['refresh_token'] ?? '' ) ),
 				'expires_at'    => gmdate( 'Y-m-d H:i:s', (int) $tokens['expires_at'] ),
 				'sync_enabled'  => 1,
 			),
 			array( '%d', '%s', '%s', '%s', '%s', '%d' )
 		);
+
+		// C6 (6.13.1): reconectó con éxito — ya no necesita reautorización.
+		$reauth = get_option( 'atora_google_reauth_needed', array() );
+		if ( isset( $reauth[ $user_id . ':' . $provider ] ) ) {
+			unset( $reauth[ $user_id . ':' . $provider ] );
+			update_option( 'atora_google_reauth_needed', $reauth, false );
+		}
 	}
 
 	/**
@@ -395,10 +475,43 @@ class Calendar_Sync {
 			return null;
 		}
 
+		// C6 (6.13.1): distinguir "clave rotada, token cifrado bajo la
+		// anterior" de "token vacío/corrupto" — antes ambos casos hacían
+		// que decrypt() devolviera '' indistinguiblemente y la conexión
+		// fallaba sin ninguna pista de por qué.
+		if ( \ATORA_Token_Crypto::key_mismatch( (string) $row->access_token ) || \ATORA_Token_Crypto::key_mismatch( (string) $row->refresh_token ) ) {
+			$wpdb->update(
+				"{$wpdb->prefix}atora_calendar_sync",
+				array( 'sync_enabled' => 0 ),
+				array( 'user_id' => $user_id, 'provider' => $provider ),
+				array( '%d' ),
+				array( '%d', '%s' )
+			);
+			$reauth = get_option( 'atora_google_reauth_needed', array() );
+			$reauth[ $user_id . ':' . $provider ] = current_time( 'mysql', true );
+			update_option( 'atora_google_reauth_needed', $reauth, false );
+
+			do_action( 'atora/calendar/key_mismatch', $user_id, $provider );
+
+			return null;
+		}
+
+		// P10.1 (6.13.0): decrypt() detecta valores legados en texto plano
+		// (sin el prefijo de marca) y los devuelve tal cual — lectura
+		// transparente durante la migración.
 		return array(
-			'access_token'  => $row->access_token,
-			'refresh_token' => $row->refresh_token,
+			'access_token'  => \ATORA_Token_Crypto::decrypt( (string) $row->access_token ),
+			'refresh_token' => \ATORA_Token_Crypto::decrypt( (string) $row->refresh_token ),
 			'expires_at'    => strtotime( $row->expires_at ),
 		);
+	}
+
+	/**
+	 * @return array<string,string> Claves "user_id:provider" => fecha
+	 * detectada, para que el panel de seguridad/Google avise de
+	 * conexiones que necesitan reautorización por rotación de clave.
+	 */
+	public static function get_connections_needing_reauth(): array {
+		return (array) get_option( 'atora_google_reauth_needed', array() );
 	}
 }

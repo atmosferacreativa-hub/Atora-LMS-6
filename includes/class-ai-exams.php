@@ -23,8 +23,12 @@ class CLMS_AI_Exams {
      */
     public function __construct() {
         
-        // Register REST routes
-        add_action( 'rest_api_init', [ $this, 'register_routes' ] );
+        // Register REST routes — P2 (6.12.0): gateado por módulo 'ai'.
+        // Fail-open si el registry aún no cargó, mismo criterio que el
+        // resto del gate de módulos.
+        if ( ! class_exists( 'CLMS_Module_Registry' ) || CLMS_Module_Registry::is_active( 'ai' ) ) {
+            add_action( 'rest_api_init', [ $this, 'register_routes' ] );
+        }
         
         // Settings menu
         add_action( 'admin_menu', [ $this, 'add_settings_menu' ] );

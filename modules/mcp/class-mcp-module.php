@@ -29,7 +29,10 @@ class ATORA_MCP_Module {
 	const NS = 'atora/mcp/v1';
 
 	public static function init(): void {
-		add_action( 'rest_api_init', array( __CLASS__, 'register_routes' ) );
+		// P2 (6.12.0): gateado por módulo 'mcp'.
+		if ( ! class_exists( 'CLMS_Module_Registry' ) || CLMS_Module_Registry::is_active( 'mcp' ) ) {
+			add_action( 'rest_api_init', array( __CLASS__, 'register_routes' ) );
+		}
 	}
 
 	public static function register_routes(): void {

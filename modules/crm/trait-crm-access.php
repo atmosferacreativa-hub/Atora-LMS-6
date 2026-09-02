@@ -125,7 +125,10 @@ trait CRM_Access_Trait {
 		}
 
 		// REST API.
-		add_action( 'rest_api_init', array( __CLASS__, 'register_rest_routes' ) );
+		// P2 (6.12.0): gateado por módulo 'crm'.
+		if ( ! class_exists( '\CLMS_Module_Registry' ) || \CLMS_Module_Registry::is_active( 'crm' ) ) {
+			add_action( 'rest_api_init', array( __CLASS__, 'register_rest_routes' ) );
+		}
 
 		// Admin.
 		if ( is_admin() ) {
