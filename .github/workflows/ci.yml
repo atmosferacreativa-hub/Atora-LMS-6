@@ -174,6 +174,9 @@ jobs:
             }
           ' --path=/tmp/wordpress
           wp --path=/tmp/wordpress --context=admin eval '
+            if ( class_exists( "CLMS_Admin_Menu" ) ) {
+              new CLMS_Admin_Menu();
+            }
             do_action( "admin_menu" );
             $hook = get_plugin_page_hookname( "atora-onboarding", "clms-dashboard" );
             if ( empty( $GLOBALS["_registered_pages"][ $hook ] ) ) {
