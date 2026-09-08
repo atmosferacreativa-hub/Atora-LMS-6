@@ -171,14 +171,44 @@ class ATORA_Onboarding_Wizard {
 		$email   = sanitize_email(      (string) wp_unslash( $_POST['contact_email']   ?? '' ) );
 		$company = sanitize_text_field( (string) wp_unslash( $_POST['contact_company'] ?? '' ) );
 
-		if ( $email && class_exists( '\ATORA\CRM_V2\Services\Contact_Service' ) ) {
-			\ATORA\CRM_V2\Services\Contact_Service::create_contact( array(
-				'name'    => $name,
-				'email'   => $email,
-				'company' => $company,
-				'status'  => 'lead',
-				'source'  => 'onboarding',
-			) );
+		if ( ! $email ) {
+			return;
+		}
+
+		$contact_id     = 0;
+		$contact_service = '\\ATORA\\CRM_V2\\Services\\Contact_Service';
+
+		if ( class_exists( $contact_service ) && method_exists( $contact_service, 'create_lead_quick' ) ) {
+			$contact_id = $contact_service::create_lead_quick(
+				array(
+					'name'     => $name,
+					'email'    => $email,
+					'interest' => '',
+				)
+			);
+		} elseif ( class_exists( '\\ATORA\\CRM\\CRM' ) && method_exists( '\\ATORA\\CRM\\CRM', 'upsert_contact' ) ) {
+			$contact_id = \\ATORA\\CRM\\CRM::upsert_contact(
+				array(
+					'name'   => $name,
+					'email'  => $email,
+					'status' => 'lead',
+					'source' => 'onboarding',
+				)
+			);
+		}
+
+		$company_service = '\\ATORA\\CRM_V2\\Services\\Company_Service';
+		if (
+			$contact_id > 0
+			&& '' !== $company
+			&& class_exists( $company_service )
+			&& method_exists( $company_service, 'create' )
+			&& method_exists( $company_service, 'assign_contact' )
+		) {
+			$company_id = $company_service::create( array( 'name' => $company ) );
+			if ( $company_id > 0 ) {
+				$company_service::assign_contact( $company_id, $contact_id );
+			}
 		}
 	}
 
