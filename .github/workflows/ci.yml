@@ -173,6 +173,14 @@ jobs:
               exit( 1 );
             }
           ' --path=/tmp/wordpress
+          wp --path=/tmp/wordpress --context=admin eval '
+            do_action( "admin_menu" );
+            $hook = get_plugin_page_hookname( "atora-onboarding", "clms-dashboard" );
+            if ( empty( $GLOBALS["_registered_pages"][ $hook ] ) ) {
+              fwrite( STDERR, "ATORA onboarding admin page was not registered with its parent hook\n" );
+              exit( 1 );
+            }
+          '
           wp rewrite structure '/%postname%/' --path=/tmp/wordpress
           wp rewrite flush --hard --path=/tmp/wordpress
           course_id="$(wp post create \
