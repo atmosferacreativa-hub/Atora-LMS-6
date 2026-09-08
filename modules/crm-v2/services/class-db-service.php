@@ -133,6 +133,21 @@ class DB_Service {
 	}
 
 	/**
+	 * Reconcilia columnas del CRM después de activar el módulo en caliente.
+	 *
+	 * El instalador base puede crear atora_contacts después de que la
+	 * comprobación versionada del CRM ya haya ocurrido en el mismo request.
+	 * Esta entrada explícita evita dejar la tabla recién creada sin las
+	 * columnas añadidas por CRM v2.
+	 *
+	 * @return void
+	 */
+	public static function reconcile_after_module_activation(): void {
+		self::ensure_runtime_columns();
+		update_option( 'atora_db_columns_version', self::SCHEMA_VERSION, false );
+	}
+
+	/**
 	 * Garantiza columnas agregadas por sprints posteriores.
 	 *
 	 * @return void
