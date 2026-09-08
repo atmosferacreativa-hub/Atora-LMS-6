@@ -124,6 +124,7 @@ class Contact_Service {
 		$name   = sanitize_text_field( (string) ( $data['name'] ?? '' ) );
 		$email  = sanitize_email( (string) ( $data['email'] ?? '' ) );
 		$course = sanitize_text_field( (string) ( $data['interest'] ?? '' ) );
+		$source = sanitize_key( (string) ( $data['source'] ?? 'crm_v2_hub' ) ) ?: 'crm_v2_hub';
 		if ( '' === $name && '' === $email ) {
 			return 0;
 		}
@@ -134,7 +135,7 @@ class Contact_Service {
 				'name'       => $name ?: __( 'Lead nuevo', 'atora-lms' ),
 				'email'      => $email,
 				'status'     => 'lead',
-				'source'     => 'crm_v2_hub',
+				'source'     => $source,
 				'updated_at' => current_time( 'mysql', true ),
 			)
 		);
