@@ -193,6 +193,41 @@ jobs:
               exit( 1 );
             }
           '
+          wp --path=/tmp/wordpress --context=admin eval '
+            $_POST = array(
+              "contact_name"    => "Estudiante CI",
+              "contact_email"   => "estudiante-ci@atora.test",
+              "contact_company" => "ATORA CI",
+            );
+
+            $method = new ReflectionMethod( "ATORA_Onboarding_Wizard", "save_step3" );
+            $method->setAccessible( true );
+            $method->invoke( null );
+
+            global $wpdb;
+            $contact = $wpdb->get_row(
+              $wpdb->prepare(
+                "SELECT id, company_id, source FROM {$wpdb->prefix}atora_contacts WHERE email = %s LIMIT 1",
+                "estudiante-ci@atora.test"
+              ),
+              ARRAY_A
+            );
+            if ( empty( $contact["id"] ) || "onboarding" !== $contact["source"] ) {
+              fwrite( STDERR, "ATORA onboarding did not persist the CRM contact correctly\n" );
+              exit( 1 );
+            }
+
+            $company_name = $wpdb->get_var(
+              $wpdb->prepare(
+                "SELECT name FROM {$wpdb->prefix}atora_companies WHERE id = %d LIMIT 1",
+                absint( $contact["company_id"] ?? 0 )
+              )
+            );
+            if ( "ATORA CI" !== $company_name ) {
+              fwrite( STDERR, "ATORA onboarding did not associate the CRM company\n" );
+              exit( 1 );
+            }
+          '
           wp rewrite structure '/%postname%/' --path=/tmp/wordpress
           wp rewrite flush --hard --path=/tmp/wordpress
           course_id="$(wp post create \
