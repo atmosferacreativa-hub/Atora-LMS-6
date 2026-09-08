@@ -68,7 +68,7 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 	 * PT-2.1 (6.9.0): marcado de la búsqueda persistente — un ícono de
 	 * lupa fijo, siempre en la misma posición (justo debajo de la barra
 	 * de admin de WordPress, antes del contenido de cualquier página
-	 * atora-*/clms-*). search.js maneja el resto (expandir, buscar,
+	 * atora-* o clms-*). search.js maneja el resto (expandir, buscar,
 	 * mostrar resultados).
 	 *
 	 * @return void
