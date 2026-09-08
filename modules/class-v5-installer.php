@@ -514,7 +514,25 @@ class V5_Installer {
 	 * @return bool
 	 */
 	public static function ensure_active_module_tables(): bool {
-		return self::create_tables();
+		$installed = self::create_tables();
+
+		if ( self::module_wants_tables( 'crm' ) ) {
+			$schema_service = '\\ATORA\\CRM_V2\\Services\\DB_Service';
+			if ( ! class_exists( $schema_service ) ) {
+				$file = defined( 'ATORA_LMS_DIR' )
+					? ATORA_LMS_DIR . 'modules/crm-v2/services/class-db-service.php'
+					: '';
+				if ( $file && file_exists( $file ) ) {
+					require_once $file;
+				}
+			}
+
+			if ( class_exists( $schema_service ) && method_exists( $schema_service, 'reconcile_after_module_activation' ) ) {
+				$schema_service::reconcile_after_module_activation();
+			}
+		}
+
+		return $installed;
 	}
 
 	/**
