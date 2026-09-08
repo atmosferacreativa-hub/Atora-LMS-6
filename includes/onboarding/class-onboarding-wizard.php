@@ -28,7 +28,9 @@ class ATORA_Onboarding_Wizard {
 	public static function init(): void {
 		if ( get_option( self::OPTION_COMPLETE ) === '1' ) { return; }
 
-		// El menú padre clms-dashboard se registra en prioridad 10. Registrar después\n\t\t// mantiene estable el hook interno que WordPress usa para autorizar la página.\n\t\tadd_action( 'admin_menu',            array( __CLASS__, 'register_page' ), 20 );
+		// El menú padre clms-dashboard se registra en prioridad 10. Registrar después
+		// mantiene estable el hook interno que WordPress usa para autorizar la página.
+		add_action( 'admin_menu',            array( __CLASS__, 'register_page' ), 20 );
 		add_action( 'admin_init',            array( __CLASS__, 'handle_form' ) );
 		add_action( 'admin_notices',         array( __CLASS__, 'show_notice' ) );
 		add_action( 'wp_ajax_atora_onboarding_skip', array( __CLASS__, 'ajax_skip' ) );
