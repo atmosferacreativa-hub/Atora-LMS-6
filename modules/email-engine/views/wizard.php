@@ -22,9 +22,9 @@ if ( in_array( $wizard_identity, array( 'docencia', 'docente', 'teacher', 'comer
 } else {
 	$wizard_identity = 'academia';
 }
-?>
-<h2><?php esc_html_e( 'Asistente rápido de configuración', 'atora-lms' ); ?></h2>
-<p><?php esc_html_e( 'Configura correo paso a paso sin tocar código: Gmail, Outlook, Yahoo, iCloud, dominios propios (como Atmósfera) y más.', 'atora-lms' ); ?></p>
+	?>
+	<h2><?php esc_html_e( 'Asistente rápido de configuración', 'atora-lms' ); ?></h2>
+	<p><?php esc_html_e( 'Configura correo paso a paso sin tocar código: Gmail, Outlook, Yahoo, iCloud, dominio propio y más.', 'atora-lms' ); ?></p>
 
 <form method="post">
 	<?php wp_nonce_field( 'atora_email_admin_action', 'atora_email_nonce' ); ?>
@@ -34,14 +34,14 @@ if ( in_array( $wizard_identity, array( 'docencia', 'docente', 'teacher', 'comer
 		<tr>
 			<th><label for="wizard_preset"><?php esc_html_e( 'Preset recomendado', 'atora-lms' ); ?></label></th>
 			<td>
-				<select id="wizard_preset" name="wizard_preset">
-					<option value="manual"><?php esc_html_e( 'Manual (cualquier proveedor)', 'atora-lms' ); ?></option>
-					<option value="atmosfera"><?php esc_html_e( 'Atmósfera Creativa (dominio propio)', 'atora-lms' ); ?></option>
-					<option value="gmail"><?php esc_html_e( 'Gmail / Google Workspace', 'atora-lms' ); ?></option>
-					<option value="outlook"><?php esc_html_e( 'Outlook / Microsoft 365', 'atora-lms' ); ?></option>
-					<option value="yahoo"><?php esc_html_e( 'Yahoo Mail', 'atora-lms' ); ?></option>
-					<option value="icloud"><?php esc_html_e( 'iCloud Mail', 'atora-lms' ); ?></option>
-					<option value="zoho"><?php esc_html_e( 'Zoho Mail', 'atora-lms' ); ?></option>
+					<select id="wizard_preset" name="wizard_preset">
+						<option value="manual"><?php esc_html_e( 'Manual (cualquier proveedor)', 'atora-lms' ); ?></option>
+						<option value="custom_domain"><?php esc_html_e( 'Dominio propio (genérico)', 'atora-lms' ); ?></option>
+						<option value="gmail"><?php esc_html_e( 'Gmail / Google Workspace', 'atora-lms' ); ?></option>
+						<option value="outlook"><?php esc_html_e( 'Outlook / Microsoft 365', 'atora-lms' ); ?></option>
+						<option value="yahoo"><?php esc_html_e( 'Yahoo Mail', 'atora-lms' ); ?></option>
+						<option value="icloud"><?php esc_html_e( 'iCloud Mail', 'atora-lms' ); ?></option>
+						<option value="zoho"><?php esc_html_e( 'Zoho Mail', 'atora-lms' ); ?></option>
 				</select>
 				<p class="description"><?php esc_html_e( 'El preset completa host/puertos/seguridad. Puedes editar cualquier valor manualmente.', 'atora-lms' ); ?></p>
 			</td>
@@ -71,10 +71,10 @@ if ( in_array( $wizard_identity, array( 'docencia', 'docente', 'teacher', 'comer
 				<p class="description"><?php esc_html_e( 'Para Gmail/Yahoo/iCloud/Outlook usa contraseña de aplicación (no tu contraseña normal).', 'atora-lms' ); ?></p>
 			</td>
 		</tr>
-		<tr>
-			<th><label for="smtp_host"><?php esc_html_e( 'Servidor SMTP', 'atora-lms' ); ?></label></th>
-			<td><input type="text" class="regular-text" id="smtp_host" name="smtp_host" value="<?php echo esc_attr( (string) ( $settings['smtp_host'] ?? 'atmosferacreativa.com' ) ); ?>"></td>
-		</tr>
+			<tr>
+				<th><label for="smtp_host"><?php esc_html_e( 'Servidor SMTP', 'atora-lms' ); ?></label></th>
+				<td><input type="text" class="regular-text" id="smtp_host" name="smtp_host" value="<?php echo esc_attr( (string) ( $settings['smtp_host'] ?? 'smtp.tudominio.com' ) ); ?>"></td>
+			</tr>
 		<tr>
 			<th><label for="smtp_port"><?php esc_html_e( 'Puerto SMTP', 'atora-lms' ); ?></label></th>
 			<td><input type="number" min="1" max="65535" id="smtp_port" name="smtp_port" value="<?php echo esc_attr( (string) absint( $settings['smtp_port'] ?? 465 ) ); ?>"></td>
@@ -88,10 +88,10 @@ if ( in_array( $wizard_identity, array( 'docencia', 'docente', 'teacher', 'comer
 				</select>
 			</td>
 		</tr>
-		<tr>
-			<th><label for="imap_host"><?php esc_html_e( 'Servidor IMAP (opcional)', 'atora-lms' ); ?></label></th>
-			<td><input type="text" class="regular-text" id="imap_host" name="imap_host" value="<?php echo esc_attr( (string) ( $settings['imap_host'] ?? 'atmosferacreativa.com' ) ); ?>"></td>
-		</tr>
+			<tr>
+				<th><label for="imap_host"><?php esc_html_e( 'Servidor IMAP (opcional)', 'atora-lms' ); ?></label></th>
+				<td><input type="text" class="regular-text" id="imap_host" name="imap_host" value="<?php echo esc_attr( (string) ( $settings['imap_host'] ?? 'imap.tudominio.com' ) ); ?>"></td>
+			</tr>
 		<tr>
 			<th><label for="imap_port"><?php esc_html_e( 'Puerto IMAP', 'atora-lms' ); ?></label></th>
 			<td><input type="number" min="1" max="65535" id="imap_port" name="imap_port" value="<?php echo esc_attr( (string) absint( $settings['imap_port'] ?? 993 ) ); ?>"></td>
@@ -152,15 +152,15 @@ if ( in_array( $wizard_identity, array( 'docencia', 'docente', 'teacher', 'comer
 	const provider = document.getElementById('wizard_provider');
 	if (!btn || !preset) return;
 
-	const presets = {
-		manual: null,
-		atmosfera: { smtp_host: 'atmosferacreativa.com', smtp_port: '465', smtp_secure: 'ssl', imap_host: 'atmosferacreativa.com', imap_port: '993', imap_secure: 'ssl', provider: 'smtp' },
-		gmail: { smtp_host: 'smtp.gmail.com', smtp_port: '465', smtp_secure: 'ssl', imap_host: 'imap.gmail.com', imap_port: '993', imap_secure: 'ssl', provider: 'smtp' },
-		outlook: { smtp_host: 'smtp.office365.com', smtp_port: '587', smtp_secure: 'tls', imap_host: 'outlook.office365.com', imap_port: '993', imap_secure: 'ssl', provider: 'smtp' },
-		yahoo: { smtp_host: 'smtp.mail.yahoo.com', smtp_port: '465', smtp_secure: 'ssl', imap_host: 'imap.mail.yahoo.com', imap_port: '993', imap_secure: 'ssl', provider: 'smtp' },
-		icloud: { smtp_host: 'smtp.mail.me.com', smtp_port: '587', smtp_secure: 'tls', imap_host: 'imap.mail.me.com', imap_port: '993', imap_secure: 'ssl', provider: 'smtp' },
-		zoho: { smtp_host: 'smtp.zoho.com', smtp_port: '465', smtp_secure: 'ssl', imap_host: 'imap.zoho.com', imap_port: '993', imap_secure: 'ssl', provider: 'smtp' }
-	};
+		const presets = {
+			manual: null,
+			custom_domain: { smtp_host: 'smtp.tudominio.com', smtp_port: '465', smtp_secure: 'ssl', imap_host: 'imap.tudominio.com', imap_port: '993', imap_secure: 'ssl', provider: 'smtp' },
+			gmail: { smtp_host: 'smtp.gmail.com', smtp_port: '465', smtp_secure: 'ssl', imap_host: 'imap.gmail.com', imap_port: '993', imap_secure: 'ssl', provider: 'smtp' },
+			outlook: { smtp_host: 'smtp.office365.com', smtp_port: '587', smtp_secure: 'tls', imap_host: 'outlook.office365.com', imap_port: '993', imap_secure: 'ssl', provider: 'smtp' },
+			yahoo: { smtp_host: 'smtp.mail.yahoo.com', smtp_port: '465', smtp_secure: 'ssl', imap_host: 'imap.mail.yahoo.com', imap_port: '993', imap_secure: 'ssl', provider: 'smtp' },
+			icloud: { smtp_host: 'smtp.mail.me.com', smtp_port: '587', smtp_secure: 'tls', imap_host: 'imap.mail.me.com', imap_port: '993', imap_secure: 'ssl', provider: 'smtp' },
+			zoho: { smtp_host: 'smtp.zoho.com', smtp_port: '465', smtp_secure: 'ssl', imap_host: 'imap.zoho.com', imap_port: '993', imap_secure: 'ssl', provider: 'smtp' }
+		};
 
 	btn.addEventListener('click', () => {
 		const selected = presets[preset.value] || null;

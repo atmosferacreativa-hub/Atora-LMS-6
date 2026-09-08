@@ -1555,13 +1555,13 @@ $crm_quick_links = array(
 	</div>
 
 	<section class="atora-emails-admin__guide">
-		<h3><?php esc_html_e( 'Flujo recomendado para operar sin errores', 'atora-lms' ); ?></h3>
-		<ol class="atora-emails-admin__steps">
-			<li><?php esc_html_e( 'Elige preset en Asistente rápido (Atmósfera, Gmail, Outlook, etc.) o usa modo manual.', 'atora-lms' ); ?></li>
-			<li><?php esc_html_e( 'Si tu proveedor lo exige, genera una App Password y pégala en SMTP/IMAP.', 'atora-lms' ); ?></li>
-			<li><?php esc_html_e( 'Valida con “Probar conexión del provider” y luego “Prueba de envío”.', 'atora-lms' ); ?></li>
-			<li><?php esc_html_e( 'Confirma trazabilidad en CRM → Correos y CRM → Bandeja.', 'atora-lms' ); ?></li>
-		</ol>
+			<h3><?php esc_html_e( 'Flujo recomendado para operar sin errores', 'atora-lms' ); ?></h3>
+			<ol class="atora-emails-admin__steps">
+				<li><?php esc_html_e( 'Elige preset en Asistente rápido (dominio propio, Gmail, Outlook, etc.) o usa modo manual.', 'atora-lms' ); ?></li>
+				<li><?php esc_html_e( 'Si tu proveedor lo exige, genera una App Password y pégala en SMTP/IMAP.', 'atora-lms' ); ?></li>
+				<li><?php esc_html_e( 'Valida con “Probar conexión del provider” y luego “Prueba de envío”.', 'atora-lms' ); ?></li>
+				<li><?php esc_html_e( 'Confirma trazabilidad en CRM → Correos y CRM → Bandeja.', 'atora-lms' ); ?></li>
+			</ol>
 		<div class="atora-emails-admin__help-links">
 			<?php foreach ( $app_password_links as $provider_help ) : ?>
 				<a href="<?php echo esc_url( (string) $provider_help['url'] ); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html( (string) $provider_help['label'] ); ?> · <?php esc_html_e( 'App Password', 'atora-lms' ); ?></a>

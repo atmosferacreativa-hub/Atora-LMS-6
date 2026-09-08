@@ -24,12 +24,12 @@ $has_dmarc = $domain ? checkdnsrr( '_dmarc.' . $domain, 'TXT' ) : false;
 <h2><?php esc_html_e( 'Diagnóstico DNS', 'atora-lms' ); ?></h2>
 <p><?php esc_html_e( 'Revisión rápida de registros para entregabilidad de correo.', 'atora-lms' ); ?></p>
 
-<form method="get" style="margin-bottom:12px;">
-	<input type="hidden" name="page" value="atora-emails">
-	<input type="hidden" name="tab" value="diagnostics">
-	<input type="text" name="domain" class="regular-text" value="<?php echo esc_attr( $domain ); ?>" placeholder="atmosferacreativa.com">
-	<button type="submit" class="button"><?php esc_html_e( 'Revisar', 'atora-lms' ); ?></button>
-</form>
+	<form method="get" style="margin-bottom:12px;">
+		<input type="hidden" name="page" value="atora-emails">
+		<input type="hidden" name="tab" value="diagnostics">
+		<input type="text" name="domain" class="regular-text" value="<?php echo esc_attr( $domain ); ?>" placeholder="tudominio.com">
+		<button type="submit" class="button"><?php esc_html_e( 'Revisar', 'atora-lms' ); ?></button>
+	</form>
 
 <?php if ( $domain ) : ?>
 <table class="widefat striped" style="max-width:760px;">
@@ -60,8 +60,8 @@ $has_dmarc = $domain ? checkdnsrr( '_dmarc.' . $domain, 'TXT' ) : false;
 </table>
 <?php endif; ?>
 
-<div class="notice inline notice-info" style="margin-top:14px;">
-	<p><strong><?php esc_html_e( 'Ejemplos rápidos de configuración', 'atora-lms' ); ?></strong></p>
-	<p><code>Atmósfera/Dominio propio: SMTP dominio.com:465 SSL · IMAP dominio.com:993 SSL</code></p>
-	<p><code>Gmail: smtp.gmail.com:465 SSL · imap.gmail.com:993 SSL</code></p>
-</div>
+	<div class="notice inline notice-info" style="margin-top:14px;">
+		<p><strong><?php esc_html_e( 'Ejemplos rápidos de configuración', 'atora-lms' ); ?></strong></p>
+		<p><code>Dominio propio: SMTP smtp.tudominio.com:465 SSL · IMAP imap.tudominio.com:993 SSL</code></p>
+		<p><code>Gmail: smtp.gmail.com:465 SSL · imap.gmail.com:993 SSL</code></p>
+	</div>

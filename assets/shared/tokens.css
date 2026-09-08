@@ -10,7 +10,7 @@
  *    repositorio (es un plugin, no un tema) — los únicos lugares
  *    donde estos valores exactos aparecen hoy son plantillas de
  *    bloques de una landing/blog específica (includes/ui/class-ui-editor-templates.php,
- *    contenido de "Academia Atmósfera Creativa"), como estilos
+ *    contenido de templates de ejemplo), como estilos
  *    inline, no como variables reutilizables. El plugin no puede
  *    asumir que ese tema/sitio está activo en toda instalación, así
  *    que estos son los DEFAULTS DEL PLUGIN (esos mismos valores),

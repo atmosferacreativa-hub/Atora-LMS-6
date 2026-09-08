@@ -1,16 +1,16 @@
 <?php
 /**
  * Plugin Name:       ATORA LMS
- * Plugin URI:        https://atora-lms.com
- * Description:       El LMS más completo del mundo. LMS, Email Marketing, CRM, Calendario, Mensajería multi-canal, Afiliados, Live Streaming y más.
+ * Plugin URI:        https://atora.studio
+ * Description:       LMS modular para WordPress con IA, evaluaciones, certificados, CRM, mensajería multi-canal, afiliados, live streaming y más. Autor: Atora Studio. Creado por Atmósfera Creativa.
  * Version:           6.13.3
  * Requires at least: 6.4
  * Requires PHP:      8.1
- * Author:            @mundocap - 
- * Author URI:        https://mundocap.com
+ * Author:            Atora Studio
+ * Author URI:        https://atora.studio
  * License:           GPL v2 or later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
- * Update URI:        https://atora-lms.com
+ * Update URI:        https://atora.studio
  * Text Domain:       atora-lms
  * Domain Path:       /languages
  *

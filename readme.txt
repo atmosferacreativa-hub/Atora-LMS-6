@@ -1,5 +1,5 @@
 === ATORA LMS ===
-Contributors: mundocap, atmosferacreativa
+Contributors: atorastudio, atmosferacreativa
 Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.4
@@ -8,7 +8,7 @@ Stable tag: 6.13.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-ATORA LMS is a modular learning management system for WordPress with AI-assisted teaching, assessments, certificates, and student engagement tools.
+ATORA LMS is a modular learning management system for WordPress with AI-assisted teaching, assessments, certificates, and student engagement tools. Author: Atora Studio (atora.studio). Created by Atmósfera Creativa.
 
 == Description ==
 ATORA LMS brings a complete learning ecosystem to WordPress. It is built for educators and teams that need a flexible LMS with modern workflows, AI-assisted tools, and a clean, role-based experience.
