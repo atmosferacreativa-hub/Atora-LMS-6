@@ -2,7 +2,7 @@
 Contributors: atorastudio, atmosferacreativa
 Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
-Tested up to: 6.4
+Tested up to: 6.8
 Requires PHP: 8.1
 Stable tag: 6.13.3
 License: GPLv2 or later
