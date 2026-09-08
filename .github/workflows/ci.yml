@@ -194,6 +194,9 @@ jobs:
             }
           '
           wp --path=/tmp/wordpress --context=admin eval '
+            CLMS_Install_Profiles::apply( "academia" );
+            \\ATORA\\V5_Installer::ensure_active_module_tables();
+
             $_POST = array(
               "contact_name"    => "Estudiante CI",
               "contact_email"   => "estudiante-ci@atora.test",
