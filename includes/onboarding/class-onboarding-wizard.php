@@ -184,6 +184,7 @@ class ATORA_Onboarding_Wizard {
 					'name'     => $name,
 					'email'    => $email,
 					'interest' => '',
+					'source'   => 'onboarding',
 				)
 			);
 		} elseif ( class_exists( '\\ATORA\\CRM\\CRM' ) && method_exists( '\\ATORA\\CRM\\CRM', 'upsert_contact' ) ) {
