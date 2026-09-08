@@ -175,8 +175,9 @@ class ATORA_Onboarding_Wizard {
 			return;
 		}
 
-		$contact_id     = 0;
+		$contact_id      = 0;
 		$contact_service = '\\ATORA\\CRM_V2\\Services\\Contact_Service';
+		$legacy_crm      = '\\ATORA\\CRM\\CRM';
 
 		if ( class_exists( $contact_service ) && method_exists( $contact_service, 'create_lead_quick' ) ) {
 			$contact_id = $contact_service::create_lead_quick(
@@ -187,8 +188,8 @@ class ATORA_Onboarding_Wizard {
 					'source'   => 'onboarding',
 				)
 			);
-		} elseif ( class_exists( '\\ATORA\\CRM\\CRM' ) && method_exists( '\\ATORA\\CRM\\CRM', 'upsert_contact' ) ) {
-			$contact_id = \\ATORA\\CRM\\CRM::upsert_contact(
+		} elseif ( class_exists( $legacy_crm ) && method_exists( $legacy_crm, 'upsert_contact' ) ) {
+			$contact_id = $legacy_crm::upsert_contact(
 				array(
 					'name'   => $name,
 					'email'  => $email,
