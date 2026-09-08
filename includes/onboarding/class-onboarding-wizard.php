@@ -175,6 +175,12 @@ class ATORA_Onboarding_Wizard {
 			return;
 		}
 
+		// Repara instalaciones que activaron CRM dentro de este mismo onboarding
+		// antes de intentar escribir el primer contacto.
+		if ( class_exists( '\\ATORA\\V5_Installer' ) ) {
+			\\ATORA\\V5_Installer::ensure_active_module_tables();
+		}
+
 		$contact_id      = 0;
 		$contact_service = '\\ATORA\\CRM_V2\\Services\\Contact_Service';
 		$legacy_crm      = '\\ATORA\\CRM\\CRM';
