@@ -55,15 +55,15 @@ composer install
 composer test
 ```
 
-La automatización de GitHub ejecuta:
+La automatización de GitHub aplica como barreras obligatorias:
 
 - validación de Composer;
 - sintaxis PHP en PHP 8.1, 8.2, 8.3 y 8.4;
-- pruebas PHPUnit;
-- instalación limpia de WordPress 6.4 y 6.8;
-- activación del plugin;
-- verificación del CPT de cursos y creación de contenido de humo;
+- instalación limpia de WordPress 6.4 y 6.8 con PHP 8.1 y MySQL 8;
+- activación del plugin, verificación del bootstrap y creación de un curso de humo;
 - construcción e inspección del ZIP de distribución.
+
+La suite PHPUnit heredada también se ejecuta completa como diagnóstico. Actualmente contiene deuda previa de bootstrap, aislamiento y dobles de WordPress; por eso sus fallos quedan visibles, pero no sustituyen ni bloquean las comprobaciones dinámicas anteriores. Debe estabilizarse antes de convertirla en barrera obligatoria.
 
 Estas comprobaciones son una barrera técnica mínima. No reemplazan la matriz funcional manual para administrador, docente, estudiante, migraciones, WooCommerce, correo, IA, Google, clases en vivo y permisos REST.
 
