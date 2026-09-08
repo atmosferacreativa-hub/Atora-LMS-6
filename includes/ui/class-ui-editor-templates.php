@@ -39,24 +39,24 @@ class CLMS_UI_Editor_Templates {
 			$version
 		);
 
-		wp_localize_script(
-			'atora-lms-editor-templates',
-			'ATORA_EDITOR_TEMPLATES',
-			array(
-				'templates' => $this->get_templates(),
-				'labels'    => array(
-					'tab'       => __( 'Templates', 'atora-lms' ),
-					'search'    => __( 'Buscar templates', 'atora-lms' ),
-					'insert'    => __( 'Insertar', 'atora-lms' ),
-					'replace'   => __( 'Reemplazar contenido', 'atora-lms' ),
-					'empty'     => __( 'No hay templates con ese filtro.', 'atora-lms' ),
-					'confirm'   => __( 'Esto reemplazara los bloques actuales. Continuar?', 'atora-lms' ),
-					'panel'     => __( 'Templates ATORA', 'atora-lms' ),
-					'help'      => __( 'Tambien estan disponibles en Patrones > ATORA Templates.', 'atora-lms' ),
-				),
-			)
-		);
-	}
+			wp_localize_script(
+				'atora-lms-editor-templates',
+				'ATORA_EDITOR_TEMPLATES',
+				array(
+					'templates' => $this->get_templates(),
+					'labels'    => array(
+						'tab'       => __( 'Templates', 'atora-lms' ),
+						'search'    => __( 'Buscar templates', 'atora-lms' ),
+						'insert'    => __( 'Insertar', 'atora-lms' ),
+						'replace'   => __( 'Reemplazar contenido', 'atora-lms' ),
+						'empty'     => __( 'No hay templates con ese filtro.', 'atora-lms' ),
+						'confirm'   => __( 'Esto reemplazara los bloques actuales. Continuar?', 'atora-lms' ),
+						'panel'     => __( 'Atora Theme', 'atora-lms' ),
+						'help'      => __( 'Tambien estan disponibles en Patrones > Atora Theme.', 'atora-lms' ),
+					),
+				)
+			);
+		}
 
 	public function register_patterns(): void {
 		if ( ! function_exists( 'register_block_pattern' ) || ! function_exists( 'register_block_pattern_category' ) ) {
@@ -66,7 +66,7 @@ class CLMS_UI_Editor_Templates {
 		register_block_pattern_category(
 			'atora-editor-templates',
 			array(
-				'label' => __( 'ATORA Templates', 'atora-lms' ),
+				'label' => __( 'Atora Theme', 'atora-lms' ),
 			)
 		);
 
@@ -80,7 +80,7 @@ class CLMS_UI_Editor_Templates {
 				array(
 					'title'       => sprintf(
 						/* translators: %s: template title. */
-						__( 'Template ATORA: %s', 'atora-lms' ),
+						__( 'Atora Theme: %s', 'atora-lms' ),
 						$template['title']
 					),
 					'description' => $template['description'] ?? '',
@@ -105,14 +105,14 @@ class CLMS_UI_Editor_Templates {
 
 	private function get_templates(): array {
 		return array(
-			array(
-				'id'          => 'home-academia-visual',
-				'type'        => __( 'Home', 'atora-lms' ),
-				'title'       => __( 'Home Academia Visual', 'atora-lms' ),
-				'description' => __( 'Portada editorial con promesa, catalogo y prueba social.', 'atora-lms' ),
-				'tone'        => 'light',
-				'content'     => $this->template_home_academia_visual(),
-			),
+				array(
+					'id'          => 'home-academia-visual',
+					'type'        => __( 'Home', 'atora-lms' ),
+					'title'       => __( 'Home Academia', 'atora-lms' ),
+					'description' => __( 'Portada editorial con promesa, catalogo y prueba social.', 'atora-lms' ),
+					'tone'        => 'light',
+					'content'     => $this->template_home_academia_visual(),
+				),
 			array(
 				'id'          => 'home-lms-catalog',
 				'type'        => __( 'Home', 'atora-lms' ),
@@ -121,14 +121,14 @@ class CLMS_UI_Editor_Templates {
 				'tone'        => 'blue',
 				'content'     => $this->template_home_lms_catalog(),
 			),
-			array(
-				'id'          => 'home-studio-dark',
-				'type'        => __( 'Home', 'atora-lms' ),
-				'title'       => __( 'Home Studio Dark', 'atora-lms' ),
-				'description' => __( 'Primera pantalla oscura con contraste alto y bloques de conversion.', 'atora-lms' ),
-				'tone'        => 'dark',
-				'content'     => $this->template_home_studio_dark(),
-			),
+				array(
+					'id'          => 'home-studio-dark',
+					'type'        => __( 'Home', 'atora-lms' ),
+					'title'       => __( 'Home Dark', 'atora-lms' ),
+					'description' => __( 'Primera pantalla oscura con contraste alto y bloques de conversion.', 'atora-lms' ),
+					'tone'        => 'dark',
+					'content'     => $this->template_home_studio_dark(),
+				),
 			array(
 				'id'          => 'blog-editorial',
 				'type'        => __( 'Blog', 'atora-lms' ),
@@ -161,14 +161,14 @@ class CLMS_UI_Editor_Templates {
 				'tone'        => 'dark',
 				'content'     => $this->template_post_tutorial(),
 			),
-			array(
-				'id'          => 'header-studio-simple',
-				'type'        => __( 'Header', 'atora-lms' ),
-				'title'       => __( 'Header Studio Simple', 'atora-lms' ),
-				'description' => __( 'Logo, titulo del sitio, navegacion y CTA limpio.', 'atora-lms' ),
-				'tone'        => 'light',
-				'content'     => $this->template_header_studio_simple(),
-			),
+				array(
+					'id'          => 'header-studio-simple',
+					'type'        => __( 'Header', 'atora-lms' ),
+					'title'       => __( 'Header Simple', 'atora-lms' ),
+					'description' => __( 'Logo, titulo del sitio, navegacion y CTA limpio.', 'atora-lms' ),
+					'tone'        => 'light',
+					'content'     => $this->template_header_studio_simple(),
+				),
 			array(
 				'id'          => 'header-landing-cta',
 				'type'        => __( 'Header', 'atora-lms' ),
@@ -185,14 +185,14 @@ class CLMS_UI_Editor_Templates {
 				'tone'        => 'dark',
 				'content'     => $this->template_header_student_access(),
 			),
-			array(
-				'id'          => 'footer-studio-full',
-				'type'        => __( 'Footer', 'atora-lms' ),
-				'title'       => __( 'Footer Studio Completo', 'atora-lms' ),
-				'description' => __( 'Footer de cuatro columnas para marca, enlaces y contacto.', 'atora-lms' ),
-				'tone'        => 'dark',
-				'content'     => $this->template_footer_studio_full(),
-			),
+				array(
+					'id'          => 'footer-studio-full',
+					'type'        => __( 'Footer', 'atora-lms' ),
+					'title'       => __( 'Footer Completo', 'atora-lms' ),
+					'description' => __( 'Footer de cuatro columnas para marca, enlaces y contacto.', 'atora-lms' ),
+					'tone'        => 'dark',
+					'content'     => $this->template_footer_studio_full(),
+				),
 			array(
 				'id'          => 'footer-academy-cta',
 				'type'        => __( 'Footer', 'atora-lms' ),
@@ -215,19 +215,19 @@ class CLMS_UI_Editor_Templates {
 	private function template_home_academia_visual(): string {
 		return <<<'HTML'
 <!-- wp:group {"align":"full","style":{"color":{"background":"#f7f3ec"},"spacing":{"padding":{"top":"86px","right":"24px","bottom":"64px","left":"24px"}}},"layout":{"type":"constrained","contentSize":"1180px"}} -->
-<div class="wp-block-group alignfull has-background" style="background-color:#f7f3ec;padding-top:86px;padding-right:24px;padding-bottom:64px;padding-left:24px"><!-- wp:columns {"verticalAlignment":"center","style":{"spacing":{"blockGap":{"left":"52px"}}}} -->
-<div class="wp-block-columns are-vertically-aligned-center"><!-- wp:column {"verticalAlignment":"center","width":"58%"} -->
-<div class="wp-block-column is-vertically-aligned-center" style="flex-basis:58%"><!-- wp:paragraph {"style":{"typography":{"textTransform":"uppercase","fontStyle":"normal","fontWeight":"700"},"color":{"text":"#1769f6"}}} -->
-<p class="has-text-color" style="color:#1769f6;font-style:normal;font-weight:700;text-transform:uppercase">Academia Atmósfera Creativa</p>
-<!-- /wp:paragraph -->
+	<div class="wp-block-group alignfull has-background" style="background-color:#f7f3ec;padding-top:86px;padding-right:24px;padding-bottom:64px;padding-left:24px"><!-- wp:columns {"verticalAlignment":"center","style":{"spacing":{"blockGap":{"left":"52px"}}}} -->
+	<div class="wp-block-columns are-vertically-aligned-center"><!-- wp:column {"verticalAlignment":"center","width":"58%"} -->
+	<div class="wp-block-column is-vertically-aligned-center" style="flex-basis:58%"><!-- wp:paragraph {"style":{"typography":{"textTransform":"uppercase","fontStyle":"normal","fontWeight":"700"},"color":{"text":"#1769f6"}}} -->
+	<p class="has-text-color" style="color:#1769f6;font-style:normal;font-weight:700;text-transform:uppercase">Atora Theme</p>
+	<!-- /wp:paragraph -->
 
-<!-- wp:heading {"level":1,"style":{"typography":{"fontSize":"clamp(3.2rem, 8vw, 6.8rem)","lineHeight":"0.94"},"color":{"text":"#0d0d0b"}}} -->
-<h1 class="wp-block-heading has-text-color" style="color:#0d0d0b;font-size:clamp(3.2rem, 8vw, 6.8rem);line-height:0.94">Forma tu voz. Afina tu mirada.</h1>
-<!-- /wp:heading -->
+	<!-- wp:heading {"level":1,"style":{"typography":{"fontSize":"clamp(3.2rem, 8vw, 6.8rem)","lineHeight":"0.94"},"color":{"text":"#0d0d0b"}}} -->
+	<h1 class="wp-block-heading has-text-color" style="color:#0d0d0b;font-size:clamp(3.2rem, 8vw, 6.8rem);line-height:0.94">Aprende a tu ritmo. Progresa con claridad.</h1>
+	<!-- /wp:heading -->
 
-<!-- wp:paragraph {"style":{"typography":{"fontSize":"1.25rem","lineHeight":"1.7"},"color":{"text":"#4b5563"}}} -->
-<p class="has-text-color" style="color:#4b5563;font-size:1.25rem;line-height:1.7">Una pagina de inicio para presentar cursos, programas y una experiencia academica visual con autoridad, ritmo y conversion.</p>
-<!-- /wp:paragraph -->
+	<!-- wp:paragraph {"style":{"typography":{"fontSize":"1.25rem","lineHeight":"1.7"},"color":{"text":"#4b5563"}}} -->
+	<p class="has-text-color" style="color:#4b5563;font-size:1.25rem;line-height:1.7">Una pagina de inicio para presentar cursos, programas y una experiencia academica con autoridad, ritmo y conversion.</p>
+	<!-- /wp:paragraph -->
 
 <!-- wp:buttons -->
 <div class="wp-block-buttons"><!-- wp:button {"style":{"color":{"background":"#0d0d0b","text":"#ffffff"},"border":{"radius":"999px"}}} -->
@@ -243,8 +243,8 @@ class CLMS_UI_Editor_Templates {
 <!-- wp:column {"verticalAlignment":"center","width":"42%"} -->
 <div class="wp-block-column is-vertically-aligned-center" style="flex-basis:42%"><!-- wp:group {"style":{"border":{"radius":"8px"},"color":{"background":"#ffffff"},"spacing":{"padding":{"top":"28px","right":"28px","bottom":"28px","left":"28px"}}},"layout":{"type":"constrained"}} -->
 <div class="wp-block-group has-background" style="border-radius:8px;background-color:#ffffff;padding-top:28px;padding-right:28px;padding-bottom:28px;padding-left:28px"><!-- wp:heading {"level":3} -->
-<h3 class="wp-block-heading">Aprende con metodo y sensibilidad visual</h3>
-<!-- /wp:heading -->
+	<h3 class="wp-block-heading">Aprende con un metodo claro y practico</h3>
+	<!-- /wp:heading -->
 
 <!-- wp:list -->
 <ul><!-- wp:list-item --><li>Diplomados y cursos online</li><!-- /wp:list-item --><!-- wp:list-item --><li>Ruta para estudiantes inscritos</li><!-- /wp:list-item --><!-- wp:list-item --><li>Contenido editorial para atraer nuevos alumnos</li><!-- /wp:list-item --></ul>
@@ -280,10 +280,10 @@ HTML;
 
 	private function template_home_lms_catalog(): string {
 		return <<<'HTML'
-<!-- wp:group {"align":"full","style":{"color":{"background":"#1769f6","text":"#ffffff"},"spacing":{"padding":{"top":"76px","right":"24px","bottom":"70px","left":"24px"}}},"layout":{"type":"constrained","contentSize":"1120px"}} -->
-<div class="wp-block-group alignfull has-text-color has-background" style="color:#ffffff;background-color:#1769f6;padding-top:76px;padding-right:24px;padding-bottom:70px;padding-left:24px"><!-- wp:heading {"level":1,"textAlign":"center","style":{"typography":{"fontSize":"clamp(3rem, 8vw, 6rem)","lineHeight":"0.96"}}} -->
-<h1 class="wp-block-heading has-text-align-center" style="font-size:clamp(3rem, 8vw, 6rem);line-height:0.96">Tu campus visual, simple y listo para crecer.</h1>
-<!-- /wp:heading -->
+	<!-- wp:group {"align":"full","style":{"color":{"background":"#1769f6","text":"#ffffff"},"spacing":{"padding":{"top":"76px","right":"24px","bottom":"70px","left":"24px"}}},"layout":{"type":"constrained","contentSize":"1120px"}} -->
+	<div class="wp-block-group alignfull has-text-color has-background" style="color:#ffffff;background-color:#1769f6;padding-top:76px;padding-right:24px;padding-bottom:70px;padding-left:24px"><!-- wp:heading {"level":1,"textAlign":"center","style":{"typography":{"fontSize":"clamp(3rem, 8vw, 6rem)","lineHeight":"0.96"}}} -->
+	<h1 class="wp-block-heading has-text-align-center" style="font-size:clamp(3rem, 8vw, 6rem);line-height:0.96">Tu campus online, simple y listo para crecer.</h1>
+	<!-- /wp:heading -->
 
 <!-- wp:paragraph {"align":"center","style":{"typography":{"fontSize":"1.25rem","lineHeight":"1.7"}}} -->
 <p class="has-text-align-center" style="font-size:1.25rem;line-height:1.7">Una home para mostrar cursos, programas, comunidad y acceso rapido al aprendizaje.</p>
@@ -316,10 +316,10 @@ HTML;
 
 	private function template_home_studio_dark(): string {
 		return <<<'HTML'
-<!-- wp:group {"align":"full","style":{"color":{"background":"#0d0d0b","text":"#f7f3ec"},"spacing":{"padding":{"top":"86px","right":"24px","bottom":"74px","left":"24px"}}},"layout":{"type":"constrained","contentSize":"1120px"}} -->
-<div class="wp-block-group alignfull has-text-color has-background" style="color:#f7f3ec;background-color:#0d0d0b;padding-top:86px;padding-right:24px;padding-bottom:74px;padding-left:24px"><!-- wp:paragraph {"align":"center","style":{"typography":{"textTransform":"uppercase","fontStyle":"normal","fontWeight":"700"},"color":{"text":"#f4b21b"}}} -->
-<p class="has-text-align-center has-text-color" style="color:#f4b21b;font-style:normal;font-weight:700;text-transform:uppercase">Atora Studio</p>
-<!-- /wp:paragraph -->
+	<!-- wp:group {"align":"full","style":{"color":{"background":"#0d0d0b","text":"#f7f3ec"},"spacing":{"padding":{"top":"86px","right":"24px","bottom":"74px","left":"24px"}}},"layout":{"type":"constrained","contentSize":"1120px"}} -->
+	<div class="wp-block-group alignfull has-text-color has-background" style="color:#f7f3ec;background-color:#0d0d0b;padding-top:86px;padding-right:24px;padding-bottom:74px;padding-left:24px"><!-- wp:paragraph {"align":"center","style":{"typography":{"textTransform":"uppercase","fontStyle":"normal","fontWeight":"700"},"color":{"text":"#f4b21b"}}} -->
+	<p class="has-text-align-center has-text-color" style="color:#f4b21b;font-style:normal;font-weight:700;text-transform:uppercase">Atora Theme</p>
+	<!-- /wp:paragraph -->
 
 <!-- wp:heading {"level":1,"textAlign":"center","style":{"typography":{"fontSize":"clamp(3.4rem, 9vw, 7rem)","lineHeight":"0.92"}}} -->
 <h1 class="wp-block-heading has-text-align-center" style="font-size:clamp(3.4rem, 9vw, 7rem);line-height:0.92">Una primera impresion con pulso y claridad.</h1>
@@ -351,13 +351,13 @@ HTML;
 	private function template_blog_editorial(): string {
 		return <<<'HTML'
 <!-- wp:group {"align":"wide","style":{"spacing":{"padding":{"top":"64px","bottom":"34px"}}},"layout":{"type":"constrained","contentSize":"900px"}} -->
-<div class="wp-block-group alignwide" style="padding-top:64px;padding-bottom:34px"><!-- wp:paragraph {"style":{"typography":{"textTransform":"uppercase","fontStyle":"normal","fontWeight":"700"},"color":{"text":"#1769f6"}}} -->
-<p class="has-text-color" style="color:#1769f6;font-style:normal;font-weight:700;text-transform:uppercase">Blog</p>
-<!-- /wp:paragraph -->
+	<div class="wp-block-group alignwide" style="padding-top:64px;padding-bottom:34px"><!-- wp:paragraph {"style":{"typography":{"textTransform":"uppercase","fontStyle":"normal","fontWeight":"700"},"color":{"text":"#1769f6"}}} -->
+	<p class="has-text-color" style="color:#1769f6;font-style:normal;font-weight:700;text-transform:uppercase">Blog</p>
+	<!-- /wp:paragraph -->
 
-<!-- wp:heading {"level":1,"style":{"typography":{"fontSize":"clamp(3rem, 8vw, 6rem)","lineHeight":"0.95"}}} -->
-<h1 class="wp-block-heading" style="font-size:clamp(3rem, 8vw, 6rem);line-height:0.95">Ideas para mirar, crear y aprender mejor.</h1>
-<!-- /wp:heading -->
+	<!-- wp:heading {"level":1,"style":{"typography":{"fontSize":"clamp(3rem, 8vw, 6rem)","lineHeight":"0.95"}}} -->
+	<h1 class="wp-block-heading" style="font-size:clamp(3rem, 8vw, 6rem);line-height:0.95">Ideas, guias y recursos para aprender mejor.</h1>
+	<!-- /wp:heading -->
 
 <!-- wp:paragraph {"style":{"typography":{"fontSize":"1.2rem","lineHeight":"1.7"},"color":{"text":"#4b5563"}}} -->
 <p class="has-text-color" style="color:#4b5563;font-size:1.2rem;line-height:1.7">Una entrada editorial para publicar ensayos, guias, entrevistas y recursos academicos.</p>
@@ -380,7 +380,7 @@ HTML;
 		return <<<'HTML'
 <!-- wp:group {"align":"full","style":{"color":{"background":"#f0ebe2"},"spacing":{"padding":{"top":"58px","right":"24px","bottom":"40px","left":"24px"}}},"layout":{"type":"constrained","contentSize":"1180px"}} -->
 <div class="wp-block-group alignfull has-background" style="background-color:#f0ebe2;padding-top:58px;padding-right:24px;padding-bottom:40px;padding-left:24px"><!-- wp:heading {"level":1,"textAlign":"center","style":{"typography":{"fontSize":"clamp(3rem, 8vw, 6rem)","lineHeight":"0.95"}}} -->
-<h1 class="wp-block-heading has-text-align-center" style="font-size:clamp(3rem, 8vw, 6rem);line-height:0.95">Revista visual</h1>
+	<h1 class="wp-block-heading has-text-align-center" style="font-size:clamp(3rem, 8vw, 6rem);line-height:0.95">Blog</h1>
 <!-- /wp:heading -->
 
 <!-- wp:paragraph {"align":"center"} -->
@@ -404,7 +404,7 @@ HTML;
 		return <<<'HTML'
 <!-- wp:group {"layout":{"type":"constrained","contentSize":"820px"},"style":{"spacing":{"padding":{"top":"56px","bottom":"24px"}}}} -->
 <div class="wp-block-group" style="padding-top:56px;padding-bottom:24px"><!-- wp:paragraph {"style":{"typography":{"textTransform":"uppercase","fontStyle":"normal","fontWeight":"700"},"color":{"text":"#1769f6"}}} -->
-<p class="has-text-color" style="color:#1769f6;font-style:normal;font-weight:700;text-transform:uppercase">Ensayo visual</p>
+	<p class="has-text-color" style="color:#1769f6;font-style:normal;font-weight:700;text-transform:uppercase">Articulo</p>
 <!-- /wp:paragraph -->
 
 <!-- wp:heading {"level":1,"style":{"typography":{"fontSize":"clamp(2.8rem, 7vw, 5.4rem)","lineHeight":"0.98"}}} -->
@@ -436,7 +436,7 @@ HTML;
 <!-- /wp:heading -->
 
 <!-- wp:paragraph -->
-<p>Conecta la idea con una accion concreta para estudiantes, fotografos o comunicadores.</p>
+	<p>Conecta la idea con una accion concreta para tus estudiantes.</p>
 <!-- /wp:paragraph --></div>
 <!-- /wp:group -->
 HTML;
@@ -564,7 +564,7 @@ HTML;
 <!-- wp:site-title {"level":0} /-->
 
 <!-- wp:paragraph -->
-<p>Formacion en fotografia, comunicacion estrategica y aprendizaje digital.</p>
+	<p>Formacion online, comunidad y aprendizaje digital.</p>
 <!-- /wp:paragraph --></div>
 <!-- /wp:column -->
 
@@ -582,7 +582,7 @@ HTML;
 <!-- /wp:heading -->
 
 <!-- wp:paragraph -->
-<p>hola@atmosferacreativa.com<br>Caracas, Venezuela</p>
+	<p>hola@tusitio.com<br>Tu ciudad</p>
 <!-- /wp:paragraph --></div>
 <!-- /wp:column -->
 
@@ -604,11 +604,11 @@ HTML;
 		return <<<'HTML'
 <!-- wp:group {"align":"full","style":{"color":{"background":"#1769f6","text":"#ffffff"},"spacing":{"padding":{"top":"48px","right":"24px","bottom":"48px","left":"24px"}}},"layout":{"type":"constrained","contentSize":"960px"}} -->
 <div class="wp-block-group alignfull has-text-color has-background" style="color:#ffffff;background-color:#1769f6;padding-top:48px;padding-right:24px;padding-bottom:48px;padding-left:24px"><!-- wp:heading {"textAlign":"center"} -->
-<h2 class="wp-block-heading has-text-align-center">Sigue aprendiendo con Atmósfera Creativa</h2>
+	<h2 class="wp-block-heading has-text-align-center">Sigue aprendiendo con Atora Theme</h2>
 <!-- /wp:heading -->
 
 <!-- wp:paragraph {"align":"center"} -->
-<p class="has-text-align-center">Explora cursos, programas y recursos para entrenar tu mirada.</p>
+	<p class="has-text-align-center">Explora cursos, programas y recursos para seguir aprendiendo.</p>
 <!-- /wp:paragraph -->
 
 <!-- wp:buttons {"layout":{"type":"flex","justifyContent":"center"}} -->
@@ -627,7 +627,7 @@ HTML;
 <div class="wp-block-group"><!-- wp:site-title {"level":0} /-->
 
 <!-- wp:paragraph -->
-<p>© Atora Studio. Todos los derechos reservados.</p>
+	<p>© Atora Theme. Todos los derechos reservados.</p>
 <!-- /wp:paragraph --></div>
 <!-- /wp:group --></div>
 <!-- /wp:group -->

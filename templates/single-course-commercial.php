@@ -34,10 +34,13 @@ if ( ! have_posts() ) {
 
 the_post();
 
-$course_id        = get_the_ID();
-$course_permalink = get_permalink( $course_id );
+	$course_id        = get_the_ID();
+	$course_permalink = get_permalink( $course_id );
+	$ui_ready         = class_exists( 'CLMS_UI_Template_Resolver', false )
+		&& class_exists( 'CLMS_UI_Template_Context', false )
+		&& class_exists( 'CLMS_UI_Template_Engine', false );
 
-?>
+	?>
 <style>
 /* ── Comercial layout ───────────────────────────────────────────────────────── */
 .cc-wrap{max-width:1140px;margin:0 auto;padding:0 20px 60px;font-family:inherit;box-sizing:border-box;
@@ -234,60 +237,85 @@ $course_permalink = get_permalink( $course_id );
 		}
 		$_cc_schema_context = ( $_ctx_enr_c && ! $_ctx_admin_c ) ? 'course_overview' : 'course_commercial';
 
-		$resolver = new CLMS_UI_Template_Resolver();
-		$schema   = apply_filters(
-			'clms_course_commercial_ui_schema',
-			$resolver->resolve( $course_id, $_cc_schema_context ),
-			$course_id
-		);
-		$repository = $resolver->repository();
-		if ( ! $repository->validate( $schema ) || empty( $schema['sections'] ) ) {
-			$schema = $resolver->resolve( $course_id, $_cc_schema_context );
-		}
-
-		$ctx             = CLMS_UI_Template_Context::make( $course_id, $_cc_schema_context );
-		$engine          = new CLMS_UI_Template_Engine();
-		$sections_output = $engine->render_to_array( $ctx, $schema );
-		$sections_order  = array_keys( $sections_output );
-
-		// ── Split grid: instructor + benefits ─────────────────────────────────
-		$split_pair_enabled = isset( $sections_output['instructor'] ) && isset( $sections_output['benefits'] );
+		$fallback_html     = '';
+		$sections_output   = array();
+		$sections_order    = array();
+		$split_pair_enabled = false;
 		$split_pair_first   = '';
 		$split_pair_second  = '';
 
-		if ( $split_pair_enabled ) {
-			$instructor_index = array_search( 'instructor', $sections_order, true );
-			$benefits_index   = array_search( 'benefits', $sections_order, true );
-			if ( false !== $instructor_index && false !== $benefits_index ) {
-				if ( $instructor_index <= $benefits_index ) {
-					$split_pair_first  = 'instructor';
-					$split_pair_second = 'benefits';
-				} else {
-					$split_pair_first  = 'benefits';
-					$split_pair_second = 'instructor';
+		$build_fallback = static function () use ( $course_id ): string {
+			ob_start();
+			echo '<main class="cc-fallback" style="max-width:920px;margin:0 auto;padding:28px 20px">';
+			echo '<h1>' . esc_html( get_the_title( $course_id ) ) . '</h1>';
+			echo wp_kses_post( apply_filters( 'the_content', get_post_field( 'post_content', $course_id ) ) );
+			echo '</main>';
+			return (string) ob_get_clean();
+		};
+
+		if ( ! $ui_ready ) {
+			$fallback_html = $build_fallback();
+		} else {
+			try {
+				$resolver = new CLMS_UI_Template_Resolver();
+				$schema   = apply_filters(
+					'clms_course_commercial_ui_schema',
+					$resolver->resolve( $course_id, $_cc_schema_context ),
+					$course_id
+				);
+				$repository = method_exists( $resolver, 'repository' ) ? $resolver->repository() : null;
+				if ( $repository && method_exists( $repository, 'validate' ) && ( ! $repository->validate( $schema ) || empty( $schema['sections'] ) ) ) {
+					$schema = $resolver->resolve( $course_id, $_cc_schema_context );
 				}
-			} else {
-				$split_pair_enabled = false;
+
+				$ctx             = CLMS_UI_Template_Context::make( $course_id, $_cc_schema_context );
+				$engine          = new CLMS_UI_Template_Engine();
+				$sections_output = $engine->render_to_array( $ctx, $schema );
+				$sections_order  = array_keys( $sections_output );
+
+				// ── Split grid: instructor + benefits ─────────────────────────────────
+				$split_pair_enabled = isset( $sections_output['instructor'] ) && isset( $sections_output['benefits'] );
+				if ( $split_pair_enabled ) {
+					$instructor_index = array_search( 'instructor', $sections_order, true );
+					$benefits_index   = array_search( 'benefits', $sections_order, true );
+					if ( false !== $instructor_index && false !== $benefits_index ) {
+						if ( $instructor_index <= $benefits_index ) {
+							$split_pair_first  = 'instructor';
+							$split_pair_second = 'benefits';
+						} else {
+							$split_pair_first  = 'benefits';
+							$split_pair_second = 'instructor';
+						}
+					} else {
+						$split_pair_enabled = false;
+					}
+				}
+			} catch ( Throwable $e ) {
+				$fallback_html = $build_fallback();
 			}
 		}
 		?>
-		<?php foreach ( $sections_order as $section_id ) : ?>
-			<?php if ( $split_pair_enabled && $section_id === $split_pair_first ) : ?>
-				<div class="cc-section--split">
-					<div class="cc-split-grid">
-						<?php echo $sections_output[ $split_pair_first ]; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
-						<?php echo $sections_output[ $split_pair_second ]; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+		<?php if ( '' !== $fallback_html ) : ?>
+			<?php echo $fallback_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+		<?php else : ?>
+			<?php foreach ( $sections_order as $section_id ) : ?>
+				<?php if ( $split_pair_enabled && $section_id === $split_pair_first ) : ?>
+					<div class="cc-section--split">
+						<div class="cc-split-grid">
+							<?php echo $sections_output[ $split_pair_first ]; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+							<?php echo $sections_output[ $split_pair_second ]; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+						</div>
 					</div>
-				</div>
-				<?php continue; ?>
-			<?php endif; ?>
-			<?php if ( $split_pair_enabled && $section_id === $split_pair_second ) : ?>
-				<?php continue; ?>
-			<?php endif; ?>
-			<?php if ( ! empty( $sections_output[ $section_id ] ) ) : ?>
-				<?php echo $sections_output[ $section_id ]; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
-			<?php endif; ?>
-		<?php endforeach; ?>
+					<?php continue; ?>
+				<?php endif; ?>
+				<?php if ( $split_pair_enabled && $section_id === $split_pair_second ) : ?>
+					<?php continue; ?>
+				<?php endif; ?>
+				<?php if ( ! empty( $sections_output[ $section_id ] ) ) : ?>
+					<?php echo $sections_output[ $section_id ]; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+				<?php endif; ?>
+			<?php endforeach; ?>
+		<?php endif; ?>
 </div><!-- .cc-wrap -->
 
 <?php

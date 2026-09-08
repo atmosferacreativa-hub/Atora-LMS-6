@@ -581,10 +581,10 @@ class CLMS_UI_Template_Parts {
 		exit;
 	}
 
-	private function default_template_content( string $area ): string {
-		if ( 'footer' === $area ) {
-			return '<!-- wp:group {"align":"full","style":{"color":{"background":"#0d0d0b","text":"#f7f3ec"},"spacing":{"padding":{"top":"38px","right":"24px","bottom":"38px","left":"24px"}}},"layout":{"type":"constrained","contentSize":"1180px"}} --><div class="wp-block-group alignfull has-text-color has-background" style="color:#f7f3ec;background-color:#0d0d0b;padding-top:38px;padding-right:24px;padding-bottom:38px;padding-left:24px"><!-- wp:columns --><div class="wp-block-columns"><!-- wp:column --><div class="wp-block-column"><!-- wp:site-title /--><!-- wp:paragraph --><p>Formacion visual, comunicacion y aprendizaje digital.</p><!-- /wp:paragraph --></div><!-- /wp:column --><!-- wp:column --><div class="wp-block-column"><!-- wp:navigation {"overlayMenu":"never"} /--></div><!-- /wp:column --></div><!-- /wp:columns --></div><!-- /wp:group -->';
-		}
+		private function default_template_content( string $area ): string {
+			if ( 'footer' === $area ) {
+				return '<!-- wp:group {"align":"full","style":{"color":{"background":"#0d0d0b","text":"#f7f3ec"},"spacing":{"padding":{"top":"38px","right":"24px","bottom":"38px","left":"24px"}}},"layout":{"type":"constrained","contentSize":"1180px"}} --><div class="wp-block-group alignfull has-text-color has-background" style="color:#f7f3ec;background-color:#0d0d0b;padding-top:38px;padding-right:24px;padding-bottom:38px;padding-left:24px"><!-- wp:columns --><div class="wp-block-columns"><!-- wp:column --><div class="wp-block-column"><!-- wp:site-title /--><!-- wp:paragraph --><p>Aprendizaje online, recursos y comunidad.</p><!-- /wp:paragraph --></div><!-- /wp:column --><!-- wp:column --><div class="wp-block-column"><!-- wp:navigation {"overlayMenu":"never"} /--></div><!-- /wp:column --></div><!-- /wp:columns --></div><!-- /wp:group -->';
+			}
 
 		return '<!-- wp:group {"align":"full","style":{"color":{"background":"#ffffff"},"spacing":{"padding":{"top":"14px","right":"24px","bottom":"14px","left":"24px"}}},"layout":{"type":"constrained","contentSize":"1180px"}} --><div class="wp-block-group alignfull has-background" style="background-color:#ffffff;padding-top:14px;padding-right:24px;padding-bottom:14px;padding-left:24px"><!-- wp:group {"layout":{"type":"flex","flexWrap":"wrap","justifyContent":"space-between","verticalAlignment":"center"}} --><div class="wp-block-group"><!-- wp:group {"layout":{"type":"flex","flexWrap":"nowrap","verticalAlignment":"center"}} --><div class="wp-block-group"><!-- wp:site-logo {"width":72} /--><!-- wp:site-title /--></div><!-- /wp:group --><!-- wp:navigation {"overlayMenu":"mobile"} /--></div><!-- /wp:group --></div><!-- /wp:group -->';
 	}

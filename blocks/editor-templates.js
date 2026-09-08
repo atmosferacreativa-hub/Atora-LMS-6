@@ -176,10 +176,10 @@
 		});
 		panel.appendChild(search);
 
-		var help = document.createElement('p');
-		help.className = 'atora-editor-templates-help';
-		help.textContent = labels.help || __('Tambien estan disponibles en Patrones > ATORA Templates.', 'atora-lms');
-		panel.appendChild(help);
+			var help = document.createElement('p');
+			help.className = 'atora-editor-templates-help';
+			help.textContent = labels.help || __('Tambien estan disponibles en Patrones > Atora Theme.', 'atora-lms');
+			panel.appendChild(help);
 
 		if (!filtered.length) {
 			var empty = document.createElement('p');
@@ -260,7 +260,7 @@
 					setQuery(event.target.value);
 				},
 			}),
-			el('p', { className: 'atora-editor-templates-help' }, labels.help || __('Tambien estan disponibles en Patrones > ATORA Templates.', 'atora-lms')),
+			el('p', { className: 'atora-editor-templates-help' }, labels.help || __('Tambien estan disponibles en Patrones > Atora Theme.', 'atora-lms')),
 			!filtered.length
 				? el('p', { className: 'atora-editor-templates-empty' }, labels.empty || __('No hay templates con ese filtro.', 'atora-lms'))
 				: groupByType(filtered).map(function (group) {
@@ -321,32 +321,32 @@
 					null,
 					PluginDocumentSettingPanel
 						? el(
-							PluginDocumentSettingPanel,
-							{
-								name: 'atora-editor-templates-panel',
-								title: labels.panel || __('Templates ATORA', 'atora-lms'),
-								className: 'atora-editor-templates-settings-panel',
-							},
-							el(TemplateBrowser, { compact: true })
+								PluginDocumentSettingPanel,
+								{
+									name: 'atora-editor-templates-panel',
+									title: labels.panel || __('Atora Theme', 'atora-lms'),
+									className: 'atora-editor-templates-settings-panel',
+								},
+								el(TemplateBrowser, { compact: true })
 						)
 						: null,
 					PluginSidebar && PluginSidebarMoreMenuItem
 						? el(
 							Fragment,
 							null,
-							el(PluginSidebarMoreMenuItem, {
-								target: 'atora-editor-templates-sidebar',
-								icon: 'layout',
-							}, labels.panel || __('Templates ATORA', 'atora-lms')),
-							el(
-								PluginSidebar,
-								{
-									name: 'atora-editor-templates-sidebar',
-									title: labels.panel || __('Templates ATORA', 'atora-lms'),
+								el(PluginSidebarMoreMenuItem, {
+									target: 'atora-editor-templates-sidebar',
 									icon: 'layout',
-								},
-								el(TemplateBrowser, null)
-							)
+								}, labels.panel || __('Atora Theme', 'atora-lms')),
+								el(
+									PluginSidebar,
+									{
+										name: 'atora-editor-templates-sidebar',
+										title: labels.panel || __('Atora Theme', 'atora-lms'),
+										icon: 'layout',
+									},
+									el(TemplateBrowser, null)
+								)
 						)
 						: null
 				);

@@ -24,6 +24,9 @@ $program_id = get_the_ID();
 
 $content_html      = function_exists( 'atora_lms_get_entry_content_html' ) ? atora_lms_get_entry_content_html( $program_id, true ) : '';
 $has_block_content = function_exists( 'atora_lms_entry_has_block_content' ) ? atora_lms_entry_has_block_content( $program_id ) : false;
+$ui_ready          = class_exists( 'CLMS_UI_Template_Resolver', false )
+	&& class_exists( 'CLMS_UI_Template_Context', false )
+	&& class_exists( 'CLMS_UI_Template_Engine', false );
 ?>
 
 <style>
@@ -164,28 +167,53 @@ $has_block_content = function_exists( 'atora_lms_entry_has_block_content' ) ? at
 		<?php echo $content_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 	<?php else : ?>
 		<?php
-		$resolver = new CLMS_UI_Template_Resolver();
-		$schema   = apply_filters(
-			'clms_program_overview_ui_schema',
-			$resolver->resolve( $program_id, 'program_overview' ),
-			$program_id
-		);
+		$fallback_html   = '';
+		$sections_output = array();
+		$sections_order  = array();
 
-		$repository = $resolver->repository();
-		if ( ! $repository->validate( $schema ) || empty( $schema['sections'] ) ) {
-			$schema = $resolver->resolve( $program_id, 'program_overview' );
+		$build_fallback = static function () use ( $content_html, $program_id ): string {
+			ob_start();
+			if ( ! preg_match( '/<h1\\b/i', $content_html ) ) {
+				echo '<h1 class="apl-title">' . esc_html( get_the_title( $program_id ) ) . '</h1>';
+			}
+			echo '' !== trim( $content_html ) ? $content_html : wp_kses_post( apply_filters( 'the_content', get_post_field( 'post_content', $program_id ) ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+			return (string) ob_get_clean();
+		};
+
+		if ( ! $ui_ready ) {
+			$fallback_html = $build_fallback();
+		} else {
+			try {
+				$resolver = new CLMS_UI_Template_Resolver();
+				$schema   = apply_filters(
+					'clms_program_overview_ui_schema',
+					$resolver->resolve( $program_id, 'program_overview' ),
+					$program_id
+				);
+
+				$repository = method_exists( $resolver, 'repository' ) ? $resolver->repository() : null;
+				if ( $repository && method_exists( $repository, 'validate' ) && ( ! $repository->validate( $schema ) || empty( $schema['sections'] ) ) ) {
+					$schema = $resolver->resolve( $program_id, 'program_overview' );
+				}
+
+				$ctx             = CLMS_UI_Template_Context::make( $program_id, 'program_overview' );
+				$engine          = new CLMS_UI_Template_Engine();
+				$sections_output = $engine->render_to_array( $ctx, $schema );
+				$sections_order  = array_keys( $sections_output );
+			} catch ( Throwable $e ) {
+				$fallback_html = $build_fallback();
+			}
 		}
-
-		$ctx             = CLMS_UI_Template_Context::make( $program_id, 'program_overview' );
-		$engine          = new CLMS_UI_Template_Engine();
-		$sections_output = $engine->render_to_array( $ctx, $schema );
-		$sections_order  = array_keys( $sections_output );
 		?>
-		<?php foreach ( $sections_order as $section_id ) : ?>
-			<?php if ( ! empty( $sections_output[ $section_id ] ) ) : ?>
-				<?php echo $sections_output[ $section_id ]; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
-			<?php endif; ?>
-		<?php endforeach; ?>
+		<?php if ( '' !== $fallback_html ) : ?>
+			<?php echo $fallback_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+		<?php else : ?>
+			<?php foreach ( $sections_order as $section_id ) : ?>
+				<?php if ( ! empty( $sections_output[ $section_id ] ) ) : ?>
+					<?php echo $sections_output[ $section_id ]; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+				<?php endif; ?>
+			<?php endforeach; ?>
+		<?php endif; ?>
 	<?php endif; ?>
 </div>
 
