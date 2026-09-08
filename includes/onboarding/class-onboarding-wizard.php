@@ -1,6 +1,6 @@
 <?php
 /**
- * Onboarding Wizard — ATORA LMS v6.0.0 (Sprint S18), + perfil de
+ * Onboarding Wizard — ATORA LMS (Sprint S18), + perfil de
  * instalación como paso 1 desde 6.3.0 (PT-3.2).
  *
  * 5 pasos en admin para configuración inicial:
@@ -28,7 +28,7 @@ class ATORA_Onboarding_Wizard {
 	public static function init(): void {
 		if ( get_option( self::OPTION_COMPLETE ) === '1' ) { return; }
 
-		add_action( 'admin_menu',            array( __CLASS__, 'register_page' ), 5 );
+		// El menú padre clms-dashboard se registra en prioridad 10. Registrar después\n\t\t// mantiene estable el hook interno que WordPress usa para autorizar la página.\n\t\tadd_action( 'admin_menu',            array( __CLASS__, 'register_page' ), 20 );
 		add_action( 'admin_init',            array( __CLASS__, 'handle_form' ) );
 		add_action( 'admin_notices',         array( __CLASS__, 'show_notice' ) );
 		add_action( 'wp_ajax_atora_onboarding_skip', array( __CLASS__, 'ajax_skip' ) );
@@ -54,7 +54,7 @@ class ATORA_Onboarding_Wizard {
 		<div class="notice notice-info" style="display:flex;align-items:center;gap:12px;padding:12px 16px">
 			<span style="font-size:20px">🚀</span>
 			<div>
-				<strong><?php esc_html_e( '¡Bienvenido a ATORA LMS 6.0!', 'atora-lms' ); ?></strong>
+				<strong><?php printf( esc_html__( '¡Bienvenido a ATORA LMS %s!', 'atora-lms' ), esc_html( ATORA_LMS_VERSION ) ); ?></strong>
 				<?php esc_html_e( 'Completa la configuración inicial para sacar el máximo partido.', 'atora-lms' ); ?>
 				<a href="<?php echo esc_url( admin_url( 'admin.php?page=' . self::PAGE_SLUG ) ); ?>"
 				   style="margin-left:10px;font-weight:600">
@@ -222,10 +222,10 @@ class ATORA_Onboarding_Wizard {
 		<div class="wrap" style="max-width:680px;font-family:sans-serif">
 
 			<h1 style="font-size:22px;font-weight:800;margin-bottom:4px">
-				🚀 <?php esc_html_e( 'Configuración inicial — ATORA LMS 6.0', 'atora-lms' ); ?>
+				🚀 <?php printf( esc_html__( 'Configuración inicial — ATORA LMS %s', 'atora-lms' ), esc_html( ATORA_LMS_VERSION ) ); ?>
 			</h1>
 			<p style="color:#64748b;margin-top:0;font-size:13px">
-				<?php esc_html_e( 'Completa los 4 pasos para dejar tu academia lista en minutos.', 'atora-lms' ); ?>
+				<?php esc_html_e( 'Completa los 5 pasos para dejar tu academia lista en minutos.', 'atora-lms' ); ?>
 			</p>
 
 			<!-- Indicador de pasos -->
@@ -254,7 +254,7 @@ class ATORA_Onboarding_Wizard {
 						<?php esc_html_e( '¡Tu academia está lista!', 'atora-lms' ); ?>
 					</h2>
 					<p style="color:#64748b;font-size:14px;margin:0 0 24px">
-						<?php esc_html_e( 'Has completado la configuración inicial de ATORA LMS 6.0.', 'atora-lms' ); ?>
+						<?php printf( esc_html__( 'Has completado la configuración inicial de ATORA LMS %s.', 'atora-lms' ), esc_html( ATORA_LMS_VERSION ) ); ?>
 					</p>
 					<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
 						<a href="<?php echo esc_url( admin_url( 'admin.php?page=atora-crm-v2' ) ); ?>"
