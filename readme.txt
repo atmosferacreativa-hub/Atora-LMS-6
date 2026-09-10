@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 6.15.1
+Stable tag: 6.15.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,11 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.15.2 =
+* Learning Analytics: export JSON (admin + REST) con esquema BI-friendly (schema_version=1).
+* Learning Analytics: timeline de estudiante (submissions recientes + links a SpeedGrade) y entregas perdidas en el detalle.
+* Early Warning: helper público para listar entregas perdidas por estudiante/curso (reusado por Learning Analytics).
+
 = 6.15.1 =
 * Learning Analytics: filtros por cohorte/docente, listado multi-curso, export CSV multi-curso y vista de detalle por estudiante.
 * Learning Analytics REST: endpoints por cohorte/docente y scan por cohorte/docente.

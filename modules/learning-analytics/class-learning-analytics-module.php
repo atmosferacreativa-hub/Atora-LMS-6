@@ -32,6 +32,7 @@ final class Learning_Analytics_Module {
 			add_action( 'atora_lms_admin_menu', array( __CLASS__, 'register_admin_menu' ) );
 			add_action( 'admin_post_atora_learning_analytics_scan', array( __CLASS__, 'handle_scan_now' ) );
 			add_action( 'admin_post_atora_learning_analytics_export', array( __CLASS__, 'handle_export_csv' ) );
+			add_action( 'admin_post_atora_learning_analytics_export_json', array( __CLASS__, 'handle_export_json' ) );
 		}
 	}
 
@@ -149,10 +150,23 @@ final class Learning_Analytics_Module {
 			),
 			'atora_learning_analytics_export_' . md5( (string) $course_id . '|' . (string) $teacher_id . '|' . (string) $cohort_id )
 		);
+		$export_json_url = wp_nonce_url(
+			add_query_arg(
+				array(
+					'action'     => 'atora_learning_analytics_export_json',
+					'course_id'  => $course_id,
+					'teacher_id' => $teacher_id,
+					'cohort_id'  => $cohort_id,
+				),
+				admin_url( 'admin-post.php' )
+			),
+			'atora_learning_analytics_export_json_' . md5( (string) $course_id . '|' . (string) $teacher_id . '|' . (string) $cohort_id )
+		);
 
 		echo '<p style="margin: 10px 0">';
 		echo '<a class="button button-secondary" href="' . esc_url( $scan_url ) . '">' . esc_html__( 'Refrescar ahora', 'atora-lms' ) . '</a> ';
 		echo '<a class="button" href="' . esc_url( $export_url ) . '">' . esc_html__( 'Exportar CSV', 'atora-lms' ) . '</a>';
+		echo ' <a class="button" href="' . esc_url( $export_json_url ) . '">' . esc_html__( 'Exportar JSON', 'atora-lms' ) . '</a>';
 		echo '</p>';
 
 		$rows = $primary_course_id
@@ -225,12 +239,12 @@ final class Learning_Analytics_Module {
 		echo '</tbody></table>';
 
 		if ( $student_id && $course_id ) {
-			self::render_student_detail( $student_id, $course_id );
+			self::render_student_detail( $student_id, $course_id, $service );
 		}
 		echo '</div>';
 	}
 
-	private static function render_student_detail( int $student_id, int $course_id ): void {
+	private static function render_student_detail( int $student_id, int $course_id, Learning_Analytics_Service $service ): void {
 		$student_id = absint( $student_id );
 		$course_id  = absint( $course_id );
 		if ( ! $student_id || ! $course_id ) {
@@ -263,6 +277,84 @@ final class Learning_Analytics_Module {
 		echo '<tr><th>' . esc_html__( 'Último acceso', 'atora-lms' ) . '</th><td>' . esc_html( sanitize_text_field( (string) ( $status['last_access_at'] ?? '' ) ) ) . '</td></tr>';
 		echo '<tr><th>' . esc_html__( 'Próximo paso', 'atora-lms' ) . '</th><td>' . esc_html( sanitize_text_field( (string) ( $status['next_step'] ?? '' ) ) ) . '</td></tr>';
 		echo '</tbody></table>';
+
+		echo '<h3 style="margin-top:16px">' . esc_html__( 'Acciones rápidas', 'atora-lms' ) . '</h3>';
+		echo '<p>';
+		echo '<a class="button button-primary" href="' . esc_url( add_query_arg( array( 'page' => 'clms-speedgrader', 'course_id' => $course_id ), admin_url( 'admin.php' ) ) ) . '">' . esc_html__( 'Abrir SpeedGrade del curso', 'atora-lms' ) . '</a> ';
+		echo '<a class="button" href="' . esc_url( add_query_arg( array( 'page' => 'clms-gradebook', 'course_id' => $course_id, 'student_id' => $student_id ), admin_url( 'admin.php' ) ) ) . '">' . esc_html__( 'Ver Gradebook', 'atora-lms' ) . '</a>';
+		echo '</p>';
+
+		echo '<h3 style="margin-top:16px">' . esc_html__( 'Timeline (MVP)', 'atora-lms' ) . '</h3>';
+		$recent = $service->get_recent_submissions( $student_id, $course_id, 8 );
+		if ( empty( $recent ) ) {
+			echo '<p class="description">' . esc_html__( 'No hay submissions recientes para este estudiante en el curso.', 'atora-lms' ) . '</p>';
+		} else {
+			echo '<table class="widefat striped" style="max-width: 1050px">';
+			echo '<thead><tr>';
+			echo '<th>' . esc_html__( 'Lección', 'atora-lms' ) . '</th>';
+			echo '<th>' . esc_html__( 'Estado', 'atora-lms' ) . '</th>';
+			echo '<th>' . esc_html__( 'Nota', 'atora-lms' ) . '</th>';
+			echo '<th>' . esc_html__( 'Fecha', 'atora-lms' ) . '</th>';
+			echo '<th>' . esc_html__( 'Acción', 'atora-lms' ) . '</th>';
+			echo '</tr></thead><tbody>';
+
+			foreach ( $recent as $item ) {
+				$lesson_id    = absint( $item['lesson_id'] ?? 0 );
+				$lesson_title = sanitize_text_field( (string) ( $item['lesson_title'] ?? '' ) );
+				$status       = sanitize_key( (string) ( $item['status'] ?? '' ) );
+				$grade        = isset( $item['grade'] ) ? $item['grade'] : null;
+				$created      = sanitize_text_field( (string) ( $item['created_at'] ?? '' ) );
+				$sg_url       = (string) ( $item['speedgrade_url'] ?? '' );
+
+				$lesson_link = $lesson_id ? get_edit_post_link( $lesson_id, '' ) : '';
+				$lesson_html = $lesson_link
+					? '<a href="' . esc_url( $lesson_link ) . '">' . esc_html( $lesson_title ? $lesson_title : (string) $lesson_id ) . '</a>'
+					: esc_html( $lesson_title ? $lesson_title : (string) $lesson_id );
+
+				echo '<tr>';
+				echo '<td>' . $lesson_html . '</td>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+				echo '<td>' . esc_html( $status ? $status : 'submitted' ) . '</td>';
+				echo '<td>' . esc_html( null !== $grade ? (string) absint( $grade ) : '—' ) . '</td>';
+				echo '<td><span class="description">' . esc_html( $created ? $created : '—' ) . '</span></td>';
+				echo '<td>' . ( $sg_url ? '<a class="button button-small" href="' . esc_url( $sg_url ) . '">' . esc_html__( 'SpeedGrade', 'atora-lms' ) . '</a>' : '—' ) . '</td>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+				echo '</tr>';
+			}
+
+			echo '</tbody></table>';
+		}
+
+		echo '<h3 style="margin-top:16px">' . esc_html__( 'Entregas perdidas', 'atora-lms' ) . '</h3>';
+		$missed = array();
+		if ( class_exists( '\ATORA\EarlyWarning\Early_Warning_Service' ) ) {
+			$ew = new \ATORA\EarlyWarning\Early_Warning_Service();
+			if ( method_exists( $ew, 'list_missed_submissions_for_student' ) ) {
+				$missed = (array) $ew->list_missed_submissions_for_student( $course_id, $student_id );
+			}
+		}
+
+		if ( empty( $missed ) ) {
+			echo '<p class="description">' . esc_html__( 'No se detectan entregas perdidas (según due_date).', 'atora-lms' ) . '</p>';
+		} else {
+			echo '<ul style="list-style:disc;padding-left:22px;max-width: 1050px">';
+			foreach ( $missed as $m ) {
+				$lesson_id = absint( $m['lesson_id'] ?? 0 );
+				$title     = sanitize_text_field( (string) ( $m['lesson_title'] ?? '' ) );
+				$day       = sanitize_text_field( (string) ( $m['deadline_date'] ?? '' ) );
+				$link      = $lesson_id ? get_edit_post_link( $lesson_id, '' ) : '';
+
+				$label = $title ? $title : (string) $lesson_id;
+				$line  = $day ? sprintf( '%s — %s', $label, $day ) : $label;
+
+				echo '<li>';
+				if ( $link ) {
+					echo '<a href="' . esc_url( $link ) . '">' . esc_html( $line ) . '</a>';
+				} else {
+					echo esc_html( $line );
+				}
+				echo '</li>';
+			}
+			echo '</ul>';
+		}
 	}
 
 	public static function handle_scan_now(): void {
@@ -365,61 +457,19 @@ final class Learning_Analytics_Module {
 				wp_die( esc_html__( 'No hay datos para exportar.', 'atora-lms' ) );
 			}
 
-			$headers = array(
-				__( 'Curso', 'atora-lms' ),
-				__( 'Course ID', 'atora-lms' ),
-				__( 'Nombre', 'atora-lms' ),
-				__( 'Email', 'atora-lms' ),
-				__( 'Riesgo', 'atora-lms' ),
-				__( 'Score', 'atora-lms' ),
-				__( 'Progreso', 'atora-lms' ),
-				__( 'Promedio', 'atora-lms' ),
-				__( 'Pendientes', 'atora-lms' ),
-				__( 'Último acceso', 'atora-lms' ),
-				__( 'Motivos', 'atora-lms' ),
-				__( 'Acción recomendada', 'atora-lms' ),
+			$content = $service->build_bi_csv(
+				$rows,
+				array(
+					'include_course' => true,
+				)
 			);
-
-			$stream = fopen( 'php://temp', 'w+' ); // phpcs:ignore WordPress.WP.AlternativeFunctions
-			if ( ! $stream ) {
-				wp_die( esc_html__( 'No se pudo generar el CSV.', 'atora-lms' ) );
-			}
-
-			fputcsv( $stream, $headers ); // phpcs:ignore WordPress.WP.AlternativeFunctions
-			foreach ( $rows as $row ) {
-				$signals = is_array( $row['signals'] ?? null ) ? (array) $row['signals'] : array();
-				$reasons = isset( $signals['risk_reasons'] ) && is_array( $signals['risk_reasons'] ) ? implode( ' | ', array_map( 'sanitize_text_field', $signals['risk_reasons'] ) ) : '';
-
-				fputcsv( // phpcs:ignore WordPress.WP.AlternativeFunctions
-					$stream,
-					array(
-						sanitize_text_field( (string) ( $row['course_title'] ?? '' ) ),
-						absint( $row['course_id'] ?? 0 ),
-						sanitize_text_field( (string) ( $row['student_name'] ?? '' ) ),
-						sanitize_email( (string) ( $row['student_email'] ?? '' ) ),
-						sanitize_key( (string) ( $row['risk_level'] ?? 'unknown' ) ),
-						absint( $row['risk_score'] ?? 0 ),
-						absint( $signals['progress_percent'] ?? 0 ) . '%',
-						( null !== ( $signals['final_average'] ?? null ) ? absint( $signals['final_average'] ) . '%' : '—' ),
-						absint( $signals['pending_activities'] ?? 0 ),
-						sanitize_text_field( (string) ( $signals['last_access_at'] ?? '' ) ),
-						$reasons,
-						sanitize_text_field( (string) ( $signals['recommended_action'] ?? '' ) ),
-					)
-				);
-			}
-
-			rewind( $stream );
-			$content = stream_get_contents( $stream ); // phpcs:ignore WordPress.WP.AlternativeFunctions
-			fclose( $stream ); // phpcs:ignore WordPress.WP.AlternativeFunctions
-
-			if ( ! is_string( $content ) || '' === $content ) {
+			if ( '' === (string) $content ) {
 				wp_die( esc_html__( 'No se pudo generar el CSV.', 'atora-lms' ) );
 			}
 
 			$csv = array(
 				'filename' => sprintf( 'atora-learning-analytics-%s-%s.csv', $cohort_id ? ( 'cohort-' . $cohort_id ) : ( 'teacher-' . $teacher_id ), gmdate( 'Ymd-His' ) ),
-				'content'  => $content,
+				'content'  => (string) $content,
 			);
 		}
 
@@ -431,6 +481,83 @@ final class Learning_Analytics_Module {
 		header( 'Content-Type: text/csv; charset=utf-8' );
 		header( 'Content-Disposition: attachment; filename=' . sanitize_file_name( (string) $csv['filename'] ) );
 		echo (string) $csv['content']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		exit;
+	}
+
+	public static function handle_export_json(): void {
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			wp_die( esc_html__( 'No tienes permisos.', 'atora-lms' ) );
+		}
+
+		$course_id  = isset( $_GET['course_id'] ) ? absint( wp_unslash( $_GET['course_id'] ) ) : 0;
+		$teacher_id = isset( $_GET['teacher_id'] ) ? absint( wp_unslash( $_GET['teacher_id'] ) ) : 0;
+		$cohort_id  = isset( $_GET['cohort_id'] ) ? absint( wp_unslash( $_GET['cohort_id'] ) ) : 0;
+
+		check_admin_referer( 'atora_learning_analytics_export_json_' . md5( (string) $course_id . '|' . (string) $teacher_id . '|' . (string) $cohort_id ) );
+
+		$service   = new Learning_Analytics_Service();
+		$viewer_id = get_current_user_id();
+
+		$include_course = false;
+
+		if ( $course_id ) {
+			if ( ! $service->viewer_can_access_course( $viewer_id, $course_id ) ) {
+				wp_die( esc_html__( 'No tienes acceso a este curso.', 'atora-lms' ) );
+			}
+			$rows = $service->list_course_students( $course_id );
+		} else {
+			$include_course = true;
+
+			$course_ids  = array();
+			$student_ids = array();
+			if ( $cohort_id ) {
+				$course_ids  = $service->get_course_ids_for_cohort( $cohort_id );
+				$student_ids = $service->get_student_ids_for_cohort( $cohort_id );
+			} elseif ( $teacher_id ) {
+				$course_ids = $service->get_course_ids_for_teacher( $teacher_id );
+			}
+
+			$allowed_course_ids = array();
+			foreach ( $course_ids as $cid ) {
+				$cid = absint( $cid );
+				if ( $cid && $service->viewer_can_access_course( $viewer_id, $cid ) ) {
+					$allowed_course_ids[] = $cid;
+				}
+			}
+			$allowed_course_ids = array_values( array_unique( $allowed_course_ids ) );
+
+			$rows = $service->list_students(
+				array(
+					'course_ids'  => $allowed_course_ids,
+					'student_ids' => $student_ids,
+					'limit'       => 5000,
+				)
+			);
+		}
+
+		if ( empty( $rows ) ) {
+			wp_die( esc_html__( 'No hay datos para exportar.', 'atora-lms' ) );
+		}
+
+		$payload = array(
+			'schema_version' => 1,
+			'generated_at'   => gmdate( 'c' ),
+			'filters'        => array(
+				'course_id'  => $course_id,
+				'teacher_id' => $teacher_id,
+				'cohort_id'  => $cohort_id,
+			),
+			'rows'           => $service->build_bi_rows( $rows, array( 'include_course' => $include_course ) ),
+		);
+
+		$filename = $course_id
+			? sprintf( 'atora-learning-analytics-course-%d-%s.json', $course_id, gmdate( 'Ymd-His' ) )
+			: sprintf( 'atora-learning-analytics-%s-%s.json', $cohort_id ? ( 'cohort-' . $cohort_id ) : ( 'teacher-' . $teacher_id ), gmdate( 'Ymd-His' ) );
+
+		nocache_headers();
+		header( 'Content-Type: application/json; charset=utf-8' );
+		header( 'Content-Disposition: attachment; filename=' . sanitize_file_name( $filename ) );
+		echo wp_json_encode( $payload ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 		exit;
 	}
 
@@ -529,6 +656,37 @@ final class Learning_Analytics_Module {
 
 		register_rest_route(
 			'atora/v1',
+			'/learning-analytics/export',
+			array(
+				array(
+					'methods'             => WP_REST_Server::READABLE,
+					'callback'            => array( __CLASS__, 'rest_export' ),
+					'permission_callback' => array( __CLASS__, 'rest_can_export' ),
+					'args'                => array(
+						'course_id' => array(
+							'type'     => 'integer',
+							'required' => false,
+						),
+						'teacher_id' => array(
+							'type'     => 'integer',
+							'required' => false,
+						),
+						'cohort_id' => array(
+							'type'     => 'integer',
+							'required' => false,
+						),
+						'limit' => array(
+							'type'     => 'integer',
+							'required' => false,
+							'default'  => 5000,
+						),
+					),
+				),
+			)
+		);
+
+		register_rest_route(
+			'atora/v1',
 			'/learning-analytics/teacher/scan',
 			array(
 				array(
@@ -581,6 +739,26 @@ final class Learning_Analytics_Module {
 		$course_id = absint( $request->get_param( 'course_id' ) );
 		$service = new Learning_Analytics_Service();
 		return $service->viewer_can_access_course( get_current_user_id(), $course_id );
+	}
+
+	public static function rest_can_export( WP_REST_Request $request ): bool {
+		$course_id  = absint( $request->get_param( 'course_id' ) );
+		$teacher_id = absint( $request->get_param( 'teacher_id' ) );
+		$cohort_id  = absint( $request->get_param( 'cohort_id' ) );
+
+		if ( $course_id ) {
+			return self::rest_can_view( $request );
+		}
+
+		if ( $teacher_id ) {
+			return self::rest_can_view_teacher( $request );
+		}
+
+		if ( $cohort_id ) {
+			return self::rest_can_view_cohort( $request );
+		}
+
+		return false;
 	}
 
 	public static function rest_can_view_teacher( WP_REST_Request $request ): bool {
@@ -677,6 +855,72 @@ final class Learning_Analytics_Module {
 			),
 			200
 		);
+	}
+
+	public static function rest_export( WP_REST_Request $request ): WP_REST_Response {
+		$course_id  = absint( $request->get_param( 'course_id' ) );
+		$teacher_id = absint( $request->get_param( 'teacher_id' ) );
+		$cohort_id  = absint( $request->get_param( 'cohort_id' ) );
+		$limit      = absint( $request->get_param( 'limit' ) );
+		if ( $limit <= 0 ) {
+			$limit = 5000;
+		}
+
+		$service   = new Learning_Analytics_Service();
+		$viewer_id = get_current_user_id();
+
+		$include_course = false;
+		$rows           = array();
+
+		if ( $course_id ) {
+			if ( ! $service->viewer_can_access_course( $viewer_id, $course_id ) ) {
+				return new WP_REST_Response( array( 'error' => 'forbidden' ), 403 );
+			}
+			$rows = $service->list_course_students( $course_id );
+		} else {
+			$include_course = true;
+			$course_ids  = array();
+			$student_ids = array();
+
+			if ( $cohort_id ) {
+				$course_ids  = $service->get_course_ids_for_cohort( $cohort_id );
+				$student_ids = $service->get_student_ids_for_cohort( $cohort_id );
+			} elseif ( $teacher_id ) {
+				$course_ids = $service->get_course_ids_for_teacher( $teacher_id );
+			}
+
+			$allowed_course_ids = array();
+			foreach ( $course_ids as $cid ) {
+				$cid = absint( $cid );
+				if ( $cid && $service->viewer_can_access_course( $viewer_id, $cid ) ) {
+					$allowed_course_ids[] = $cid;
+				}
+			}
+			$allowed_course_ids = array_values( array_unique( $allowed_course_ids ) );
+
+			$rows = $service->list_students(
+				array(
+					'course_ids'  => $allowed_course_ids,
+					'student_ids' => $student_ids,
+					'limit'       => $limit,
+				)
+			);
+		}
+
+		$payload = array(
+			'schema_version' => 1,
+			'generated_at'   => gmdate( 'c' ),
+			'filters'        => array(
+				'course_id'  => $course_id,
+				'teacher_id' => $teacher_id,
+				'cohort_id'  => $cohort_id,
+				'limit'      => $limit,
+			),
+			'count'          => count( $rows ),
+			'rows'           => $service->build_bi_rows( $rows, array( 'include_course' => $include_course ) ),
+		);
+
+		return new WP_REST_Response( $payload, 200 );
 	}
 
 	public static function rest_list_by_teacher( WP_REST_Request $request ): WP_REST_Response {

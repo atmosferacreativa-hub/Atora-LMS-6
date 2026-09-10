@@ -458,49 +458,12 @@ final class Learning_Analytics_Service {
 			return array();
 		}
 
-		$headers = array(
-			__( 'Nombre', 'atora-lms' ),
-			__( 'Email', 'atora-lms' ),
-			__( 'Riesgo', 'atora-lms' ),
-			__( 'Score', 'atora-lms' ),
-			__( 'Progreso', 'atora-lms' ),
-			__( 'Promedio', 'atora-lms' ),
-			__( 'Pendientes', 'atora-lms' ),
-			__( 'Último acceso', 'atora-lms' ),
-			__( 'Motivos', 'atora-lms' ),
-			__( 'Acción recomendada', 'atora-lms' ),
+		$csv = $this->build_bi_csv(
+			$rows,
+			array(
+				'include_course' => false,
+			)
 		);
-
-		$stream = fopen( 'php://temp', 'w+' ); // phpcs:ignore WordPress.WP.AlternativeFunctions
-		if ( ! $stream ) {
-			return array();
-		}
-
-		fputcsv( $stream, $headers ); // phpcs:ignore WordPress.WP.AlternativeFunctions
-		foreach ( $rows as $row ) {
-			$signals = is_array( $row['signals'] ?? null ) ? (array) $row['signals'] : array();
-			$reasons = isset( $signals['risk_reasons'] ) && is_array( $signals['risk_reasons'] ) ? implode( ' | ', array_map( 'sanitize_text_field', $signals['risk_reasons'] ) ) : '';
-
-			fputcsv( // phpcs:ignore WordPress.WP.AlternativeFunctions
-				$stream,
-				array(
-					sanitize_text_field( (string) ( $row['student_name'] ?? '' ) ),
-					sanitize_email( (string) ( $row['student_email'] ?? '' ) ),
-					sanitize_key( (string) ( $row['risk_level'] ?? 'unknown' ) ),
-					absint( $row['risk_score'] ?? 0 ),
-					absint( $signals['progress_percent'] ?? 0 ) . '%',
-					( null !== ( $signals['final_average'] ?? null ) ? absint( $signals['final_average'] ) . '%' : '—' ),
-					absint( $signals['pending_activities'] ?? 0 ),
-					sanitize_text_field( (string) ( $signals['last_access_at'] ?? '' ) ),
-					$reasons,
-					sanitize_text_field( (string) ( $signals['recommended_action'] ?? '' ) ),
-				)
-			);
-		}
-
-		rewind( $stream );
-		$csv = stream_get_contents( $stream ); // phpcs:ignore WordPress.WP.AlternativeFunctions
-		fclose( $stream ); // phpcs:ignore WordPress.WP.AlternativeFunctions
 
 		if ( ! is_string( $csv ) || '' === $csv ) {
 			return array();
@@ -510,6 +473,229 @@ final class Learning_Analytics_Service {
 			'filename' => sprintf( 'atora-learning-analytics-course-%d-%s.csv', $course_id, gmdate( 'Ymd-His' ) ),
 			'content'  => $csv,
 		);
+	}
+
+	/**
+	 * Export BI-friendly: filas normalizadas para BI (JSON).
+	 *
+	 * @param array<int,array<string,mixed>> $rows Snapshots (list_course_students o list_students).
+	 * @param array<string,mixed> $opts include_course bool
+	 * @return array<int,array<string,mixed>>
+	 */
+	public function build_bi_rows( array $rows, array $opts = array() ): array {
+		$opts = is_array( $opts ) ? $opts : array();
+		$include_course = ! empty( $opts['include_course'] );
+
+		$out = array();
+		foreach ( (array) $rows as $row ) {
+			$signals = is_array( $row['signals'] ?? null ) ? (array) $row['signals'] : array();
+			$reasons = isset( $signals['risk_reasons'] ) && is_array( $signals['risk_reasons'] ) ? array_values( array_map( 'sanitize_text_field', $signals['risk_reasons'] ) ) : array();
+
+			$item = array(
+				'user_id'            => absint( $row['user_id'] ?? 0 ),
+				'student_name'       => sanitize_text_field( (string) ( $row['student_name'] ?? '' ) ),
+				'student_email'      => sanitize_email( (string) ( $row['student_email'] ?? '' ) ),
+				'risk_level'         => sanitize_key( (string) ( $row['risk_level'] ?? 'unknown' ) ),
+				'risk_score'         => absint( $row['risk_score'] ?? 0 ),
+				'progress_percent'   => absint( $signals['progress_percent'] ?? 0 ),
+				'final_average'      => ( null !== ( $signals['final_average'] ?? null ) ? absint( $signals['final_average'] ) : null ),
+				'pending_activities' => absint( $signals['pending_activities'] ?? 0 ),
+				'last_access_at'     => sanitize_text_field( (string) ( $signals['last_access_at'] ?? '' ) ),
+				'course_time_seconds'=> absint( $signals['course_time_seconds'] ?? 0 ),
+				'risk_reasons'       => $reasons,
+				'recommended_action' => sanitize_text_field( (string) ( $signals['recommended_action'] ?? '' ) ),
+				'updated_at'         => sanitize_text_field( (string) ( $row['updated_at'] ?? '' ) ),
+			);
+
+			if ( $include_course ) {
+				$item = array_merge(
+					array(
+						'course_id'    => absint( $row['course_id'] ?? 0 ),
+						'course_title' => sanitize_text_field( (string) ( $row['course_title'] ?? '' ) ),
+					),
+					$item
+				);
+			}
+
+			$out[] = $item;
+		}
+
+		return $out;
+	}
+
+	/**
+	 * CSV BI-friendly con esquema fijo.
+	 *
+	 * @param array<int,array<string,mixed>> $rows Snapshots (list_course_students o list_students).
+	 * @param array<string,mixed> $opts include_course bool
+	 * @return string
+	 */
+	public function build_bi_csv( array $rows, array $opts = array() ): string {
+		$opts = is_array( $opts ) ? $opts : array();
+		$include_course = ! empty( $opts['include_course'] );
+
+		$stream = fopen( 'php://temp', 'w+' ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		if ( ! $stream ) {
+			return '';
+		}
+
+		$headers = $include_course
+			? array(
+				__( 'Curso', 'atora-lms' ),
+				__( 'Course ID', 'atora-lms' ),
+				__( 'Nombre', 'atora-lms' ),
+				__( 'Email', 'atora-lms' ),
+				__( 'Riesgo', 'atora-lms' ),
+				__( 'Score', 'atora-lms' ),
+				__( 'Progreso', 'atora-lms' ),
+				__( 'Promedio', 'atora-lms' ),
+				__( 'Pendientes', 'atora-lms' ),
+				__( 'Último acceso', 'atora-lms' ),
+				__( 'Tiempo (s)', 'atora-lms' ),
+				__( 'Motivos', 'atora-lms' ),
+				__( 'Acción recomendada', 'atora-lms' ),
+				__( 'Actualizado', 'atora-lms' ),
+			)
+			: array(
+				__( 'Nombre', 'atora-lms' ),
+				__( 'Email', 'atora-lms' ),
+				__( 'Riesgo', 'atora-lms' ),
+				__( 'Score', 'atora-lms' ),
+				__( 'Progreso', 'atora-lms' ),
+				__( 'Promedio', 'atora-lms' ),
+				__( 'Pendientes', 'atora-lms' ),
+				__( 'Último acceso', 'atora-lms' ),
+				__( 'Tiempo (s)', 'atora-lms' ),
+				__( 'Motivos', 'atora-lms' ),
+				__( 'Acción recomendada', 'atora-lms' ),
+				__( 'Actualizado', 'atora-lms' ),
+			);
+
+		fputcsv( $stream, $headers ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+
+		foreach ( $this->build_bi_rows( $rows, array( 'include_course' => $include_course ) ) as $item ) {
+			$reasons = isset( $item['risk_reasons'] ) && is_array( $item['risk_reasons'] ) ? implode( ' | ', array_map( 'sanitize_text_field', $item['risk_reasons'] ) ) : '';
+
+			$base = array(
+				$item['student_name'],
+				$item['student_email'],
+				$item['risk_level'],
+				absint( $item['risk_score'] ),
+				absint( $item['progress_percent'] ) . '%',
+				( null !== ( $item['final_average'] ?? null ) ? absint( $item['final_average'] ) . '%' : '—' ),
+				absint( $item['pending_activities'] ),
+				(string) ( $item['last_access_at'] ?? '' ),
+				absint( $item['course_time_seconds'] ?? 0 ),
+				$reasons,
+				(string) ( $item['recommended_action'] ?? '' ),
+				(string) ( $item['updated_at'] ?? '' ),
+			);
+
+			$row = $include_course
+				? array_merge(
+					array(
+						(string) ( $item['course_title'] ?? '' ),
+						absint( $item['course_id'] ?? 0 ),
+					),
+					$base
+				)
+				: $base;
+
+			fputcsv( $stream, $row ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		}
+
+		rewind( $stream );
+		$csv = stream_get_contents( $stream ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		fclose( $stream ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+
+		return is_string( $csv ) ? $csv : '';
+	}
+
+	/**
+	 * Timeline (MVP): submissions recientes (incluye masters grupales submitted_by).
+	 *
+	 * @param int $student_id
+	 * @param int $course_id
+	 * @param int $limit
+	 * @return array<int,array<string,mixed>>
+	 */
+	public function get_recent_submissions( int $student_id, int $course_id, int $limit = 10 ): array {
+		$student_id = absint( $student_id );
+		$course_id  = absint( $course_id );
+		$limit      = absint( $limit );
+		if ( ! $student_id || ! $course_id ) {
+			return array();
+		}
+		if ( $limit <= 0 ) {
+			$limit = 10;
+		}
+
+		$submission_post_type = class_exists( 'CLMS_Submission' ) ? \CLMS_Submission::CPT : 'clms_submission';
+
+		$q = new \WP_Query(
+			array(
+				'post_type'      => $submission_post_type,
+				'post_status'    => array( 'publish', 'private' ),
+				'posts_per_page' => min( 50, $limit ),
+				'fields'         => 'ids',
+				'no_found_rows'  => true,
+				'orderby'        => 'date',
+				'order'          => 'DESC',
+				'meta_query'     => array(
+					'relation' => 'AND',
+					array(
+						'key'   => '_clms_submission_course_id',
+						'value' => $course_id,
+						'type'  => 'NUMERIC',
+					),
+					array(
+						'relation' => 'OR',
+						array(
+							'key'   => '_clms_submission_user_id',
+							'value' => $student_id,
+							'type'  => 'NUMERIC',
+						),
+						array(
+							'key'   => '_clms_submission_submitted_by',
+							'value' => $student_id,
+							'type'  => 'NUMERIC',
+						),
+					),
+				),
+			)
+		);
+
+		$ids = is_array( $q->posts ) ? array_values( array_filter( array_map( 'absint', $q->posts ) ) ) : array();
+		if ( empty( $ids ) ) {
+			return array();
+		}
+
+		$grading = class_exists( 'CLMS_Helper' ) ? clms_core( 'CLMS_Grading' ) : null;
+
+		$out = array();
+		foreach ( $ids as $submission_id ) {
+			$lesson_id = absint( get_post_meta( $submission_id, '_clms_submission_lesson_id', true ) );
+			$status    = sanitize_key( (string) get_post_meta( $submission_id, '_clms_submission_status', true ) );
+			$grade     = get_post_meta( $submission_id, '_clms_submission_grade', true );
+			$grade     = ( '' === (string) $grade ) ? null : ( is_numeric( $grade ) ? (int) round( (float) $grade ) : null );
+
+			$speedgrade_url = '';
+			if ( $grading && method_exists( $grading, 'get_speedgrade_url' ) ) {
+				$speedgrade_url = (string) $grading->get_speedgrade_url( $submission_id, admin_url( 'admin.php?page=atora-learning-analytics&course_id=' . $course_id . '&student_id=' . $student_id ) );
+			}
+
+			$out[] = array(
+				'submission_id'  => $submission_id,
+				'lesson_id'      => $lesson_id,
+				'lesson_title'   => $lesson_id ? (string) get_the_title( $lesson_id ) : '',
+				'status'         => $status ? $status : 'submitted',
+				'grade'          => $grade,
+				'created_at'     => (string) get_post_field( 'post_date', $submission_id ),
+				'speedgrade_url' => $speedgrade_url,
+			);
+		}
+
+		return $out;
 	}
 
 	private function notify_teachers_if_needed( int $course_id, int $student_id, array $signals, int $row_id ): void {

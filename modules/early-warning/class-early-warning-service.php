@@ -35,6 +35,64 @@ final class Early_Warning_Service {
 	}
 
 	/**
+	 * Lista entregas perdidas (MVP) para un estudiante en un curso.
+	 *
+	 * @param int $course_id
+	 * @param int $student_id
+	 * @return array<int,array{lesson_id:int,deadline_ts:int,lesson_title:string,deadline_date:string}>
+	 */
+	public function list_missed_submissions_for_student( int $course_id, int $student_id ): array {
+		$course_id  = absint( $course_id );
+		$student_id = absint( $student_id );
+		if ( ! $course_id || ! $student_id || ! class_exists( 'CLMS_Helper' ) ) {
+			return array();
+		}
+
+		$deadline_lessons = $this->get_deadline_lessons( $course_id, time() );
+		if ( empty( $deadline_lessons ) ) {
+			return array();
+		}
+
+		$missed = array();
+		foreach ( $deadline_lessons as $item ) {
+			$lesson_id = absint( $item['lesson_id'] ?? 0 );
+			if ( ! $lesson_id ) {
+				continue;
+			}
+
+			$has = get_posts(
+				array(
+					'post_type'      => class_exists( 'CLMS_Submission' ) ? \CLMS_Submission::CPT : 'clms_submission',
+					'post_status'    => array( 'publish', 'private' ),
+					'posts_per_page' => 1,
+					'fields'         => 'ids',
+					'no_found_rows'  => true,
+					'meta_query'     => array(
+						array( 'key' => '_clms_submission_user_id', 'value' => $student_id, 'type' => 'NUMERIC' ),
+						array( 'key' => '_clms_submission_lesson_id', 'value' => $lesson_id, 'type' => 'NUMERIC' ),
+					),
+				)
+			);
+
+			if ( ! empty( $has ) ) {
+				continue;
+			}
+
+			$deadline_ts  = absint( $item['deadline_ts'] ?? 0 );
+			$deadline_day = $deadline_ts ? gmdate( 'Y-m-d', $deadline_ts ) : '';
+
+			$missed[] = array(
+				'lesson_id'      => $lesson_id,
+				'deadline_ts'    => $deadline_ts,
+				'lesson_title'   => (string) get_the_title( $lesson_id ),
+				'deadline_date'  => $deadline_day,
+			);
+		}
+
+		return $missed;
+	}
+
+	/**
 	 * Daily scan across published courses (MVP: minimal).
 	 *
 	 * @return void
@@ -147,36 +205,13 @@ final class Early_Warning_Service {
 			return;
 		}
 
-		$lesson_ids = (array) \CLMS_Helper::get_course_lessons( $course_id );
-		$lesson_ids = array_values( array_filter( array_map( 'absint', $lesson_ids ) ) );
-		if ( empty( $lesson_ids ) ) {
-			return;
-		}
-
 		$student_ids = (array) \CLMS_Helper::get_enrolled_student_ids( $course_id );
 		$student_ids = array_values( array_filter( array_map( 'absint', $student_ids ) ) );
 		if ( empty( $student_ids ) ) {
 			return;
 		}
 
-		$now = time();
-
-		$deadline_lessons = array();
-		foreach ( $lesson_ids as $lesson_id ) {
-			$due_date = (string) get_post_meta( $lesson_id, '_clms_due_date', true );
-			$late_date = (string) get_post_meta( $lesson_id, '_clms_due_date_late', true );
-			$due_time = (string) get_post_meta( $lesson_id, '_clms_due_time', true );
-
-			$date = '' !== trim( $late_date ) ? trim( $late_date ) : trim( $due_date );
-			if ( '' === $date ) {
-				continue;
-			}
-			$time = '' !== trim( $due_time ) ? trim( $due_time ) : '23:59';
-			$ts   = strtotime( $date . ' ' . $time );
-			if ( $ts && $ts < $now ) {
-				$deadline_lessons[] = array( 'lesson_id' => $lesson_id, 'deadline_ts' => (int) $ts );
-			}
-		}
+		$deadline_lessons = $this->get_deadline_lessons( $course_id, time() );
 
 		if ( empty( $deadline_lessons ) ) {
 			return;
@@ -225,6 +260,50 @@ final class Early_Warning_Service {
 				$this->notify_teacher( $course_id, $student_id, count( $missed ) );
 			}
 		}
+	}
+
+	/**
+	 * Lecciones con deadline en el pasado (due o late date).
+	 *
+	 * @param int $course_id
+	 * @param int $now_ts
+	 * @return array<int,array{lesson_id:int,deadline_ts:int}>
+	 */
+	private function get_deadline_lessons( int $course_id, int $now_ts ): array {
+		if ( ! class_exists( 'CLMS_Helper' ) ) {
+			return array();
+		}
+
+		$course_id = absint( $course_id );
+		$now_ts    = absint( $now_ts );
+		if ( ! $course_id || ! $now_ts ) {
+			return array();
+		}
+
+		$lesson_ids = (array) \CLMS_Helper::get_course_lessons( $course_id );
+		$lesson_ids = array_values( array_filter( array_map( 'absint', $lesson_ids ) ) );
+		if ( empty( $lesson_ids ) ) {
+			return array();
+		}
+
+		$deadline_lessons = array();
+		foreach ( $lesson_ids as $lesson_id ) {
+			$due_date  = (string) get_post_meta( $lesson_id, '_clms_due_date', true );
+			$late_date = (string) get_post_meta( $lesson_id, '_clms_due_date_late', true );
+			$due_time  = (string) get_post_meta( $lesson_id, '_clms_due_time', true );
+
+			$date = '' !== trim( $late_date ) ? trim( $late_date ) : trim( $due_date );
+			if ( '' === $date ) {
+				continue;
+			}
+			$time = '' !== trim( $due_time ) ? trim( $due_time ) : '23:59';
+			$ts   = strtotime( $date . ' ' . $time );
+			if ( $ts && $ts < $now_ts ) {
+				$deadline_lessons[] = array( 'lesson_id' => absint( $lesson_id ), 'deadline_ts' => absint( $ts ) );
+			}
+		}
+
+		return $deadline_lessons;
 	}
 
 	private function upsert_warning( int $course_id, int $user_id, string $type, array $data, int $severity ): void {
