@@ -619,6 +619,7 @@ $services_dir = __DIR__ . '/../modules/crm-v2/services/';
 foreach ( array(
 	'class-db-service.php',
 	'class-contact-service.php',
+	'class-activity-service.php',
 	'class-scoring-service.php',
 	'class-company-service.php',
 	'class-list-service.php',
