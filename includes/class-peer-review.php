@@ -38,6 +38,10 @@ class CLMS_Peer_Review {
 		add_shortcode( 'clms_peer_review_training', array( $this, 'render_training_module' ) );
 		add_action( 'clms_peer_review_completed', array( $this, 'maybe_aggregate' ), 10, 2 );
 		add_action( 'clms_peer_review_completed', array( $this, 'capture_review_quality' ), 20, 2 );
+
+		if ( is_admin() ) {
+			add_action( 'atora_lms_admin_menu', array( $this, 'register_admin_menu' ) );
+		}
 	}
 
 	/* ----------------------------------------------------------------
@@ -63,6 +67,217 @@ class CLMS_Peer_Review {
 	/* ----------------------------------------------------------------
 	 * ASSIGNMENT ENGINE
 	 * -------------------------------------------------------------- */
+
+	/**
+	 * Ajustes de calibración por lección.
+	 *
+	 * @param int $lesson_id
+	 * @return array{enabled:bool,submission_id:int,teacher_grade:int}
+	 */
+	protected static function get_calibration_settings_for_lesson( int $lesson_id ): array {
+		$lesson_id = absint( $lesson_id );
+		$enabled   = (bool) get_post_meta( $lesson_id, '_clms_pr_calibration_enabled', true );
+		$submission_id = absint( get_post_meta( $lesson_id, '_clms_pr_calibration_submission_id', true ) );
+		$teacher_grade = max( 0, min( 100, absint( get_post_meta( $lesson_id, '_clms_pr_calibration_teacher_grade', true ) ) ) );
+
+		if ( ! $enabled || ! $submission_id ) {
+			return array(
+				'enabled'       => false,
+				'submission_id' => 0,
+				'teacher_grade' => $teacher_grade,
+			);
+		}
+
+		// Defensive: the exemplar must be a submission.
+		if ( $submission_id && 'clms_submission' !== get_post_type( $submission_id ) ) {
+			$submission_id = 0;
+		}
+
+		return array(
+			'enabled'       => $enabled && $submission_id > 0,
+			'submission_id' => $submission_id,
+			'teacher_grade' => $teacher_grade,
+		);
+	}
+
+	public static function is_calibration_required_for_lesson( int $lesson_id ): bool {
+		$settings = self::get_calibration_settings_for_lesson( absint( $lesson_id ) );
+		return ! empty( $settings['enabled'] ) && ! empty( $settings['submission_id'] );
+	}
+
+	public static function is_reviewer_calibrated_for_lesson( int $reviewer_id, int $lesson_id ): bool {
+		$reviewer_id = absint( $reviewer_id );
+		$lesson_id   = absint( $lesson_id );
+		if ( ! $reviewer_id || ! $lesson_id ) {
+			return false;
+		}
+
+		$cache = get_user_meta( $reviewer_id, '_clms_pr_calibration_status_' . $lesson_id, true );
+		if ( is_string( $cache ) && '' !== $cache ) {
+			return 'pass' === sanitize_key( $cache ) || 'warn' === sanitize_key( $cache );
+		}
+
+		$done = get_posts(
+			array(
+				'post_type'      => 'clms_peer_review',
+				'post_status'    => array( 'publish' ),
+				'posts_per_page' => 1,
+				'fields'         => 'ids',
+				'meta_query'     => array(
+					array( 'key' => '_clms_pr_lesson_id', 'value' => $lesson_id, 'type' => 'NUMERIC' ),
+					array( 'key' => '_clms_pr_reviewer_id', 'value' => $reviewer_id, 'type' => 'NUMERIC' ),
+					array( 'key' => '_clms_pr_is_calibration', 'value' => '1' ),
+					array( 'key' => '_clms_pr_status', 'value' => 'completed' ),
+				),
+			)
+		);
+
+		return ! empty( $done );
+	}
+
+	/**
+	 * Devuelve el % 0–100 de una asignación (sum(scores)/max).
+	 *
+	 * @param int $assignment_id
+	 * @param int $lesson_id
+	 * @return int
+	 */
+	protected static function get_assignment_percent( int $assignment_id, int $lesson_id ): int {
+		$assignment_id = absint( $assignment_id );
+		$lesson_id     = absint( $lesson_id );
+		if ( ! $assignment_id ) {
+			return 0;
+		}
+
+		$scores = (array) get_post_meta( $assignment_id, '_clms_pr_scores', true );
+		$total  = 0;
+		foreach ( $scores as $v ) {
+			$total += absint( $v );
+		}
+
+		$max_score = 100;
+		$rubric_id = $lesson_id ? absint( get_post_meta( $lesson_id, '_clms_rubric_id', true ) ) : 0;
+		if ( $rubric_id && class_exists( 'CLMS_Rubric' ) ) {
+			$derived = CLMS_Rubric::get_total_points( $rubric_id );
+			if ( $derived > 0 ) {
+				$max_score = $derived;
+			}
+		}
+
+		if ( $max_score <= 0 ) {
+			return 0;
+		}
+
+		return max( 0, min( 100, absint( round( ( $total / $max_score ) * 100 ) ) ) );
+	}
+
+	public static function score_calibration_assignment( int $assignment_id ): void {
+		$assignment_id = absint( $assignment_id );
+		if ( ! $assignment_id || '1' !== (string) get_post_meta( $assignment_id, '_clms_pr_is_calibration', true ) ) {
+			return;
+		}
+
+		$lesson_id   = absint( get_post_meta( $assignment_id, '_clms_pr_lesson_id', true ) );
+		$reviewer_id = absint( get_post_meta( $assignment_id, '_clms_pr_reviewer_id', true ) );
+
+		$settings = self::get_calibration_settings_for_lesson( $lesson_id );
+		$teacher_grade = absint( $settings['teacher_grade'] ?? 0 );
+
+		$percent = self::get_assignment_percent( $assignment_id, $lesson_id );
+		$delta   = (int) ( $percent - $teacher_grade );
+		$abs     = abs( $delta );
+
+		$status = 'pass';
+		if ( $abs > 20 ) {
+			$status = 'fail';
+		} elseif ( $abs > 10 ) {
+			$status = 'warn';
+		}
+
+		$score = max( 0, 100 - $abs );
+
+		update_post_meta( $assignment_id, '_clms_pr_total_percent', $percent );
+		update_post_meta( $assignment_id, '_clms_pr_calibration_delta', $delta );
+		update_post_meta( $assignment_id, '_clms_pr_calibration_score', $score );
+		update_post_meta( $assignment_id, '_clms_pr_calibration_status', $status );
+
+		if ( $reviewer_id && $lesson_id ) {
+			update_user_meta( $reviewer_id, '_clms_pr_calibration_status_' . $lesson_id, $status );
+			update_user_meta( $reviewer_id, '_clms_pr_calibration_delta_' . $lesson_id, $delta );
+			update_user_meta( $reviewer_id, '_clms_pr_calibration_scored_at_' . $lesson_id, gmdate( 'Y-m-d H:i:s' ) );
+		}
+
+		self::audit(
+			'calibration_scored',
+			array(
+				'assignment_id' => $assignment_id,
+				'lesson_id'     => $lesson_id,
+				'submission_id' => absint( get_post_meta( $assignment_id, '_clms_pr_submission_id', true ) ),
+				'reviewer_id'   => $reviewer_id,
+				'reviewee_id'   => 0,
+				'actor_id'      => $reviewer_id,
+				'meta'          => array(
+					'teacher_grade' => $teacher_grade,
+					'percent'       => $percent,
+					'delta'         => $delta,
+					'status'        => $status,
+				),
+			)
+		);
+	}
+
+	protected static function score_consistency_for_submission( int $submission_id, int $peer_grade, int $lesson_id ): void {
+		$submission_id = absint( $submission_id );
+		$peer_grade    = absint( $peer_grade );
+		$lesson_id     = absint( $lesson_id );
+		if ( ! $submission_id ) {
+			return;
+		}
+
+		$assignments = get_posts(
+			array(
+				'post_type'      => 'clms_peer_review',
+				'post_status'    => array( 'publish' ),
+				'posts_per_page' => -1,
+				'fields'         => 'ids',
+				'meta_query'     => array(
+					array( 'key' => '_clms_pr_submission_id', 'value' => $submission_id, 'type' => 'NUMERIC' ),
+					array( 'key' => '_clms_pr_status', 'value' => 'completed' ),
+					array( 'key' => '_clms_pr_is_calibration', 'value' => '0' ),
+				),
+			)
+		);
+
+		foreach ( (array) $assignments as $assignment_id ) {
+			$assignment_id = absint( $assignment_id );
+			if ( ! $assignment_id ) {
+				continue;
+			}
+
+			$percent = self::get_assignment_percent( $assignment_id, $lesson_id );
+			$delta   = (int) ( $percent - $peer_grade );
+			$flag    = abs( $delta ) >= 20 ? 'outlier' : 'ok';
+
+			update_post_meta( $assignment_id, '_clms_pr_total_percent', $percent );
+			update_post_meta( $assignment_id, '_clms_pr_consistency_delta', $delta );
+			update_post_meta( $assignment_id, '_clms_pr_consistency_flag', $flag );
+		}
+
+		self::audit(
+			'consistency_scored',
+			array(
+				'assignment_id' => 0,
+				'lesson_id'     => $lesson_id,
+				'submission_id' => $submission_id,
+				'reviewer_id'   => 0,
+				'reviewee_id'   => absint( get_post_meta( $submission_id, '_clms_submission_user_id', true ) ),
+				'actor_id'      => get_current_user_id(),
+				'meta'          => array(
+					'peer_grade' => $peer_grade,
+				),
+			)
+		);
+	}
 
 	/**
 	 * Distributes submissions of a lesson to peer reviewers.
@@ -154,9 +369,83 @@ class CLMS_Peer_Review {
 					update_post_meta( $pr_id, '_clms_pr_reviewee_id',   $reviewee_id );
 					update_post_meta( $pr_id, '_clms_pr_reviewer_id',   $reviewer_id );
 					update_post_meta( $pr_id, '_clms_pr_status',        'pending' );
+					update_post_meta( $pr_id, '_clms_pr_is_calibration', '0' );
+					self::audit(
+						'assignment_created',
+						array(
+							'assignment_id' => $pr_id,
+							'lesson_id'     => $lesson_id,
+							'submission_id' => $submission_id,
+							'reviewer_id'   => $reviewer_id,
+							'reviewee_id'   => $reviewee_id,
+							'actor_id'      => get_current_user_id(),
+						)
+					);
 					++$assigned;
 					++$count;
 				}
+			}
+		}
+
+		// Calibration (optional): create one shared exemplar review per reviewer.
+		$calibration = self::get_calibration_settings_for_lesson( $lesson_id );
+		if ( ! empty( $calibration['enabled'] ) && ! empty( $calibration['submission_id'] ) ) {
+			foreach ( $student_ids as $reviewer_id ) {
+				$reviewer_id = absint( $reviewer_id );
+				if ( ! $reviewer_id ) {
+					continue;
+				}
+
+				$exists = get_posts(
+					array(
+						'post_type'      => 'clms_peer_review',
+						'posts_per_page' => 1,
+						'fields'         => 'ids',
+						'meta_query'     => array(
+							array( 'key' => '_clms_pr_lesson_id',     'value' => $lesson_id, 'type' => 'NUMERIC' ),
+							array( 'key' => '_clms_pr_reviewer_id',   'value' => $reviewer_id, 'type' => 'NUMERIC' ),
+							array( 'key' => '_clms_pr_submission_id', 'value' => absint( $calibration['submission_id'] ), 'type' => 'NUMERIC' ),
+							array( 'key' => '_clms_pr_is_calibration','value' => '1' ),
+						),
+					)
+				);
+				if ( $exists ) {
+					continue;
+				}
+
+				$pr_id = wp_insert_post(
+					array(
+						'post_type'   => 'clms_peer_review',
+						'post_status' => 'draft',
+						'post_title'  => "PR Calibration: Lesson {$lesson_id} / Reviewer {$reviewer_id}",
+						'post_author' => $reviewer_id,
+					)
+				);
+				if ( is_wp_error( $pr_id ) ) {
+					continue;
+				}
+
+				update_post_meta( $pr_id, '_clms_pr_lesson_id',     $lesson_id );
+				update_post_meta( $pr_id, '_clms_pr_submission_id', absint( $calibration['submission_id'] ) );
+				update_post_meta( $pr_id, '_clms_pr_reviewee_id',   0 );
+				update_post_meta( $pr_id, '_clms_pr_reviewer_id',   $reviewer_id );
+				update_post_meta( $pr_id, '_clms_pr_status',        'pending' );
+				update_post_meta( $pr_id, '_clms_pr_is_calibration', '1' );
+
+				self::audit(
+					'calibration_assigned',
+					array(
+						'assignment_id' => $pr_id,
+						'lesson_id'     => $lesson_id,
+						'submission_id' => absint( $calibration['submission_id'] ),
+						'reviewer_id'   => $reviewer_id,
+						'reviewee_id'   => 0,
+						'actor_id'      => get_current_user_id(),
+						'meta'          => array(
+							'teacher_grade' => absint( $calibration['teacher_grade'] ?? 0 ),
+						),
+					)
+				);
 			}
 		}
 
@@ -195,6 +484,11 @@ class CLMS_Peer_Review {
 			wp_send_json_error( array( 'message' => __( 'Debes completar el entrenamiento de revisión antes de enviar evaluaciones entre pares.', 'atora-lms' ) ), 403 );
 		}
 
+		$is_calibration = '1' === (string) get_post_meta( $assignment_id, '_clms_pr_is_calibration', true );
+		if ( ! $is_calibration && self::is_calibration_required_for_lesson( $lesson_id ) && ! self::is_reviewer_calibrated_for_lesson( $reviewer_id, $lesson_id ) ) {
+			wp_send_json_error( array( 'message' => __( 'Debes completar la calibración antes de enviar revisiones entre pares.', 'atora-lms' ) ), 403 );
+		}
+
 		$raw_scores = isset( $_POST['scores'] ) && is_array( $_POST['scores'] ) ? wp_unslash( $_POST['scores'] ) : array();
 		$scores     = self::validate_scores_for_assignment( $assignment_id, $raw_scores );
 
@@ -211,6 +505,26 @@ class CLMS_Peer_Review {
 		wp_update_post( array( 'ID' => $assignment_id, 'post_status' => 'publish' ) );
 
 		$submission_id = absint( get_post_meta( $assignment_id, '_clms_pr_submission_id', true ) );
+
+		self::audit(
+			'review_submitted',
+			array(
+				'assignment_id' => $assignment_id,
+				'lesson_id'     => $lesson_id,
+				'submission_id' => $submission_id,
+				'reviewer_id'   => $reviewer_id,
+				'reviewee_id'   => absint( get_post_meta( $assignment_id, '_clms_pr_reviewee_id', true ) ),
+				'actor_id'      => $reviewer_id,
+				'meta'          => array(
+					'is_calibration' => $is_calibration ? 1 : 0,
+				),
+			)
+		);
+
+		if ( $is_calibration ) {
+			self::score_calibration_assignment( $assignment_id );
+		}
+
 		do_action( 'clms_peer_review_completed', $assignment_id, $submission_id );
 
 		wp_send_json_success( array( 'message' => __( 'Revisión enviada correctamente.', 'atora-lms' ) ) );
@@ -391,6 +705,9 @@ class CLMS_Peer_Review {
 		update_post_meta( $submission_id, '_clms_peer_grade_at',  gmdate( 'Y-m-d H:i:s' ) );
 		update_post_meta( $submission_id, '_clms_final_grade',    $final_grade );
 
+		// Consistency scoring: store deltas per reviewer assignment vs peer mean.
+		self::score_consistency_for_submission( $submission_id, $peer_grade, $lesson_id );
+
 		// Notify the reviewee.
 		$reviewee_id = absint( get_post_meta( $submission_id, '_clms_submission_user_id', true ) );
 		if ( $reviewee_id ) {
@@ -553,6 +870,17 @@ class CLMS_Peer_Review {
 			$completed = array_filter( $assignments, fn( $a ) => 'completed' === get_post_meta( $a->ID, '_clms_pr_status', true ) );
 
 			if ( ! empty( $pending ) ) {
+				usort(
+					$pending,
+					static function ( $a, $b ) {
+						$ac = '1' === (string) get_post_meta( $a->ID, '_clms_pr_is_calibration', true );
+						$bc = '1' === (string) get_post_meta( $b->ID, '_clms_pr_is_calibration', true );
+						if ( $ac !== $bc ) {
+							return $ac ? -1 : 1;
+						}
+						return $b->post_date_gmt <=> $a->post_date_gmt;
+					}
+				);
 				echo '<h3 class="clms-pr-inbox__section-title">' . sprintf( esc_html__( 'Pendientes (%d)', 'atora-lms' ), count( $pending ) ) . '</h3>';
 				echo '<div class="clms-pr-cards">';
 				foreach ( $pending as $a ) {
@@ -576,6 +904,237 @@ class CLMS_Peer_Review {
 		$this->render_inline_styles();
 
 		return ob_get_clean();
+	}
+
+	/* ----------------------------------------------------------------
+	 * ADMIN: REPORTES
+	 * -------------------------------------------------------------- */
+
+	public function register_admin_menu(): void {
+		add_submenu_page(
+			'clms-dashboard',
+			__( 'Coevaluación', 'atora-lms' ),
+			__( 'Coevaluación', 'atora-lms' ),
+			'edit_posts',
+			'clms-peer-review-reports',
+			array( $this, 'render_admin_reports_page' )
+		);
+	}
+
+	public function render_admin_reports_page(): void {
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			wp_die( esc_html__( 'No tienes permisos.', 'atora-lms' ) );
+		}
+
+		$lesson_id = isset( $_GET['lesson_id'] ) ? absint( wp_unslash( $_GET['lesson_id'] ) ) : 0;
+
+		echo '<div class="wrap"><h1>' . esc_html__( 'Coevaluación — Reporte', 'atora-lms' ) . '</h1>';
+		echo '<p class="description">' . esc_html__( 'MVP: calibración + consistencia (outliers) + auditoría básica.', 'atora-lms' ) . '</p>';
+
+		echo '<form method="get" style="margin:12px 0">';
+		echo '<input type="hidden" name="page" value="clms-peer-review-reports">';
+		echo '<label><strong>' . esc_html__( 'Lesson ID', 'atora-lms' ) . '</strong></label><br>';
+		echo '<input type="number" name="lesson_id" value="' . esc_attr( (string) $lesson_id ) . '" min="1" style="width:180px">';
+		echo '<button class="button button-primary" type="submit" style="margin-left:8px">' . esc_html__( 'Cargar', 'atora-lms' ) . '</button>';
+		echo '</form>';
+
+		if ( ! $lesson_id ) {
+			echo '<p class="description">' . esc_html__( 'Indica un lesson_id para ver el reporte.', 'atora-lms' ) . '</p>';
+			echo '</div>';
+			return;
+		}
+
+		$lesson = get_post( $lesson_id );
+		if ( ! $lesson ) {
+			echo '<div class="notice notice-error"><p>' . esc_html__( 'Lección no encontrada.', 'atora-lms' ) . '</p></div>';
+			echo '</div>';
+			return;
+		}
+
+		$calibration = self::get_calibration_settings_for_lesson( $lesson_id );
+		echo '<h2>' . esc_html( $lesson->post_title ) . ' <span class="description">#' . esc_html( (string) $lesson_id ) . '</span></h2>';
+
+		$peer_enabled = (bool) get_post_meta( $lesson_id, '_clms_peer_review_enabled', true );
+		$blind        = (bool) get_post_meta( $lesson_id, '_clms_peer_review_blind', true );
+
+		echo '<p class="description">';
+		echo esc_html__( 'Peer review:', 'atora-lms' ) . ' <strong>' . ( $peer_enabled ? esc_html__( 'sí', 'atora-lms' ) : esc_html__( 'no', 'atora-lms' ) ) . '</strong>';
+		echo ' — ' . esc_html__( 'Modo ciego:', 'atora-lms' ) . ' <strong>' . ( $blind ? esc_html__( 'sí', 'atora-lms' ) : esc_html__( 'no', 'atora-lms' ) ) . '</strong>';
+		echo ' — ' . esc_html__( 'Calibración:', 'atora-lms' ) . ' <strong>' . ( ! empty( $calibration['enabled'] ) ? esc_html__( 'sí', 'atora-lms' ) : esc_html__( 'no', 'atora-lms' ) ) . '</strong>';
+		if ( ! empty( $calibration['enabled'] ) ) {
+			echo ' <span class="description">';
+			echo esc_html__( '(ejemplar', 'atora-lms' ) . ' #' . esc_html( (string) absint( $calibration['submission_id'] ?? 0 ) ) . ', ';
+			echo esc_html__( 'pauta', 'atora-lms' ) . ': ' . esc_html( (string) absint( $calibration['teacher_grade'] ?? 0 ) ) . '/100)';
+			echo '</span>';
+		}
+		echo '</p>';
+
+		$assignments = get_posts(
+			array(
+				'post_type'      => 'clms_peer_review',
+				'post_status'    => array( 'publish', 'draft' ),
+				'posts_per_page' => -1,
+				'fields'         => 'ids',
+				'no_found_rows'  => true,
+				'meta_query'     => array(
+					array( 'key' => '_clms_pr_lesson_id', 'value' => $lesson_id, 'type' => 'NUMERIC' ),
+				),
+			)
+		);
+
+		if ( empty( $assignments ) ) {
+			echo '<div class="notice notice-info"><p>' . esc_html__( 'No hay asignaciones de peer review para esta lección.', 'atora-lms' ) . '</p></div>';
+			echo '</div>';
+			return;
+		}
+
+		$by_reviewer = array();
+		foreach ( $assignments as $assignment_id ) {
+			$assignment_id = absint( $assignment_id );
+			$reviewer_id   = absint( get_post_meta( $assignment_id, '_clms_pr_reviewer_id', true ) );
+			if ( ! $reviewer_id ) {
+				continue;
+			}
+
+			if ( empty( $by_reviewer[ $reviewer_id ] ) ) {
+				$by_reviewer[ $reviewer_id ] = array(
+					'reviewer_id'    => $reviewer_id,
+					'completed'      => 0,
+					'pending'        => 0,
+					'outliers'       => 0,
+					'avg_abs_delta'  => null,
+					'deltas'         => array(),
+					'cal_status'     => '',
+					'cal_delta'      => null,
+					'cal_score'      => null,
+				);
+			}
+
+			$status = sanitize_key( (string) get_post_meta( $assignment_id, '_clms_pr_status', true ) );
+			$is_cal = '1' === (string) get_post_meta( $assignment_id, '_clms_pr_is_calibration', true );
+
+			if ( 'completed' === $status ) {
+				$by_reviewer[ $reviewer_id ]['completed']++;
+			} else {
+				$by_reviewer[ $reviewer_id ]['pending']++;
+			}
+
+			if ( $is_cal ) {
+				$by_reviewer[ $reviewer_id ]['cal_status'] = sanitize_key( (string) get_post_meta( $assignment_id, '_clms_pr_calibration_status', true ) );
+				$by_reviewer[ $reviewer_id ]['cal_delta']  = get_post_meta( $assignment_id, '_clms_pr_calibration_delta', true );
+				$by_reviewer[ $reviewer_id ]['cal_score']  = get_post_meta( $assignment_id, '_clms_pr_calibration_score', true );
+				continue;
+			}
+
+			$flag = sanitize_key( (string) get_post_meta( $assignment_id, '_clms_pr_consistency_flag', true ) );
+			if ( 'outlier' === $flag ) {
+				$by_reviewer[ $reviewer_id ]['outliers']++;
+			}
+
+			$delta = get_post_meta( $assignment_id, '_clms_pr_consistency_delta', true );
+			if ( '' !== (string) $delta && is_numeric( $delta ) ) {
+				$by_reviewer[ $reviewer_id ]['deltas'][] = abs( (int) $delta );
+			}
+		}
+
+		foreach ( $by_reviewer as $rid => $row ) {
+			$deltas = $row['deltas'];
+			if ( ! empty( $deltas ) ) {
+				$by_reviewer[ $rid ]['avg_abs_delta'] = round( array_sum( $deltas ) / count( $deltas ), 1 );
+			}
+			unset( $by_reviewer[ $rid ]['deltas'] );
+		}
+
+		$rows = array_values( $by_reviewer );
+		usort(
+			$rows,
+			static function ( $a, $b ) {
+				return absint( $b['outliers'] ?? 0 ) <=> absint( $a['outliers'] ?? 0 );
+			}
+		);
+
+		echo '<h3>' . esc_html__( 'Resumen por revisor', 'atora-lms' ) . '</h3>';
+		echo '<table class="widefat striped" style="max-width: 1200px">';
+		echo '<thead><tr>';
+		echo '<th>' . esc_html__( 'Revisor', 'atora-lms' ) . '</th>';
+		echo '<th>' . esc_html__( 'Completadas', 'atora-lms' ) . '</th>';
+		echo '<th>' . esc_html__( 'Pendientes', 'atora-lms' ) . '</th>';
+		echo '<th>' . esc_html__( 'Outliers', 'atora-lms' ) . '</th>';
+		echo '<th>' . esc_html__( 'Δ promedio', 'atora-lms' ) . '</th>';
+		echo '<th>' . esc_html__( 'Calibración', 'atora-lms' ) . '</th>';
+		echo '</tr></thead><tbody>';
+
+		foreach ( $rows as $row ) {
+			$rid = absint( $row['reviewer_id'] ?? 0 );
+			$u   = $rid ? get_userdata( $rid ) : null;
+			$name = $u ? ( $u->display_name ? $u->display_name : $u->user_login ) : (string) $rid;
+
+			$cal_status = sanitize_key( (string) ( $row['cal_status'] ?? '' ) );
+			$cal_delta  = isset( $row['cal_delta'] ) && is_numeric( $row['cal_delta'] ) ? (int) $row['cal_delta'] : null;
+			$cal_score  = isset( $row['cal_score'] ) && is_numeric( $row['cal_score'] ) ? absint( $row['cal_score'] ) : null;
+
+			$cal_label = $cal_status ? $cal_status : '—';
+			if ( null !== $cal_delta ) {
+				$cal_label .= ' (Δ ' . ( $cal_delta > 0 ? '+' : '' ) . (string) $cal_delta . ')';
+			}
+			if ( null !== $cal_score ) {
+				$cal_label .= ' — ' . (string) $cal_score . '/100';
+			}
+
+			echo '<tr>';
+			echo '<td><strong>' . esc_html( $name ) . '</strong><br><span class="description">#' . esc_html( (string) $rid ) . '</span></td>';
+			echo '<td>' . esc_html( (string) absint( $row['completed'] ?? 0 ) ) . '</td>';
+			echo '<td>' . esc_html( (string) absint( $row['pending'] ?? 0 ) ) . '</td>';
+			echo '<td>' . esc_html( (string) absint( $row['outliers'] ?? 0 ) ) . '</td>';
+			echo '<td>' . esc_html( null !== ( $row['avg_abs_delta'] ?? null ) ? (string) $row['avg_abs_delta'] : '—' ) . '</td>';
+			echo '<td>' . esc_html( $cal_label ) . '</td>';
+			echo '</tr>';
+		}
+
+		echo '</tbody></table>';
+		echo '</div>';
+	}
+
+	/* ----------------------------------------------------------------
+	 * AUDIT LOG
+	 * -------------------------------------------------------------- */
+
+	public static function audit( string $event_type, array $payload ): void {
+		global $wpdb;
+
+		$event_type = sanitize_key( $event_type );
+		if ( '' === $event_type ) {
+			return;
+		}
+
+		$table = $wpdb->prefix . 'clms_peer_review_audit_log';
+		$exists = $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $table ) );
+		if ( ! $exists ) {
+			return;
+		}
+
+		$lesson_id     = absint( $payload['lesson_id'] ?? 0 );
+		$submission_id = absint( $payload['submission_id'] ?? 0 );
+		$assignment_id = absint( $payload['assignment_id'] ?? 0 );
+		$reviewer_id   = absint( $payload['reviewer_id'] ?? 0 );
+		$reviewee_id   = absint( $payload['reviewee_id'] ?? 0 );
+		$actor_id      = absint( $payload['actor_id'] ?? 0 );
+		$meta          = isset( $payload['meta'] ) && is_array( $payload['meta'] ) ? $payload['meta'] : array();
+
+		$wpdb->insert(
+			$table,
+			array(
+				'event_type'    => $event_type,
+				'lesson_id'     => $lesson_id,
+				'submission_id' => $submission_id,
+				'assignment_id' => $assignment_id,
+				'reviewer_id'   => $reviewer_id,
+				'reviewee_id'   => $reviewee_id,
+				'actor_id'      => $actor_id,
+				'meta_json'     => $meta ? wp_json_encode( $meta ) : null,
+				'created_at'    => current_time( 'mysql' ),
+			)
+		);
 	}
 
 	/**
@@ -930,6 +1489,7 @@ class CLMS_Peer_Review {
 		$lesson_id     = absint( get_post_meta( $assignment->ID, '_clms_pr_lesson_id',     true ) );
 		$submission_id = absint( get_post_meta( $assignment->ID, '_clms_pr_submission_id', true ) );
 		$rubric_id     = absint( get_post_meta( $lesson_id, '_clms_rubric_id', true ) );
+		$is_calibration = '1' === (string) get_post_meta( $assignment->ID, '_clms_pr_is_calibration', true );
 		$lesson        = get_post( $lesson_id );
 		$submission    = get_post( $submission_id );
 		$lesson_title  = $lesson ? esc_html( $lesson->post_title ) : sprintf(
@@ -946,12 +1506,15 @@ class CLMS_Peer_Review {
 		<div class="clms-pr-card <?php echo esc_attr( $status_class ); ?>" id="clms-pr-card-<?php echo esc_attr( $assignment->ID ); ?>">
 			<div class="clms-pr-card__header">
 				<span class="clms-pr-card__lesson"><?php echo $lesson_title; ?></span>
+				<?php if ( $is_calibration ) : ?>
+					<span class="clms-pr-card__badge" style="background:#eff6ff;color:#1e3a8a;border:1px solid #bfdbfe"><?php esc_html_e( 'Calibración', 'atora-lms' ); ?></span>
+				<?php endif; ?>
 				<span class="clms-pr-card__badge <?php echo esc_attr( $status_class ); ?>"><?php echo esc_html( $status_label ); ?></span>
 			</div>
 
 			<?php if ( $sub_content ) : ?>
 			<div class="clms-pr-card__submission">
-				<strong><?php esc_html_e( 'Entrega del estudiante:', 'atora-lms' ); ?></strong>
+				<strong><?php echo esc_html( $is_calibration ? __( 'Ejemplar de calibración:', 'atora-lms' ) : __( 'Entrega del estudiante:', 'atora-lms' ) ); ?></strong>
 				<div class="clms-pr-card__submission-body"><?php echo $sub_content; ?></div>
 			</div>
 			<?php endif; ?>

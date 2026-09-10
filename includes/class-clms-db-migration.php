@@ -55,6 +55,7 @@ class CLMS_DB_Migration {
 		$this->create_groups_tables();
 		$this->create_early_warning_table();
 		$this->create_student_analytics_table();
+		$this->create_peer_review_audit_log_table();
 
 		update_option( self::SCHEMA_VERSION_KEY, $this->get_schema_version() );
 
@@ -319,6 +320,40 @@ class CLMS_DB_Migration {
 			KEY risk_score (risk_score),
 			KEY risk_trend (risk_trend),
 			KEY updated_at (updated_at)
+		) {$charset};";
+
+		dbDelta( $sql );
+	}
+
+	/**
+	 * Auditoría de coevaluación (peer review).
+	 *
+	 * @return void
+	 */
+	private function create_peer_review_audit_log_table(): void {
+		global $wpdb;
+
+		$table   = $wpdb->prefix . 'clms_peer_review_audit_log';
+		$charset = $wpdb->get_charset_collate();
+
+		$sql = "CREATE TABLE {$table} (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			event_type varchar(40) NOT NULL,
+			lesson_id bigint(20) unsigned NOT NULL DEFAULT 0,
+			submission_id bigint(20) unsigned NOT NULL DEFAULT 0,
+			assignment_id bigint(20) unsigned NOT NULL DEFAULT 0,
+			reviewer_id bigint(20) unsigned NOT NULL DEFAULT 0,
+			reviewee_id bigint(20) unsigned NOT NULL DEFAULT 0,
+			actor_id bigint(20) unsigned NOT NULL DEFAULT 0,
+			meta_json longtext,
+			created_at datetime NOT NULL,
+			PRIMARY KEY (id),
+			KEY event_type (event_type),
+			KEY lesson_id (lesson_id),
+			KEY submission_id (submission_id),
+			KEY reviewer_id (reviewer_id),
+			KEY reviewee_id (reviewee_id),
+			KEY created_at (created_at)
 		) {$charset};";
 
 		dbDelta( $sql );

@@ -139,6 +139,10 @@ trait CLMS_REST_Academics_Helpers_Trait {
 			'evaluation_mode'    => (string) get_post_meta( $post->ID, '_clms_evaluation_mode', true ),
 			'rubric_id'          => absint( get_post_meta( $post->ID, '_clms_rubric_id', true ) ),
 			'peer_review_enabled' => $this->sanitize_bool( get_post_meta( $post->ID, '_clms_peer_review_enabled', true ) ),
+			'peer_review_blind'   => $this->sanitize_bool( get_post_meta( $post->ID, '_clms_peer_review_blind', true ) ),
+			'peer_review_calibration_enabled' => $this->sanitize_bool( get_post_meta( $post->ID, '_clms_pr_calibration_enabled', true ) ),
+			'peer_review_calibration_submission_id' => absint( get_post_meta( $post->ID, '_clms_pr_calibration_submission_id', true ) ),
+			'peer_review_calibration_teacher_grade' => absint( get_post_meta( $post->ID, '_clms_pr_calibration_teacher_grade', true ) ),
 			'ai_confidence_threshold' => (float) get_post_meta( $post->ID, '_clms_ai_confidence_threshold', true ),
 			'ai_confidence_threshold_resolved' => isset( $assessment_settings['ai_confidence_threshold'] ) ? (float) $assessment_settings['ai_confidence_threshold'] : (float) get_post_meta( $post->ID, '_clms_ai_confidence_threshold', true ),
 			'ai_confidence_thresholds' => is_array( get_post_meta( $post->ID, '_clms_ai_confidence_thresholds', true ) ) ? get_post_meta( $post->ID, '_clms_ai_confidence_thresholds', true ) : array(),
@@ -372,6 +376,18 @@ trait CLMS_REST_Academics_Helpers_Trait {
 		if ( array_key_exists( 'peer_review_enabled', $data ) ) {
 			update_post_meta( $post_id, '_clms_peer_review_enabled', $this->sanitize_bool( $data['peer_review_enabled'] ) ? '1' : '0' );
 		}
+		if ( array_key_exists( 'peer_review_blind', $data ) ) {
+			update_post_meta( $post_id, '_clms_peer_review_blind', $this->sanitize_bool( $data['peer_review_blind'] ) ? '1' : '0' );
+		}
+		if ( array_key_exists( 'peer_review_calibration_enabled', $data ) ) {
+			update_post_meta( $post_id, '_clms_pr_calibration_enabled', $this->sanitize_bool( $data['peer_review_calibration_enabled'] ) ? '1' : '0' );
+		}
+		if ( array_key_exists( 'peer_review_calibration_submission_id', $data ) ) {
+			update_post_meta( $post_id, '_clms_pr_calibration_submission_id', absint( $data['peer_review_calibration_submission_id'] ) );
+		}
+		if ( array_key_exists( 'peer_review_calibration_teacher_grade', $data ) ) {
+			update_post_meta( $post_id, '_clms_pr_calibration_teacher_grade', max( 0, min( 100, absint( $data['peer_review_calibration_teacher_grade'] ) ) ) );
+		}
 
 		if ( array_key_exists( 'ai_confidence_threshold', $data ) ) {
 			$threshold = max( 0.5, min( 0.99, (float) $data['ai_confidence_threshold'] ) );
@@ -421,6 +437,18 @@ trait CLMS_REST_Academics_Helpers_Trait {
 
 		if ( array_key_exists( 'peer_review_enabled', $data ) ) {
 			$normalized['peer_review_enabled'] = $this->sanitize_bool( $data['peer_review_enabled'] );
+		}
+		if ( array_key_exists( 'peer_review_blind', $data ) ) {
+			$normalized['peer_review_blind'] = $this->sanitize_bool( $data['peer_review_blind'] );
+		}
+		if ( array_key_exists( 'peer_review_calibration_enabled', $data ) ) {
+			$normalized['peer_review_calibration_enabled'] = $this->sanitize_bool( $data['peer_review_calibration_enabled'] );
+		}
+		if ( array_key_exists( 'peer_review_calibration_submission_id', $data ) ) {
+			$normalized['peer_review_calibration_submission_id'] = absint( $data['peer_review_calibration_submission_id'] );
+		}
+		if ( array_key_exists( 'peer_review_calibration_teacher_grade', $data ) ) {
+			$normalized['peer_review_calibration_teacher_grade'] = max( 0, min( 100, absint( $data['peer_review_calibration_teacher_grade'] ) ) );
 		}
 
 		if ( array_key_exists( 'activity_mode', $data ) ) {

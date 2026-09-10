@@ -729,6 +729,10 @@ trait CLMS_Metabox_Lesson_Render_Trait {
 		$quiz_enabled           = $quiz_enabled_bool ? '1' : '0';
 		$peer_review_enabled    = $this->get_meta( $post->ID, array( '_clms_peer_review_enabled' ), '0' );
 		$peer_reviews_per_student = absint( $this->get_meta( $post->ID, array( '_clms_peer_reviews_per_student' ), '2' ) );
+		$peer_review_blind      = $this->get_meta( $post->ID, array( '_clms_peer_review_blind' ), '0' );
+		$peer_review_calibration_enabled = $this->get_meta( $post->ID, array( '_clms_pr_calibration_enabled' ), '0' );
+		$peer_review_calibration_submission_id = absint( $this->get_meta( $post->ID, array( '_clms_pr_calibration_submission_id' ), '0' ) );
+		$peer_review_calibration_teacher_grade = $this->get_meta( $post->ID, array( '_clms_pr_calibration_teacher_grade' ), '' );
 		$assessment_mode        = $this->get_meta( $post->ID, array( '_clms_evaluation_mode' ), ( '1' === $peer_review_enabled ? 'peer_review' : 'manual' ) );
 		$ai_confidence_threshold = $this->get_meta( $post->ID, array( '_clms_ai_confidence_threshold' ), '0.75' );
 		$ai_confidence_thresholds = get_post_meta( $post->ID, '_clms_ai_confidence_thresholds', true );
@@ -867,6 +871,32 @@ trait CLMS_Metabox_Lesson_Render_Trait {
 					min="1" max="5" step="1"
 					value="<?php echo esc_attr( $peer_reviews_per_student ); ?>">
 				<span class="clms-help"><?php esc_html_e( 'Cantidad de revisores asignados por estudiante en esta lección.', 'atora-lms' ); ?></span>
+			</p>
+			<p class="clms-f clms-eval-peer-only">
+				<label for="_clms_peer_review_blind"><?php esc_html_e( 'Modo ciego (anónimo)', 'atora-lms' ); ?></label>
+				<select name="_clms_peer_review_blind" id="_clms_peer_review_blind">
+					<option value="0" <?php selected( $peer_review_blind, '0' ); ?>><?php esc_html_e( 'No', 'atora-lms' ); ?></option>
+					<option value="1" <?php selected( $peer_review_blind, '1' ); ?>><?php esc_html_e( 'Sí', 'atora-lms' ); ?></option>
+				</select>
+				<span class="clms-help"><?php esc_html_e( 'Oculta la identidad del autor al revisor y del revisor al autor. El docente siempre puede auditar el mapa.', 'atora-lms' ); ?></span>
+			</p>
+			<p class="clms-f clms-eval-peer-only">
+				<label for="_clms_pr_calibration_enabled"><?php esc_html_e( 'Calibración (entrenamiento con ejemplar)', 'atora-lms' ); ?></label>
+				<select name="_clms_pr_calibration_enabled" id="_clms_pr_calibration_enabled">
+					<option value="0" <?php selected( $peer_review_calibration_enabled, '0' ); ?>><?php esc_html_e( 'No', 'atora-lms' ); ?></option>
+					<option value="1" <?php selected( $peer_review_calibration_enabled, '1' ); ?>><?php esc_html_e( 'Sí', 'atora-lms' ); ?></option>
+				</select>
+				<span class="clms-help"><?php esc_html_e( 'Antes de revisar a pares, el estudiante revisa un ejemplar y se compara contra la pauta del docente.', 'atora-lms' ); ?></span>
+			</p>
+			<p class="clms-f clms-eval-peer-only">
+				<label for="_clms_pr_calibration_submission_id"><?php esc_html_e( 'Submission ID del ejemplar', 'atora-lms' ); ?></label>
+				<input type="number" name="_clms_pr_calibration_submission_id" id="_clms_pr_calibration_submission_id" min="0" step="1" value="<?php echo esc_attr( (string) $peer_review_calibration_submission_id ); ?>">
+				<span class="clms-help"><?php esc_html_e( 'ID de una entrega (clms_submission) que se usará como ejemplar. Si está vacío, no se asigna calibración.', 'atora-lms' ); ?></span>
+			</p>
+			<p class="clms-f clms-eval-peer-only">
+				<label for="_clms_pr_calibration_teacher_grade"><?php esc_html_e( 'Nota pauta del docente (0–100)', 'atora-lms' ); ?></label>
+				<input type="number" name="_clms_pr_calibration_teacher_grade" id="_clms_pr_calibration_teacher_grade" min="0" max="100" step="1" value="<?php echo esc_attr( (string) $peer_review_calibration_teacher_grade ); ?>">
+				<span class="clms-help"><?php esc_html_e( 'Se usa para calcular la desviación (delta) del estudiante en la calibración.', 'atora-lms' ); ?></span>
 			</p>
 			<p class="clms-f full clms-eval-quiz-inactive-note<?php echo ( 'quiz' === $activity_type && $quiz_enabled_bool ) ? ' clms-is-hidden' : ''; ?>">
 				<span class="clms-help clms-help-highlight"><?php esc_html_e( 'Para configurar la experiencia del quiz, usa tipo de actividad "Evaluación" y habilita el quiz.', 'atora-lms' ); ?></span>

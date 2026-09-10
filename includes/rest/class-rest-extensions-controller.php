@@ -499,6 +499,11 @@ class CLMS_REST_Extensions_Controller {
 			return new WP_Error( 'training_required', __( 'Debes completar el entrenamiento de revisión antes de enviar evaluaciones entre pares.', 'atora-lms' ), array( 'status' => 403 ) );
 		}
 
+		$is_calibration = '1' === (string) get_post_meta( $assignment_id, '_clms_pr_is_calibration', true );
+		if ( ! $is_calibration && class_exists( 'CLMS_Peer_Review' ) && CLMS_Peer_Review::is_calibration_required_for_lesson( $lesson_id ) && ! CLMS_Peer_Review::is_reviewer_calibrated_for_lesson( $reviewer_id, $lesson_id ) ) {
+			return new WP_Error( 'calibration_required', __( 'Debes completar la calibración antes de enviar revisiones entre pares.', 'atora-lms' ), array( 'status' => 403 ) );
+		}
+
 		$data    = $this->get_json_or_body_params( $request );
 		$scores  = CLMS_Peer_Review::validate_scores_for_assignment(
 			$assignment_id,
@@ -518,6 +523,27 @@ class CLMS_REST_Extensions_Controller {
 		wp_update_post( array( 'ID' => $assignment_id, 'post_status' => 'publish' ) );
 
 		$submission_id = absint( get_post_meta( $assignment_id, '_clms_pr_submission_id', true ) );
+
+		if ( class_exists( 'CLMS_Peer_Review' ) ) {
+			CLMS_Peer_Review::audit(
+				'review_submitted',
+				array(
+					'assignment_id' => $assignment_id,
+					'lesson_id'     => $lesson_id,
+					'submission_id' => $submission_id,
+					'reviewer_id'   => $reviewer_id,
+					'reviewee_id'   => absint( get_post_meta( $assignment_id, '_clms_pr_reviewee_id', true ) ),
+					'actor_id'      => $reviewer_id,
+					'meta'          => array(
+						'is_calibration' => $is_calibration ? 1 : 0,
+					),
+				)
+			);
+			if ( $is_calibration ) {
+				CLMS_Peer_Review::score_calibration_assignment( $assignment_id );
+			}
+		}
+
 		do_action( 'clms_peer_review_completed', $assignment_id, $submission_id );
 
 		return rest_ensure_response( array( 'assignment_id' => $assignment_id, 'status' => 'completed' ) );
@@ -558,6 +584,7 @@ class CLMS_REST_Extensions_Controller {
 			'lesson_id'     => $lesson_id,
 			'submission_id' => $submission_id,
 			'reviewer_id'   => $reviewer_id,
+			'is_calibration'=> '1' === (string) get_post_meta( $post->ID, '_clms_pr_is_calibration', true ),
 			'status'        => get_post_meta( $post->ID, '_clms_pr_status', true ) ?: 'pending',
 			'scores'        => (array) get_post_meta( $post->ID, '_clms_pr_scores', true ),
 			'comment'       => get_post_meta( $post->ID, '_clms_pr_comment', true ) ?: '',
