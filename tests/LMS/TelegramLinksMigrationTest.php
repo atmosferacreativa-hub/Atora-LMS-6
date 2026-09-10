@@ -203,7 +203,7 @@ class TelegramLinksMigrationTest extends TestCase {
 	}
 
 	/** @test */
-	public function test_returns_false_if_table_does_not_exist(): void {
+	public function test_skips_cleanly_if_optional_messaging_table_does_not_exist(): void {
 		global $wpdb;
 		$original = $wpdb;
 
@@ -223,7 +223,7 @@ class TelegramLinksMigrationTest extends TestCase {
 		};
 
 		$ok = $this->invoke_migration();
-		$this->assertFalse( $ok );
+		$this->assertTrue( $ok, 'una tabla opcional ausente no debe bloquear la instalación del resto de módulos' );
 
 		$wpdb = $original;
 	}
