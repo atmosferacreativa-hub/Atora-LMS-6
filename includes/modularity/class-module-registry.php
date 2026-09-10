@@ -254,7 +254,7 @@ class CLMS_Module_Registry {
 				'provides_pages'      => array( 'atora-portfolios' ),
 				'provides_shortcodes' => array( 'atora_portfolio', 'atora_portfolio_public' ),
 				'provides_rest'       => array( '/portfolios' ),
-				'tables'              => array( 'atora_portfolios', 'atora_portfolio_items', 'atora_portfolio_feedback' ),
+				'tables'              => array( 'atora_portfolios', 'atora_portfolio_assessments', 'atora_portfolio_items', 'atora_portfolio_feedback' ),
 				'core'                => true,
 			),
 			'security'       => array(

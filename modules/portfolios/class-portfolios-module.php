@@ -33,6 +33,7 @@ final class Portfolios_Module {
 		add_action( 'admin_post_atora_portfolio_delete_item', array( __CLASS__, 'handle_delete_item' ) );
 		add_action( 'admin_post_atora_portfolio_reorder', array( __CLASS__, 'handle_reorder' ) );
 		add_action( 'admin_post_atora_portfolio_add_feedback', array( __CLASS__, 'handle_add_feedback' ) );
+		add_action( 'admin_post_atora_portfolio_assess', array( __CLASS__, 'handle_assess' ) );
 	}
 
 	private static function service(): Portfolios_Service {
@@ -222,6 +223,139 @@ final class Portfolios_Module {
 			echo '</tr>';
 		}
 		echo '</tbody></table>';
+
+		echo '<h3 style="margin-top:18px">' . esc_html__( 'Evaluación con rúbrica', 'atora-lms' ) . '</h3>';
+		self::render_admin_assessment_box( $portfolio, $service );
+	}
+
+	private static function render_admin_assessment_box( array $portfolio, Portfolios_Service $service ): void {
+		$portfolio_id = absint( $portfolio['id'] ?? 0 );
+		$course_id    = absint( $portfolio['course_id'] ?? 0 );
+		if ( ! $portfolio_id || ! $course_id ) {
+			return;
+		}
+
+		$viewer = get_current_user_id();
+		if ( ! $service->viewer_can_access_course( $viewer, $course_id ) ) {
+			return;
+		}
+
+		$rubric_id = isset( $_GET['rubric_id'] ) ? absint( wp_unslash( $_GET['rubric_id'] ) ) : 0;
+		$final = $service->get_final_assessment( $portfolio_id );
+		$final_rubric = absint( $final['rubric_id'] ?? 0 );
+		if ( ! $rubric_id && $final_rubric ) {
+			$rubric_id = $final_rubric;
+		}
+
+		$can_see_all = current_user_can( 'edit_others_lm_courses' ) || current_user_can( 'manage_options' );
+		$rubric_args = array(
+			'post_type'      => 'clms_rubric',
+			'post_status'    => 'publish',
+			'posts_per_page' => 200,
+			'orderby'        => 'date',
+			'order'          => 'DESC',
+			'no_found_rows'  => true,
+		);
+		if ( ! $can_see_all ) {
+			$rubric_args['author'] = $viewer;
+		}
+		$rubrics = get_posts( $rubric_args );
+
+		echo '<div style="padding: 14px; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; max-width: 1050px;">';
+
+		if ( ! empty( $final ) ) {
+			$title = $final_rubric ? (string) get_the_title( $final_rubric ) : '';
+			echo '<p style="margin:0 0 10px 0;">';
+			echo '<strong>' . esc_html__( 'Evaluación final:', 'atora-lms' ) . '</strong> ';
+			echo esc_html( (string) absint( $final['total_percent'] ?? 0 ) ) . '/100';
+			if ( $title ) {
+				echo ' <span class="description">(' . esc_html( $title ) . ')</span>';
+			}
+			if ( ! empty( $final['assessed_by_name'] ) ) {
+				echo ' <span class="description">— ' . esc_html( (string) $final['assessed_by_name'] ) . '</span>';
+			}
+			if ( ! empty( $final['created_at'] ) ) {
+				echo ' <span class="description">— ' . esc_html( (string) $final['created_at'] ) . '</span>';
+			}
+			echo '</p>';
+			if ( ! empty( $final['comment'] ) ) {
+				echo '<blockquote style="margin:0 0 10px 0;padding:10px 12px;background:#f9fafb;border-left:4px solid #e5e7eb;">' . esc_html( (string) $final['comment'] ) . '</blockquote>';
+			}
+		} else {
+			echo '<p class="description" style="margin:0 0 10px 0;">' . esc_html__( 'Aún no hay evaluación final.', 'atora-lms' ) . '</p>';
+		}
+
+		$base_url = add_query_arg(
+			array(
+				'page'         => 'atora-portfolios',
+				'course_id'    => $course_id,
+				'portfolio_id' => $portfolio_id,
+			),
+			admin_url( 'admin.php' )
+		);
+
+		echo '<form method="get" action="' . esc_url( admin_url( 'admin.php' ) ) . '" style="margin:0 0 12px 0;">';
+		echo '<input type="hidden" name="page" value="atora-portfolios">';
+		echo '<input type="hidden" name="course_id" value="' . esc_attr( (string) $course_id ) . '">';
+		echo '<input type="hidden" name="portfolio_id" value="' . esc_attr( (string) $portfolio_id ) . '">';
+		echo '<label><strong>' . esc_html__( 'Rúbrica', 'atora-lms' ) . '</strong></label><br>';
+		echo '<select name="rubric_id" style="min-width: 360px; max-width: 100%;">';
+		echo '<option value="0">' . esc_html__( 'Selecciona…', 'atora-lms' ) . '</option>';
+		foreach ( (array) $rubrics as $r ) {
+			if ( ! $r instanceof \WP_Post ) {
+				continue;
+			}
+			echo '<option value="' . esc_attr( (string) absint( $r->ID ) ) . '" ' . selected( $rubric_id, absint( $r->ID ), false ) . '>' . esc_html( (string) $r->post_title ) . '</option>';
+		}
+		echo '</select>';
+		echo '<button type="submit" class="button" style="margin-left:8px">' . esc_html__( 'Cargar rúbrica', 'atora-lms' ) . '</button>';
+		echo '</form>';
+
+		if ( $rubric_id && class_exists( '\CLMS_Rubric' ) ) {
+			$criteria = (array) \CLMS_Rubric::get_criteria( $rubric_id );
+			$max      = absint( \CLMS_Rubric::get_total_points( $rubric_id ) );
+			if ( $max <= 0 ) {
+				$max = 100;
+			}
+			$saved_scores = isset( $final['scores'] ) && is_array( $final['scores'] ) ? (array) $final['scores'] : array();
+
+			echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
+			echo '<input type="hidden" name="action" value="atora_portfolio_assess">';
+			echo '<input type="hidden" name="portfolio_id" value="' . esc_attr( (string) $portfolio_id ) . '">';
+			echo '<input type="hidden" name="course_id" value="' . esc_attr( (string) $course_id ) . '">';
+			echo '<input type="hidden" name="rubric_id" value="' . esc_attr( (string) $rubric_id ) . '">';
+			wp_nonce_field( 'atora_portfolio_assess_' . $portfolio_id );
+			echo '<p class="description" style="margin:0 0 10px 0;">' . esc_html( sprintf( __( 'Califica por criterio (máx. %d pts. total). Guardar sobrescribe la evaluación final.', 'atora-lms' ), $max ) ) . '</p>';
+
+			foreach ( $criteria as $i => $c ) {
+				$name = isset( $c['name'] ) ? sanitize_text_field( (string) $c['name'] ) : '';
+				$desc = isset( $c['description'] ) ? sanitize_textarea_field( (string) $c['description'] ) : '';
+				$maxp = isset( $c['max_points'] ) ? absint( $c['max_points'] ) : 0;
+				$key  = (string) $i;
+				$val  = isset( $saved_scores[ $key ] ) && is_numeric( $saved_scores[ $key ] ) ? (int) $saved_scores[ $key ] : 0;
+
+				echo '<div style="margin: 0 0 12px 0; padding: 12px; border: 1px solid #f3f4f6; border-radius: 10px;">';
+				echo '<p style="margin:0 0 6px 0;"><strong>' . esc_html( $name ? $name : ( __( 'Criterio', 'atora-lms' ) . ' ' . ( $i + 1 ) ) ) . '</strong> <span class="description">(' . esc_html( (string) $maxp ) . ' pts)</span></p>';
+				if ( $desc ) {
+					echo '<p class="description" style="margin:0 0 8px 0;">' . esc_html( $desc ) . '</p>';
+				}
+				echo '<input type="number" name="scores[' . esc_attr( $key ) . ']" min="0" max="' . esc_attr( (string) $maxp ) . '" step="1" value="' . esc_attr( (string) $val ) . '" style="width: 120px;">';
+				echo '</div>';
+			}
+
+			echo '<p style="margin:0 0 10px 0;">';
+			echo '<label><strong>' . esc_html__( 'Comentario (opcional)', 'atora-lms' ) . '</strong></label><br>';
+			echo '<textarea name="comment" rows="3" style="width:100%; max-width: 760px;">' . esc_textarea( (string) ( $final['comment'] ?? '' ) ) . '</textarea>';
+			echo '</p>';
+
+			echo '<p style="margin:0;">';
+			echo '<button type="submit" class="button button-primary" onclick="return confirm(\'' . esc_js( __( '¿Guardar como evaluación final?', 'atora-lms' ) ) . '\')">' . esc_html__( 'Guardar evaluación final', 'atora-lms' ) . '</button> ';
+			echo '<a class="button" href="' . esc_url( $base_url ) . '">' . esc_html__( 'Recargar', 'atora-lms' ) . '</a>';
+			echo '</p>';
+			echo '</form>';
+		}
+
+		echo '</div>';
 	}
 
 	// ── Shortcodes ──────────────────────────────────────────────────────────
@@ -284,6 +418,29 @@ final class Portfolios_Module {
 				</select>
 				<button type="submit" class="atora-btn atora-btn-secondary" style="margin-left: 8px;"><?php esc_html_e( 'Cargar', 'atora-lms' ); ?></button>
 			</form>
+
+			<?php
+			$assessment = $portfolio_id ? $service->get_final_assessment( $portfolio_id ) : array();
+			?>
+			<?php if ( ! empty( $assessment ) ) : ?>
+				<div style="padding: 14px; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; margin-bottom: 18px;">
+					<h3 style="margin:0 0 10px 0;"><?php esc_html_e( 'Evaluación', 'atora-lms' ); ?></h3>
+					<p style="margin:0 0 8px 0;">
+						<strong><?php esc_html_e( 'Nota final:', 'atora-lms' ); ?></strong>
+						<?php echo esc_html( (string) absint( $assessment['total_percent'] ?? 0 ) ); ?>/100
+						<?php
+						$ar = absint( $assessment['rubric_id'] ?? 0 );
+						$title = $ar ? (string) get_the_title( $ar ) : '';
+						if ( $title ) :
+							?>
+							<span class="description">(<?php echo esc_html( $title ); ?>)</span>
+						<?php endif; ?>
+					</p>
+					<?php if ( ! empty( $assessment['comment'] ) ) : ?>
+						<blockquote style="margin:0;padding:10px 12px;background:#f9fafb;border-left:4px solid #e5e7eb;"><?php echo esc_html( (string) $assessment['comment'] ); ?></blockquote>
+					<?php endif; ?>
+				</div>
+			<?php endif; ?>
 
 			<div style="padding: 14px; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; margin-bottom: 18px;">
 				<h3 style="margin:0 0 10px 0;"><?php esc_html_e( 'Configuración', 'atora-lms' ); ?></h3>
@@ -725,6 +882,36 @@ final class Portfolios_Module {
 		exit;
 	}
 
+	public static function handle_assess(): void {
+		if ( ! is_user_logged_in() ) {
+			wp_die( esc_html__( 'Debes iniciar sesión.', 'atora-lms' ) );
+		}
+
+		$portfolio_id = isset( $_POST['portfolio_id'] ) ? absint( wp_unslash( $_POST['portfolio_id'] ) ) : 0;
+		check_admin_referer( 'atora_portfolio_assess_' . $portfolio_id );
+
+		$service = self::service();
+		$portfolio = $service->get_portfolio( $portfolio_id );
+		if ( empty( $portfolio ) ) {
+			wp_die( esc_html__( 'Portafolio no encontrado.', 'atora-lms' ) );
+		}
+
+		$viewer   = get_current_user_id();
+		$course_id = absint( $portfolio['course_id'] ?? 0 );
+		if ( ! $service->viewer_can_access_course( $viewer, $course_id ) ) {
+			wp_die( esc_html__( 'No tienes permisos.', 'atora-lms' ) );
+		}
+
+		$rubric_id = isset( $_POST['rubric_id'] ) ? absint( wp_unslash( $_POST['rubric_id'] ) ) : 0;
+		$scores    = isset( $_POST['scores'] ) && is_array( $_POST['scores'] ) ? (array) wp_unslash( $_POST['scores'] ) : array();
+		$comment   = isset( $_POST['comment'] ) ? (string) wp_unslash( $_POST['comment'] ) : '';
+
+		$service->save_final_assessment( $portfolio_id, $rubric_id, $scores, $comment, $viewer );
+
+		wp_safe_redirect( wp_get_referer() ? wp_get_referer() : admin_url( 'admin.php?page=atora-portfolios&course_id=' . $course_id . '&portfolio_id=' . $portfolio_id ) );
+		exit;
+	}
+
 	// ── REST ────────────────────────────────────────────────────────────────
 
 	public static function register_rest_routes(): void {
@@ -791,6 +978,18 @@ final class Portfolios_Module {
 				array(
 					'methods'             => WP_REST_Server::CREATABLE,
 					'callback'            => array( __CLASS__, 'rest_add_feedback' ),
+					'permission_callback' => array( __CLASS__, 'rest_can_comment_portfolio' ),
+				),
+			)
+		);
+
+		register_rest_route(
+			'atora/v1',
+			'/portfolios/(?P<id>\\d+)/assessment',
+			array(
+				array(
+					'methods'             => WP_REST_Server::CREATABLE,
+					'callback'            => array( __CLASS__, 'rest_save_assessment' ),
 					'permission_callback' => array( __CLASS__, 'rest_can_comment_portfolio' ),
 				),
 			)
@@ -974,6 +1173,39 @@ final class Portfolios_Module {
 		);
 
 		return rest_ensure_response( array( 'feedback' => $feedback ) );
+	}
+
+	public static function rest_save_assessment( WP_REST_Request $r ) {
+		$service = self::service();
+		$portfolio = $service->get_portfolio( absint( $r['id'] ) );
+		if ( empty( $portfolio ) ) {
+			return new \WP_Error( 'not_found', __( 'Portafolio no encontrado.', 'atora-lms' ), array( 'status' => 404 ) );
+		}
+
+		if ( ! current_user_can( 'manage_options' ) && ! current_user_can( 'clms_grade_submissions' ) ) {
+			return new \WP_Error( 'forbidden', __( 'No tienes permisos para evaluar.', 'atora-lms' ), array( 'status' => 403 ) );
+		}
+
+		$data = $r->get_json_params();
+		$data = is_array( $data ) ? $data : array();
+
+		$rubric_id = absint( $data['rubric_id'] ?? 0 );
+		$scores    = isset( $data['scores'] ) && is_array( $data['scores'] ) ? (array) $data['scores'] : array();
+		$comment   = isset( $data['comment'] ) ? (string) $data['comment'] : '';
+
+		$assessment = $service->save_final_assessment(
+			absint( $portfolio['id'] ),
+			$rubric_id,
+			$scores,
+			$comment,
+			get_current_user_id()
+		);
+
+		if ( empty( $assessment ) ) {
+			return new \WP_Error( 'save_failed', __( 'No se pudo guardar la evaluación.', 'atora-lms' ), array( 'status' => 400 ) );
+		}
+
+		return rest_ensure_response( array( 'assessment' => $assessment ) );
 	}
 
 	public static function rest_public_portfolio( WP_REST_Request $r ) {

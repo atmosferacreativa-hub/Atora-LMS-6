@@ -24,6 +24,11 @@ final class Portfolios_Service {
 		return $wpdb->prefix . 'atora_portfolio_items';
 	}
 
+	private function table_assessments(): string {
+		global $wpdb;
+		return $wpdb->prefix . 'atora_portfolio_assessments';
+	}
+
 	private function table_feedback(): string {
 		global $wpdb;
 		return $wpdb->prefix . 'atora_portfolio_feedback';
@@ -288,6 +293,135 @@ final class Portfolios_Service {
 		unset( $row );
 
 		return $rows;
+	}
+
+	public function get_final_assessment( int $portfolio_id ): array {
+		global $wpdb;
+
+		$portfolio_id = absint( $portfolio_id );
+		if ( ! $portfolio_id ) {
+			return array();
+		}
+
+		$table = $this->table_assessments();
+		$exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) );
+		if ( ! $exists ) {
+			return array();
+		}
+
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT id, portfolio_id, rubric_id, assessed_by, is_final, total_percent, scores_json, comment, created_at
+				 FROM {$this->table_assessments()}
+				 WHERE portfolio_id = %d AND is_final = 1
+				 ORDER BY id DESC
+				 LIMIT 1",
+				$portfolio_id
+			),
+			ARRAY_A
+		);
+
+		if ( ! is_array( $row ) ) {
+			return array();
+		}
+
+		$row['id']           = absint( $row['id'] ?? 0 );
+		$row['portfolio_id'] = absint( $row['portfolio_id'] ?? 0 );
+		$row['rubric_id']    = absint( $row['rubric_id'] ?? 0 );
+		$row['assessed_by']  = absint( $row['assessed_by'] ?? 0 );
+		$row['is_final']     = ! empty( $row['is_final'] );
+		$row['total_percent']= absint( $row['total_percent'] ?? 0 );
+		$row['scores']       = $row['scores_json'] ? json_decode( (string) $row['scores_json'], true ) : array();
+		$row['scores']       = is_array( $row['scores'] ) ? $row['scores'] : array();
+		unset( $row['scores_json'] );
+		$row['comment']      = sanitize_textarea_field( (string) ( $row['comment'] ?? '' ) );
+		$row['created_at']   = sanitize_text_field( (string) ( $row['created_at'] ?? '' ) );
+
+		$assessor = $row['assessed_by'] ? get_userdata( $row['assessed_by'] ) : null;
+		$row['assessed_by_name'] = $assessor ? (string) ( $assessor->display_name ? $assessor->display_name : $assessor->user_login ) : '';
+
+		return $row;
+	}
+
+	/**
+	 * Guarda evaluación final (override): inserta nueva fila y desmarca previas.
+	 *
+	 * @param int $portfolio_id
+	 * @param int $rubric_id
+	 * @param array $scores
+	 * @param string $comment
+	 * @param int $assessed_by
+	 * @return array Evaluación final.
+	 */
+	public function save_final_assessment( int $portfolio_id, int $rubric_id, array $scores, string $comment, int $assessed_by ): array {
+		global $wpdb;
+
+		$portfolio_id = absint( $portfolio_id );
+		$rubric_id    = absint( $rubric_id );
+		$assessed_by  = absint( $assessed_by );
+		$comment      = sanitize_textarea_field( (string) $comment );
+		$scores       = is_array( $scores ) ? $scores : array();
+
+		if ( ! $portfolio_id || ! $rubric_id || ! $assessed_by ) {
+			return array();
+		}
+
+		if ( 'clms_rubric' !== get_post_type( $rubric_id ) ) {
+			return array();
+		}
+
+		$criteria = class_exists( '\CLMS_Rubric' ) ? (array) \CLMS_Rubric::get_criteria( $rubric_id ) : array();
+		$max      = class_exists( '\CLMS_Rubric' ) ? absint( \CLMS_Rubric::get_total_points( $rubric_id ) ) : 0;
+		if ( $max <= 0 ) {
+			$max = 100;
+		}
+
+		$total = 0;
+		$normalized = array();
+		foreach ( $criteria as $i => $criterion ) {
+			$key = (string) $i;
+			$max_points = isset( $criterion['max_points'] ) ? absint( $criterion['max_points'] ) : 0;
+			$raw = $scores[ $key ] ?? null;
+			if ( null === $raw || '' === (string) $raw || ! is_numeric( $raw ) ) {
+				$normalized[ $key ] = 0;
+				continue;
+			}
+			$pts = (int) round( (float) $raw );
+			$pts = max( 0, min( $max_points, $pts ) );
+			$normalized[ $key ] = $pts;
+			$total += $pts;
+		}
+
+		$percent = $max > 0 ? min( 100, absint( round( ( $total / $max ) * 100 ) ) ) : 0;
+
+		$table = $this->table_assessments();
+		$exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) );
+		if ( ! $exists ) {
+			return array();
+		}
+
+		// Clear previous finals.
+		$wpdb->update(
+			$table,
+			array( 'is_final' => 0 ),
+			array( 'portfolio_id' => $portfolio_id, 'is_final' => 1 )
+		);
+
+		$wpdb->insert(
+			$table,
+			array(
+				'portfolio_id'   => $portfolio_id,
+				'rubric_id'      => $rubric_id,
+				'assessed_by'    => $assessed_by,
+				'is_final'       => 1,
+				'total_percent'  => $percent,
+				'scores_json'    => wp_json_encode( $normalized ),
+				'comment'        => $comment,
+				'created_at'     => current_time( 'mysql' ),
+			)
+		);
+
+		return $this->get_final_assessment( $portfolio_id );
 	}
 
 	public function add_item( int $portfolio_id, int $submission_id, array $data = array() ): array {

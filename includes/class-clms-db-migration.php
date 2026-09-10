@@ -390,6 +390,26 @@ class CLMS_DB_Migration {
 		) {$charset};";
 		dbDelta( $sql );
 
+		$assess = $wpdb->prefix . 'atora_portfolio_assessments';
+		$sql = "CREATE TABLE {$assess} (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			portfolio_id bigint(20) unsigned NOT NULL,
+			rubric_id bigint(20) unsigned NOT NULL DEFAULT 0,
+			assessed_by bigint(20) unsigned NOT NULL DEFAULT 0,
+			is_final tinyint(1) NOT NULL DEFAULT 1,
+			total_percent int(10) unsigned NOT NULL DEFAULT 0,
+			scores_json longtext,
+			comment longtext,
+			created_at datetime NOT NULL,
+			PRIMARY KEY (id),
+			KEY portfolio_id (portfolio_id),
+			KEY rubric_id (rubric_id),
+			KEY assessed_by (assessed_by),
+			KEY is_final (is_final),
+			KEY created_at (created_at)
+		) {$charset};";
+		dbDelta( $sql );
+
 		$items = $wpdb->prefix . 'atora_portfolio_items';
 		$sql = "CREATE TABLE {$items} (
 			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
