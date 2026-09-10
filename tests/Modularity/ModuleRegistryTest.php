@@ -15,6 +15,14 @@ class ModuleRegistryTest extends TestCase {
 
 	protected function setUp(): void {
 		parent::setUp();
+		\Brain\Monkey\Functions\when( 'apply_filters' )->alias(
+			static function( string $hook, $value, ...$args ) {
+				foreach ( $GLOBALS['__atora_test_filters'][ $hook ] ?? array() as $entry ) {
+					$value = call_user_func( $entry['cb'], $value, ...$args );
+				}
+				return $value;
+			}
+		);
 		atora_test_reset_options();
 		\CLMS_Module_Registry::flush_cache();
 	}
