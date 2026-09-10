@@ -596,11 +596,49 @@ trait CLMS_Grading_SpeedGrade_Trait {
 		// Rubric: read per-criterion scores if available
 		$lesson_id      = absint( get_post_meta( $submission_id, '_clms_submission_lesson_id', true ) );
 		$rubric_id      = $lesson_id ? absint( get_post_meta( $lesson_id, '_clms_rubric_id', true ) ) : 0;
+		$rubric_snapshot = $rubric_id ? get_post_meta( $submission_id, '_clms_submission_rubric_snapshot', true ) : array();
+		$rubric_snapshot = is_array( $rubric_snapshot ) ? $rubric_snapshot : array();
 		$rubric_scores  = array();
 		$grade_from_rubric = '';
 
 		if ( $rubric_id && class_exists( 'CLMS_Rubric' ) ) {
-			$criteria    = CLMS_Rubric::get_criteria( $rubric_id );
+			$criteria = array();
+			$total_points = 0;
+			$scale_type = '';
+			$is_holistic = false;
+
+			$has_snapshot = ! empty( $rubric_snapshot['rubric_id'] )
+				&& $rubric_id === absint( $rubric_snapshot['rubric_id'] )
+				&& ! empty( $rubric_snapshot['criteria'] )
+				&& is_array( $rubric_snapshot['criteria'] );
+
+			if ( $has_snapshot ) {
+				$criteria     = (array) $rubric_snapshot['criteria'];
+				$total_points = absint( $rubric_snapshot['total_points'] ?? 0 );
+				$scale_type   = sanitize_key( (string) ( $rubric_snapshot['scale_type'] ?? '' ) );
+				$is_holistic  = ! empty( $rubric_snapshot['is_holistic'] );
+			} else {
+				$criteria     = CLMS_Rubric::get_criteria( $rubric_id );
+				$total_points = absint( CLMS_Rubric::get_total_points( $rubric_id ) );
+				$scale_type   = sanitize_key( (string) get_post_meta( $rubric_id, CLMS_Rubric::META_SCALE, true ) );
+				$is_holistic  = '1' === (string) get_post_meta( $rubric_id, CLMS_Rubric::META_HOLISTIC, true );
+
+				// Snapshot por entrega: evita que cambios futuros en la rúbrica rompan la trazabilidad.
+				if ( ! empty( $criteria ) ) {
+					$rubric_snapshot = array(
+						'rubric_id'     => $rubric_id,
+						'rubric_title'  => (string) get_the_title( $rubric_id ),
+						'scale_type'    => $scale_type,
+						'is_holistic'   => $is_holistic ? 1 : 0,
+						'total_points'  => $total_points,
+						'criteria'      => $criteria,
+						'captured_at'   => current_time( 'mysql' ),
+					);
+					update_post_meta( $submission_id, '_clms_submission_rubric_snapshot', $rubric_snapshot );
+					update_post_meta( $submission_id, '_clms_submission_rubric_snapshot_hash', md5( wp_json_encode( $rubric_snapshot ) ) );
+				}
+			}
+
 			$raw_scores  = isset( $_POST['rubric_scores'] ) ? wp_unslash( $_POST['rubric_scores'] ) : array();
 			$raw_scores  = is_array( $raw_scores ) ? $raw_scores : array();
 			$total_pts   = 0;
@@ -610,7 +648,7 @@ trait CLMS_Grading_SpeedGrade_Trait {
 			$total_criteria = is_array( $criteria ) ? count( $criteria ) : 0;
 			$scored_criteria = 0;
 
-			foreach ( $criteria as $i => $c ) {
+			foreach ( (array) $criteria as $i => $c ) {
 				$max            = isset( $c['max_points'] ) ? absint( $c['max_points'] ) : 0;
 				$weight         = isset( $c['weight'] ) ? (float) $c['weight'] : 0.0;
 				$score_raw      = isset( $raw_scores[ $i ] ) ? trim( (string) $raw_scores[ $i ] ) : '';
@@ -963,6 +1001,8 @@ trait CLMS_Grading_SpeedGrade_Trait {
 		$recent_history   = $this->get_student_recent_submission_history( $student_id, $course_id, $lesson_id, $submission_id, 5 );
 		$ai_pending       = $this->is_submission_ai_pending_validation( $submission_id, $status, $assessment_record );
 		$rubric_id        = $lesson_id ? absint( get_post_meta( $lesson_id, '_clms_rubric_id', true ) ) : 0;
+		$rubric_snapshot  = $rubric_id ? get_post_meta( $submission_id, '_clms_submission_rubric_snapshot', true ) : array();
+		$rubric_snapshot  = is_array( $rubric_snapshot ) ? $rubric_snapshot : array();
 		$context = array(
 			'submission_id' => $submission_id,
 			'student_id'    => $student_id,
@@ -981,6 +1021,7 @@ trait CLMS_Grading_SpeedGrade_Trait {
 			'submitted_at'  => $this->format_datetime( $submitted ),
 			'rubric_id'     => $rubric_id,
 			'rubric_title'  => $rubric_id ? get_the_title( $rubric_id ) : '',
+			'rubric_snapshot' => $rubric_snapshot,
 			'rubric_scores' => $this->get_rubric_scores( $submission_id ),
 			'assessment'    => is_array( $assessment_record ) ? $assessment_record : array(),
 			'assessment_log' => is_array( $assessment_log ) ? $assessment_log : array(),

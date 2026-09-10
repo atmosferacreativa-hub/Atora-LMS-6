@@ -119,7 +119,7 @@ Evolucionar ATORA LMS en ciclos continuos, priorizando (1) evaluación colaborat
 - [x] Modelo: extender `clms_rubric` (CPT + meta) con `scale_type`, `is_holistic`, pesos por criterio y ejemplares.
 - [x] UI admin: extender builder en `includes/class-rubric.php` (pesos, escalas, holística, benchmarks) + preset UI.
 - [x] Cálculo: actualizar servicios de grading para pesos + normalización (impacta `includes/grading/`).
-- [ ] Versionado: estrategia (snapshot por meta + “rubric_version_id”) o duplicado controlado del CPT con relación padre/hijo.
+- [x] Versionado: snapshot por entrega (meta) para trazabilidad y compatibilidad en SpeedGrade.
 - [x] Presets: catálogo (CPT `clms_rubric_preset`) + permisos.
 - [x] Migración: compatibilidad con rúbricas existentes sin pesos explícitos (default = pesos iguales).
 - [ ] QA: pruebas con escalas mixtas, rounding, y compatibilidad con SpeedGrade.
