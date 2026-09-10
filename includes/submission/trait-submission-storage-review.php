@@ -217,19 +217,25 @@ trait CLMS_Submission_Storage_Review_Trait {
 			$course_id = $this->get_course_id_for_lesson( $lesson_id );
 			$group_id  = $course_id ? absint( (int) apply_filters( 'atora/groups/user_group_id', 0, $user_id, absint( $course_id ), $lesson_id ) ) : 0;
 
-			// Intentar primero la shadow (submission del estudiante).
-			$submission_id = $this->get_existing_submission_id( $user_id, $lesson_id );
-
-			// Hardening: si por alguna razón no existe shadow aún, crearla desde el master.
-			if ( ! $submission_id && $group_id ) {
+			if ( $group_id ) {
 				$master_id = $this->get_existing_group_master_submission_id( $group_id, $lesson_id );
+
+				// Si el estudiante cambió de grupo post-entrega, no tomar shadows anteriores de otro grupo.
 				if ( $master_id && class_exists( '\ATORA\Groups\Group_Service' ) ) {
 					$service = new \ATORA\Groups\Group_Service();
-					$shadow_id = $service->ensure_shadow_submission( $user_id, $lesson_id, absint( $course_id ), $group_id, absint( $master_id ) );
-					if ( $shadow_id ) {
-						$service->sync_shadow_grade_from_master( absint( $shadow_id ), absint( $master_id ) );
-						$submission_id = absint( $shadow_id );
+					$submission_id = $service->find_shadow_submission_id( $user_id, $lesson_id, $group_id, absint( $master_id ) );
+
+					// Hardening: si no existe shadow aún, crearla desde el master.
+					if ( ! $submission_id ) {
+						$shadow_id = $service->ensure_shadow_submission( $user_id, $lesson_id, absint( $course_id ), $group_id, absint( $master_id ) );
+						if ( $shadow_id ) {
+							$service->sync_shadow_grade_from_master( absint( $shadow_id ), absint( $master_id ) );
+							$submission_id = absint( $shadow_id );
+						}
 					}
+				} else {
+					// Fallback legacy (sin Group_Service): shadow por user+lesson.
+					$submission_id = $this->get_existing_submission_id( $user_id, $lesson_id );
 				}
 			}
 		} else {
