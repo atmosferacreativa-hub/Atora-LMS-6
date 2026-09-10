@@ -25,7 +25,7 @@ namespace {
 	}
 }
 
-namespace ATORA\Tests\Groups;
+namespace ATORA\Tests\Groups {
 
 use Brain\Monkey\Functions;
 use PHPUnit\Framework\TestCase;
@@ -170,4 +170,4 @@ final class GroupSubmissionFetchTest extends TestCase {
 		$this->assertTrue( $dummy->can_view_attachment_public( $user_id, $attachment_id ) );
 	}
 }
-
+}
