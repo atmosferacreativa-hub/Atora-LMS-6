@@ -20,7 +20,13 @@ class CLMS_DB_Migration {
 	const SCHEMA_VERSION_FALLBACK = '6.13.3';
 
 	public function __construct() {
+		// Nota: este módulo se instancia a través del loader en `init`, por lo que
+		// cuando llega aquí `plugins_loaded` ya pudo haber corrido. Si solo
+		// enganchamos a `plugins_loaded`, la migración no se ejecuta nunca.
 		add_action( 'plugins_loaded', array( $this, 'maybe_run' ), 5 );
+		if ( did_action( 'plugins_loaded' ) ) {
+			$this->maybe_run();
+		}
 		add_action( 'clms_db_migrate', array( $this, 'run' ) );
 	}
 
