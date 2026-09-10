@@ -58,7 +58,7 @@ final class Learning_Analytics_Module {
 		$student_id = isset( $_GET['student_id'] ) ? absint( wp_unslash( $_GET['student_id'] ) ) : 0;
 
 		echo '<div class="wrap"><h1>' . esc_html__( 'Analítica de riesgo', 'atora-lms' ) . '</h1>';
-		echo '<p class="description">' . esc_html__( 'Scoring por estudiante/curso basado en progreso, pendientes, notas e inactividad (MVP).', 'atora-lms' ) . '</p>';
+		echo '<p class="description">' . esc_html__( 'Scoring por estudiante/curso basado en progreso, pendientes, notas, inactividad y engagement (lecturas/mensajes).', 'atora-lms' ) . '</p>';
 
 		echo '<form method="get" style="margin:12px 0">';
 		echo '<input type="hidden" name="page" value="atora-learning-analytics">';
@@ -205,12 +205,14 @@ final class Learning_Analytics_Module {
 			$row_course_id = absint( $row['course_id'] ?? 0 );
 
 			$signals_line = sprintf(
-				/* translators: 1: progress, 2: average, 3: pending, 4: missed, 5: last access */
-				__( 'Progreso: %1$s | Promedio: %2$s | Pendientes: %3$s | Perdidas: %4$s | Último acceso: %5$s', 'atora-lms' ),
+				/* translators: 1: progress, 2: average, 3: pending, 4: missed, 5: reads, 6: messages, 7: last access */
+				__( 'Progreso: %1$s | Promedio: %2$s | Pendientes: %3$s | Perdidas: %4$s | Lecturas (14d): %5$s | Mensajes (14d): %6$s | Último acceso: %7$s', 'atora-lms' ),
 				absint( $signals['progress_percent'] ?? 0 ) . '%',
 				( null !== ( $signals['final_average'] ?? null ) ? absint( $signals['final_average'] ) . '%' : '—' ),
 				absint( $signals['pending_activities'] ?? 0 ),
 				absint( $signals['missed_submissions'] ?? 0 ),
+				absint( $signals['lesson_reads_14d'] ?? 0 ),
+				absint( $signals['messages_14d'] ?? 0 ),
 				$last ? $last : '—'
 			);
 

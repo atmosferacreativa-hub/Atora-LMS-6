@@ -26,6 +26,8 @@ final class Learning_Analytics_Service {
 	 * @return array<int,int>
 	 */
 	public function get_course_ids_for_teacher( int $teacher_id ): array {
+		global $wpdb;
+
 		$teacher_id = absint( $teacher_id );
 		if ( ! $teacher_id ) {
 			return array();
@@ -64,6 +66,26 @@ final class Learning_Analytics_Service {
 		foreach ( (array) $meta_courses as $cid ) {
 			$cid = absint( $cid );
 			if ( $cid ) {
+				$course_ids[] = $cid;
+			}
+		}
+
+		// Secciones (lead/assistant/coordinator): cursos asignados vía atora_sections.
+		if ( $this->section_tables_exist() ) {
+			$sections_table = $wpdb->prefix . 'atora_sections';
+			$teachers_table = $wpdb->prefix . 'atora_section_teachers';
+
+			$sec_course_ids = $wpdb->get_col(
+				$wpdb->prepare(
+					"SELECT DISTINCT s.wp_course_id
+					 FROM {$teachers_table} st
+					 INNER JOIN {$sections_table} s ON s.id = st.section_id
+					 WHERE st.user_id = %d AND st.role IN ('lead','assistant','coordinator')",
+					$teacher_id
+				)
+			);
+			$sec_course_ids = array_values( array_filter( array_map( 'absint', (array) $sec_course_ids ) ) );
+			foreach ( $sec_course_ids as $cid ) {
 				$course_ids[] = $cid;
 			}
 		}
@@ -117,6 +139,8 @@ final class Learning_Analytics_Service {
 	 * @return bool
 	 */
 	public function viewer_can_access_course( int $viewer_id, int $course_id ): bool {
+		global $wpdb;
+
 		$viewer_id = absint( $viewer_id );
 		$course_id = absint( $course_id );
 		if ( ! $viewer_id || ! $course_id ) {
@@ -146,16 +170,43 @@ final class Learning_Analytics_Service {
 			}
 		}
 
-		return in_array( $viewer_id, array_values( array_unique( $teacher_ids ) ), true );
+		if ( in_array( $viewer_id, array_values( array_unique( $teacher_ids ) ), true ) ) {
+			return true;
+		}
+
+		// Secciones (lead/assistant/coordinator): acceso por rol en tablas atora_sections.
+		if ( ! $this->section_tables_exist() ) {
+			return false;
+		}
+
+		$sections_table = $wpdb->prefix . 'atora_sections';
+		$teachers_table = $wpdb->prefix . 'atora_section_teachers';
+
+		$found = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT 1
+				 FROM {$teachers_table} st
+				 INNER JOIN {$sections_table} s ON s.id = st.section_id
+				 WHERE s.wp_course_id = %d
+				   AND st.user_id = %d
+				   AND st.role IN ('lead','assistant','coordinator')
+				 LIMIT 1",
+				$course_id,
+				$viewer_id
+			)
+		);
+
+		return (bool) $found;
 	}
 
 	/**
 	 * Calcula score 0–100 a partir de un status académico.
 	 *
 	 * @param array<string,mixed> $status
+	 * @param array<string,mixed> $extra_signals
 	 * @return int
 	 */
-	public static function calculate_risk_score_from_status( array $status ): int {
+	public static function calculate_risk_score_from_status( array $status, array $extra_signals = array() ): int {
 		$risk_level = sanitize_key( (string) ( $status['risk_level'] ?? 'unknown' ) );
 		$pending    = absint( $status['pending_activities'] ?? 0 );
 		$progress   = absint( $status['progress_percent'] ?? 0 );
@@ -205,6 +256,27 @@ final class Learning_Analytics_Service {
 			}
 		}
 
+		// Señales extra (mensajes/lecturas) — engagement reciente.
+		$messages_14d    = absint( $extra_signals['messages_14d'] ?? 0 );
+		$lesson_reads_14d = absint( $extra_signals['lesson_reads_14d'] ?? 0 );
+
+		if ( 0 === $lesson_reads_14d && 0 === $messages_14d ) {
+			$score += 10;
+		} elseif ( 0 === $lesson_reads_14d ) {
+			$score += 8;
+		} elseif ( $lesson_reads_14d > 0 && $lesson_reads_14d < 2 ) {
+			$score += 4;
+		}
+
+		if ( $messages_14d > 0 && $messages_14d < 2 ) {
+			$score += 2;
+		}
+
+		// Engaged: pequeña reducción (sin “anular” riesgo académico).
+		if ( $lesson_reads_14d >= 8 || $messages_14d >= 2 ) {
+			$score -= 5;
+		}
+
 		$score = max( 0, min( 100, $score ) );
 		return absint( $score );
 	}
@@ -239,17 +311,14 @@ final class Learning_Analytics_Service {
 			return 0;
 		}
 
+		$existing_rows = $this->get_existing_rows_map( $course_id, $student_ids );
+		$missed_map    = $this->get_missed_submissions_counts( $course_id, $student_ids );
+		$msg_map       = $this->get_course_message_stats( $course_id, $student_ids, 14 );
+		$read_map      = $this->get_course_read_stats_from_recent_events( $course_id, $student_ids, 14 );
+
 		$rows = 0;
 		foreach ( $student_ids as $student_id ) {
-			$existing = $wpdb->get_row(
-				$wpdb->prepare(
-					"SELECT id, risk_score, risk_level, last_notified_at, last_alert_type FROM {$this->table()} WHERE course_id = %d AND user_id = %d LIMIT 1",
-					$course_id,
-					$student_id
-				),
-				ARRAY_A
-			);
-			$existing = is_array( $existing ) ? $existing : array();
+			$existing = isset( $existing_rows[ $student_id ] ) && is_array( $existing_rows[ $student_id ] ) ? (array) $existing_rows[ $student_id ] : array();
 			$existing_id = absint( $existing['id'] ?? 0 );
 			$prev_score  = isset( $existing['risk_score'] ) ? absint( $existing['risk_score'] ) : null;
 			$prev_level  = sanitize_key( (string) ( $existing['risk_level'] ?? '' ) );
@@ -263,7 +332,20 @@ final class Learning_Analytics_Service {
 			);
 
 			$risk_level = sanitize_key( (string) ( $status['risk_level'] ?? 'unknown' ) );
-			$risk_score = self::calculate_risk_score_from_status( $status );
+
+			$messages_14d = absint( $msg_map[ $student_id ]['messages_14d'] ?? 0 );
+			$last_message_at = sanitize_text_field( (string) ( $msg_map[ $student_id ]['last_message_at'] ?? '' ) );
+
+			$lesson_reads_14d = absint( $read_map[ $student_id ]['lesson_reads_14d'] ?? 0 );
+			$last_read_at     = sanitize_text_field( (string) ( $read_map[ $student_id ]['last_read_at'] ?? '' ) );
+
+			$risk_score = self::calculate_risk_score_from_status(
+				$status,
+				array(
+					'messages_14d'     => $messages_14d,
+					'lesson_reads_14d' => $lesson_reads_14d,
+				)
+			);
 			$risk_score_prev  = ( null !== $prev_score ) ? absint( $prev_score ) : null;
 			$risk_score_delta = ( null !== $prev_score ) ? (int) ( $risk_score - absint( $prev_score ) ) : null;
 			$risk_trend       = null === $prev_score ? 'new' : ( ( $risk_score_delta ?? 0 ) > 0 ? 'up' : ( ( $risk_score_delta ?? 0 ) < 0 ? 'down' : 'flat' ) );
@@ -277,7 +359,16 @@ final class Learning_Analytics_Service {
 				$threshold_days = 14;
 			}
 
-			$missed_count = $this->get_missed_submissions_count( $course_id, $student_id );
+			$missed_count = absint( $missed_map[ $student_id ] ?? 0 );
+
+			$reasons = isset( $status['risk_reasons'] ) && is_array( $status['risk_reasons'] ) ? array_values( array_map( 'sanitize_text_field', $status['risk_reasons'] ) ) : array();
+			if ( 0 === $lesson_reads_14d ) {
+				$reasons[] = __( 'Baja actividad de lectura (14 días).', 'atora-lms' );
+			}
+			if ( 0 === $messages_14d ) {
+				$reasons[] = __( 'Sin mensajes recientes (14 días).', 'atora-lms' );
+			}
+			$reasons = array_values( array_unique( array_filter( $reasons ) ) );
 
 			$signals    = array(
 				'progress_percent'   => absint( $status['progress_percent'] ?? 0 ),
@@ -286,7 +377,11 @@ final class Learning_Analytics_Service {
 				'last_access_at'     => sanitize_text_field( (string) ( $status['last_access_at'] ?? '' ) ),
 				'course_time_seconds'=> absint( $status['course_time_seconds'] ?? 0 ),
 				'missed_submissions' => absint( $missed_count ),
-				'risk_reasons'       => isset( $status['risk_reasons'] ) && is_array( $status['risk_reasons'] ) ? array_values( array_map( 'sanitize_text_field', $status['risk_reasons'] ) ) : array(),
+				'messages_14d'       => $messages_14d,
+				'last_message_at'    => $last_message_at,
+				'lesson_reads_14d'   => $lesson_reads_14d,
+				'last_read_at'       => $last_read_at,
+				'risk_reasons'       => $reasons,
 				'recommended_action' => sanitize_text_field( (string) ( $status['recommended_action'] ?? '' ) ),
 				'risk_score_prev'    => $risk_score_prev,
 				'risk_score_delta'   => $risk_score_delta,
@@ -295,6 +390,9 @@ final class Learning_Analytics_Service {
 
 			if ( $missed_count > 0 && '' === (string) ( $signals['recommended_action'] ?? '' ) ) {
 				$signals['recommended_action'] = __( 'Revisa las entregas vencidas y acuerda un plan de recuperación.', 'atora-lms' );
+			}
+			if ( 0 === $lesson_reads_14d && '' === (string) ( $signals['recommended_action'] ?? '' ) ) {
+				$signals['recommended_action'] = __( 'Contacta al estudiante y sugiere retomar lecturas y actividades esta semana.', 'atora-lms' );
 			}
 
 			$alert_type = '';
@@ -349,39 +447,240 @@ final class Learning_Analytics_Service {
 		return absint( $rows );
 	}
 
-	private function get_missed_submissions_count( int $course_id, int $student_id ): int {
+	private function get_existing_rows_map( int $course_id, array $student_ids ): array {
 		global $wpdb;
 
-		$course_id  = absint( $course_id );
-		$student_id = absint( $student_id );
-		if ( ! $course_id || ! $student_id ) {
-			return 0;
+		$course_id = absint( $course_id );
+		$student_ids = array_values( array_filter( array_map( 'absint', (array) $student_ids ) ) );
+		if ( ! $course_id || empty( $student_ids ) ) {
+			return array();
+		}
+
+		$placeholders = implode( ',', array_fill( 0, count( $student_ids ), '%d' ) );
+		$args = array_merge( array( $course_id ), $student_ids );
+
+		// phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+		$sql = $wpdb->prepare(
+			"SELECT id, user_id, risk_score, risk_level, last_notified_at, last_alert_type
+			 FROM {$this->table()}
+			 WHERE course_id = %d AND user_id IN ({$placeholders})",
+			$args
+		);
+
+		$rows = $wpdb->get_results( $sql, ARRAY_A );
+		$rows = is_array( $rows ) ? $rows : array();
+
+		$map = array();
+		foreach ( $rows as $row ) {
+			$uid = absint( $row['user_id'] ?? 0 );
+			if ( $uid ) {
+				$map[ $uid ] = $row;
+			}
+		}
+
+		return $map;
+	}
+
+	private function get_missed_submissions_counts( int $course_id, array $student_ids ): array {
+		global $wpdb;
+
+		$course_id = absint( $course_id );
+		$student_ids = array_values( array_filter( array_map( 'absint', (array) $student_ids ) ) );
+		if ( ! $course_id || empty( $student_ids ) ) {
+			return array();
 		}
 
 		$table = $wpdb->prefix . 'atora_early_warning';
 		$exists = $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $table ) );
 		if ( ! $exists ) {
-			return 0;
+			return array();
 		}
 
-		$data = $wpdb->get_var(
-			$wpdb->prepare(
-				"SELECT data FROM {$table}
-				 WHERE course_id = %d AND user_id = %d AND warning_type = %s AND status = 'open'
-				 LIMIT 1",
-				$course_id,
-				$student_id,
-				'missed_submission'
-			)
+		$placeholders = implode( ',', array_fill( 0, count( $student_ids ), '%d' ) );
+		$args = array_merge( array( $course_id, 'missed_submission' ), $student_ids );
+
+		// phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+		$sql = $wpdb->prepare(
+			"SELECT user_id, data
+			 FROM {$table}
+			 WHERE course_id = %d
+			   AND warning_type = %s
+			   AND status = 'open'
+			   AND user_id IN ({$placeholders})",
+			$args
 		);
 
-		if ( ! $data ) {
-			return 0;
+		$rows = $wpdb->get_results( $sql, ARRAY_A );
+		$rows = is_array( $rows ) ? $rows : array();
+
+		$map = array();
+		foreach ( $rows as $row ) {
+			$uid = absint( $row['user_id'] ?? 0 );
+			if ( ! $uid ) {
+				continue;
+			}
+			$decoded = json_decode( (string) ( $row['data'] ?? '' ), true );
+			$decoded = is_array( $decoded ) ? $decoded : array();
+			$map[ $uid ] = absint( $decoded['count'] ?? 0 );
 		}
 
-		$decoded = json_decode( (string) $data, true );
-		$decoded = is_array( $decoded ) ? $decoded : array();
-		return absint( $decoded['count'] ?? 0 );
+		return $map;
+	}
+
+	private function get_course_message_stats( int $course_id, array $student_ids, int $days = 14 ): array {
+		global $wpdb;
+
+		$course_id   = absint( $course_id );
+		$student_ids = array_values( array_filter( array_map( 'absint', (array) $student_ids ) ) );
+		$days        = max( 1, absint( $days ) );
+
+		if ( ! $course_id || empty( $student_ids ) ) {
+			return array();
+		}
+
+		$msg_table  = $wpdb->prefix . 'atora_conversation_messages';
+		$conv_table = $wpdb->prefix . 'atora_conversations';
+
+		// Tablas opcionales (depende del módulo CRM).
+		$exists = $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $conv_table ) );
+		if ( ! $exists ) {
+			return array();
+		}
+		$exists = $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $msg_table ) );
+		if ( ! $exists ) {
+			return array();
+		}
+
+		$since = date( 'Y-m-d H:i:s', current_time( 'timestamp' ) - ( $days * DAY_IN_SECONDS ) );
+		$placeholders = implode( ',', array_fill( 0, count( $student_ids ), '%d' ) );
+		$args = array_merge( array( $course_id, $since ), $student_ids );
+
+		// phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+		$sql = $wpdb->prepare(
+			"SELECT c.user_id AS user_id, COUNT(m.id) AS cnt, MAX(m.created_at) AS last_at
+			 FROM {$conv_table} c
+			 INNER JOIN {$msg_table} m ON m.conversation_id = c.id
+			 WHERE c.course_id = %d
+			   AND m.created_at >= %s
+			   AND m.direction IN ('inbound','outbound')
+			   AND c.user_id IN ({$placeholders})
+			 GROUP BY c.user_id",
+			$args
+		);
+
+		$rows = $wpdb->get_results( $sql, ARRAY_A );
+		$rows = is_array( $rows ) ? $rows : array();
+
+		$map = array();
+		foreach ( $rows as $row ) {
+			$uid = absint( $row['user_id'] ?? 0 );
+			if ( ! $uid ) {
+				continue;
+			}
+			$map[ $uid ] = array(
+				'messages_14d'    => absint( $row['cnt'] ?? 0 ),
+				'last_message_at' => sanitize_text_field( (string) ( $row['last_at'] ?? '' ) ),
+			);
+		}
+
+		return $map;
+	}
+
+	private function get_course_read_stats_from_recent_events( int $course_id, array $student_ids, int $days = 14 ): array {
+		global $wpdb;
+
+		$course_id   = absint( $course_id );
+		$student_ids = array_values( array_filter( array_map( 'absint', (array) $student_ids ) ) );
+		$days        = max( 1, absint( $days ) );
+
+		if ( ! $course_id || empty( $student_ids ) ) {
+			return array();
+		}
+
+		$since_ts = current_time( 'timestamp' ) - ( $days * DAY_IN_SECONDS );
+		$meta_key = class_exists( 'CLMS_Student_Activity_Tracker' )
+			? \CLMS_Student_Activity_Tracker::USER_META_EVENTS
+			: '_clms_recent_activity_events';
+
+		$placeholders = implode( ',', array_fill( 0, count( $student_ids ), '%d' ) );
+		$args = array_merge( array( $meta_key ), $student_ids );
+
+		// phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+		$sql = $wpdb->prepare(
+			"SELECT user_id, meta_value
+			 FROM {$wpdb->usermeta}
+			 WHERE meta_key = %s
+			   AND user_id IN ({$placeholders})",
+			$args
+		);
+
+		$rows = $wpdb->get_results( $sql, ARRAY_A );
+		$rows = is_array( $rows ) ? $rows : array();
+
+		$map = array();
+		foreach ( $rows as $row ) {
+			$uid = absint( $row['user_id'] ?? 0 );
+			if ( ! $uid ) {
+				continue;
+			}
+			$events = maybe_unserialize( (string) ( $row['meta_value'] ?? '' ) );
+			$events = is_array( $events ) ? $events : array();
+
+			$count = 0;
+			$last  = 0;
+			$last_at = '';
+			foreach ( $events as $ev ) {
+				if ( ! is_array( $ev ) ) {
+					continue;
+				}
+				if ( $course_id !== absint( $ev['course_id'] ?? 0 ) ) {
+					continue;
+				}
+				$post_type = sanitize_key( (string) ( $ev['post_type'] ?? '' ) );
+				if ( 'lm_lesson' !== $post_type ) {
+					continue;
+				}
+				$at = sanitize_text_field( (string) ( $ev['accessed_at'] ?? '' ) );
+				$ts = $at ? strtotime( $at ) : 0;
+				if ( ! $ts || $ts < $since_ts ) {
+					continue;
+				}
+				++$count;
+				if ( $ts > $last ) {
+					$last = $ts;
+					$last_at = $at;
+				}
+			}
+
+			if ( $count > 0 || $last > 0 ) {
+				$map[ $uid ] = array(
+					'lesson_reads_14d' => absint( $count ),
+					'last_read_at'     => $last_at ? $last_at : '',
+				);
+			}
+		}
+
+		return $map;
+	}
+
+	private function section_tables_exist(): bool {
+		static $cache = null;
+		if ( null !== $cache ) {
+			return (bool) $cache;
+		}
+
+		global $wpdb;
+		$sections_table = $wpdb->prefix . 'atora_sections';
+		$teachers_table = $wpdb->prefix . 'atora_section_teachers';
+
+		$exists = $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $sections_table ) );
+		if ( ! $exists ) {
+			$cache = false;
+			return false;
+		}
+		$exists = $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $teachers_table ) );
+		$cache = (bool) $exists;
+		return (bool) $cache;
 	}
 
 	/**
@@ -595,6 +894,10 @@ final class Learning_Analytics_Service {
 				'missed_submissions' => absint( $signals['missed_submissions'] ?? 0 ),
 				'last_access_at'     => sanitize_text_field( (string) ( $signals['last_access_at'] ?? '' ) ),
 				'course_time_seconds'=> absint( $signals['course_time_seconds'] ?? 0 ),
+				'lesson_reads_14d'   => absint( $signals['lesson_reads_14d'] ?? 0 ),
+				'last_read_at'       => sanitize_text_field( (string) ( $signals['last_read_at'] ?? '' ) ),
+				'messages_14d'       => absint( $signals['messages_14d'] ?? 0 ),
+				'last_message_at'    => sanitize_text_field( (string) ( $signals['last_message_at'] ?? '' ) ),
 				'risk_reasons'       => $reasons,
 				'recommended_action' => sanitize_text_field( (string) ( $signals['recommended_action'] ?? '' ) ),
 				'updated_at'         => sanitize_text_field( (string) ( $row['updated_at'] ?? '' ) ),
@@ -649,6 +952,10 @@ final class Learning_Analytics_Service {
 				__( 'Entregas perdidas', 'atora-lms' ),
 				__( 'Último acceso', 'atora-lms' ),
 				__( 'Tiempo (s)', 'atora-lms' ),
+				__( 'Lecturas (14d)', 'atora-lms' ),
+				__( 'Última lectura', 'atora-lms' ),
+				__( 'Mensajes (14d)', 'atora-lms' ),
+				__( 'Último mensaje', 'atora-lms' ),
 				__( 'Motivos', 'atora-lms' ),
 				__( 'Acción recomendada', 'atora-lms' ),
 				__( 'Actualizado', 'atora-lms' ),
@@ -667,6 +974,10 @@ final class Learning_Analytics_Service {
 				__( 'Entregas perdidas', 'atora-lms' ),
 				__( 'Último acceso', 'atora-lms' ),
 				__( 'Tiempo (s)', 'atora-lms' ),
+				__( 'Lecturas (14d)', 'atora-lms' ),
+				__( 'Última lectura', 'atora-lms' ),
+				__( 'Mensajes (14d)', 'atora-lms' ),
+				__( 'Último mensaje', 'atora-lms' ),
 				__( 'Motivos', 'atora-lms' ),
 				__( 'Acción recomendada', 'atora-lms' ),
 				__( 'Actualizado', 'atora-lms' ),
@@ -691,6 +1002,10 @@ final class Learning_Analytics_Service {
 				absint( $item['missed_submissions'] ?? 0 ),
 				(string) ( $item['last_access_at'] ?? '' ),
 				absint( $item['course_time_seconds'] ?? 0 ),
+				absint( $item['lesson_reads_14d'] ?? 0 ),
+				(string) ( $item['last_read_at'] ?? '' ),
+				absint( $item['messages_14d'] ?? 0 ),
+				(string) ( $item['last_message_at'] ?? '' ),
 				$reasons,
 				(string) ( $item['recommended_action'] ?? '' ),
 				(string) ( $item['updated_at'] ?? '' ),

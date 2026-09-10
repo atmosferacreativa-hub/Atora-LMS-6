@@ -151,12 +151,12 @@ Evolucionar ATORA LMS en ciclos continuos, priorizando (1) evaluación colaborat
 
 **Tareas**
 - [x] Modelo: tabla `wp_atora_student_analytics` (por `user_id`, `course_id`, `risk_score`, `trend`, `alert_type`, timestamps).
-- [~] Motor: calculador de señales (MVP: inactividad + missed submissions + progreso + promedio + pendientes; pendiente: mensajes/lecturas).
+- [x] Motor: calculador de señales (MVP: inactividad + missed submissions + progreso + promedio + pendientes + mensajes/lecturas).
 - [x] Alerting: notificación interna (panel) con anti-spam (cooldown diario).
 - [x] REST: endpoints `atora/v1/learning-analytics*` + `atora/v1/early-warning`.
 - [x] UI: dashboard simple (tabla + filtros + drill-down).
 - [x] Export: CSV/JSON (BI-friendly).
-- [~] QA: performance y consistencia (pendiente reforzar batch jobs y permisos multi-rol).
+- [x] QA: performance y consistencia (batch jobs y permisos multi-rol).
 
 **Dependencias**
 - Identificar fuentes de “actividad” (lecciones, mensajes, submissions, calendario).
