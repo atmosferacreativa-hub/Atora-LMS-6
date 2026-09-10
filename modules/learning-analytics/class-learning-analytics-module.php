@@ -205,11 +205,12 @@ final class Learning_Analytics_Module {
 			$row_course_id = absint( $row['course_id'] ?? 0 );
 
 			$signals_line = sprintf(
-				/* translators: 1: progress, 2: average, 3: pending, 4: last access */
-				__( 'Progreso: %1$s | Promedio: %2$s | Pendientes: %3$s | Último acceso: %4$s', 'atora-lms' ),
+				/* translators: 1: progress, 2: average, 3: pending, 4: missed, 5: last access */
+				__( 'Progreso: %1$s | Promedio: %2$s | Pendientes: %3$s | Perdidas: %4$s | Último acceso: %5$s', 'atora-lms' ),
 				absint( $signals['progress_percent'] ?? 0 ) . '%',
 				( null !== ( $signals['final_average'] ?? null ) ? absint( $signals['final_average'] ) . '%' : '—' ),
 				absint( $signals['pending_activities'] ?? 0 ),
+				absint( $signals['missed_submissions'] ?? 0 ),
 				$last ? $last : '—'
 			);
 

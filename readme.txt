@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 6.15.3
+Stable tag: 6.15.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,9 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.15.4 =
+* Learning Analytics: incluye “entregas perdidas” en señales y export BI (CSV/JSON) usando `wp_atora_early_warning`.
+
 = 6.15.3 =
 * Learning Analytics: trend/delta por estudiante, nuevos tipos de alerta (high_risk/inactivity/risk_spike) y notificación con contexto (curso + delta).
 * Learning Analytics: export BI incluye trend/delta/alert_type (CSV/JSON).

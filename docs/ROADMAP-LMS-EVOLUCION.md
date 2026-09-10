@@ -1,7 +1,7 @@
 # Roadmap técnico — Evolución del LMS (rolling 6 meses)
 
 Última actualización: 2026-09-10  
-Base: ATORA LMS `6.15.3`
+Base: ATORA LMS `6.15.4`
 
 ## Estado actual (implementado en 6.14.0)
 - Epic 1 (MVP): Group Assessment (grupos por curso + entregas grupales + propagación + overrides + CSV + REST).

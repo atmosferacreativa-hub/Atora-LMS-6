@@ -277,18 +277,25 @@ final class Learning_Analytics_Service {
 				$threshold_days = 14;
 			}
 
+			$missed_count = $this->get_missed_submissions_count( $course_id, $student_id );
+
 			$signals    = array(
 				'progress_percent'   => absint( $status['progress_percent'] ?? 0 ),
 				'final_average'      => ( isset( $status['final_average'] ) && is_numeric( $status['final_average'] ) ) ? absint( $status['final_average'] ) : null,
 				'pending_activities' => absint( $status['pending_activities'] ?? 0 ),
 				'last_access_at'     => sanitize_text_field( (string) ( $status['last_access_at'] ?? '' ) ),
 				'course_time_seconds'=> absint( $status['course_time_seconds'] ?? 0 ),
+				'missed_submissions' => absint( $missed_count ),
 				'risk_reasons'       => isset( $status['risk_reasons'] ) && is_array( $status['risk_reasons'] ) ? array_values( array_map( 'sanitize_text_field', $status['risk_reasons'] ) ) : array(),
 				'recommended_action' => sanitize_text_field( (string) ( $status['recommended_action'] ?? '' ) ),
 				'risk_score_prev'    => $risk_score_prev,
 				'risk_score_delta'   => $risk_score_delta,
 				'risk_trend'         => $risk_trend,
 			);
+
+			if ( $missed_count > 0 && '' === (string) ( $signals['recommended_action'] ?? '' ) ) {
+				$signals['recommended_action'] = __( 'Revisa las entregas vencidas y acuerda un plan de recuperación.', 'atora-lms' );
+			}
 
 			$alert_type = '';
 			$last_access_raw = (string) ( $signals['last_access_at'] ?? '' );
@@ -340,6 +347,41 @@ final class Learning_Analytics_Service {
 		}
 
 		return absint( $rows );
+	}
+
+	private function get_missed_submissions_count( int $course_id, int $student_id ): int {
+		global $wpdb;
+
+		$course_id  = absint( $course_id );
+		$student_id = absint( $student_id );
+		if ( ! $course_id || ! $student_id ) {
+			return 0;
+		}
+
+		$table = $wpdb->prefix . 'atora_early_warning';
+		$exists = $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $table ) );
+		if ( ! $exists ) {
+			return 0;
+		}
+
+		$data = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT data FROM {$table}
+				 WHERE course_id = %d AND user_id = %d AND warning_type = %s AND status = 'open'
+				 LIMIT 1",
+				$course_id,
+				$student_id,
+				'missed_submission'
+			)
+		);
+
+		if ( ! $data ) {
+			return 0;
+		}
+
+		$decoded = json_decode( (string) $data, true );
+		$decoded = is_array( $decoded ) ? $decoded : array();
+		return absint( $decoded['count'] ?? 0 );
 	}
 
 	/**
@@ -550,6 +592,7 @@ final class Learning_Analytics_Service {
 				'progress_percent'   => absint( $signals['progress_percent'] ?? 0 ),
 				'final_average'      => ( null !== ( $signals['final_average'] ?? null ) ? absint( $signals['final_average'] ) : null ),
 				'pending_activities' => absint( $signals['pending_activities'] ?? 0 ),
+				'missed_submissions' => absint( $signals['missed_submissions'] ?? 0 ),
 				'last_access_at'     => sanitize_text_field( (string) ( $signals['last_access_at'] ?? '' ) ),
 				'course_time_seconds'=> absint( $signals['course_time_seconds'] ?? 0 ),
 				'risk_reasons'       => $reasons,
@@ -603,6 +646,7 @@ final class Learning_Analytics_Service {
 				__( 'Progreso', 'atora-lms' ),
 				__( 'Promedio', 'atora-lms' ),
 				__( 'Pendientes', 'atora-lms' ),
+				__( 'Entregas perdidas', 'atora-lms' ),
 				__( 'Último acceso', 'atora-lms' ),
 				__( 'Tiempo (s)', 'atora-lms' ),
 				__( 'Motivos', 'atora-lms' ),
@@ -620,6 +664,7 @@ final class Learning_Analytics_Service {
 				__( 'Progreso', 'atora-lms' ),
 				__( 'Promedio', 'atora-lms' ),
 				__( 'Pendientes', 'atora-lms' ),
+				__( 'Entregas perdidas', 'atora-lms' ),
 				__( 'Último acceso', 'atora-lms' ),
 				__( 'Tiempo (s)', 'atora-lms' ),
 				__( 'Motivos', 'atora-lms' ),
@@ -643,6 +688,7 @@ final class Learning_Analytics_Service {
 				absint( $item['progress_percent'] ) . '%',
 				( null !== ( $item['final_average'] ?? null ) ? absint( $item['final_average'] ) . '%' : '—' ),
 				absint( $item['pending_activities'] ),
+				absint( $item['missed_submissions'] ?? 0 ),
 				(string) ( $item['last_access_at'] ?? '' ),
 				absint( $item['course_time_seconds'] ?? 0 ),
 				$reasons,
