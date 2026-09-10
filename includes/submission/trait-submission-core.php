@@ -79,7 +79,49 @@ trait CLMS_Submission_Core_Trait {
 		}
 
 		$submission = $this->get_user_submission_for_grading( $user_id, $lesson_id );
-		$has_files  = ! empty( $submission['files'] ) && is_array( $submission['files'] );
+		$evaluation_mode = sanitize_key( (string) get_post_meta( $lesson_id, '_clms_evaluation_mode', true ) );
+		$group_context   = array();
+
+		$display_files = ( ! empty( $submission['files'] ) && is_array( $submission['files'] ) )
+			? array_values( array_filter( array_map( 'absint', $submission['files'] ) ) )
+			: array();
+
+		$comment_prefill = isset( $submission['comment'] ) ? (string) $submission['comment'] : '';
+
+		if ( 'group' === $evaluation_mode ) {
+			$shadow_id = ! empty( $submission['submission_id'] ) ? absint( $submission['submission_id'] ) : 0;
+			$master_id = 0;
+
+			if ( $shadow_id ) {
+				$master_id = absint( get_post_meta( $shadow_id, '_clms_submission_group_master_id', true ) );
+				if ( ! $master_id && '1' === (string) get_post_meta( $shadow_id, '_clms_submission_group_master', true ) ) {
+					$master_id = $shadow_id;
+				}
+			}
+
+			if ( $master_id ) {
+				$group_context = array(
+					'master_id'    => $master_id,
+					'group_id'     => absint( get_post_meta( $master_id, '_clms_submission_group_id', true ) ),
+					'submitted_by' => absint( get_post_meta( $master_id, '_clms_submission_submitted_by', true ) ),
+					'submitted_at' => sanitize_text_field( (string) get_post_meta( $master_id, '_clms_submission_submitted_at', true ) ),
+				);
+
+				if ( empty( $display_files ) ) {
+					$files = get_post_meta( $master_id, '_clms_submission_files', true );
+					if ( ! is_array( $files ) || empty( $files ) ) {
+						$files = get_post_meta( $master_id, '_clms_submission_attachments', true );
+					}
+					$display_files = is_array( $files ) ? array_values( array_filter( array_map( 'absint', $files ) ) ) : array();
+				}
+
+				if ( '' === trim( $comment_prefill ) ) {
+					$comment_prefill = (string) get_post_meta( $master_id, '_clms_submission_comment', true );
+				}
+			}
+		}
+
+		$has_files = ! empty( $display_files );
 		$student_status = isset( $submission['status'] ) ? sanitize_key( (string) $submission['status'] ) : '';
 		$can_view_grade = $this->can_student_view_published_grade( $submission );
 		$can_view_feedback = $this->can_student_view_feedback( $submission );
@@ -117,9 +159,8 @@ trait CLMS_Submission_Core_Trait {
 			<?php endif; ?>
 			<?php echo $this->render_submission_notice(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 
-			<?php
-			$evaluation_mode = sanitize_key( (string) get_post_meta( $lesson_id, '_clms_evaluation_mode', true ) );
-			if ( 'group' === $evaluation_mode ) :
+			<?php if ( 'group' === $evaluation_mode ) : ?>
+				<?php
 				$course_id = absint( get_post_meta( $lesson_id, '_clms_lesson_course_id', true ) );
 				if ( ! $course_id ) { $course_id = absint( get_post_meta( $lesson_id, '_clms_course_id', true ) ); }
 				if ( ! $course_id ) { $course_id = absint( get_post_meta( $lesson_id, 'course_id', true ) ); }
@@ -162,6 +203,35 @@ trait CLMS_Submission_Core_Trait {
 						</span>
 						<?php if ( ! empty( $member_names ) ) : ?>
 							<br><span class="description"><?php echo esc_html( implode( ' · ', $member_names ) ); ?></span>
+						<?php endif; ?>
+
+						<?php if ( ! empty( $group_context['master_id'] ) ) : ?>
+							<?php
+							$submitted_by_id = absint( $group_context['submitted_by'] ?? 0 );
+							$submitted_by_u  = $submitted_by_id ? get_userdata( $submitted_by_id ) : null;
+							$submitted_by_name = $submitted_by_u ? (string) ( $submitted_by_u->display_name ?? '' ) : '';
+							$submitted_at = sanitize_text_field( (string) ( $group_context['submitted_at'] ?? '' ) );
+							?>
+							<?php if ( $submitted_by_name || $submitted_at ) : ?>
+								<br><span class="description">
+									<?php
+									if ( $submitted_by_name && $submitted_at ) {
+										printf(
+											/* translators: 1: name, 2: datetime */
+											esc_html__( 'Última entrega: %1$s (%2$s).', 'atora-lms' ),
+											esc_html( $submitted_by_name ),
+											esc_html( $submitted_at )
+										);
+									} elseif ( $submitted_at ) {
+										printf(
+											/* translators: 1: datetime */
+											esc_html__( 'Última entrega: %s.', 'atora-lms' ),
+											esc_html( $submitted_at )
+										);
+									}
+									?>
+								</span>
+							<?php endif; ?>
 						<?php endif; ?>
 					<?php endif; ?>
 				</div>
@@ -231,7 +301,7 @@ trait CLMS_Submission_Core_Trait {
 					<div class="clms-message">
 						<strong>Archivos enviados:</strong>
 						<ul>
-							<?php foreach ( $submission['files'] as $file_id ) : ?>
+							<?php foreach ( $display_files as $file_id ) : ?>
 								<?php
 								$file_id = absint( $file_id );
 
@@ -271,7 +341,7 @@ trait CLMS_Submission_Core_Trait {
 						name="clms_submission_comment"
 						rows="5"
 						style="width:100%;"
-					><?php echo ! empty( $submission['comment'] ) ? esc_textarea( $submission['comment'] ) : ''; ?></textarea>
+					><?php echo '' !== trim( $comment_prefill ) ? esc_textarea( $comment_prefill ) : ''; ?></textarea>
 				</p>
 				<?php endif; ?>
 

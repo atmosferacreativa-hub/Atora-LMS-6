@@ -824,13 +824,25 @@ trait CLMS_Metabox_Lesson_Render_Trait {
 					$course_id_for_groups = absint( get_post_meta( $post->ID, '_clms_lesson_course_id', true ) );
 					if ( ! $course_id_for_groups ) { $course_id_for_groups = absint( get_post_meta( $post->ID, '_clms_course_id', true ) ); }
 					if ( ! $course_id_for_groups ) { $course_id_for_groups = absint( get_post_meta( $post->ID, 'course_id', true ) ); }
+					$groups_enabled_for_course = $course_id_for_groups ? ( '1' === (string) get_post_meta( $course_id_for_groups, '_clms_course_groups_enabled', true ) ) : false;
 					?>
 					<span class="clms-help">
 						<?php esc_html_e( 'Los grupos se gestionan a nivel de curso. Debes habilitar "Grupos" en el curso y luego crear/asignar grupos.', 'atora-lms' ); ?>
 						<?php if ( $course_id_for_groups ) : ?>
+							<br>
 							<a href="<?php echo esc_url( admin_url( 'admin.php?page=atora-groups&course_id=' . $course_id_for_groups ) ); ?>">
-								<?php esc_html_e( 'Gestionar grupos', 'atora-lms' ); ?>
+								<?php esc_html_e( 'Gestionar grupos del curso', 'atora-lms' ); ?>
 							</a>
+							<?php if ( ! $groups_enabled_for_course ) : ?>
+								<br><span style="color:#b32d2e">
+									<?php esc_html_e( 'Atención: el curso aún no tiene habilitada la evaluación por grupos.', 'atora-lms' ); ?>
+									<a href="<?php echo esc_url( get_edit_post_link( $course_id_for_groups, '' ) ); ?>">
+										<?php esc_html_e( 'Abrir curso', 'atora-lms' ); ?>
+									</a>
+								</span>
+							<?php endif; ?>
+						<?php else : ?>
+							<br><span style="color:#b32d2e"><?php esc_html_e( 'No se pudo detectar el curso asociado a esta lección. Guarda la lección y verifica su curso antes de usar "Trabajo en grupo".', 'atora-lms' ); ?></span>
 						<?php endif; ?>
 					</span>
 				<?php endif; ?>

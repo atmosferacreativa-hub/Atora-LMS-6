@@ -210,7 +210,31 @@ trait CLMS_Submission_Storage_Review_Trait {
 			return array();
 		}
 
-		$submission_id = $this->get_existing_submission_id( $user_id, $lesson_id );
+		$submission_id = 0;
+
+		$evaluation_mode = sanitize_key( (string) get_post_meta( $lesson_id, '_clms_evaluation_mode', true ) );
+		if ( 'group' === $evaluation_mode ) {
+			$course_id = $this->get_course_id_for_lesson( $lesson_id );
+			$group_id  = $course_id ? absint( (int) apply_filters( 'atora/groups/user_group_id', 0, $user_id, absint( $course_id ), $lesson_id ) ) : 0;
+
+			// Intentar primero la shadow (submission del estudiante).
+			$submission_id = $this->get_existing_submission_id( $user_id, $lesson_id );
+
+			// Hardening: si por alguna razón no existe shadow aún, crearla desde el master.
+			if ( ! $submission_id && $group_id ) {
+				$master_id = $this->get_existing_group_master_submission_id( $group_id, $lesson_id );
+				if ( $master_id && class_exists( '\ATORA\Groups\Group_Service' ) ) {
+					$service = new \ATORA\Groups\Group_Service();
+					$shadow_id = $service->ensure_shadow_submission( $user_id, $lesson_id, absint( $course_id ), $group_id, absint( $master_id ) );
+					if ( $shadow_id ) {
+						$service->sync_shadow_grade_from_master( absint( $shadow_id ), absint( $master_id ) );
+						$submission_id = absint( $shadow_id );
+					}
+				}
+			}
+		} else {
+			$submission_id = $this->get_existing_submission_id( $user_id, $lesson_id );
+		}
 
 		if ( ! $submission_id ) {
 			return array();
@@ -607,6 +631,25 @@ trait CLMS_Submission_Storage_Review_Trait {
 
 		if ( CLMS_Helper::user_can_manage_lms() ) {
 			return true;
+		}
+
+		// Group Assessment: permitir ver adjuntos del submission master si el usuario
+		// pertenece al mismo grupo (los adjuntos se comparten a nivel grupal).
+		$submission_id = absint( get_post_meta( $file_id, '_clms_submission_id', true ) );
+		if ( $submission_id && '1' === (string) get_post_meta( $submission_id, '_clms_submission_group_master', true ) ) {
+			$group_id  = absint( get_post_meta( $submission_id, '_clms_submission_group_id', true ) );
+			$lesson_id = absint( get_post_meta( $submission_id, '_clms_submission_lesson_id', true ) );
+			$course_id = absint( get_post_meta( $submission_id, '_clms_submission_course_id', true ) );
+			if ( ! $course_id && $lesson_id && class_exists( 'CLMS_Helper' ) ) {
+				$course_id = absint( CLMS_Helper::get_lesson_course_id( $lesson_id ) );
+			}
+
+			if ( $group_id && $course_id ) {
+				$user_group_id = absint( (int) apply_filters( 'atora/groups/user_group_id', 0, $user_id, $course_id, $lesson_id ) );
+				if ( $user_group_id && $user_group_id === $group_id ) {
+					return true;
+				}
+			}
 		}
 
 		$owner = absint( get_post_meta( $file_id, '_clms_submission_owner', true ) );

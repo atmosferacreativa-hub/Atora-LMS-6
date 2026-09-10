@@ -91,8 +91,8 @@ Evolucionar ATORA LMS en ciclos continuos, priorizando (1) evaluación colaborat
 - [x] Migración: extender `includes/class-clms-db-migration.php` con `dbDelta()` y sincronización de `clms_db_schema_version`.
 - [x] Backend: extender flujo de `clms_submission` para soportar “submission tipo grupo” y mapping a miembros.
 - [x] Gradebook: ajustar “propagación de nota” (sin duplicar cálculos) y evitar double-grading.
-- [ ] UI docente: builder de grupos en metabox/lección (o pantalla dedicada) + validaciones.
-- [ ] UI estudiante: pantalla de entrega que muestre grupo, estado, y “quién entregó”.
+- [x] UI docente: builder de grupos en metabox/lección (o pantalla dedicada) + validaciones.
+- [x] UI estudiante: pantalla de entrega que muestre grupo, estado, y “quién entregó”.
 - [x] Permisos: checks en REST para gestión de grupos y overrides.
 - [x] Reportes: export de calificaciones grupales e individuales (CSV mínimo).
 - [ ] QA: casos límite (cambio de grupo post-entrega, miembros sin entrega, retiro/abandono, reintentos).
