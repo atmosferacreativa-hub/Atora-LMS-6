@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 6.14.0
+Stable tag: 6.14.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,11 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.14.1 =
+* Hardening Group Assessment: enabled “Trabajo en grupo” mode in lesson UI and added group context to the student submission form.
+* Improved course group management UI (create groups, assign members, safe preset autogeneration) and added locked-group safe add-only flow.
+* Prevented double grading in SpeedGrade by excluding shadow submissions and restricting group lessons to master submissions only.
+
 = 6.14.0 =
 * Added Group Assessment (work in groups): course-level group management, group submissions, grade propagation to all members, per-student overrides, and CSV export.
 * Improved Rubrics: per-criterion weights (auto-normalized), configurable scales (0–4, 0–5, 0–20, 0–100, A–F), holistic flag, and exemplars/benchmarks per level. Added shared rubric presets.
