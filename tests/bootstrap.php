@@ -1,6 +1,6 @@
 <?php
 /**
- * PHPUnit Bootstrap — ATORA LMS v6.0.0
+ * PHPUnit Bootstrap — ATORA LMS v6.21.0
  *
  * Usa Brain\Monkey para mockear funciones de WordPress sin necesitar
  * una instalación completa. Compatible con PHPUnit 10+ y PHP 8.1+.
@@ -27,7 +27,7 @@ require_once $autoload;
 
 // Definir constantes WP mínimas
 if ( ! defined( 'ABSPATH' ) )         { define( 'ABSPATH', '/tmp/wp/' ); }
-if ( ! defined( 'ATORA_LMS_VERSION' ) ) { define( 'ATORA_LMS_VERSION', '6.0.0' ); }
+if ( ! defined( 'ATORA_LMS_VERSION' ) ) { define( 'ATORA_LMS_VERSION', '6.21.0' ); }
 if ( ! defined( 'DAY_IN_SECONDS' ) )  { define( 'DAY_IN_SECONDS', 86400 ); }
 if ( ! defined( 'HOUR_IN_SECONDS' ) ) { define( 'HOUR_IN_SECONDS', 3600 ); }
 if ( ! defined( 'MINUTE_IN_SECONDS' ) ) { define( 'MINUTE_IN_SECONDS', 60 ); }
@@ -145,6 +145,38 @@ if ( ! function_exists( 'update_option' ) )    {
 }
 if ( ! function_exists( 'atora_test_reset_options' ) ) {
 	function atora_test_reset_options(): void { $GLOBALS['__atora_test_options'] = array(); }
+}
+if ( ! function_exists( 'delete_option' ) ) {
+	function delete_option( string $k ): bool {
+		$exists = array_key_exists( $k, $GLOBALS['__atora_test_options'] );
+		unset( $GLOBALS['__atora_test_options'][ $k ] );
+		return $exists;
+	}
+}
+if ( ! function_exists( 'wp_parse_args' ) ) {
+	function wp_parse_args( $args, array $defaults = array() ): array {
+		if ( is_object( $args ) ) {
+			$args = get_object_vars( $args );
+		} elseif ( is_string( $args ) ) {
+			parse_str( $args, $args );
+		}
+		return array_merge( $defaults, is_array( $args ) ? $args : array() );
+	}
+}
+if ( ! function_exists( 'wp_list_pluck' ) ) {
+	function wp_list_pluck( array $list, $field, $index_key = null ): array {
+		$result = array();
+		foreach ( $list as $item ) {
+			$value = is_array( $item ) ? ( $item[ $field ] ?? null ) : ( $item->{$field} ?? null );
+			if ( null === $index_key ) {
+				$result[] = $value;
+				continue;
+			}
+			$key = is_array( $item ) ? ( $item[ $index_key ] ?? null ) : ( $item->{$index_key} ?? null );
+			$result[ $key ] = $value;
+		}
+		return $result;
+	}
 }
 $GLOBALS['__atora_test_user_meta'] = array();
 if ( ! function_exists( 'get_user_meta' ) )    {
