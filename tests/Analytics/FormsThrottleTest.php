@@ -210,7 +210,7 @@ class FormsThrottleTest extends TestCase {
 		// defecto ("PRIVATE IP ≠ TRUSTED PROXY") — se configura
 		// explícitamente para este test, igual que tendría que hacerlo
 		// un sitio real detrás de un proxy en una IP privada.
-		add_filter( 'atora_client_ip_trusted_proxies', static function () { return array( '10.0.0.5' ); } );
+		$GLOBALS['__atora_test_filters']['atora_client_ip_trusted_proxies'][] = array( 'cb' => static function () { return array( '10.0.0.5' ); } );
 
 		$_SERVER['REMOTE_ADDR']         = '10.0.0.5'; // proxy explícitamente confiable para este test.
 		$_SERVER['HTTP_X_FORWARDED_FOR'] = '198.51.100.77';
