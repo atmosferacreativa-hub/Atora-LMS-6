@@ -892,6 +892,9 @@ trait CLMS_Grading_SpeedGrade_Trait {
 		}
 
 		$student_id  = absint( get_post_meta( $submission_id, '_clms_submission_user_id', true ) );
+		if ( ! $student_id && '1' === (string) get_post_meta( $submission_id, '_clms_submission_group_master', true ) ) {
+			$student_id = absint( get_post_meta( $submission_id, '_clms_submission_submitted_by', true ) );
+		}
 		$lesson_id   = absint( get_post_meta( $submission_id, '_clms_submission_lesson_id', true ) );
 		$course_id   = absint( get_post_meta( $submission_id, '_clms_submission_course_id', true ) );
 		$status      = (string) get_post_meta( $submission_id, '_clms_submission_status', true );
@@ -1254,6 +1257,11 @@ trait CLMS_Grading_SpeedGrade_Trait {
 				continue;
 			}
 
+			// Group Assessment: hide shadow submissions to prevent double grading.
+			if ( '1' === (string) get_post_meta( $submission_id, '_clms_submission_is_shadow', true ) ) {
+				continue;
+			}
+
 			$lesson_id  = absint( get_post_meta( $submission_id, '_clms_submission_lesson_id', true ) );
 			$course_id  = absint( get_post_meta( $submission_id, '_clms_submission_course_id', true ) );
 			$student_id = absint( get_post_meta( $submission_id, '_clms_submission_user_id', true ) );
@@ -1261,6 +1269,18 @@ trait CLMS_Grading_SpeedGrade_Trait {
 
 			if ( ! $lesson_id || ! in_array( $lesson_id, $lesson_ids, true ) ) {
 				continue;
+			}
+
+			$evaluation_mode = sanitize_key( (string) get_post_meta( $lesson_id, '_clms_evaluation_mode', true ) );
+			if ( 'group' === $evaluation_mode ) {
+				// Only grade the master submission for a group lesson.
+				if ( '1' !== (string) get_post_meta( $submission_id, '_clms_submission_group_master', true ) ) {
+					continue;
+				}
+				// Use the submitter as a stable display user for SpeedGrade UI.
+				if ( ! $student_id ) {
+					$student_id = absint( get_post_meta( $submission_id, '_clms_submission_submitted_by', true ) );
+				}
 			}
 
 			if ( ! $course_id ) {
