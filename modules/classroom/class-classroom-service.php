@@ -48,37 +48,7 @@ final class Classroom_Service {
 	 * @return array|WP_Error
 	 */
 	public function api_get( string $path, array $query, int $user_id ) {
-		$token = $this->get_access_token( $user_id );
-		if ( ! $token ) {
-			return new WP_Error( 'not_connected', __( 'Google no está conectado para este usuario.', 'atora-lms' ) );
-		}
-
-		$url = 'https://classroom.googleapis.com/v1' . $path;
-		if ( ! empty( $query ) ) {
-			$url = add_query_arg( $query, $url );
-		}
-
-		$res = wp_remote_get( $url, array(
-			'headers' => array(
-				'Authorization' => 'Bearer ' . $token,
-				'Accept'        => 'application/json',
-			),
-			'timeout' => 20,
-		) );
-		if ( is_wp_error( $res ) ) {
-			return $res;
-		}
-
-		$code = (int) wp_remote_retrieve_response_code( $res );
-		$body = (string) wp_remote_retrieve_body( $res );
-		$data = json_decode( $body, true );
-
-		if ( $code < 200 || $code >= 300 ) {
-			$msg = is_array( $data ) && isset( $data['error']['message'] ) ? (string) $data['error']['message'] : __( 'Error al llamar Google Classroom.', 'atora-lms' );
-			return new WP_Error( 'classroom_api_error', $msg, array( 'status' => $code ) );
-		}
-
-		return is_array( $data ) ? $data : array();
+		return $this->api_request( 'GET', $path, $query, array(), $user_id );
 	}
 
 	/**
@@ -101,30 +71,87 @@ final class Classroom_Service {
 			$url = add_query_arg( $query, $url );
 		}
 
-		$res = wp_remote_request( $url, array(
-			'method'  => $method,
-			'headers' => array(
-				'Authorization' => 'Bearer ' . $token,
-				'Accept'        => 'application/json',
-				'Content-Type'  => 'application/json',
-			),
-			'body'    => wp_json_encode( $body ),
-			'timeout' => 25,
-		) );
+		$attempts = 0;
+		$max_attempts = 4;
+		$res = null;
+		$code = 0;
+		$retry_after = 0;
+
+		while ( $attempts < $max_attempts ) {
+			++$attempts;
+
+			$args = array(
+				'method'  => $method,
+				'headers' => array(
+					'Authorization' => 'Bearer ' . $token,
+					'Accept'        => 'application/json',
+					'Content-Type'  => 'application/json',
+				),
+				'timeout' => 25,
+			);
+			if ( 'GET' !== $method && 'HEAD' !== $method ) {
+				$args['body'] = wp_json_encode( $body );
+			}
+
+			$res = wp_remote_request( $url, $args );
+			if ( is_wp_error( $res ) ) {
+				// Errores de red suelen ser transitorios: pequeño backoff y retry.
+				$this->sleep_backoff_ms( $attempts, 0 );
+				continue;
+			}
+
+			$code = (int) wp_remote_retrieve_response_code( $res );
+			$retry_after_raw = wp_remote_retrieve_header( $res, 'retry-after' );
+			$retry_after = is_scalar( $retry_after_raw ) ? absint( (string) $retry_after_raw ) : 0;
+
+			if ( $this->should_retry_http_code( $code ) ) {
+				$this->sleep_backoff_ms( $attempts, $retry_after );
+				continue;
+			}
+
+			break;
+		}
+
 		if ( is_wp_error( $res ) ) {
 			return $res;
 		}
 
-		$code = (int) wp_remote_retrieve_response_code( $res );
 		$raw  = (string) wp_remote_retrieve_body( $res );
 		$data = '' !== trim( $raw ) ? json_decode( $raw, true ) : array();
 
 		if ( $code < 200 || $code >= 300 ) {
 			$msg = is_array( $data ) && isset( $data['error']['message'] ) ? (string) $data['error']['message'] : __( 'Error al llamar Google Classroom.', 'atora-lms' );
+			// Mensaje más accionable cuando faltan scopes.
+			if ( 403 === $code && is_string( $msg ) && false !== stripos( $msg, 'insufficient authentication scopes' ) ) {
+				$msg = __( 'Google Classroom: permisos insuficientes (scopes). Activa Classroom en ATORA → Google y reconecta la cuenta.', 'atora-lms' );
+			}
 			return new WP_Error( 'classroom_api_error', $msg, array( 'status' => $code ) );
 		}
 
 		return is_array( $data ) ? $data : array();
+	}
+
+	private function should_retry_http_code( int $code ): bool {
+		return in_array( (int) $code, array( 429, 500, 502, 503, 504 ), true );
+	}
+
+	private function sleep_backoff_ms( int $attempt, int $retry_after_seconds = 0 ): void {
+		$attempt = max( 1, $attempt );
+		$retry_after_seconds = max( 0, absint( $retry_after_seconds ) );
+
+		// Si Google envía Retry-After, respétalo (cap pequeño para no bloquear requests largos).
+		if ( $retry_after_seconds > 0 ) {
+			$ms = min( 3000, $retry_after_seconds * 1000 );
+			usleep( $ms * 1000 );
+			return;
+		}
+
+		// Backoff exponencial suave: 250ms, 500ms, 1000ms, 2000ms...
+		$ms = (int) ( 250 * ( 2 ** ( $attempt - 1 ) ) );
+		$ms = max( 0, min( 2000, $ms ) );
+		if ( $ms > 0 ) {
+			usleep( $ms * 1000 );
+		}
 	}
 
 	/**

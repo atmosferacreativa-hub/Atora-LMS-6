@@ -266,7 +266,7 @@ final class Classroom_Module {
 		$coursework = $service->list_coursework( $gc_course_id, $actor_user_id );
 
 		if ( empty( $coursework ) ) {
-			echo '<p class="description" style="margin-top:12px;">' . esc_html__( 'No se encontraron tareas en Classroom (o faltan permisos/scopes).', 'atora-lms' ) . '</p>';
+			echo '<p class="description" style="margin-top:12px;">' . esc_html__( 'No se encontraron tareas en Classroom. Si esperabas ver tareas, revisa que Classroom esté habilitado y reconectado (scopes) en ATORA → Google.', 'atora-lms' ) . '</p>';
 			return;
 		}
 
@@ -290,6 +290,7 @@ final class Classroom_Module {
 		echo '<th style="width: 32px;"></th>';
 		echo '<th>' . esc_html__( 'Título', 'atora-lms' ) . '</th>';
 		echo '<th>' . esc_html__( 'Vence', 'atora-lms' ) . '</th>';
+		echo '<th>' . esc_html__( 'Puntos', 'atora-lms' ) . '</th>';
 		echo '<th>' . esc_html__( 'Estado', 'atora-lms' ) . '</th>';
 		echo '<th>' . esc_html__( 'Importado', 'atora-lms' ) . '</th>';
 		echo '<th>' . esc_html__( 'Notas', 'atora-lms' ) . '</th>';
@@ -304,6 +305,7 @@ final class Classroom_Module {
 			$due_date = sanitize_text_field( (string) ( $cw['due_date'] ?? '' ) );
 			$due_time = sanitize_text_field( (string) ( $cw['due_time'] ?? '' ) );
 			$state = sanitize_key( (string) ( $cw['state'] ?? '' ) );
+			$max_points = absint( $cw['max_points'] ?? 0 );
 
 			$imp = isset( $imported[ $gc_id ] ) ? (array) $imported[ $gc_id ] : array();
 			$wp_lesson_id = absint( $imp['wp_lesson_id'] ?? 0 );
@@ -319,6 +321,7 @@ final class Classroom_Module {
 			echo '<td><input type="checkbox" name="gc_coursework_ids[]" value="' . esc_attr( $gc_id ) . '"></td>';
 			echo '<td><strong>' . esc_html( $title ?: $gc_id ) . '</strong><br><span class="description">' . esc_html( $gc_id ) . '</span></td>';
 			echo '<td><span class="description">' . esc_html( $due_label ) . '</span></td>';
+			echo '<td><span class="description">' . esc_html( $max_points ? (string) $max_points : '—' ) . '</span></td>';
 			echo '<td><span class="description">' . esc_html( $state ?: '—' ) . '</span></td>';
 			echo '<td>';
 			if ( $wp_lesson_id && $lesson_link ) {

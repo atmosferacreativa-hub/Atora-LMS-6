@@ -219,8 +219,8 @@ Evolucionar ATORA LMS en ciclos continuos, priorizando (1) evaluación colaborat
 - [x] Import (MVP): listar `courseWork` y crear lecciones en curso WP (idempotente).
 - [x] Notas (MVP): empujar notas de lecciones a Classroom via `draftGrade` + `:return`.
 - [x] Logs: tabla `wp_atora_google_classroom_sync_log` (MVP).
-- [~] UI: panel “Google Classroom” + acciones (MVP).
-- [ ] QA: límites de API, paginación y pruebas con sandbox de Google.
+- [x] UI: panel “Google Classroom” + acciones (MVP).
+- [x] QA: límites de API, paginación y hardening (retry/backoff, mensajes por scopes) + pruebas en entorno real.
 
 ---
 
