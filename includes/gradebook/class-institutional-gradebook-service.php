@@ -436,6 +436,56 @@ class CLMS_Institutional_Gradebook_Service {
 		return true;
 	}
 
+	public function get_context( $academy_id = 0, $course_id = 0, $cycle_id = 0 ) {
+		global $wpdb;
+
+		$academy_id = absint( $academy_id );
+		$course_id  = absint( $course_id );
+		$cycle_id   = absint( $cycle_id );
+
+		$periods = $wpdb->get_results(
+			$wpdb->prepare( "SELECT * FROM {$wpdb->prefix}atora_academic_periods WHERE academy_id = %d ORDER BY starts_at DESC, id DESC", $academy_id ),
+			ARRAY_A
+		);
+		$scales = $wpdb->get_results(
+			$wpdb->prepare( "SELECT * FROM {$wpdb->prefix}atora_grading_scales WHERE academy_id = %d ORDER BY code ASC, version DESC", $academy_id ),
+			ARRAY_A
+		);
+
+		if ( $course_id ) {
+			$cycles = $wpdb->get_results(
+				$wpdb->prepare( "SELECT * FROM {$wpdb->prefix}atora_gradebook_cycles WHERE academy_id = %d AND course_id = %d ORDER BY id DESC", $academy_id, $course_id ),
+				ARRAY_A
+			);
+		} else {
+			$cycles = $wpdb->get_results(
+				$wpdb->prepare( "SELECT * FROM {$wpdb->prefix}atora_gradebook_cycles WHERE academy_id = %d ORDER BY id DESC", $academy_id ),
+				ARRAY_A
+			);
+		}
+
+		$grades = array();
+		$rectifications = array();
+		if ( $cycle_id ) {
+			$grades = $wpdb->get_results(
+				$wpdb->prepare( "SELECT * FROM {$wpdb->prefix}atora_institutional_grades WHERE cycle_id = %d ORDER BY student_id ASC", $cycle_id ),
+				ARRAY_A
+			);
+			$rectifications = $wpdb->get_results(
+				$wpdb->prepare( "SELECT * FROM {$wpdb->prefix}atora_grade_rectifications WHERE cycle_id = %d ORDER BY id DESC", $cycle_id ),
+				ARRAY_A
+			);
+		}
+
+		return array(
+			'periods'        => is_array( $periods ) ? $periods : array(),
+			'scales'         => is_array( $scales ) ? $scales : array(),
+			'cycles'         => is_array( $cycles ) ? $cycles : array(),
+			'grades'         => is_array( $grades ) ? $grades : array(),
+			'rectifications' => is_array( $rectifications ) ? $rectifications : array(),
+		);
+	}
+
 	public function get_row( $table_suffix, $id ) {
 		global $wpdb;
 
