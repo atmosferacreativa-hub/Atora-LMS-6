@@ -117,6 +117,56 @@ trait CLMS_Submission_Core_Trait {
 			<?php endif; ?>
 			<?php echo $this->render_submission_notice(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 
+			<?php
+			$evaluation_mode = sanitize_key( (string) get_post_meta( $lesson_id, '_clms_evaluation_mode', true ) );
+			if ( 'group' === $evaluation_mode ) :
+				$course_id = absint( get_post_meta( $lesson_id, '_clms_lesson_course_id', true ) );
+				if ( ! $course_id ) { $course_id = absint( get_post_meta( $lesson_id, '_clms_course_id', true ) ); }
+				if ( ! $course_id ) { $course_id = absint( get_post_meta( $lesson_id, 'course_id', true ) ); }
+
+				$groups_enabled = $course_id ? ( '1' === (string) get_post_meta( $course_id, '_clms_course_groups_enabled', true ) ) : false;
+				$group_id       = $course_id ? absint( (int) apply_filters( 'atora/groups/user_group_id', 0, $user_id, $course_id, $lesson_id ) ) : 0;
+
+				$group_name   = '';
+				$member_names = array();
+
+				if ( $groups_enabled && $group_id && class_exists( '\ATORA\Groups\Group_Service' ) ) {
+					$service = new \ATORA\Groups\Group_Service();
+					$g       = $service->get_group( $group_id );
+					$group_name = is_array( $g ) ? (string) ( $g['name'] ?? '' ) : '';
+					$member_ids = $service->get_group_member_ids( $group_id );
+					foreach ( (array) $member_ids as $mid ) {
+						$u = get_userdata( absint( $mid ) );
+						if ( $u && ! empty( $u->display_name ) ) {
+							$member_names[] = (string) $u->display_name;
+						}
+					}
+				}
+				?>
+				<div class="clms-message">
+					<strong><?php esc_html_e( 'Trabajo en grupo', 'atora-lms' ); ?></strong><br>
+					<?php if ( ! $groups_enabled ) : ?>
+						<span><?php esc_html_e( 'Este curso no tiene habilitada la evaluación por grupos. Contacta a tu docente.', 'atora-lms' ); ?></span>
+					<?php elseif ( ! $group_id ) : ?>
+						<span><?php esc_html_e( 'No tienes un grupo asignado para esta actividad. Contacta a tu docente.', 'atora-lms' ); ?></span>
+					<?php else : ?>
+						<span>
+							<?php
+							printf(
+								/* translators: 1: group name, 2: group id */
+								esc_html__( 'Tu grupo: %1$s (ID %2$d).', 'atora-lms' ),
+								esc_html( $group_name ? $group_name : __( 'Sin nombre', 'atora-lms' ) ),
+								(int) $group_id
+							);
+							?>
+						</span>
+						<?php if ( ! empty( $member_names ) ) : ?>
+							<br><span class="description"><?php echo esc_html( implode( ' · ', $member_names ) ); ?></span>
+						<?php endif; ?>
+					<?php endif; ?>
+				</div>
+			<?php endif; ?>
+
 				<?php if ( ! empty( $submission['submission_id'] ) ) : ?>
 					<div class="clms-message">
 						<strong>Estado actual:</strong>

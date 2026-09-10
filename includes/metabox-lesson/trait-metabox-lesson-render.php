@@ -808,6 +808,7 @@ trait CLMS_Metabox_Lesson_Render_Trait {
 				<label for="_clms_evaluation_mode"><?php esc_html_e( 'Modo de evaluación', 'atora-lms' ); ?></label>
 				<select name="_clms_evaluation_mode" id="_clms_evaluation_mode">
 					<option value="manual" <?php selected( $assessment_mode, 'manual' ); ?>><?php esc_html_e( 'Manual', 'atora-lms' ); ?></option>
+					<option value="group" <?php selected( $assessment_mode, 'group' ); ?>><?php esc_html_e( 'Trabajo en grupo', 'atora-lms' ); ?></option>
 					<option value="ai_assisted" <?php selected( $assessment_mode, 'ai_assisted' ); ?>><?php esc_html_e( 'IA asistida', 'atora-lms' ); ?></option>
 					<option value="ai_auto_grade" <?php selected( $assessment_mode, 'ai_auto_grade' ); ?>><?php esc_html_e( 'IA automática', 'atora-lms' ); ?></option>
 					<option value="peer_review" <?php selected( $assessment_mode, 'peer_review' ); ?>><?php esc_html_e( 'Revisión entre pares', 'atora-lms' ); ?></option>

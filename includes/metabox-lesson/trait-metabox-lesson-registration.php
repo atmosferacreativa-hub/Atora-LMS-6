@@ -445,6 +445,7 @@ trait CLMS_Metabox_Lesson_Registration_Trait {
 			'bankError'          => __( 'Error al generar.', 'atora-lms' ),
 			'bankNetworkError'   => __( 'Error de red. Intenta de nuevo.', 'atora-lms' ),
 			'evalHintManual'     => __( 'Manual: el docente revisa y publica la nota final.', 'atora-lms' ),
+			'evalHintGroup'      => __( 'Trabajo en grupo: una entrega por grupo; ATORA replica la nota a los integrantes (permite ajuste individual).', 'atora-lms' ),
 			'evalHintAiAssisted' => __( 'IA asistida: ATORA sugiere evaluación y el docente valida.', 'atora-lms' ),
 			'evalHintAiAuto'     => __( 'IA automática: la nota se publica si supera el umbral de confianza.', 'atora-lms' ),
 			'evalHintPeer'       => __( 'Revisión entre pares: activa asignación y agregación de pares.', 'atora-lms' ),
@@ -1008,6 +1009,7 @@ trait CLMS_Metabox_Lesson_Registration_Trait {
 
 					function getModeHint(mode){
 						switch(mode){
+							case 'group': return clmsI18n.evalHintGroup || '';
 							case 'ai_assisted': return clmsI18n.evalHintAiAssisted || '';
 							case 'ai_auto_grade': return clmsI18n.evalHintAiAuto || '';
 							case 'peer_review': return clmsI18n.evalHintPeer || '';

@@ -84,6 +84,27 @@ final class Group_Service {
 		return is_array( $rows ) ? $rows : array();
 	}
 
+	public function get_group( int $group_id ): ?array {
+		global $wpdb;
+		$group_id = absint( $group_id );
+		if ( ! $group_id ) {
+			return null;
+		}
+
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT id, course_id, name, locked_at, created_at, updated_at
+				 FROM {$this->table_groups()}
+				 WHERE id = %d
+				 LIMIT 1",
+				$group_id
+			),
+			ARRAY_A
+		);
+
+		return is_array( $row ) ? $row : null;
+	}
+
 	public function get_group_course_id( int $group_id ): int {
 		global $wpdb;
 		$group_id = absint( $group_id );
