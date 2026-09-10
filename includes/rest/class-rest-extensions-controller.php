@@ -442,7 +442,7 @@ class CLMS_REST_Extensions_Controller {
 
 		$rows = array();
 		foreach ( $assignments as $assignment ) {
-			$rows[] = $this->format_peer_assignment( $assignment );
+			$rows[] = $this->format_peer_assignment( $assignment, true );
 		}
 
 		return rest_ensure_response( array( 'assignments' => $rows, 'total' => count( $rows ) ) );
@@ -499,6 +499,11 @@ class CLMS_REST_Extensions_Controller {
 			return new WP_Error( 'training_required', __( 'Debes completar el entrenamiento de revisión antes de enviar evaluaciones entre pares.', 'atora-lms' ), array( 'status' => 403 ) );
 		}
 
+		$is_calibration = '1' === (string) get_post_meta( $assignment_id, '_clms_pr_is_calibration', true );
+		if ( ! $is_calibration && class_exists( 'CLMS_Peer_Review' ) && CLMS_Peer_Review::is_calibration_required_for_lesson( $lesson_id ) && ! CLMS_Peer_Review::is_reviewer_calibrated_for_lesson( $reviewer_id, $lesson_id ) ) {
+			return new WP_Error( 'calibration_required', __( 'Debes completar la calibración antes de enviar revisiones entre pares.', 'atora-lms' ), array( 'status' => 403 ) );
+		}
+
 		$data    = $this->get_json_or_body_params( $request );
 		$scores  = CLMS_Peer_Review::validate_scores_for_assignment(
 			$assignment_id,
@@ -518,6 +523,27 @@ class CLMS_REST_Extensions_Controller {
 		wp_update_post( array( 'ID' => $assignment_id, 'post_status' => 'publish' ) );
 
 		$submission_id = absint( get_post_meta( $assignment_id, '_clms_pr_submission_id', true ) );
+
+		if ( class_exists( 'CLMS_Peer_Review' ) ) {
+			CLMS_Peer_Review::audit(
+				'review_submitted',
+				array(
+					'assignment_id' => $assignment_id,
+					'lesson_id'     => $lesson_id,
+					'submission_id' => $submission_id,
+					'reviewer_id'   => $reviewer_id,
+					'reviewee_id'   => absint( get_post_meta( $assignment_id, '_clms_pr_reviewee_id', true ) ),
+					'actor_id'      => $reviewer_id,
+					'meta'          => array(
+						'is_calibration' => $is_calibration ? 1 : 0,
+					),
+				)
+			);
+			if ( $is_calibration ) {
+				CLMS_Peer_Review::score_calibration_assignment( $assignment_id );
+			}
+		}
+
 		do_action( 'clms_peer_review_completed', $assignment_id, $submission_id );
 
 		return rest_ensure_response( array( 'assignment_id' => $assignment_id, 'status' => 'completed' ) );
@@ -542,27 +568,56 @@ class CLMS_REST_Extensions_Controller {
 
 		$rows = array();
 		foreach ( $assignments as $assignment ) {
-			$rows[] = $this->format_peer_assignment( $assignment );
+			$rows[] = $this->format_peer_assignment( $assignment, false );
 		}
 
 		return rest_ensure_response( array( 'assignments' => $rows ) );
 	}
 
-	protected function format_peer_assignment( WP_Post $post ) {
+	protected function format_peer_assignment( WP_Post $post, bool $include_sensitive = false ) {
 		$submission_id = absint( get_post_meta( $post->ID, '_clms_pr_submission_id', true ) );
 		$reviewer_id   = absint( get_post_meta( $post->ID, '_clms_pr_reviewer_id', true ) );
 		$lesson_id     = absint( get_post_meta( $post->ID, '_clms_pr_lesson_id', true ) );
+		$reviewee_id   = absint( get_post_meta( $post->ID, '_clms_pr_reviewee_id', true ) );
+		$is_calibration = '1' === (string) get_post_meta( $post->ID, '_clms_pr_is_calibration', true );
+		$is_blind      = (bool) get_post_meta( $lesson_id, '_clms_peer_review_blind', true );
+		$excluded      = '1' === (string) get_post_meta( $post->ID, '_clms_pr_excluded', true );
+		$excluded_reason = '';
+		if ( $include_sensitive ) {
+			$excluded_reason = sanitize_text_field( (string) get_post_meta( $post->ID, '_clms_pr_excluded_reason', true ) );
+		}
+
+		$reviewer_name = '';
+		$reviewee_name = '';
+		if ( $include_sensitive ) {
+			$u = $reviewer_id ? get_userdata( $reviewer_id ) : null;
+			$reviewer_name = $u ? ( $u->display_name ? $u->display_name : $u->user_login ) : '';
+			$v = $reviewee_id ? get_userdata( $reviewee_id ) : null;
+			$reviewee_name = $v ? ( $v->display_name ? $v->display_name : $v->user_login ) : '';
+		}
 
 		return array(
 			'id'            => $post->ID,
 			'lesson_id'     => $lesson_id,
 			'submission_id' => $submission_id,
 			'reviewer_id'   => $reviewer_id,
+			'reviewer_name' => $include_sensitive ? $reviewer_name : '',
+			'reviewee_id'   => $include_sensitive ? $reviewee_id : 0,
+			'reviewee_name' => $include_sensitive ? $reviewee_name : '',
+			'is_calibration'=> $is_calibration,
+			'is_blind'      => $is_blind,
+			'excluded'      => $excluded,
+			'excluded_reason' => $include_sensitive ? $excluded_reason : '',
 			'status'        => get_post_meta( $post->ID, '_clms_pr_status', true ) ?: 'pending',
 			'scores'        => (array) get_post_meta( $post->ID, '_clms_pr_scores', true ),
 			'comment'       => get_post_meta( $post->ID, '_clms_pr_comment', true ) ?: '',
 			'quality_score' => absint( get_post_meta( $post->ID, '_clms_pr_quality_score', true ) ),
 			'quality_status'=> sanitize_key( (string) get_post_meta( $post->ID, '_clms_pr_quality_status', true ) ),
+			'consistency_delta' => $is_calibration ? null : ( ( '' !== (string) get_post_meta( $post->ID, '_clms_pr_consistency_delta', true ) ) ? (int) get_post_meta( $post->ID, '_clms_pr_consistency_delta', true ) : null ),
+			'consistency_flag'  => $is_calibration ? '' : sanitize_key( (string) get_post_meta( $post->ID, '_clms_pr_consistency_flag', true ) ),
+			'calibration_delta' => $is_calibration ? ( ( '' !== (string) get_post_meta( $post->ID, '_clms_pr_calibration_delta', true ) ) ? (int) get_post_meta( $post->ID, '_clms_pr_calibration_delta', true ) : null ) : null,
+			'calibration_score' => $is_calibration ? ( ( '' !== (string) get_post_meta( $post->ID, '_clms_pr_calibration_score', true ) ) ? absint( get_post_meta( $post->ID, '_clms_pr_calibration_score', true ) ) : null ) : null,
+			'calibration_status'=> $is_calibration ? sanitize_key( (string) get_post_meta( $post->ID, '_clms_pr_calibration_status', true ) ) : '',
 			'submitted_at'  => get_post_meta( $post->ID, '_clms_pr_submitted_at', true ) ?: null,
 			'created_at'    => $post->post_date_gmt,
 		);

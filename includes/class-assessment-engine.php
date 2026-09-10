@@ -1007,6 +1007,8 @@ class CLMS_Assessment_Engine {
 			return new WP_Error( 'invalid_submission', __( 'La entrega no es válida para publicar calificación.', 'atora-lms' ) );
 		}
 
+		$is_group_master = '1' === (string) get_post_meta( $submission_id, '_clms_submission_group_master', true );
+
 		$student_id = absint( get_post_meta( $submission_id, '_clms_submission_user_id', true ) );
 		if ( ! $student_id ) {
 			$student_id = absint( get_post_meta( $submission_id, '_clms_submission_student_id', true ) );
@@ -1021,7 +1023,13 @@ class CLMS_Assessment_Engine {
 			$course_id = absint( CLMS_Helper::get_lesson_course_id( $lesson_id ) );
 		}
 
-		if ( ! $student_id || ! $lesson_id ) {
+		// Group Assessment: la entrega master no pertenece a un estudiante; permitir publicar
+		// sin recalcular gradebook para un usuario específico (las sombras se propagan aparte).
+		if ( ! $student_id && $is_group_master ) {
+			$student_id = 0;
+		}
+
+		if ( ( ! $student_id && ! $is_group_master ) || ! $lesson_id ) {
 			return new WP_Error( 'missing_submission_context', __( 'No se pudo resolver estudiante o lección de la entrega.', 'atora-lms' ) );
 		}
 
@@ -1122,10 +1130,12 @@ class CLMS_Assessment_Engine {
 			)
 		);
 
-		$this->invalidate_cache_for_user_course( $student_id, $course_id );
+		if ( $student_id ) {
+			$this->invalidate_cache_for_user_course( $student_id, $course_id );
+		}
 
 		$grading = class_exists( 'CLMS_Helper' ) ? clms_core('CLMS_Grading') : null;
-		if ( $grading && method_exists( $grading, 'calculate_and_store_course_grade' ) ) {
+		if ( $grading && method_exists( $grading, 'calculate_and_store_course_grade' ) && $student_id ) {
 			$grading->calculate_and_store_course_grade( $student_id, $course_id );
 		}
 
@@ -1133,7 +1143,7 @@ class CLMS_Assessment_Engine {
 		if ( ! $grading_engine && class_exists( 'CLMS_Grading_Engine' ) ) {
 			$grading_engine = new CLMS_Grading_Engine();
 		}
-		if ( $grading_engine && method_exists( $grading_engine, 'invalidate_grade_cache' ) ) {
+		if ( $grading_engine && method_exists( $grading_engine, 'invalidate_grade_cache' ) && $student_id ) {
 			$grading_engine->invalidate_grade_cache( $student_id, $course_id );
 		}
 
@@ -1154,7 +1164,7 @@ class CLMS_Assessment_Engine {
 			'is_published'  => $is_grade_published,
 		);
 
-		if ( $is_grade_published ) {
+		if ( $is_grade_published && $student_id ) {
 			do_action( 'clms_grade_published', $payload );
 		}
 

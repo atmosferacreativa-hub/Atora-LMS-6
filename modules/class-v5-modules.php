@@ -91,6 +91,30 @@ class V5_Modules {
 			self::load_early_warning();
 		}
 
+		// Learning Analytics: cron/rest/admin.
+		if ( ( $ctx['is_admin'] || $ctx['is_rest'] || $ctx['is_cron'] )
+			&& self::module_active( 'learning-analytics' ) ) {
+			self::load_learning_analytics();
+		}
+
+		// Portafolios: admin/rest/front/ajax (estudiantes gestionan desde shortcode).
+		if ( ( $ctx['is_admin'] || $ctx['is_rest'] || $ctx['is_front'] || $ctx['is_ajax'] )
+			&& self::module_active( 'portfolios' ) ) {
+			self::load_portfolios();
+		}
+
+		// Epic 6: Google Classroom (admin/rest/cron).
+		if ( ( $ctx['is_admin'] || $ctx['is_rest'] || $ctx['is_cron'] )
+			&& self::module_active( 'classroom' ) ) {
+			self::load_classroom();
+		}
+
+		// Epic 8: H5P (front/ajax/admin/rest).
+		if ( ( $ctx['is_admin'] || $ctx['is_front'] || $ctx['is_ajax'] || $ctx['is_rest'] )
+			&& self::module_active( 'h5p' ) ) {
+			self::load_h5p();
+		}
+
 		// Messaging: evitar carga en frontend público general.
 		if ( ( $ctx['is_admin'] || $ctx['is_cron'] || $ctx['is_rest'] || $ctx['is_ajax'] || $ctx['is_webhook'] )
 			&& self::module_active( 'messaging' ) ) {
@@ -110,6 +134,12 @@ class V5_Modules {
 		// cualquier contexto admin/rest/cron.
 		if ( self::module_active( 'google' ) ) {
 			self::load_google();
+		}
+
+		// Epic 7 (6.20.0): Microsoft (Entra SSO + Teams + Outlook iCal) —
+		// carga amplia por el botón de login (wp-login.php).
+		if ( self::module_active( 'microsoft' ) ) {
+			self::load_microsoft();
 		}
 	}
 
@@ -143,6 +173,25 @@ class V5_Modules {
 	}
 
 	/** @return void */
+	private static function load_microsoft(): void {
+		$dir = ATORA_LMS_MODULES_DIR . 'microsoft/';
+		self::require_file( $dir . 'class-microsoft-module.php' );
+		self::require_file( $dir . 'class-microsoft-identity.php' );
+		self::require_file( $dir . 'class-microsoft-teams.php' );
+		self::require_file( $dir . 'class-microsoft-outlook.php' );
+
+		if ( class_exists( '\ATORA\Microsoft\Microsoft_Module' ) ) {
+			\ATORA\Microsoft\Microsoft_Module::init();
+		}
+		if ( class_exists( '\ATORA\Microsoft\Microsoft_Identity' ) ) {
+			\ATORA\Microsoft\Microsoft_Identity::init();
+		}
+		if ( class_exists( '\ATORA\Microsoft\Microsoft_Teams' ) ) {
+			\ATORA\Microsoft\Microsoft_Teams::init();
+		}
+	}
+
+	/** @return void */
 	private static function load_groups(): void {
 		$dir = ATORA_LMS_MODULES_DIR . 'groups/';
 		self::require_file( $dir . 'class-group-service.php' );
@@ -172,6 +221,54 @@ class V5_Modules {
 
 		if ( class_exists( '\ATORA\EarlyWarning\Early_Warning_Module' ) ) {
 			\ATORA\EarlyWarning\Early_Warning_Module::init();
+		}
+	}
+
+	/** @return void */
+	private static function load_learning_analytics(): void {
+		$dir = ATORA_LMS_MODULES_DIR . 'learning-analytics/';
+		self::require_file( $dir . 'class-learning-analytics-service.php' );
+		self::require_file( $dir . 'class-learning-analytics-module.php' );
+
+		if ( class_exists( '\ATORA\LearningAnalytics\Learning_Analytics_Module' ) ) {
+			\ATORA\LearningAnalytics\Learning_Analytics_Module::init();
+		}
+	}
+
+	/** @return void */
+	private static function load_portfolios(): void {
+		$dir = ATORA_LMS_MODULES_DIR . 'portfolios/';
+		self::require_file( $dir . 'class-portfolios-service.php' );
+		self::require_file( $dir . 'class-portfolios-module.php' );
+
+		if ( class_exists( '\ATORA\Portfolios\Portfolios_Module' ) ) {
+			\ATORA\Portfolios\Portfolios_Module::init();
+		}
+	}
+
+	/** @return void */
+	private static function load_classroom(): void {
+		$dir = ATORA_LMS_MODULES_DIR . 'classroom/';
+		self::require_file( $dir . 'class-classroom-service.php' );
+		self::require_file( $dir . 'class-classroom-module.php' );
+
+		if ( class_exists( '\ATORA\Classroom\Classroom_Module' ) ) {
+			\ATORA\Classroom\Classroom_Module::init();
+		}
+	}
+
+	private static function load_h5p(): void {
+		$dir = ATORA_LMS_MODULES_DIR . 'h5p/';
+		self::require_file( $dir . 'class-h5p-content-manager.php' );
+		self::require_file( $dir . 'class-h5p-tracking-service.php' );
+		self::require_file( $dir . 'class-h5p-library-service.php' );
+		self::require_file( $dir . 'rest/class-h5p-content-controller.php' );
+		self::require_file( $dir . 'rest/class-h5p-library-controller.php' );
+		self::require_file( $dir . 'rest/class-h5p-tracking-controller.php' );
+		self::require_file( $dir . 'class-h5p-module.php' );
+
+		if ( class_exists( '\ATORA\H5P\H5P_Module' ) ) {
+			\ATORA\H5P\H5P_Module::init();
 		}
 	}
 

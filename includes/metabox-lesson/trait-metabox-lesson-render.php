@@ -729,6 +729,10 @@ trait CLMS_Metabox_Lesson_Render_Trait {
 		$quiz_enabled           = $quiz_enabled_bool ? '1' : '0';
 		$peer_review_enabled    = $this->get_meta( $post->ID, array( '_clms_peer_review_enabled' ), '0' );
 		$peer_reviews_per_student = absint( $this->get_meta( $post->ID, array( '_clms_peer_reviews_per_student' ), '2' ) );
+		$peer_review_blind      = $this->get_meta( $post->ID, array( '_clms_peer_review_blind' ), '0' );
+		$peer_review_calibration_enabled = $this->get_meta( $post->ID, array( '_clms_pr_calibration_enabled' ), '0' );
+		$peer_review_calibration_submission_id = absint( $this->get_meta( $post->ID, array( '_clms_pr_calibration_submission_id' ), '0' ) );
+		$peer_review_calibration_teacher_grade = $this->get_meta( $post->ID, array( '_clms_pr_calibration_teacher_grade' ), '' );
 		$assessment_mode        = $this->get_meta( $post->ID, array( '_clms_evaluation_mode' ), ( '1' === $peer_review_enabled ? 'peer_review' : 'manual' ) );
 		$ai_confidence_threshold = $this->get_meta( $post->ID, array( '_clms_ai_confidence_threshold' ), '0.75' );
 		$ai_confidence_thresholds = get_post_meta( $post->ID, '_clms_ai_confidence_thresholds', true );
@@ -817,20 +821,68 @@ trait CLMS_Metabox_Lesson_Render_Trait {
 				<span class="clms-help" id="clms-eval-mode-summary" aria-live="polite"></span>
 				<?php if ( 'group' === $assessment_mode ) : ?>
 					<?php
-					$course_id_for_groups = absint( get_post_meta( $post->ID, '_clms_lesson_course_id', true ) );
-					if ( ! $course_id_for_groups ) { $course_id_for_groups = absint( get_post_meta( $post->ID, '_clms_course_id', true ) ); }
-					if ( ! $course_id_for_groups ) { $course_id_for_groups = absint( get_post_meta( $post->ID, 'course_id', true ) ); }
-					?>
-					<span class="clms-help">
-						<?php esc_html_e( 'Los grupos se gestionan a nivel de curso. Debes habilitar "Grupos" en el curso y luego crear/asignar grupos.', 'atora-lms' ); ?>
-						<?php if ( $course_id_for_groups ) : ?>
-							<a href="<?php echo esc_url( admin_url( 'admin.php?page=atora-groups&course_id=' . $course_id_for_groups ) ); ?>">
-								<?php esc_html_e( 'Gestionar grupos', 'atora-lms' ); ?>
-							</a>
-						<?php endif; ?>
-					</span>
-				<?php endif; ?>
+						$course_id_for_groups = absint( get_post_meta( $post->ID, '_clms_lesson_course_id', true ) );
+						if ( ! $course_id_for_groups ) { $course_id_for_groups = absint( get_post_meta( $post->ID, '_clms_course_id', true ) ); }
+						if ( ! $course_id_for_groups ) { $course_id_for_groups = absint( get_post_meta( $post->ID, 'course_id', true ) ); }
+						$groups_enabled_for_course = $course_id_for_groups ? ( '1' === (string) get_post_meta( $course_id_for_groups, '_clms_course_groups_enabled', true ) ) : false;
+						?>
+						<span class="clms-help">
+							<?php esc_html_e( 'Los grupos se gestionan a nivel de curso. Debes habilitar "Grupos" en el curso y luego crear/asignar grupos.', 'atora-lms' ); ?>
+							<?php if ( $course_id_for_groups ) : ?>
+								<br>
+								<a href="<?php echo esc_url( admin_url( 'admin.php?page=atora-groups&course_id=' . $course_id_for_groups ) ); ?>">
+									<?php esc_html_e( 'Gestionar grupos del curso', 'atora-lms' ); ?>
+								</a>
+								<?php if ( ! $groups_enabled_for_course ) : ?>
+									<br><span style="color:#b32d2e">
+										<?php esc_html_e( 'Atención: el curso aún no tiene habilitada la evaluación por grupos.', 'atora-lms' ); ?>
+										<a href="<?php echo esc_url( get_edit_post_link( $course_id_for_groups, '' ) ); ?>">
+											<?php esc_html_e( 'Abrir curso', 'atora-lms' ); ?>
+										</a>
+									</span>
+								<?php endif; ?>
+							<?php else : ?>
+								<br><span style="color:#b32d2e"><?php esc_html_e( 'No se pudo detectar el curso asociado a esta lección. Guarda la lección y verifica su curso antes de usar "Trabajo en grupo".', 'atora-lms' ); ?></span>
+							<?php endif; ?>
+						</span>
+					<?php endif; ?>
 			</p>
+			<?php
+			$h5p_content_id = absint( get_post_meta( $post->ID, '_clms_h5p_content_id', true ) );
+			$h5p_embed      = '1' === (string) get_post_meta( $post->ID, '_clms_h5p_embed', true );
+			$h5p_track      = '1' === (string) get_post_meta( $post->ID, '_clms_h5p_track', true );
+			$h5p_autoscore  = '1' === (string) get_post_meta( $post->ID, '_clms_h5p_autoscore', true );
+			$h5p_available  = shortcode_exists( 'h5p' ) || post_type_exists( 'h5p_content' );
+			?>
+			<div class="clms-f full" style="border:1px solid #e5e7eb;border-radius:10px;padding:10px;background:#fff">
+				<p style="margin:0 0 8px 0"><strong><?php esc_html_e( 'H5P (MVP)', 'atora-lms' ); ?></strong></p>
+				<div class="clms-grid-3">
+					<p class="clms-f">
+						<label for="_clms_h5p_content_id"><?php esc_html_e( 'Content ID', 'atora-lms' ); ?></label>
+						<input type="number" min="0" name="_clms_h5p_content_id" id="_clms_h5p_content_id" value="<?php echo esc_attr( (string) $h5p_content_id ); ?>">
+						<span class="clms-help"><?php esc_html_e( 'ID del contenido H5P (post_type h5p_content).', 'atora-lms' ); ?></span>
+					</p>
+					<p class="clms-f">
+						<label style="display:block">&nbsp;</label>
+						<label><input type="checkbox" name="_clms_h5p_embed" value="1" <?php checked( $h5p_embed, true ); ?>> <strong><?php esc_html_e( 'Embebido en lección', 'atora-lms' ); ?></strong></label>
+						<span class="clms-help"><?php esc_html_e( 'Inyecta el H5P arriba del contenido si no hay shortcode manual.', 'atora-lms' ); ?></span>
+					</p>
+					<p class="clms-f">
+						<label style="display:block">&nbsp;</label>
+						<label><input type="checkbox" name="_clms_h5p_track" value="1" <?php checked( $h5p_track, true ); ?>> <strong><?php esc_html_e( 'Tracking xAPI', 'atora-lms' ); ?></strong></label><br>
+						<label><input type="checkbox" name="_clms_h5p_autoscore" value="1" <?php checked( $h5p_autoscore, true ); ?>> <strong><?php esc_html_e( 'Auto-scoring', 'atora-lms' ); ?></strong></label>
+						<span class="clms-help"><?php esc_html_e( 'Guarda progreso y (si no hay quiz habilitado) escribe nota en canal quiz.', 'atora-lms' ); ?></span>
+					</p>
+				</div>
+				<?php if ( ! $h5p_available ) : ?>
+					<p class="description" style="margin:6px 0;color:#b32d2e">
+						<?php esc_html_e( 'H5P no parece instalado/activo (no existe shortcode [h5p]). Puedes guardar la configuración, pero no se renderizará hasta instalar el plugin H5P.', 'atora-lms' ); ?>
+					</p>
+				<?php endif; ?>
+				<p class="description" style="margin:6px 0 0 0">
+					<?php esc_html_e( 'Tip: también puedes colocar manualmente [atora_h5p] o [h5p id="..."] dentro del contenido para controlar la ubicación.', 'atora-lms' ); ?>
+				</p>
+			</div>
 			<p class="clms-f clms-eval-ai-only">
 				<label for="_clms_ai_confidence_threshold"><?php esc_html_e( 'Umbral de confianza IA', 'atora-lms' ); ?></label>
 				<input type="number" min="0.50" max="0.99" step="0.01" name="_clms_ai_confidence_threshold" id="_clms_ai_confidence_threshold" value="<?php echo esc_attr( $ai_confidence_threshold ); ?>">
@@ -867,6 +919,32 @@ trait CLMS_Metabox_Lesson_Render_Trait {
 					min="1" max="5" step="1"
 					value="<?php echo esc_attr( $peer_reviews_per_student ); ?>">
 				<span class="clms-help"><?php esc_html_e( 'Cantidad de revisores asignados por estudiante en esta lección.', 'atora-lms' ); ?></span>
+			</p>
+			<p class="clms-f clms-eval-peer-only">
+				<label for="_clms_peer_review_blind"><?php esc_html_e( 'Modo ciego (anónimo)', 'atora-lms' ); ?></label>
+				<select name="_clms_peer_review_blind" id="_clms_peer_review_blind">
+					<option value="0" <?php selected( $peer_review_blind, '0' ); ?>><?php esc_html_e( 'No', 'atora-lms' ); ?></option>
+					<option value="1" <?php selected( $peer_review_blind, '1' ); ?>><?php esc_html_e( 'Sí', 'atora-lms' ); ?></option>
+				</select>
+				<span class="clms-help"><?php esc_html_e( 'Oculta la identidad del autor al revisor y del revisor al autor. El docente siempre puede auditar el mapa.', 'atora-lms' ); ?></span>
+			</p>
+			<p class="clms-f clms-eval-peer-only">
+				<label for="_clms_pr_calibration_enabled"><?php esc_html_e( 'Calibración (entrenamiento con ejemplar)', 'atora-lms' ); ?></label>
+				<select name="_clms_pr_calibration_enabled" id="_clms_pr_calibration_enabled">
+					<option value="0" <?php selected( $peer_review_calibration_enabled, '0' ); ?>><?php esc_html_e( 'No', 'atora-lms' ); ?></option>
+					<option value="1" <?php selected( $peer_review_calibration_enabled, '1' ); ?>><?php esc_html_e( 'Sí', 'atora-lms' ); ?></option>
+				</select>
+				<span class="clms-help"><?php esc_html_e( 'Antes de revisar a pares, el estudiante revisa un ejemplar y se compara contra la pauta del docente.', 'atora-lms' ); ?></span>
+			</p>
+			<p class="clms-f clms-eval-peer-only">
+				<label for="_clms_pr_calibration_submission_id"><?php esc_html_e( 'Submission ID del ejemplar', 'atora-lms' ); ?></label>
+				<input type="number" name="_clms_pr_calibration_submission_id" id="_clms_pr_calibration_submission_id" min="0" step="1" value="<?php echo esc_attr( (string) $peer_review_calibration_submission_id ); ?>">
+				<span class="clms-help"><?php esc_html_e( 'ID de una entrega (clms_submission) que se usará como ejemplar. Si está vacío, no se asigna calibración.', 'atora-lms' ); ?></span>
+			</p>
+			<p class="clms-f clms-eval-peer-only">
+				<label for="_clms_pr_calibration_teacher_grade"><?php esc_html_e( 'Nota pauta del docente (0–100)', 'atora-lms' ); ?></label>
+				<input type="number" name="_clms_pr_calibration_teacher_grade" id="_clms_pr_calibration_teacher_grade" min="0" max="100" step="1" value="<?php echo esc_attr( (string) $peer_review_calibration_teacher_grade ); ?>">
+				<span class="clms-help"><?php esc_html_e( 'Se usa para calcular la desviación (delta) del estudiante en la calibración.', 'atora-lms' ); ?></span>
 			</p>
 			<p class="clms-f full clms-eval-quiz-inactive-note<?php echo ( 'quiz' === $activity_type && $quiz_enabled_bool ) ? ' clms-is-hidden' : ''; ?>">
 				<span class="clms-help clms-help-highlight"><?php esc_html_e( 'Para configurar la experiencia del quiz, usa tipo de actividad "Evaluación" y habilita el quiz.', 'atora-lms' ); ?></span>

@@ -1,12 +1,15 @@
 # Roadmap técnico — Evolución del LMS (rolling 6 meses)
 
 Última actualización: 2026-09-10  
-Base: ATORA LMS `6.14.1`
+Base: ATORA LMS `6.21.0`
 
 ## Estado actual (implementado en 6.14.0)
 - Epic 1 (MVP): Group Assessment (grupos por curso + entregas grupales + propagación + overrides + CSV + REST).
 - Epic 2 (MVP): Rubrics v2 (pesos, escalas por curso con lock tras primera nota, holística, ejemplares, presets).
 - Epic 3 (MVP): Early Warning (entregas perdidas + notificación interna + REST + pantalla admin).
+
+## Estado actual (implementado en 6.15.0)
+- Epic 3 (MVP, ampliación): Learning Analytics (snapshots de riesgo por estudiante/curso + cron + REST + dashboard + CSV).
 
 **Pendiente (roadmap):** analítica de riesgo completa, coevaluación avanzada, portafolios, interoperabilidad (Classroom/Microsoft), H5P, hardening y QA ampliado.
 
@@ -87,12 +90,12 @@ Evolucionar ATORA LMS en ciclos continuos, priorizando (1) evaluación colaborat
 - [x] Datos: definir modelo (tablas `wp_clms_groups`, `wp_clms_group_members`, `wp_clms_group_submissions`, `wp_clms_group_grade_overrides`, `wp_clms_group_audit_log`).
 - [x] Migración: extender `includes/class-clms-db-migration.php` con `dbDelta()` y sincronización de `clms_db_schema_version`.
 - [x] Backend: extender flujo de `clms_submission` para soportar “submission tipo grupo” y mapping a miembros.
-- [ ] Gradebook: ajustar “propagación de nota” (sin duplicar cálculos) y evitar double-grading.
-- [ ] UI docente: builder de grupos en metabox/lección (o pantalla dedicada) + validaciones.
-- [ ] UI estudiante: pantalla de entrega que muestre grupo, estado, y “quién entregó”.
+- [x] Gradebook: ajustar “propagación de nota” (sin duplicar cálculos) y evitar double-grading.
+- [x] UI docente: builder de grupos en metabox/lección (o pantalla dedicada) + validaciones.
+- [x] UI estudiante: pantalla de entrega que muestre grupo, estado, y “quién entregó”.
 - [x] Permisos: checks en REST para gestión de grupos y overrides.
 - [x] Reportes: export de calificaciones grupales e individuales (CSV mínimo).
-- [ ] QA: casos límite (cambio de grupo post-entrega, miembros sin entrega, retiro/abandono, reintentos).
+- [x] QA: casos límite (cambio de grupo post-entrega, miembros sin entrega, retiro/abandono, reintentos).
 
 **Dependencias**
 - E2E con evaluación existente (manual/rúbrica/peer review), `clms_submission`, engine de calificación.
@@ -116,7 +119,7 @@ Evolucionar ATORA LMS en ciclos continuos, priorizando (1) evaluación colaborat
 - [x] Modelo: extender `clms_rubric` (CPT + meta) con `scale_type`, `is_holistic`, pesos por criterio y ejemplares.
 - [x] UI admin: extender builder en `includes/class-rubric.php` (pesos, escalas, holística, benchmarks) + preset UI.
 - [x] Cálculo: actualizar servicios de grading para pesos + normalización (impacta `includes/grading/`).
-- [ ] Versionado: estrategia (snapshot por meta + “rubric_version_id”) o duplicado controlado del CPT con relación padre/hijo.
+- [x] Versionado: snapshot por entrega (meta) para trazabilidad y compatibilidad en SpeedGrade.
 - [x] Presets: catálogo (CPT `clms_rubric_preset`) + permisos.
 - [x] Migración: compatibilidad con rúbricas existentes sin pesos explícitos (default = pesos iguales).
 - [ ] QA: pruebas con escalas mixtas, rounding, y compatibilidad con SpeedGrade.
@@ -132,7 +135,7 @@ Evolucionar ATORA LMS en ciclos continuos, priorizando (1) evaluación colaborat
 
 **Nota:** existe `modules/analytics/class-analytics-engine.php`, pero hoy está orientado a métricas de email/engagement global. Este epic agrega *learning analytics* (académico) y alertas operativas.
 
-**Estado:** Early Warning MVP implementado en `6.14.0` (solo “entregas perdidas”). Pendiente: risk scoring, fuentes de actividad, dashboard completo y export BI.
+**Estado:** Early Warning (entregas perdidas) + Learning Analytics (risk scoring + dashboard + export BI) implementado (MVP). Pendiente: ampliar señales (mensajes/lecturas), reglas avanzadas y canales extra (Teams/webhooks).
 
 **MVP 6.14.0 (completado)**
 - [x] Tabla `wp_atora_early_warning` + migración.
@@ -142,18 +145,18 @@ Evolucionar ATORA LMS en ciclos continuos, priorizando (1) evaluación colaborat
 - [x] Pantalla admin “Alertas tempranas”.
 
 **Historias**
-- [ ] Como coordinación, veo lista priorizada de estudiantes en riesgo (por curso/cohorte/docente).
-- [ ] Como docente, recibo alertas por inactividad y entregas perdidas con acciones sugeridas.
-- [ ] Como institución, exporto dataset para BI (CSV/JSON) con métricas clave.
+- [x] Como coordinación, veo lista priorizada de estudiantes en riesgo (por curso/cohorte/docente).
+- [x] Como docente, recibo alertas por inactividad y entregas perdidas con acciones sugeridas.
+- [x] Como institución, exporto dataset para BI (CSV/JSON) con métricas clave.
 
 **Tareas**
-- [ ] Modelo: tabla(s) tipo `wp_atora_student_analytics` (por `user_id`, `course_id`, `risk_score`, `last_activity`, `trend`, `alert_type`, timestamps).
-- [ ] Motor: calculador de señales (inactividad, missing submissions, caída de notas, no lectura de mensajes).
-- [ ] Alerting: reglas + canales (panel, email, opcional webhooks/Teams) con anti-spam (cooldown).
-- [ ] REST: endpoints académicos (p.ej. `/atora/v1/academics/early-warning`) con filtros (curso/cohorte/periodo).
-- [ ] UI: dashboard simple (tabla + filtros + drill-down).
-- [ ] Export: CSV (mínimo) y contrato de esquema (BI-friendly).
-- [ ] QA: performance (batch jobs), consistencia de timestamps/timezones, y permisos.
+- [x] Modelo: tabla `wp_atora_student_analytics` (por `user_id`, `course_id`, `risk_score`, `trend`, `alert_type`, timestamps).
+- [x] Motor: calculador de señales (MVP: inactividad + missed submissions + progreso + promedio + pendientes + mensajes/lecturas).
+- [x] Alerting: notificación interna (panel) con anti-spam (cooldown diario).
+- [x] REST: endpoints `atora/v1/learning-analytics*` + `atora/v1/early-warning`.
+- [x] UI: dashboard simple (tabla + filtros + drill-down).
+- [x] Export: CSV/JSON (BI-friendly).
+- [x] QA: performance y consistencia (batch jobs y permisos multi-rol).
 
 **Dependencias**
 - Identificar fuentes de “actividad” (lecciones, mensajes, submissions, calendario).
@@ -165,16 +168,16 @@ Evolucionar ATORA LMS en ciclos continuos, priorizando (1) evaluación colaborat
 **Estimación:** 2–3 semanas (≈400–600 líneas netas; depende de reportes y anonimato).
 
 **Historias**
-- [ ] Como docente, activo calibración (todos evalúan un ejemplar) y el sistema calcula “calibration score”.
-- [ ] Como docente, veo incoherencias (desviación vs promedio/docente) y puedo intervenir.
-- [ ] Como institución, audito quién evaluó a quién, cuándo, con modo ciego/no ciego.
+- [x] Como docente, activo calibración (todos evalúan un ejemplar) y el sistema calcula “calibration score”.
+- [x] Como docente, veo incoherencias (desviación vs promedio/docente) y puedo intervenir.
+- [x] Como institución, audito quién evaluó a quién, cuándo, con modo ciego/no ciego.
 
 **Tareas**
-- [ ] Datos: agregar metadatos/campos para `calibration_score`, `consistency_check`, `is_blind`, `review_audit_log`.
-- [ ] Flujo: training obligatorio antes de habilitar reviews reales (si aplica).
-- [ ] Reportes: mapa reviewer↔reviewee + distribución de notas y desviaciones.
-- [ ] Permisos/privacidad: ocultar identidad según modo; controles anti-abuso.
-- [ ] QA: fairness (asignación), anonimato y edge cases (no completan reviews).
+- [x] Datos: agregar metadatos/campos para `calibration_score`, `consistency_check`, `is_blind`, `review_audit_log`.
+- [x] Flujo: training obligatorio antes de habilitar reviews reales (si aplica).
+- [x] Reportes: mapa reviewer↔reviewee + distribución de notas y desviaciones (incluye export CSV).
+- [x] Permisos/privacidad: ocultar identidad según modo; controles anti-abuso (exclusión manual con motivo).
+- [x] QA: fairness (asignación), anonimato y edge cases (no completan reviews).
 
 ---
 
@@ -183,18 +186,18 @@ Evolucionar ATORA LMS en ciclos continuos, priorizando (1) evaluación colaborat
 **Estimación:** 4–5 semanas (≈700–900 líneas netas; depende de sharing/export).
 
 **Historias**
-- [ ] Como estudiante, creo un portafolio por curso/cohorte y agrego artefactos (submissions) con orden y tags.
-- [ ] Como estudiante, escribo reflexiones por artefacto y a nivel portafolio.
-- [ ] Como docente/pares, doy feedback al portafolio y puedo evaluarlo con rúbrica.
-- [ ] Como estudiante, configuro visibilidad (privado, docentes, público) según política institucional.
+- [x] Como estudiante, creo un portafolio por curso y agrego artefactos (submissions) con orden y tags.
+- [x] Como estudiante, escribo reflexiones por artefacto y a nivel portafolio (MVP: por artefacto).
+- [x] Como docente/pares, doy feedback al portafolio y puedo evaluarlo con rúbrica (MVP: evaluación final con override).
+- [x] Como estudiante, configuro visibilidad (privado, docentes, público) según política institucional.
 
 **Tareas**
-- [ ] Modelo: CPT `clms_portfolio` + tablas para artefactos/feedback **o** tablas dedicadas (según volumen y reporting).
-- [ ] UI estudiante: CRUD portafolio + selector de artefactos + editor de reflexión.
-- [ ] UI docente: vista de portafolio + feedback + evaluación (rúbrica específica).
-- [ ] Permisos: visibilidad y control de acceso (incluye URLs públicas si aplica).
-- [ ] Export: PDF/ZIP (nice-to-have) para acreditación.
-- [ ] QA: privacidad, caching, y compatibilidad con cambios de matrícula.
+- [x] Modelo: tablas dedicadas `wp_atora_portfolios`, `wp_atora_portfolio_items`, `wp_atora_portfolio_feedback`.
+- [x] UI estudiante: builder por shortcode (CRUD básico + selector de artefactos + editor de reflexión/tags).
+- [x] UI docente: vista en panel admin + feedback + evaluación con rúbrica (override final).
+- [x] Permisos: visibilidad y control de acceso (incluye endpoint público de solo lectura).
+- [x] Export: ZIP (incluye HTML imprimible para guardar como PDF) para acreditación.
+- [x] QA: privacidad y compatibilidad con cambios de matrícula (hardening + caching por request).
 
 **Dependencias**
 - Epic 2 (rúbricas v2) si se evaluará portafolio con nuevas escalas/pesos.
@@ -206,31 +209,33 @@ Evolucionar ATORA LMS en ciclos continuos, priorizando (1) evaluación colaborat
 **Estimación:** 2–3 semanas (≈300–500 líneas netas; depende de idempotencia y UI de sync).
 
 **Historias**
-- [ ] Como docente, importo tareas de Classroom como actividades/lecciones en ATORA.
-- [ ] Como coordinación, sincronizo rosters (altas/bajas) y evito duplicados.
-- [ ] Como docente, devuelvo notas desde ATORA a Classroom.
+- [x] Como docente, importo tareas de Classroom como actividades/lecciones en ATORA (MVP: import como lección).
+- [x] Como coordinación, sincronizo rosters (solo altas por ahora) y evito duplicados.
+- [x] Como docente, devuelvo notas desde ATORA a Classroom (MVP: push draft + return).
 
 **Tareas**
-- [ ] OAuth scopes y credenciales institucionales; manejo multi-tenant si aplica.
-- [ ] Sync: mapeo `course/classroom_course_id`, `assignment_id`, `submission` y estados.
-- [ ] Errores/reintentos: colas y logs (idempotencia).
-- [ ] UI: estado de sincronización por curso + “reintentar”.
-- [ ] QA: límites de API, paginación y pruebas con sandbox de Google.
+- [x] OAuth scopes (toggle en Google) y credenciales BYO (reusa Google module).
+- [x] Sync (MVP): mapeo `wp_course_id` ↔ `gc_course_id` + roster sync por email (solo altas).
+- [x] Import (MVP): listar `courseWork` y crear lecciones en curso WP (idempotente).
+- [x] Notas (MVP): empujar notas de lecciones a Classroom via `draftGrade` + `:return`.
+- [x] Logs: tabla `wp_atora_google_classroom_sync_log` (MVP).
+- [x] UI: panel “Google Classroom” + acciones (MVP).
+- [x] QA: límites de API, paginación y hardening (retry/backoff, mensajes por scopes) + pruebas en entorno real.
 
 ---
 
 ### Epic 7 — Microsoft (Entra SSO + Teams/Outlook) (condicional)
 **Estimación:** 2–3 semanas (≈400–600 líneas netas; depende de Graph + políticas Entra).
 **Historias**
-- [ ] Como usuario, inicio sesión con Microsoft Entra (OIDC/OAuth) y se aprovisiona cuenta si corresponde.
-- [ ] Como docente, recibo alertas relevantes en Teams (no solo email).
-- [ ] Como institución, sincronizo calendario de entregas con Outlook.
+- [x] Como usuario, inicio sesión con Microsoft Entra (OIDC/OAuth) y se aprovisiona cuenta si corresponde.
+- [x] Como docente, recibo alertas relevantes en Teams (no solo email).
+- [x] Como institución, sincronizo calendario de entregas con Outlook (MVP: iCal por curso).
 
 **Tareas**
-- [ ] Entra SSO: flujo OIDC, linking de cuentas, políticas de MFA y logout.
-- [ ] Teams: canal de notificaciones (webhooks/Graph) + plantillas.
-- [ ] Outlook: calendario por curso/cohorte + actualizaciones.
-- [ ] QA: seguridad (tokens, scopes), rate limits y auditoría.
+- [x] Entra SSO: flujo OAuth (code) + linking de cuentas (sin fusión por email).
+- [x] Teams: canal de notificaciones por webhook + templates simples + filtros por tipo.
+- [x] Outlook: calendario iCal por curso (entregas + sesiones live) + URL con token para suscripción.
+- [x] QA: hardening básico (state transient, rate limit por transient, no auto-link por email).
 
 ---
 

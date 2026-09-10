@@ -95,6 +95,7 @@ final class Early_Warning_Module {
 		echo '<thead><tr>';
 		echo '<th>' . esc_html__( 'Estudiante', 'atora-lms' ) . '</th>';
 		echo '<th>' . esc_html__( 'Entregas perdidas', 'atora-lms' ) . '</th>';
+		echo '<th>' . esc_html__( 'Detalle', 'atora-lms' ) . '</th>';
 		echo '<th>' . esc_html__( 'Severidad', 'atora-lms' ) . '</th>';
 		echo '<th>' . esc_html__( 'Última notificación', 'atora-lms' ) . '</th>';
 		echo '<th>' . esc_html__( 'Acciones', 'atora-lms' ) . '</th>';
@@ -109,15 +110,33 @@ final class Early_Warning_Module {
 			$data         = is_array( $row['data'] ?? null ) ? (array) $row['data'] : array();
 			$missed_count = absint( $data['count'] ?? 0 );
 			$last_notify  = (string) ( $row['last_notified_at'] ?? '' );
+			$missed_items = isset( $data['missed'] ) && is_array( $data['missed'] ) ? (array) $data['missed'] : array();
 
 			$resolve_url = wp_nonce_url(
 				admin_url( 'admin-post.php?action=atora_early_warning_resolve&course_id=' . $course_id . '&user_id=' . $user_id . '&warning_type=' . rawurlencode( $type ) ),
 				'atora_early_warning_resolve_' . $course_id . '_' . $user_id . '_' . $type
 			);
 
+			$details = array();
+			foreach ( array_slice( $missed_items, 0, 5 ) as $m ) {
+				$lesson_id = absint( $m['lesson_id'] ?? 0 );
+				$ts        = absint( $m['deadline_ts'] ?? 0 );
+				if ( ! $lesson_id ) {
+					continue;
+				}
+				$title = (string) get_the_title( $lesson_id );
+				$date  = $ts ? date_i18n( 'Y-m-d', $ts ) : '';
+				$details[] = ( $title ? $title : ( '#' . $lesson_id ) ) . ( $date ? ( ' (' . $date . ')' ) : '' );
+			}
+			$details_label = $details ? implode( ' | ', array_map( 'sanitize_text_field', $details ) ) : '—';
+			if ( $missed_count > 5 ) {
+				$details_label .= ' …';
+			}
+
 			echo '<tr>';
 			echo '<td><strong>' . esc_html( $student_name ? $student_name : (string) $user_id ) . '</strong><br><span class="description">' . esc_html( $student_mail ) . '</span></td>';
 			echo '<td>' . esc_html( (string) $missed_count ) . '</td>';
+			echo '<td><span class="description">' . esc_html( $details_label ) . '</span></td>';
 			echo '<td>' . esc_html( (string) $severity ) . '</td>';
 			echo '<td>' . esc_html( $last_notify ? $last_notify : '—' ) . '</td>';
 			echo '<td><a class="button button-small" href="' . esc_url( $resolve_url ) . '">' . esc_html__( 'Marcar resuelto', 'atora-lms' ) . '</a></td>';
@@ -163,16 +182,26 @@ final class Early_Warning_Module {
 		$service = new Early_Warning_Service();
 		$rows    = $service->list_course_warnings( $course_id, 'open' );
 
-		$csv  = "user_id,student_name,student_email,warning_type,missed_count,severity,status,created_at,updated_at\n";
+		$csv  = "user_id,student_name,student_email,warning_type,missed_count,missed_lessons,severity,status,created_at,updated_at\n";
 		foreach ( (array) $rows as $row ) {
 			$data = is_array( $row['data'] ?? null ) ? (array) $row['data'] : array();
+			$missed_items = isset( $data['missed'] ) && is_array( $data['missed'] ) ? (array) $data['missed'] : array();
+			$missed_lessons = array();
+			foreach ( $missed_items as $m ) {
+				$lesson_id = absint( $m['lesson_id'] ?? 0 );
+				if ( $lesson_id ) {
+					$missed_lessons[] = (string) $lesson_id;
+				}
+			}
+			$missed_lessons_str = implode( '|', array_values( array_unique( $missed_lessons ) ) );
 			$csv .= sprintf(
-				"%d,%s,%s,%s,%d,%d,%s,%s,%s\n",
+				"%d,%s,%s,%s,%d,%s,%d,%s,%s,%s\n",
 				absint( $row['user_id'] ?? 0 ),
-				str_replace( '"', '""', '"' . (string) ( $row['student_name'] ?? '' ) . '"' ),
-				str_replace( '"', '""', '"' . (string) ( $row['student_email'] ?? '' ) . '"' ),
+				str_replace( '"', '""', '"' . \CLMS_Helper::csv_safe_field( $row['student_name'] ?? '' ) . '"' ),
+				str_replace( '"', '""', '"' . \CLMS_Helper::csv_safe_field( $row['student_email'] ?? '' ) . '"' ),
 				(string) ( $row['warning_type'] ?? '' ),
 				absint( $data['count'] ?? 0 ),
+				str_replace( '"', '""', '"' . $missed_lessons_str . '"' ),
 				absint( $row['severity'] ?? 0 ),
 				(string) ( $row['status'] ?? '' ),
 				(string) ( $row['created_at'] ?? '' ),

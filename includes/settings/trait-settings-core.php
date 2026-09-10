@@ -287,6 +287,10 @@ trait CLMS_Settings_Core_Trait {
 	}
 
 	protected function save_channels() {
+		$teams_input = isset( $_POST['clms_teams'] ) && is_array( $_POST['clms_teams'] )
+			? (array) wp_unslash( $_POST['clms_teams'] )
+			: array();
+
 		$email_input = isset( $_POST['clms_email_engine'] ) && is_array( $_POST['clms_email_engine'] )
 			? (array) wp_unslash( $_POST['clms_email_engine'] )
 			: array();
@@ -423,6 +427,17 @@ trait CLMS_Settings_Core_Trait {
 		$admin_chat_id = (string) preg_replace( '/[^0-9\-]/', '', (string) ( $telegram_input['admin_chat_id'] ?? $telegram_settings['admin_chat_id'] ) );
 		$telegram_settings['admin_chat_id'] = (string) $admin_chat_id;
 		update_option( self::OPTION_TELEGRAM, $telegram_settings );
+
+		$teams_settings = self::get_teams_settings();
+		$teams_settings['enabled'] = ! empty( $teams_input['enabled'] ) ? 1 : 0;
+		$teams_settings['webhook_url'] = esc_url_raw( (string) ( $teams_input['webhook_url'] ?? $teams_settings['webhook_url'] ) );
+		$send_types = isset( $teams_input['send_types'] ) && is_array( $teams_input['send_types'] ) ? (array) $teams_input['send_types'] : (array) ( $teams_settings['send_types'] ?? array() );
+		$send_types = array_values( array_filter( array_map( 'sanitize_key', $send_types ) ) );
+		if ( empty( $send_types ) ) {
+			$send_types = array( 'early_warning' );
+		}
+		$teams_settings['send_types'] = $send_types;
+		update_option( self::OPTION_TEAMS, $teams_settings );
 	}
 
 	protected function save_apis() {
@@ -538,11 +553,28 @@ trait CLMS_Settings_Core_Trait {
 	}
 
 	protected function save_advanced() {
+		// Microsoft Entra SSO (option separada).
+		$ms_existing = get_option( self::OPTION_MICROSOFT, array() );
+		$ms_existing = is_array( $ms_existing ) ? $ms_existing : array();
+		$ms_tenant = isset( $_POST['microsoft_tenant'] ) ? sanitize_text_field( wp_unslash( $_POST['microsoft_tenant'] ) ) : (string) ( $ms_existing['tenant'] ?? 'common' );
+		$ms_tenant = '' !== trim( $ms_tenant ) ? $ms_tenant : 'common';
+		$ms = array(
+			'enabled'        => isset( $_POST['microsoft_enabled'] ) ? 1 : 0,
+			'tenant'         => $ms_tenant,
+			'client_id'      => isset( $_POST['microsoft_client_id'] ) ? sanitize_text_field( wp_unslash( $_POST['microsoft_client_id'] ) ) : (string) ( $ms_existing['client_id'] ?? '' ),
+			'client_secret'  => isset( $_POST['microsoft_client_secret'] ) ? sanitize_text_field( wp_unslash( $_POST['microsoft_client_secret'] ) ) : (string) ( $ms_existing['client_secret'] ?? '' ),
+			'allowed_domain' => isset( $_POST['microsoft_allowed_domain'] ) ? sanitize_text_field( wp_unslash( $_POST['microsoft_allowed_domain'] ) ) : (string) ( $ms_existing['allowed_domain'] ?? '' ),
+		);
+		update_option( self::OPTION_MICROSOFT, $ms );
+
 		$inactivity_days = isset( $_POST['inactivity_days_threshold'] ) ? absint( wp_unslash( $_POST['inactivity_days_threshold'] ) ) : 14;
 		$inactivity_days = max( 1, min( 90, $inactivity_days ) );
 
 		$inactivity_cooldown_hours = isset( $_POST['inactivity_email_cooldown_hours'] ) ? absint( wp_unslash( $_POST['inactivity_email_cooldown_hours'] ) ) : 72;
 		$inactivity_cooldown_hours = max( 1, min( 720, $inactivity_cooldown_hours ) );
+
+		$existing = get_option( self::OPTION_ADV, array() );
+		$existing = is_array( $existing ) ? $existing : array();
 
 		$data = array(
 			'disable_rest_api' => isset( $_POST['disable_rest_api'] ) ? '1' : '0',
@@ -556,7 +588,7 @@ trait CLMS_Settings_Core_Trait {
 			'inactivity_email_footer_note'   => isset( $_POST['inactivity_email_footer_note'] ) ? sanitize_text_field( wp_unslash( $_POST['inactivity_email_footer_note'] ) ) : '',
 			'inactivity_email_body'          => isset( $_POST['inactivity_email_body'] ) ? sanitize_textarea_field( wp_unslash( $_POST['inactivity_email_body'] ) ) : '',
 		);
-		update_option( self::OPTION_ADV, $data );
+		update_option( self::OPTION_ADV, array_merge( $existing, $data ) );
 		update_option( self::OPTION_CRM_V2_ENABLED, isset( $_POST['crm_v2_enabled'] ) ? 1 : 0 );
 		update_option( 'clms_inactivity_days_threshold', $inactivity_days );
 	}

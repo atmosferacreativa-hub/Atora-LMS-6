@@ -398,6 +398,7 @@ trait CLMS_Loader_Module_Groups_Trait {
 					'file'         => 'includes/class-student-assistant.php',
 					'class'        => 'CLMS_Student_Assistant',
 					'dependencies' => array( 'CLMS_Helper', 'CLMS_AI_Knowledge_Base' ),
+					'condition'    => 'module:ai',
 				),
 				array(
 					'file'         => 'includes/class-settings.php',

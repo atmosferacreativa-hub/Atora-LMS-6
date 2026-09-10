@@ -178,7 +178,10 @@ final class Groups_Module {
 			return;
 		}
 
-		$export_url = admin_url( 'admin-post.php?action=atora_groups_export&course_id=' . $course_id );
+		$export_url = wp_nonce_url(
+			admin_url( 'admin-post.php?action=atora_groups_export&course_id=' . $course_id ),
+			'atora_groups_export_' . $course_id
+		);
 		echo '<p><a class="button" href="' . esc_url( $export_url ) . '">' . esc_html__( 'Exportar CSV (grupal + individual)', 'atora-lms' ) . '</a></p>';
 
 		if ( ! class_exists( '\CLMS_Helper' ) || ! method_exists( '\CLMS_Helper', 'get_enrolled_student_ids' ) ) {
@@ -287,6 +290,8 @@ final class Groups_Module {
 			if ( $locked_at ) {
 				echo '<p class="description" style="margin:8px 0">' . esc_html__( 'Este grupo está bloqueado por entregas. Por defecto no se puede editar.', 'atora-lms' ) . '</p>';
 				echo '<label style="display:block;margin:6px 0"><input type="checkbox" name="force_add" value="1"> ' . esc_html__( 'Forzar: permitir agregar miembros (no remover)', 'atora-lms' ) . '</label>';
+				echo '<label style="display:block;margin:6px 0"><input type="checkbox" name="force_edit" value="1"> ' . esc_html__( 'Forzar (avanzado): permitir editar miembros (agregar y remover)', 'atora-lms' ) . '</label>';
+				echo '<p class="description" style="margin:6px 0">' . esc_html__( 'Recomendación: evita cambios retroactivos si ya hay entregas calificadas; para esos casos usa overrides individuales.', 'atora-lms' ) . '</p>';
 			}
 
 			echo '<p style="margin:8px 0"><button class="button button-primary" type="submit">' . esc_html__( 'Guardar', 'atora-lms' ) . '</button></p>';
@@ -312,6 +317,10 @@ final class Groups_Module {
 		}
 
 		check_admin_referer( 'atora_groups_create_' . $course_id );
+
+		if ( ! self::can_manage_course( $course_id ) ) {
+			wp_die( esc_html__( 'No tienes permisos sobre este curso.', 'atora-lms' ) );
+		}
 
 		$name = isset( $_POST['group_name'] ) ? sanitize_text_field( wp_unslash( $_POST['group_name'] ) ) : '';
 		if ( '' === trim( $name ) ) {
@@ -339,16 +348,28 @@ final class Groups_Module {
 
 		check_admin_referer( 'atora_groups_save_members_' . $course_id . '_' . $group_id );
 
+		if ( ! self::can_manage_course( $course_id ) ) {
+			wp_die( esc_html__( 'No tienes permisos sobre este curso.', 'atora-lms' ) );
+		}
+
+		$service = new Group_Service();
+		if ( $service->get_group_course_id( $group_id ) !== $course_id ) {
+			wp_die( esc_html__( 'El grupo no pertenece a este curso.', 'atora-lms' ) );
+		}
+
 		$members   = isset( $_POST['members'] ) ? (array) wp_unslash( $_POST['members'] ) : array();
 		$members   = array_values( array_unique( array_filter( array_map( 'absint', $members ) ) ) );
 		$force_add = isset( $_POST['force_add'] ) ? ( '1' === (string) wp_unslash( $_POST['force_add'] ) ) : false;
+		$force_edit = isset( $_POST['force_edit'] ) ? ( '1' === (string) wp_unslash( $_POST['force_edit'] ) ) : false;
 
-		$service = new Group_Service();
-		$result  = $service->set_members_with_options(
+		$result = $service->set_members_with_options(
 			$group_id,
 			$members,
 			get_current_user_id(),
-			array( 'force_add' => (bool) $force_add )
+			array(
+				'force_add'  => (bool) $force_add,
+				'force_edit' => (bool) $force_edit,
+			)
 		);
 
 		$flag = is_wp_error( $result ) ? ( 'error=' . rawurlencode( $result->get_error_code() ) ) : 'saved=1';
@@ -367,6 +388,10 @@ final class Groups_Module {
 		}
 
 		check_admin_referer( 'atora_groups_autogenerate_' . $course_id );
+
+		if ( ! self::can_manage_course( $course_id ) ) {
+			wp_die( esc_html__( 'No tienes permisos sobre este curso.', 'atora-lms' ) );
+		}
 
 		if ( ! class_exists( '\CLMS_Helper' ) || ! method_exists( '\CLMS_Helper', 'get_enrolled_student_ids' ) ) {
 			wp_safe_redirect( admin_url( 'admin.php?page=atora-groups&course_id=' . $course_id . '&error=no_students' ) );
@@ -418,6 +443,12 @@ final class Groups_Module {
 		$course_id = isset( $_GET['course_id'] ) ? absint( wp_unslash( $_GET['course_id'] ) ) : 0;
 		if ( ! $course_id ) {
 			wp_die( esc_html__( 'course_id inválido.', 'atora-lms' ) );
+		}
+
+		check_admin_referer( 'atora_groups_export_' . $course_id );
+
+		if ( ! self::can_manage_course( $course_id ) ) {
+			wp_die( esc_html__( 'No tienes permisos sobre este curso.', 'atora-lms' ) );
 		}
 
 		$service = new Group_Report_Service();

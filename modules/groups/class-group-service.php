@@ -176,6 +176,7 @@ final class Group_Service {
 		$actor_user_id = absint( $actor_user_id );
 		$member_ids    = array_values( array_unique( array_filter( array_map( 'absint', $member_ids ) ) ) );
 		$force_add     = ! empty( $options['force_add'] );
+		$force_edit    = ! empty( $options['force_edit'] );
 
 		if ( ! $group_id ) {
 			return new \WP_Error( 'invalid_group', __( 'Grupo inválido.', 'atora-lms' ) );
@@ -183,7 +184,7 @@ final class Group_Service {
 
 		$locked_at = $wpdb->get_var( $wpdb->prepare( "SELECT locked_at FROM {$this->table_groups()} WHERE id = %d", $group_id ) );
 		if ( ! empty( $locked_at ) ) {
-			if ( ! $force_add ) {
+			if ( ! $force_add && ! $force_edit ) {
 				return new \WP_Error( 'group_locked', __( 'El grupo ya tiene entregas registradas y no se puede modificar.', 'atora-lms' ) );
 			}
 		}
@@ -196,8 +197,37 @@ final class Group_Service {
 			return new \WP_Error( 'group_locked_removal', __( 'Este grupo está bloqueado por entregas. Solo se permite agregar miembros (no remover).', 'atora-lms' ) );
 		}
 
+		$course_id = $this->get_group_course_id( $group_id );
+		$affected_student_ids = array();
+
+		// Las operaciones de membresía (mover de otros grupos, insertar,
+		// eliminar, auditar y tocar updated_at) son todas $wpdb directo sobre
+		// tablas propias del módulo: se envuelven en una transacción para que
+		// un fallo a mitad de camino no deje miembros/auditoría a medias.
+		// La sincronización de shadow submissions (wp_insert_post) se hace
+		// fuera de la transacción, tras el commit — WordPress core no
+		// garantiza que wp_insert_post()/update_post_meta() participen de
+		// forma segura en una transacción SQL manual (caché de objetos y
+		// hooks asumen estado ya confirmado).
+		$wpdb->query( 'START TRANSACTION' );
+
+		$tx_failed = false;
+
+		// Enforce: un estudiante solo puede estar en 1 grupo por curso. Si lo
+		// están moviendo, se elimina de los otros grupos y se audita.
 		foreach ( $to_add as $uid ) {
-			$wpdb->insert(
+			$uid = absint( $uid );
+			if ( ! $uid || ! $course_id ) {
+				continue;
+			}
+			$moved_from = $this->remove_user_from_other_groups_in_course( $uid, $course_id, $group_id, $actor_user_id );
+			if ( ! empty( $moved_from ) ) {
+				$affected_student_ids[] = $uid;
+			}
+		}
+
+		foreach ( $to_add as $uid ) {
+			$inserted = $wpdb->insert(
 				$this->table_members(),
 				array(
 					'group_id'   => $group_id,
@@ -206,41 +236,132 @@ final class Group_Service {
 				),
 				array( '%d', '%d', '%s' )
 			);
+			if ( false === $inserted ) {
+				$tx_failed = true;
+				break;
+			}
 			$this->audit(
 				$group_id,
 				$actor_user_id,
 				! empty( $locked_at ) ? 'member_added_locked' : 'member_added',
 				array( 'user_id' => absint( $uid ) )
 			);
+			$affected_student_ids[] = absint( $uid );
 		}
 
-		foreach ( $to_del as $uid ) {
-			$wpdb->delete( $this->table_members(), array( 'group_id' => $group_id, 'user_id' => absint( $uid ) ), array( '%d', '%d' ) );
-			$this->audit( $group_id, $actor_user_id, 'member_removed', array( 'user_id' => absint( $uid ) ) );
+		if ( ! $tx_failed ) {
+			foreach ( $to_del as $uid ) {
+				$deleted = $wpdb->delete( $this->table_members(), array( 'group_id' => $group_id, 'user_id' => absint( $uid ) ), array( '%d', '%d' ) );
+				if ( false === $deleted ) {
+					$tx_failed = true;
+					break;
+				}
+				$this->audit( $group_id, $actor_user_id, ! empty( $locked_at ) ? 'member_removed_locked' : 'member_removed', array( 'user_id' => absint( $uid ) ) );
+				$affected_student_ids[] = absint( $uid );
+			}
 		}
+
+		if ( ! $tx_failed ) {
+			$updated = $wpdb->update(
+				$this->table_groups(),
+				array( 'updated_at' => current_time( 'mysql' ) ),
+				array( 'id' => $group_id ),
+				array( '%s' ),
+				array( '%d' )
+			);
+			if ( false === $updated ) {
+				$tx_failed = true;
+			}
+		}
+
+		if ( $tx_failed ) {
+			$wpdb->query( 'ROLLBACK' );
+			return new \WP_Error( 'group_members_write_failed', __( 'No se pudo guardar la membresía del grupo. No se aplicó ningún cambio.', 'atora-lms' ) );
+		}
+
+		$wpdb->query( 'COMMIT' );
 
 		// If the group is locked and we forced adding members, ensure new members receive
 		// shadow submissions for any existing group master submissions.
-		if ( ! empty( $locked_at ) && $force_add && ! empty( $to_add ) ) {
-			$course_id = $this->get_group_course_id( $group_id );
+		if ( ! empty( $locked_at ) && ( $force_add || $force_edit ) && ! empty( $to_add ) ) {
 			foreach ( $to_add as $uid ) {
 				$this->sync_new_member_shadows_for_existing_submissions( $group_id, absint( $uid ), $course_id );
 			}
 		}
 
-		$wpdb->update(
-			$this->table_groups(),
-			array( 'updated_at' => current_time( 'mysql' ) ),
-			array( 'id' => $group_id ),
-			array( '%s' ),
-			array( '%d' )
-		);
+		if ( $course_id && ! empty( $affected_student_ids ) ) {
+			$this->invalidate_grade_caches_for_students( $course_id, array_values( array_unique( array_filter( array_map( 'absint', $affected_student_ids ) ) ) ) );
+		}
 
 		return array(
 			'success'     => true,
 			'group_id'    => $group_id,
 			'member_ids'  => $this->get_group_member_ids( $group_id ),
 		);
+	}
+
+	private function remove_user_from_other_groups_in_course( int $user_id, int $course_id, int $keep_group_id, int $actor_user_id ): array {
+		global $wpdb;
+
+		$user_id      = absint( $user_id );
+		$course_id    = absint( $course_id );
+		$keep_group_id = absint( $keep_group_id );
+		$actor_user_id = absint( $actor_user_id );
+
+		if ( ! $user_id || ! $course_id || ! $keep_group_id ) {
+			return array();
+		}
+
+		$group_ids = $wpdb->get_col(
+			$wpdb->prepare(
+				"SELECT gm.group_id
+				 FROM {$this->table_members()} gm
+				 INNER JOIN {$this->table_groups()} g ON g.id = gm.group_id
+				 WHERE gm.user_id = %d AND g.course_id = %d AND gm.group_id <> %d",
+				$user_id,
+				$course_id,
+				$keep_group_id
+			)
+		);
+
+		$group_ids = array_values( array_filter( array_map( 'absint', (array) $group_ids ) ) );
+		if ( empty( $group_ids ) ) {
+			return array();
+		}
+
+		foreach ( $group_ids as $gid ) {
+			$wpdb->delete( $this->table_members(), array( 'group_id' => $gid, 'user_id' => $user_id ), array( '%d', '%d' ) );
+			$this->audit( $gid, $actor_user_id, 'member_moved_out', array( 'user_id' => $user_id, 'to_group_id' => $keep_group_id ) );
+		}
+
+		return $group_ids;
+	}
+
+	private function invalidate_grade_caches_for_students( int $course_id, array $student_ids ): void {
+		$course_id   = absint( $course_id );
+		$student_ids = array_values( array_filter( array_map( 'absint', (array) $student_ids ) ) );
+		if ( ! $course_id || empty( $student_ids ) ) {
+			return;
+		}
+
+		$assessment = class_exists( 'CLMS_Helper' ) ? clms_core( 'CLMS_Assessment_Engine' ) : null;
+		$grading    = class_exists( 'CLMS_Helper' ) ? clms_core( 'CLMS_Grading' ) : null;
+		$engine     = class_exists( 'CLMS_Helper' ) ? clms_core( 'CLMS_Grading_Engine' ) : null;
+		if ( ! $engine && class_exists( 'CLMS_Grading_Engine' ) ) {
+			$engine = new \CLMS_Grading_Engine();
+		}
+
+		foreach ( $student_ids as $student_id ) {
+			if ( $assessment && method_exists( $assessment, 'invalidate_cache_for_user_course' ) ) {
+				$assessment->invalidate_cache_for_user_course( $student_id, $course_id );
+			}
+			if ( $grading && method_exists( $grading, 'invalidate_cache_for_user_course' ) ) {
+				$grading->invalidate_cache_for_user_course( $student_id, $course_id );
+			}
+			if ( $engine && method_exists( $engine, 'invalidate_grade_cache' ) ) {
+				$engine->invalidate_grade_cache( $student_id, $course_id );
+			}
+		}
 	}
 
 	private function sync_new_member_shadows_for_existing_submissions( int $group_id, int $student_id, int $course_id ): void {
@@ -529,6 +650,19 @@ final class Group_Service {
 
 		if ( ! $group_id || ! $lesson_id || ! $student_id ) {
 			return new \WP_Error( 'invalid_request', __( 'Datos inválidos.', 'atora-lms' ) );
+		}
+
+		$member_ids = $this->get_group_member_ids( $group_id );
+		if ( ! in_array( $student_id, $member_ids, true ) ) {
+			return new \WP_Error( 'student_not_in_group', __( 'El estudiante no pertenece a este grupo.', 'atora-lms' ) );
+		}
+
+		$course_id = $this->get_group_course_id( $group_id );
+		$lesson_course_id = ( class_exists( '\CLMS_Helper' ) && method_exists( '\CLMS_Helper', 'get_lesson_course_id' ) )
+			? absint( \CLMS_Helper::get_lesson_course_id( $lesson_id ) )
+			: 0;
+		if ( ! $course_id || ! $lesson_course_id || $lesson_course_id !== $course_id ) {
+			return new \WP_Error( 'lesson_not_in_course', __( 'La lección no pertenece al curso de este grupo.', 'atora-lms' ) );
 		}
 
 		if ( '' !== (string) $override_grade ) {

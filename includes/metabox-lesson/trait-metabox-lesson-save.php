@@ -50,6 +50,11 @@ trait CLMS_Metabox_Lesson_Save_Trait {
 		$task_description = isset( $_POST['lm_task_description'] ) ? wp_kses_post( wp_unslash( $_POST['lm_task_description'] ) ) : '';
 		$show_in_calendar = isset( $_POST['lm_show_in_calendar'] ) ? ( '1' === wp_unslash( $_POST['lm_show_in_calendar'] ) ? '1' : '0' ) : '0';
 
+		$h5p_content_id = isset( $_POST['_clms_h5p_content_id'] ) ? absint( wp_unslash( $_POST['_clms_h5p_content_id'] ) ) : 0;
+		$h5p_embed      = isset( $_POST['_clms_h5p_embed'] ) ? ( '1' === wp_unslash( $_POST['_clms_h5p_embed'] ) ? '1' : '0' ) : '0';
+		$h5p_track      = isset( $_POST['_clms_h5p_track'] ) ? ( '1' === wp_unslash( $_POST['_clms_h5p_track'] ) ? '1' : '0' ) : '0';
+		$h5p_autoscore  = isset( $_POST['_clms_h5p_autoscore'] ) ? ( '1' === wp_unslash( $_POST['_clms_h5p_autoscore'] ) ? '1' : '0' ) : '0';
+
 		$due_date  = isset( $_POST['lm_due_date'] ) ? $this->sanitize_date( wp_unslash( $_POST['lm_due_date'] ) ) : '';
 		$due_time  = isset( $_POST['lm_due_time'] ) ? $this->sanitize_time( wp_unslash( $_POST['lm_due_time'] ) ) : '';
 		$late_date = isset( $_POST['lm_late_date'] ) ? $this->sanitize_date( wp_unslash( $_POST['lm_late_date'] ) ) : '';
@@ -80,6 +85,10 @@ trait CLMS_Metabox_Lesson_Save_Trait {
 		$quiz_enabled              = isset( $_POST[ self::QUIZ_ENABLED_META_KEY ] ) ? ( '1' === wp_unslash( $_POST[ self::QUIZ_ENABLED_META_KEY ] ) ? '1' : '0' ) : '0';
 		$peer_review_enabled       = isset( $_POST['_clms_peer_review_enabled'] ) ? ( '1' === wp_unslash( $_POST['_clms_peer_review_enabled'] ) ? '1' : '0' ) : '0';
 		$peer_reviews_per_student  = isset( $_POST['_clms_peer_reviews_per_student'] ) ? max( 1, min( 5, absint( wp_unslash( $_POST['_clms_peer_reviews_per_student'] ) ) ) ) : 2;
+		$peer_review_blind         = isset( $_POST['_clms_peer_review_blind'] ) ? ( '1' === wp_unslash( $_POST['_clms_peer_review_blind'] ) ? '1' : '0' ) : '0';
+		$peer_review_calibration_enabled = isset( $_POST['_clms_pr_calibration_enabled'] ) ? ( '1' === wp_unslash( $_POST['_clms_pr_calibration_enabled'] ) ? '1' : '0' ) : '0';
+		$peer_review_calibration_submission_id = isset( $_POST['_clms_pr_calibration_submission_id'] ) ? absint( wp_unslash( $_POST['_clms_pr_calibration_submission_id'] ) ) : 0;
+		$peer_review_calibration_teacher_grade = isset( $_POST['_clms_pr_calibration_teacher_grade'] ) ? max( 0, min( 100, absint( wp_unslash( $_POST['_clms_pr_calibration_teacher_grade'] ) ) ) ) : '';
 		$assessment_mode           = isset( $_POST['_clms_evaluation_mode'] ) ? sanitize_key( wp_unslash( $_POST['_clms_evaluation_mode'] ) ) : 'manual';
 		$ai_confidence_threshold   = isset( $_POST['_clms_ai_confidence_threshold'] ) ? (float) wp_unslash( $_POST['_clms_ai_confidence_threshold'] ) : 0.75;
 		$ai_confidence_thresholds  = isset( $_POST['_clms_ai_confidence_thresholds'] ) ? (array) wp_unslash( $_POST['_clms_ai_confidence_thresholds'] ) : array();
@@ -331,12 +340,21 @@ trait CLMS_Metabox_Lesson_Save_Trait {
 		update_post_meta( $post_id, self::LESSON_SUPPORT_RESOURCES, $resources );
 		update_post_meta( $post_id, CLMS_Helper::LESSON_PREREQUISITES_META, array_values( array_diff( array_unique( $lesson_prerequisites ), array( (int) $post_id ) ) ) );
 
+		update_post_meta( $post_id, '_clms_h5p_content_id', $h5p_content_id );
+		update_post_meta( $post_id, '_clms_h5p_embed', $h5p_embed );
+		update_post_meta( $post_id, '_clms_h5p_track', $h5p_track );
+		update_post_meta( $post_id, '_clms_h5p_autoscore', $h5p_autoscore );
+
 		update_post_meta( $post_id, self::QUIZ_ENABLED_META_KEY, $quiz_enabled );
 		update_post_meta( $post_id, '_clms_evaluation_mode', $assessment_mode );
 		update_post_meta( $post_id, '_clms_ai_confidence_threshold', $ai_confidence_threshold );
 		update_post_meta( $post_id, '_clms_ai_confidence_thresholds', $normalized_thresholds );
 		update_post_meta( $post_id, '_clms_peer_review_enabled', $peer_review_enabled );
 		update_post_meta( $post_id, '_clms_peer_reviews_per_student', $peer_reviews_per_student );
+		update_post_meta( $post_id, '_clms_peer_review_blind', $peer_review_blind );
+		update_post_meta( $post_id, '_clms_pr_calibration_enabled', $peer_review_calibration_enabled );
+		update_post_meta( $post_id, '_clms_pr_calibration_submission_id', $peer_review_calibration_submission_id );
+		update_post_meta( $post_id, '_clms_pr_calibration_teacher_grade', $peer_review_calibration_teacher_grade );
 		update_post_meta( $post_id, '_lm_quiz_has_eval', $quiz_has_eval );
 		update_post_meta( $post_id, '_lm_quiz_eval_mode', $quiz_eval_mode );
 		update_post_meta( $post_id, '_lm_quiz_eval_type', $quiz_eval_type );

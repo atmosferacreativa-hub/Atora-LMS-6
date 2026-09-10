@@ -210,7 +210,37 @@ trait CLMS_Submission_Storage_Review_Trait {
 			return array();
 		}
 
-		$submission_id = $this->get_existing_submission_id( $user_id, $lesson_id );
+		$submission_id = 0;
+
+		$evaluation_mode = sanitize_key( (string) get_post_meta( $lesson_id, '_clms_evaluation_mode', true ) );
+		if ( 'group' === $evaluation_mode ) {
+			$course_id = $this->get_course_id_for_lesson( $lesson_id );
+			$group_id  = $course_id ? absint( (int) apply_filters( 'atora/groups/user_group_id', 0, $user_id, absint( $course_id ), $lesson_id ) ) : 0;
+
+			if ( $group_id ) {
+				$master_id = $this->get_existing_group_master_submission_id( $group_id, $lesson_id );
+
+				// Si el estudiante cambió de grupo post-entrega, no tomar shadows anteriores de otro grupo.
+				if ( $master_id && class_exists( '\ATORA\Groups\Group_Service' ) ) {
+					$service = new \ATORA\Groups\Group_Service();
+					$submission_id = $service->find_shadow_submission_id( $user_id, $lesson_id, $group_id, absint( $master_id ) );
+
+					// Hardening: si no existe shadow aún, crearla desde el master.
+					if ( ! $submission_id ) {
+						$shadow_id = $service->ensure_shadow_submission( $user_id, $lesson_id, absint( $course_id ), $group_id, absint( $master_id ) );
+						if ( $shadow_id ) {
+							$service->sync_shadow_grade_from_master( absint( $shadow_id ), absint( $master_id ) );
+							$submission_id = absint( $shadow_id );
+						}
+					}
+				} else {
+					// Fallback legacy (sin Group_Service): shadow por user+lesson.
+					$submission_id = $this->get_existing_submission_id( $user_id, $lesson_id );
+				}
+			}
+		} else {
+			$submission_id = $this->get_existing_submission_id( $user_id, $lesson_id );
+		}
 
 		if ( ! $submission_id ) {
 			return array();
@@ -607,6 +637,41 @@ trait CLMS_Submission_Storage_Review_Trait {
 
 		if ( CLMS_Helper::user_can_manage_lms() ) {
 			return true;
+		}
+
+		// Group Assessment: permitir ver adjuntos del submission master si el usuario
+		// tiene una shadow asociada a ese master (cambio de grupo post-entrega).
+		$submission_id = absint( get_post_meta( $file_id, '_clms_submission_id', true ) );
+		if ( $submission_id && '1' === (string) get_post_meta( $submission_id, '_clms_submission_group_master', true ) ) {
+			$ids = get_posts(
+				array(
+					'post_type'      => self::CPT,
+					'post_status'    => array( 'publish', 'private' ),
+					'posts_per_page' => 1,
+					'fields'         => 'ids',
+					'no_found_rows'  => true,
+					'meta_query'     => array(
+						array(
+							'key'   => '_clms_submission_is_shadow',
+							'value' => '1',
+						),
+						array(
+							'key'   => '_clms_submission_user_id',
+							'value' => $user_id,
+							'type'  => 'NUMERIC',
+						),
+						array(
+							'key'   => '_clms_submission_group_master_id',
+							'value' => $submission_id,
+							'type'  => 'NUMERIC',
+						),
+					),
+				)
+			);
+
+			if ( ! empty( $ids ) ) {
+				return true;
+			}
 		}
 
 		$owner = absint( get_post_meta( $file_id, '_clms_submission_owner', true ) );

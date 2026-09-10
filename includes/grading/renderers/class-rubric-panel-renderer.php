@@ -15,7 +15,33 @@ class CLMS_Rubric_Panel_Renderer {
 	public static function render( $context ) {
 		$context      = is_array( $context ) ? $context : array();
 		$rubric_id    = absint( $context['rubric_id'] ?? 0 );
-		$criteria     = ( $rubric_id && class_exists( 'CLMS_Rubric' ) ) ? CLMS_Rubric::get_criteria( $rubric_id ) : array();
+		$snapshot     = isset( $context['rubric_snapshot'] ) && is_array( $context['rubric_snapshot'] ) ? (array) $context['rubric_snapshot'] : array();
+		$has_snapshot = $rubric_id
+			&& $rubric_id === absint( $snapshot['rubric_id'] ?? 0 )
+			&& ! empty( $snapshot['criteria'] )
+			&& is_array( $snapshot['criteria'] );
+
+		$criteria = array();
+		if ( $has_snapshot ) {
+			$criteria = (array) $snapshot['criteria'];
+		} elseif ( $rubric_id && class_exists( 'CLMS_Rubric' ) ) {
+			$criteria = CLMS_Rubric::get_criteria( $rubric_id );
+		}
+
+		$rubric_title = $has_snapshot
+			? sanitize_text_field( (string) ( $snapshot['rubric_title'] ?? '' ) )
+			: ( $rubric_id ? (string) get_the_title( $rubric_id ) : '' );
+
+		$rub_max = $has_snapshot ? absint( $snapshot['total_points'] ?? 0 ) : 0;
+		if ( ! $rub_max && $rubric_id && class_exists( 'CLMS_Rubric' ) ) {
+			$rub_max = absint( CLMS_Rubric::get_total_points( $rubric_id ) );
+		}
+		if ( ! $rub_max && ! empty( $criteria ) ) {
+			foreach ( (array) $criteria as $c ) {
+				$c = is_array( $c ) ? $c : array();
+				$rub_max += absint( $c['max_points'] ?? 0 );
+			}
+		}
 		$saved_scores = isset( $context['rubric_scores'] ) && is_array( $context['rubric_scores'] ) ? $context['rubric_scores'] : array();
 
 		ob_start();
@@ -23,7 +49,10 @@ class CLMS_Rubric_Panel_Renderer {
 		<?php if ( ! empty( $criteria ) ) : ?>
 			<div class="clms-sg-field">
 				<label style="font-weight:700;display:block;margin-bottom:6px">
-					<?php echo esc_html__( 'Rúbrica', 'atora-lms' ); ?>: <?php echo esc_html( get_the_title( $rubric_id ) ); ?>
+					<?php echo esc_html__( 'Rúbrica', 'atora-lms' ); ?>: <?php echo esc_html( $rubric_title ? $rubric_title : ( $rubric_id ? get_the_title( $rubric_id ) : '' ) ); ?>
+					<?php if ( $has_snapshot ) : ?>
+						<span class="description" style="font-weight:400;margin-left:6px">(<?php echo esc_html__( 'versión guardada', 'atora-lms' ); ?>)</span>
+					<?php endif; ?>
 				</label>
 				<style>
 				.clms-sg-rubric-criterion{border:1px solid rgba(255,255,255,.15);border-radius:8px;margin-bottom:12px;overflow:hidden}
@@ -147,7 +176,7 @@ class CLMS_Rubric_Panel_Renderer {
 				var totalEl  = document.getElementById('clms-sg-rubric-total');
 				var fillEl   = document.getElementById('clms-sg-rubric-progress-fill');
 				var gradeF   = document.getElementById('clms_sg_grade');
-				var rubMax   = <?php echo esc_js( (string) CLMS_Rubric::get_total_points( $rubric_id ) ); ?>;
+				var rubMax   = <?php echo esc_js( (string) absint( $rub_max ) ); ?>;
 				var emptyLabel = <?php echo wp_json_encode( __( '—', 'atora-lms' ) ); ?>;
 				var userOverride = gradeF && gradeF.value.trim() !== '';
 

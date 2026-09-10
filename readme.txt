@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 6.14.1
+Stable tag: 6.21.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,98 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.21.0 =
+* Sprint de estabilización pre-producción (S0-S5): bloqueantes de CI/loader, autorización y CSRF en Grupos, integridad de datos y rendimiento de Alertas Tempranas, saneamiento de exports CSV, y ampliación de la suite de tests automatizados.
+* CI: la versión del smoke test y del ZIP de distribución ahora se resuelve dinámicamente desde `atora_lms.php` en vez de estar hardcodeada.
+* Loader: corregido un fallo de activación de `CLMS_Student_Assistant` cuando el módulo de IA está desactivado.
+* Grupos: los handlers de crear/guardar miembros/autogenerar/exportar ahora verifican gestión real del curso (no solo `edit_posts`); exportación exige nonce; `guardar miembros` valida que el grupo pertenezca al curso del request.
+* Grupos: `set_members_with_options()` es transaccional (rollback ante fallo parcial); `set_override()` valida que el estudiante sea miembro del grupo y que la lección pertenezca a su curso.
+* H5P: ownership por-ítem en la API REST de contenido (leer/editar/borrar), listado filtrado por autor salvo administradores.
+* Alertas tempranas: el escaneo de entregas perdidas pasa de N consultas por estudiante×lección a una sola consulta por curso; las fechas límite respetan el huso horario configurado en WordPress en vez del huso del servidor.
+* Exportaciones CSV (grupos, alertas) saneadas contra inyección de fórmulas.
+* Migración de base de datos: ya no se marca como completa si faltan tablas esperadas tras `dbDelta()`.
+* Suite de tests: bootstrap de PHPUnit reparado y ampliado con cobertura nueva para Grupos, Alertas Tempranas, H5P, Rúbricas, Coevaluación, Portfolios, Classroom y Microsoft.
+
+= 6.20.0 =
+* Epic 7 (Microsoft): SSO con Entra ID (vincular/desvincular cuenta), webhooks de Teams y suscripción iCal de Outlook por curso (token de acceso scoped por curso, sin exponer datos de otros cursos).
+
+= 6.19.0 =
+* H5P: módulo standalone con endpoints REST de gestión de contenido, tracking de intentos (xAPI) y autoscore hacia el libro de calificaciones.
+
+= 6.18.11 =
+* Grupos: hardening de casos límite (cambios de grupo, invalidación de caché, unicidad de membresía por curso).
+
+= 6.18.10 =
+* Grupos: bloquea el envío de una entrega grupal si el estudiante no tiene grupo o asignación válida.
+
+= 6.18.9 =
+* Fix: evita que queden entregas "sombra" huérfanas cuando un estudiante cambia de grupo.
+
+= 6.18.8 =
+* Grupos: vista de estudiante, adjuntos compartidos entre miembros del grupo, y hardening general del módulo.
+
+= 6.18.7 =
+* Fix: evita el recálculo duplicado de notas al calificar la entrega maestra de un grupo.
+
+= 6.18.6 =
+* Rúbricas: snapshot por entrega para mantener versionado consistente en SpeedGrade aunque la rúbrica cambie después.
+
+= 6.18.5 =
+* Learning Analytics: nuevas señales de mensajes/lecturas y hardening del procesamiento batch.
+
+= 6.18.4 =
+* Portfolios: hardening de QA (cambios de inscripción) y caché por request.
+
+= 6.18.3 =
+* Classroom: hardening de QA (retry/backoff en llamadas a la API) y hoja de ruta.
+
+= 6.18.2 =
+* Classroom: push de notas hacia Google Classroom (borrador + devolución).
+
+= 6.18.1 =
+* Classroom: importar coursework de Google Classroom como lecciones (MVP).
+
+= 6.18.0 =
+* Classroom: MVP de mapeo de cursos ATORA↔Google Classroom y sincronización de roster por email.
+
+= 6.17.2 =
+* Portfolios: exportación en ZIP (snapshot) y hardening de acceso privado.
+
+= 6.17.1 =
+* Portfolios: evaluación final con rúbrica (override).
+
+= 6.17.0 =
+* Epic 5 (MVP): Portfolios de estudiante (sin CPT dedicado) + tablas de base de datos nuevas.
+
+= 6.16.1 =
+* Peer review: calibración bloquea revisiones hasta completarse (pass/warn), con fallback seguro.
+
+= 6.16.0 =
+* Epic 4 (MVP): Coevaluación mejorada — calibración por lección, scoring de consistencia (outliers) y reporte admin.
+* DB: nueva tabla de auditoría `wp_clms_peer_review_audit_log`.
+* Lesson settings: modo ciego + calibración (ejemplar + pauta) disponibles en la metabox de evaluación.
+
+= 6.15.4 =
+* Learning Analytics: incluye “entregas perdidas” en señales y export BI (CSV/JSON) usando `wp_atora_early_warning`.
+
+= 6.15.3 =
+* Learning Analytics: trend/delta por estudiante, nuevos tipos de alerta (high_risk/inactivity/risk_spike) y notificación con contexto (curso + delta).
+* Learning Analytics: export BI incluye trend/delta/alert_type (CSV/JSON).
+* DB: `wp_atora_student_analytics` agrega columnas de trend/delta para consultas más rápidas.
+
+= 6.15.2 =
+* Learning Analytics: export JSON (admin + REST) con esquema BI-friendly (schema_version=1).
+* Learning Analytics: timeline de estudiante (submissions recientes + links a SpeedGrade) y entregas perdidas en el detalle.
+* Early Warning: helper público para listar entregas perdidas por estudiante/curso (reusado por Learning Analytics).
+
+= 6.15.1 =
+* Learning Analytics: filtros por cohorte/docente, listado multi-curso, export CSV multi-curso y vista de detalle por estudiante.
+* Learning Analytics REST: endpoints por cohorte/docente y scan por cohorte/docente.
+
+= 6.15.0 =
+* Added Learning Analytics (MVP): risk snapshots per student/course (DB table + daily cron + REST + admin dashboard + CSV export).
+* Added internal notifications (MVP): alerts teachers when a student reaches high risk (daily anti-spam).
+
 = 6.14.1 =
 * Hardening Group Assessment: enabled “Trabajo en grupo” mode in lesson UI and added group context to the student submission form.
 * Improved course group management UI (create groups, assign members, safe preset autogeneration) and added locked-group safe add-only flow.

@@ -51,16 +51,37 @@ trait CLMS_Settings_Channels_Helpers_Trait {
 		$email = self::get_email_engine_settings();
 		$whatsapp = self::get_whatsapp_settings();
 		$telegram = self::get_telegram_settings();
+		$teams = self::get_teams_settings();
 
 		return array(
 			'email'    => $email,
 			'whatsapp' => $whatsapp,
 			'telegram' => $telegram,
+			'teams'    => $teams,
 			'status'   => array(
 				'email_ready'    => ! empty( $email['from_email'] ) && ! empty( $email['provider'] ),
 				'whatsapp_ready' => ! empty( $whatsapp['access_token'] ) && ! empty( $whatsapp['phone_number_id'] ),
 				'telegram_ready' => ! empty( $telegram['bot_token'] ) && ! empty( $telegram['webhook_secret'] ),
+				'teams_ready'    => ! empty( $teams['enabled'] ) && ! empty( $teams['webhook_url'] ),
 			),
+		);
+	}
+
+	/**
+	 * Ajustes Microsoft Teams (Incoming webhook).
+	 *
+	 * @return array<string,mixed>
+	 */
+	public static function get_teams_settings(): array {
+		$opt = get_option( CLMS_Settings::OPTION_TEAMS, array() );
+		$opt = is_array( $opt ) ? $opt : array();
+
+		return array(
+			'enabled'     => ! empty( $opt['enabled'] ) ? 1 : 0,
+			'webhook_url' => esc_url_raw( (string) ( $opt['webhook_url'] ?? '' ) ),
+			'send_types'  => isset( $opt['send_types'] ) && is_array( $opt['send_types'] )
+				? array_values( array_filter( array_map( 'sanitize_key', (array) $opt['send_types'] ) ) )
+				: array( 'early_warning' ),
 		);
 	}
 

@@ -326,6 +326,17 @@ class CLMS_Notifications {
 
 		update_user_meta( $user_id, self::META_KEY, $notifications );
 
+		/**
+		 * Hook de integración: notificación añadida.
+		 *
+		 * Útil para integraciones externas (Teams/Slack, etc.) sin acoplar
+		 * a este archivo con proveedores concretos.
+		 *
+		 * @param int   $user_id
+		 * @param array $item Notificación normalizada.
+		 */
+		do_action( 'atora/notification_added', $user_id, $item );
+
 		return true;
 	}
 

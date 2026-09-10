@@ -16,10 +16,11 @@ use ATORA\Google\Google_Module;
 $opts         = Google_Module::get_options();
 $redirect_uri = Google_Module::get_redirect_uri();
 $authorize    = Google_Module::get_authorize_url();
+$effective_scopes = Google_Module::get_scopes();
 ?>
 <div class="wrap">
 	<h1><?php esc_html_e( 'Google', 'atora-lms' ); ?></h1>
-	<p><?php esc_html_e( 'Cada instalación usa su propio proyecto de Google Cloud. Crea uno (o reusa uno existente), habilita las APIs de Calendar, Meet y Drive, y pega aquí el Client ID/Secret.', 'atora-lms' ); ?></p>
+	<p><?php esc_html_e( 'Cada instalación usa su propio proyecto de Google Cloud. Crea uno (o reusa uno existente), habilita las APIs de Calendar, Meet y Drive (y opcionalmente Classroom), y pega aquí el Client ID/Secret.', 'atora-lms' ); ?></p>
 
 	<?php
 	// C2 (6.13.1): perfil institución con hd_domain vacío deja el
@@ -65,7 +66,7 @@ $authorize    = Google_Module::get_authorize_url();
 		<tr>
 			<th><?php esc_html_e( 'Scopes a habilitar', 'atora-lms' ); ?></th>
 			<td>
-				<code><?php echo esc_html( implode( ' ', Google_Module::SCOPES ) ); ?></code>
+				<code><?php echo esc_html( implode( ' ', $effective_scopes ) ); ?></code>
 				<p class="description"><?php esc_html_e( 'drive.file (no drive ni drive.readonly) mantiene la verificación en básica — acceso solo a los archivos que el usuario elige explícitamente por Picker.', 'atora-lms' ); ?></p>
 			</td>
 		</tr>
@@ -97,6 +98,18 @@ $authorize    = Google_Module::get_authorize_url();
 						<input type="checkbox" name="<?php echo esc_attr( Google_Module::OPTION ); ?>[hd_auto_enroll]" value="1" <?php checked( $opts['hd_auto_enroll'] ); ?>>
 						<?php esc_html_e( 'Matricular automáticamente a quien se registre con una cuenta del dominio anterior.', 'atora-lms' ); ?>
 					</label>
+				</td>
+			</tr>
+			<tr>
+				<th><?php esc_html_e( 'Epic 6 — Google Classroom', 'atora-lms' ); ?></th>
+				<td>
+					<label>
+						<input type="checkbox" name="<?php echo esc_attr( Google_Module::OPTION ); ?>[classroom_enabled]" value="1" <?php checked( ! empty( $opts['classroom_enabled'] ) ); ?>>
+						<?php esc_html_e( 'Habilitar Google Classroom (agrega scopes a la conexión; requiere reconectar).', 'atora-lms' ); ?>
+					</label>
+					<p class="description">
+						<?php esc_html_e( 'Al habilitar Classroom, debes: (1) activar la API de Google Classroom en tu proyecto, y (2) volver a “Conectar con Google” para consentir los nuevos scopes (incluye publicación de notas).', 'atora-lms' ); ?>
+					</p>
 				</td>
 			</tr>
 		</table>
