@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 6.16.0
+Stable tag: 6.16.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,9 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.16.1 =
+* Peer review: calibración bloquea revisiones hasta completarse (pass/warn), con fallback seguro.
+
 = 6.16.0 =
 * Epic 4 (MVP): Coevaluación mejorada — calibración por lección, scoring de consistencia (outliers) y reporte admin.
 * DB: nueva tabla de auditoría `wp_clms_peer_review_audit_log`.

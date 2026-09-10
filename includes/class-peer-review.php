@@ -132,7 +132,17 @@ class CLMS_Peer_Review {
 			)
 		);
 
-		return ! empty( $done );
+		if ( empty( $done[0] ) ) {
+			return false;
+		}
+
+		$status = sanitize_key( (string) get_post_meta( absint( $done[0] ), '_clms_pr_calibration_status', true ) );
+		if ( '' === $status ) {
+			// Si no hay scoring aún, permitimos avanzar — pero se registrará en reportes.
+			return true;
+		}
+
+		return 'pass' === $status || 'warn' === $status;
 	}
 
 	/**
