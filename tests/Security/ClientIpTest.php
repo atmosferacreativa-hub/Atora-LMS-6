@@ -30,6 +30,14 @@ class ClientIpTest extends TestCase {
 
 	protected function setUp(): void {
 		parent::setUp();
+		\Brain\Monkey\Functions\when( 'apply_filters' )->alias(
+			static function( string $hook, $value, ...$args ) {
+				foreach ( $GLOBALS['__atora_test_filters'][ $hook ] ?? array() as $entry ) {
+					$value = call_user_func( $entry['cb'], $value, ...$args );
+				}
+				return $value;
+			}
+		);
 		\atora_test_reset_filters();
 		unset(
 			$_SERVER['REMOTE_ADDR'],
