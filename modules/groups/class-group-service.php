@@ -155,10 +155,27 @@ final class Group_Service {
 	}
 
 	public function set_members( int $group_id, array $member_ids, int $actor_user_id ) {
+		return $this->set_members_with_options( $group_id, $member_ids, $actor_user_id, array() );
+	}
+
+	/**
+	 * Sets members for a group.
+	 *
+	 * Options:
+	 * - force_add (bool): allow adding members even when the group is locked (no removals).
+	 *
+	 * @param int   $group_id
+	 * @param array $member_ids
+	 * @param int   $actor_user_id
+	 * @param array $options
+	 * @return array|\WP_Error
+	 */
+	public function set_members_with_options( int $group_id, array $member_ids, int $actor_user_id, array $options ) {
 		global $wpdb;
 		$group_id      = absint( $group_id );
 		$actor_user_id = absint( $actor_user_id );
 		$member_ids    = array_values( array_unique( array_filter( array_map( 'absint', $member_ids ) ) ) );
+		$force_add     = ! empty( $options['force_add'] );
 
 		if ( ! $group_id ) {
 			return new \WP_Error( 'invalid_group', __( 'Grupo inválido.', 'atora-lms' ) );
@@ -166,12 +183,18 @@ final class Group_Service {
 
 		$locked_at = $wpdb->get_var( $wpdb->prepare( "SELECT locked_at FROM {$this->table_groups()} WHERE id = %d", $group_id ) );
 		if ( ! empty( $locked_at ) ) {
-			return new \WP_Error( 'group_locked', __( 'El grupo ya tiene entregas registradas y no se puede modificar.', 'atora-lms' ) );
+			if ( ! $force_add ) {
+				return new \WP_Error( 'group_locked', __( 'El grupo ya tiene entregas registradas y no se puede modificar.', 'atora-lms' ) );
+			}
 		}
 
 		$current = $this->get_group_member_ids( $group_id );
 		$to_add  = array_values( array_diff( $member_ids, $current ) );
 		$to_del  = array_values( array_diff( $current, $member_ids ) );
+
+		if ( ! empty( $locked_at ) && $force_add && ! empty( $to_del ) ) {
+			return new \WP_Error( 'group_locked_removal', __( 'Este grupo está bloqueado por entregas. Solo se permite agregar miembros (no remover).', 'atora-lms' ) );
+		}
 
 		foreach ( $to_add as $uid ) {
 			$wpdb->insert(
@@ -183,12 +206,26 @@ final class Group_Service {
 				),
 				array( '%d', '%d', '%s' )
 			);
-			$this->audit( $group_id, $actor_user_id, 'member_added', array( 'user_id' => absint( $uid ) ) );
+			$this->audit(
+				$group_id,
+				$actor_user_id,
+				! empty( $locked_at ) ? 'member_added_locked' : 'member_added',
+				array( 'user_id' => absint( $uid ) )
+			);
 		}
 
 		foreach ( $to_del as $uid ) {
 			$wpdb->delete( $this->table_members(), array( 'group_id' => $group_id, 'user_id' => absint( $uid ) ), array( '%d', '%d' ) );
 			$this->audit( $group_id, $actor_user_id, 'member_removed', array( 'user_id' => absint( $uid ) ) );
+		}
+
+		// If the group is locked and we forced adding members, ensure new members receive
+		// shadow submissions for any existing group master submissions.
+		if ( ! empty( $locked_at ) && $force_add && ! empty( $to_add ) ) {
+			$course_id = $this->get_group_course_id( $group_id );
+			foreach ( $to_add as $uid ) {
+				$this->sync_new_member_shadows_for_existing_submissions( $group_id, absint( $uid ), $course_id );
+			}
 		}
 
 		$wpdb->update(
@@ -204,6 +241,41 @@ final class Group_Service {
 			'group_id'    => $group_id,
 			'member_ids'  => $this->get_group_member_ids( $group_id ),
 		);
+	}
+
+	private function sync_new_member_shadows_for_existing_submissions( int $group_id, int $student_id, int $course_id ): void {
+		global $wpdb;
+		$group_id   = absint( $group_id );
+		$student_id = absint( $student_id );
+		$course_id  = absint( $course_id );
+		if ( ! $group_id || ! $student_id || ! $course_id ) {
+			return;
+		}
+
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT lesson_id, submission_id
+				 FROM {$this->table_submissions()}
+				 WHERE group_id = %d
+				 ORDER BY id ASC",
+				$group_id
+			),
+			ARRAY_A
+		);
+		$rows = is_array( $rows ) ? $rows : array();
+
+		foreach ( $rows as $row ) {
+			$lesson_id = absint( $row['lesson_id'] ?? 0 );
+			$master_id = absint( $row['submission_id'] ?? 0 );
+			if ( ! $lesson_id || ! $master_id ) {
+				continue;
+			}
+
+			$shadow_id = $this->ensure_shadow_submission( $student_id, $lesson_id, $course_id, $group_id, $master_id );
+			if ( $shadow_id ) {
+				$this->sync_shadow_grade_from_master( $shadow_id, $master_id );
+			}
+		}
 	}
 
 	public function lock_group_if_needed( int $group_id, int $actor_user_id ): void {

@@ -815,6 +815,21 @@ trait CLMS_Metabox_Lesson_Render_Trait {
 					<option value="hybrid" <?php selected( $assessment_mode, 'hybrid' ); ?>><?php esc_html_e( 'Híbrido', 'atora-lms' ); ?></option>
 				</select>
 				<span class="clms-help" id="clms-eval-mode-summary" aria-live="polite"></span>
+				<?php if ( 'group' === $assessment_mode ) : ?>
+					<?php
+					$course_id_for_groups = absint( get_post_meta( $post->ID, '_clms_lesson_course_id', true ) );
+					if ( ! $course_id_for_groups ) { $course_id_for_groups = absint( get_post_meta( $post->ID, '_clms_course_id', true ) ); }
+					if ( ! $course_id_for_groups ) { $course_id_for_groups = absint( get_post_meta( $post->ID, 'course_id', true ) ); }
+					?>
+					<span class="clms-help">
+						<?php esc_html_e( 'Los grupos se gestionan a nivel de curso. Debes habilitar "Grupos" en el curso y luego crear/asignar grupos.', 'atora-lms' ); ?>
+						<?php if ( $course_id_for_groups ) : ?>
+							<a href="<?php echo esc_url( admin_url( 'admin.php?page=atora-groups&course_id=' . $course_id_for_groups ) ); ?>">
+								<?php esc_html_e( 'Gestionar grupos', 'atora-lms' ); ?>
+							</a>
+						<?php endif; ?>
+					</span>
+				<?php endif; ?>
 			</p>
 			<p class="clms-f clms-eval-ai-only">
 				<label for="_clms_ai_confidence_threshold"><?php esc_html_e( 'Umbral de confianza IA', 'atora-lms' ); ?></label>

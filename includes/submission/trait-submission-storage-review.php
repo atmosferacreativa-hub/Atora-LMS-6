@@ -67,7 +67,10 @@ trait CLMS_Submission_Storage_Review_Trait {
 					$is_new = true;
 				}
 
-				update_post_meta( $submission_id, '_clms_submission_user_id', $user_id );
+				// Group master submission is owned by the group (not a single student) to avoid
+				// double-counting in per-student analytics. The submitter is stored separately.
+				update_post_meta( $submission_id, '_clms_submission_user_id', 0 );
+				update_post_meta( $submission_id, '_clms_submission_submitted_by', $user_id );
 				update_post_meta( $submission_id, '_clms_submission_lesson_id', $lesson_id );
 				update_post_meta( $submission_id, '_clms_submission_course_id', $course_id );
 				update_post_meta( $submission_id, '_clms_submission_comment', $comment );
