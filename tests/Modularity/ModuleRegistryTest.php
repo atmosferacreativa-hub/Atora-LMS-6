@@ -130,7 +130,7 @@ class ModuleRegistryTest extends TestCase {
 		\CLMS_Module_Registry::flush_cache();
 		$this->assertTrue( \CLMS_Module_Registry::is_active( 'crm' ) );
 
-		add_filter( 'atora/profile/allowed_modules', static fn( $active ) => array_diff( $active, array( 'crm' ) ) );
+		$GLOBALS['__atora_test_filters']['atora/profile/allowed_modules'][] = array( 'cb' => static fn( $active ) => array_diff( $active, array( 'crm' ) ) );
 		\CLMS_Module_Registry::flush_cache();
 
 		$this->assertFalse( \CLMS_Module_Registry::is_active( 'crm' ) );
@@ -143,7 +143,7 @@ class ModuleRegistryTest extends TestCase {
 		update_option( 'atora_active_modules', array( 'lms', 'academic', 'gradebook', 'security' ) );
 		\CLMS_Module_Registry::flush_cache();
 
-		add_filter( 'atora/profile/allowed_modules', static fn( $active ) => array() );
+		$GLOBALS['__atora_test_filters']['atora/profile/allowed_modules'][] = array( 'cb' => static fn( $active ) => array() );
 		\CLMS_Module_Registry::flush_cache();
 
 		$this->assertTrue( \CLMS_Module_Registry::is_active( 'lms' ) );
