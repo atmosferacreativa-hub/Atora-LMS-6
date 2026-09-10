@@ -311,10 +311,11 @@ final class Learning_Analytics_Service {
 			return 0;
 		}
 
-		$existing_rows = $this->get_existing_rows_map( $course_id, $student_ids );
-		$missed_map    = $this->get_missed_submissions_counts( $course_id, $student_ids );
-		$msg_map       = $this->get_course_message_stats( $course_id, $student_ids, 14 );
-		$read_map      = $this->get_course_read_stats_from_recent_events( $course_id, $student_ids, 14 );
+			$existing_rows = $this->get_existing_rows_map( $course_id, $student_ids );
+			$missed_map    = $this->get_missed_submissions_counts( $course_id, $student_ids );
+			$msg_map       = $this->get_course_message_stats( $course_id, $student_ids, 14 );
+			$read_map      = $this->get_course_read_stats_from_recent_events( $course_id, $student_ids, 14 );
+			$h5p_map       = $this->get_course_h5p_stats( $course_id, $student_ids, 14 );
 
 		$rows = 0;
 		foreach ( $student_ids as $student_id ) {
@@ -336,16 +337,19 @@ final class Learning_Analytics_Service {
 			$messages_14d = absint( $msg_map[ $student_id ]['messages_14d'] ?? 0 );
 			$last_message_at = sanitize_text_field( (string) ( $msg_map[ $student_id ]['last_message_at'] ?? '' ) );
 
-			$lesson_reads_14d = absint( $read_map[ $student_id ]['lesson_reads_14d'] ?? 0 );
-			$last_read_at     = sanitize_text_field( (string) ( $read_map[ $student_id ]['last_read_at'] ?? '' ) );
+				$lesson_reads_14d = absint( $read_map[ $student_id ]['lesson_reads_14d'] ?? 0 );
+				$last_read_at     = sanitize_text_field( (string) ( $read_map[ $student_id ]['last_read_at'] ?? '' ) );
 
-			$risk_score = self::calculate_risk_score_from_status(
-				$status,
-				array(
-					'messages_14d'     => $messages_14d,
-					'lesson_reads_14d' => $lesson_reads_14d,
-				)
-			);
+				$h5p_attempts_14d = absint( $h5p_map[ $student_id ]['h5p_attempts_14d'] ?? 0 );
+				$last_h5p_at      = sanitize_text_field( (string) ( $h5p_map[ $student_id ]['last_h5p_at'] ?? '' ) );
+
+				$risk_score = self::calculate_risk_score_from_status(
+					$status,
+					array(
+						'messages_14d'     => $messages_14d,
+						'lesson_reads_14d' => $lesson_reads_14d,
+					)
+				);
 			$risk_score_prev  = ( null !== $prev_score ) ? absint( $prev_score ) : null;
 			$risk_score_delta = ( null !== $prev_score ) ? (int) ( $risk_score - absint( $prev_score ) ) : null;
 			$risk_trend       = null === $prev_score ? 'new' : ( ( $risk_score_delta ?? 0 ) > 0 ? 'up' : ( ( $risk_score_delta ?? 0 ) < 0 ? 'down' : 'flat' ) );
@@ -377,15 +381,17 @@ final class Learning_Analytics_Service {
 				'last_access_at'     => sanitize_text_field( (string) ( $status['last_access_at'] ?? '' ) ),
 				'course_time_seconds'=> absint( $status['course_time_seconds'] ?? 0 ),
 				'missed_submissions' => absint( $missed_count ),
-				'messages_14d'       => $messages_14d,
-				'last_message_at'    => $last_message_at,
-				'lesson_reads_14d'   => $lesson_reads_14d,
-				'last_read_at'       => $last_read_at,
-				'risk_reasons'       => $reasons,
-				'recommended_action' => sanitize_text_field( (string) ( $status['recommended_action'] ?? '' ) ),
-				'risk_score_prev'    => $risk_score_prev,
-				'risk_score_delta'   => $risk_score_delta,
-				'risk_trend'         => $risk_trend,
+					'messages_14d'       => $messages_14d,
+					'last_message_at'    => $last_message_at,
+					'lesson_reads_14d'   => $lesson_reads_14d,
+					'last_read_at'       => $last_read_at,
+					'h5p_attempts_14d'   => $h5p_attempts_14d,
+					'last_h5p_at'        => $last_h5p_at,
+					'risk_reasons'       => $reasons,
+					'recommended_action' => sanitize_text_field( (string) ( $status['recommended_action'] ?? '' ) ),
+					'risk_score_prev'    => $risk_score_prev,
+					'risk_score_delta'   => $risk_score_delta,
+					'risk_trend'         => $risk_trend,
 			);
 
 			if ( $missed_count > 0 && '' === (string) ( $signals['recommended_action'] ?? '' ) ) {
@@ -580,6 +586,56 @@ final class Learning_Analytics_Service {
 			$map[ $uid ] = array(
 				'messages_14d'    => absint( $row['cnt'] ?? 0 ),
 				'last_message_at' => sanitize_text_field( (string) ( $row['last_at'] ?? '' ) ),
+			);
+		}
+
+		return $map;
+	}
+
+	private function get_course_h5p_stats( int $course_id, array $student_ids, int $days = 14 ): array {
+		global $wpdb;
+
+		$course_id   = absint( $course_id );
+		$student_ids = array_values( array_filter( array_map( 'absint', (array) $student_ids ) ) );
+		$days        = max( 1, absint( $days ) );
+
+		if ( ! $course_id || empty( $student_ids ) ) {
+			return array();
+		}
+
+		$table  = $wpdb->prefix . 'atora_h5p_tracking';
+		$exists = $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $table ) );
+		if ( ! $exists ) {
+			return array();
+		}
+
+		$since        = date( 'Y-m-d H:i:s', current_time( 'timestamp' ) - ( $days * DAY_IN_SECONDS ) );
+		$placeholders = implode( ',', array_fill( 0, count( $student_ids ), '%d' ) );
+		$args         = array_merge( array( $course_id, $since ), $student_ids );
+
+		// phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+		$sql = $wpdb->prepare(
+			"SELECT user_id, SUM(attempts) AS cnt, MAX(last_event_at) AS last_at
+			 FROM {$table}
+			 WHERE course_id = %d
+			   AND last_event_at >= %s
+			   AND user_id IN ({$placeholders})
+			 GROUP BY user_id",
+			$args
+		);
+
+		$rows = $wpdb->get_results( $sql, ARRAY_A );
+		$rows = is_array( $rows ) ? $rows : array();
+
+		$map = array();
+		foreach ( $rows as $row ) {
+			$uid = absint( $row['user_id'] ?? 0 );
+			if ( ! $uid ) {
+				continue;
+			}
+			$map[ $uid ] = array(
+				'h5p_attempts_14d' => absint( $row['cnt'] ?? 0 ),
+				'last_h5p_at'      => sanitize_text_field( (string) ( $row['last_at'] ?? '' ) ),
 			);
 		}
 
@@ -894,14 +950,16 @@ final class Learning_Analytics_Service {
 				'missed_submissions' => absint( $signals['missed_submissions'] ?? 0 ),
 				'last_access_at'     => sanitize_text_field( (string) ( $signals['last_access_at'] ?? '' ) ),
 				'course_time_seconds'=> absint( $signals['course_time_seconds'] ?? 0 ),
-				'lesson_reads_14d'   => absint( $signals['lesson_reads_14d'] ?? 0 ),
-				'last_read_at'       => sanitize_text_field( (string) ( $signals['last_read_at'] ?? '' ) ),
-				'messages_14d'       => absint( $signals['messages_14d'] ?? 0 ),
-				'last_message_at'    => sanitize_text_field( (string) ( $signals['last_message_at'] ?? '' ) ),
-				'risk_reasons'       => $reasons,
-				'recommended_action' => sanitize_text_field( (string) ( $signals['recommended_action'] ?? '' ) ),
-				'updated_at'         => sanitize_text_field( (string) ( $row['updated_at'] ?? '' ) ),
-			);
+					'lesson_reads_14d'   => absint( $signals['lesson_reads_14d'] ?? 0 ),
+					'last_read_at'       => sanitize_text_field( (string) ( $signals['last_read_at'] ?? '' ) ),
+					'messages_14d'       => absint( $signals['messages_14d'] ?? 0 ),
+					'last_message_at'    => sanitize_text_field( (string) ( $signals['last_message_at'] ?? '' ) ),
+					'h5p_attempts_14d'   => absint( $signals['h5p_attempts_14d'] ?? 0 ),
+					'last_h5p_at'        => sanitize_text_field( (string) ( $signals['last_h5p_at'] ?? '' ) ),
+					'risk_reasons'       => $reasons,
+					'recommended_action' => sanitize_text_field( (string) ( $signals['recommended_action'] ?? '' ) ),
+					'updated_at'         => sanitize_text_field( (string) ( $row['updated_at'] ?? '' ) ),
+				);
 
 			if ( $include_course ) {
 				$item = array_merge(
@@ -954,12 +1012,14 @@ final class Learning_Analytics_Service {
 				__( 'Tiempo (s)', 'atora-lms' ),
 				__( 'Lecturas (14d)', 'atora-lms' ),
 				__( 'Última lectura', 'atora-lms' ),
-				__( 'Mensajes (14d)', 'atora-lms' ),
-				__( 'Último mensaje', 'atora-lms' ),
-				__( 'Motivos', 'atora-lms' ),
-				__( 'Acción recomendada', 'atora-lms' ),
-				__( 'Actualizado', 'atora-lms' ),
-			)
+					__( 'Mensajes (14d)', 'atora-lms' ),
+					__( 'Último mensaje', 'atora-lms' ),
+					__( 'H5P (14d)', 'atora-lms' ),
+					__( 'Último H5P', 'atora-lms' ),
+					__( 'Motivos', 'atora-lms' ),
+					__( 'Acción recomendada', 'atora-lms' ),
+					__( 'Actualizado', 'atora-lms' ),
+				)
 			: array(
 				__( 'Nombre', 'atora-lms' ),
 				__( 'Email', 'atora-lms' ),
@@ -976,12 +1036,14 @@ final class Learning_Analytics_Service {
 				__( 'Tiempo (s)', 'atora-lms' ),
 				__( 'Lecturas (14d)', 'atora-lms' ),
 				__( 'Última lectura', 'atora-lms' ),
-				__( 'Mensajes (14d)', 'atora-lms' ),
-				__( 'Último mensaje', 'atora-lms' ),
-				__( 'Motivos', 'atora-lms' ),
-				__( 'Acción recomendada', 'atora-lms' ),
-				__( 'Actualizado', 'atora-lms' ),
-			);
+					__( 'Mensajes (14d)', 'atora-lms' ),
+					__( 'Último mensaje', 'atora-lms' ),
+					__( 'H5P (14d)', 'atora-lms' ),
+					__( 'Último H5P', 'atora-lms' ),
+					__( 'Motivos', 'atora-lms' ),
+					__( 'Acción recomendada', 'atora-lms' ),
+					__( 'Actualizado', 'atora-lms' ),
+				);
 
 		fputcsv( $stream, $headers ); // phpcs:ignore WordPress.WP.AlternativeFunctions
 
@@ -1004,12 +1066,14 @@ final class Learning_Analytics_Service {
 				absint( $item['course_time_seconds'] ?? 0 ),
 				absint( $item['lesson_reads_14d'] ?? 0 ),
 				(string) ( $item['last_read_at'] ?? '' ),
-				absint( $item['messages_14d'] ?? 0 ),
-				(string) ( $item['last_message_at'] ?? '' ),
-				$reasons,
-				(string) ( $item['recommended_action'] ?? '' ),
-				(string) ( $item['updated_at'] ?? '' ),
-			);
+					absint( $item['messages_14d'] ?? 0 ),
+					(string) ( $item['last_message_at'] ?? '' ),
+					absint( $item['h5p_attempts_14d'] ?? 0 ),
+					(string) ( $item['last_h5p_at'] ?? '' ),
+					$reasons,
+					(string) ( $item['recommended_action'] ?? '' ),
+					(string) ( $item['updated_at'] ?? '' ),
+				);
 
 			$row = $include_course
 				? array_merge(

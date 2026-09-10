@@ -847,6 +847,42 @@ trait CLMS_Metabox_Lesson_Render_Trait {
 					</span>
 				<?php endif; ?>
 			</p>
+			<?php
+			$h5p_content_id = absint( get_post_meta( $post->ID, '_clms_h5p_content_id', true ) );
+			$h5p_embed      = '1' === (string) get_post_meta( $post->ID, '_clms_h5p_embed', true );
+			$h5p_track      = '1' === (string) get_post_meta( $post->ID, '_clms_h5p_track', true );
+			$h5p_autoscore  = '1' === (string) get_post_meta( $post->ID, '_clms_h5p_autoscore', true );
+			$h5p_available  = shortcode_exists( 'h5p' ) || post_type_exists( 'h5p_content' );
+			?>
+			<div class="clms-f full" style="border:1px solid #e5e7eb;border-radius:10px;padding:10px;background:#fff">
+				<p style="margin:0 0 8px 0"><strong><?php esc_html_e( 'H5P (MVP)', 'atora-lms' ); ?></strong></p>
+				<div class="clms-grid-3">
+					<p class="clms-f">
+						<label for="_clms_h5p_content_id"><?php esc_html_e( 'Content ID', 'atora-lms' ); ?></label>
+						<input type="number" min="0" name="_clms_h5p_content_id" id="_clms_h5p_content_id" value="<?php echo esc_attr( (string) $h5p_content_id ); ?>">
+						<span class="clms-help"><?php esc_html_e( 'ID del contenido H5P (post_type h5p_content).', 'atora-lms' ); ?></span>
+					</p>
+					<p class="clms-f">
+						<label style="display:block">&nbsp;</label>
+						<label><input type="checkbox" name="_clms_h5p_embed" value="1" <?php checked( $h5p_embed, true ); ?>> <strong><?php esc_html_e( 'Embebido en lección', 'atora-lms' ); ?></strong></label>
+						<span class="clms-help"><?php esc_html_e( 'Inyecta el H5P arriba del contenido si no hay shortcode manual.', 'atora-lms' ); ?></span>
+					</p>
+					<p class="clms-f">
+						<label style="display:block">&nbsp;</label>
+						<label><input type="checkbox" name="_clms_h5p_track" value="1" <?php checked( $h5p_track, true ); ?>> <strong><?php esc_html_e( 'Tracking xAPI', 'atora-lms' ); ?></strong></label><br>
+						<label><input type="checkbox" name="_clms_h5p_autoscore" value="1" <?php checked( $h5p_autoscore, true ); ?>> <strong><?php esc_html_e( 'Auto-scoring', 'atora-lms' ); ?></strong></label>
+						<span class="clms-help"><?php esc_html_e( 'Guarda progreso y (si no hay quiz habilitado) escribe nota en canal quiz.', 'atora-lms' ); ?></span>
+					</p>
+				</div>
+				<?php if ( ! $h5p_available ) : ?>
+					<p class="description" style="margin:6px 0;color:#b32d2e">
+						<?php esc_html_e( 'H5P no parece instalado/activo (no existe shortcode [h5p]). Puedes guardar la configuración, pero no se renderizará hasta instalar el plugin H5P.', 'atora-lms' ); ?>
+					</p>
+				<?php endif; ?>
+				<p class="description" style="margin:6px 0 0 0">
+					<?php esc_html_e( 'Tip: también puedes colocar manualmente [atora_h5p] o [h5p id="..."] dentro del contenido para controlar la ubicación.', 'atora-lms' ); ?>
+				</p>
+			</div>
 			<p class="clms-f clms-eval-ai-only">
 				<label for="_clms_ai_confidence_threshold"><?php esc_html_e( 'Umbral de confianza IA', 'atora-lms' ); ?></label>
 				<input type="number" min="0.50" max="0.99" step="0.01" name="_clms_ai_confidence_threshold" id="_clms_ai_confidence_threshold" value="<?php echo esc_attr( $ai_confidence_threshold ); ?>">

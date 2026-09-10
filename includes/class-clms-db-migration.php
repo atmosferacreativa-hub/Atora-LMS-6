@@ -58,6 +58,9 @@ class CLMS_DB_Migration {
 		$this->create_peer_review_audit_log_table();
 		$this->create_portfolios_tables();
 		$this->create_google_classroom_tables();
+		$this->create_h5p_content_table();
+		$this->create_h5p_library_table();
+		$this->create_h5p_tracking_table();
 
 		update_option( self::SCHEMA_VERSION_KEY, $this->get_schema_version() );
 
@@ -259,6 +262,93 @@ class CLMS_DB_Migration {
 			KEY actor_id (actor_id),
 			KEY action (action)
 		) {$charset};";
+		dbDelta( $sql );
+	}
+
+	private function create_h5p_content_table(): void {
+		global $wpdb;
+
+		$table   = $wpdb->prefix . 'atora_h5p_content';
+		$charset = $wpdb->get_charset_collate();
+
+		$sql = "CREATE TABLE {$table} (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			wp_post_id bigint(20) unsigned NOT NULL,
+			provider varchar(50) NOT NULL DEFAULT 'wp_h5p',
+			external_id varchar(190) NOT NULL DEFAULT '',
+			visibility varchar(20) NOT NULL DEFAULT 'private',
+			status varchar(20) NOT NULL DEFAULT 'active',
+			license varchar(100) NOT NULL DEFAULT '',
+			content_json longtext,
+			tags_json longtext,
+			author_id bigint(20) unsigned NOT NULL DEFAULT 0,
+			created_at datetime NOT NULL,
+			updated_at datetime NOT NULL,
+			PRIMARY KEY (id),
+			UNIQUE KEY wp_post_id (wp_post_id),
+			KEY provider (provider),
+			KEY status (status)
+		) {$charset};";
+
+		dbDelta( $sql );
+	}
+
+	private function create_h5p_library_table(): void {
+		global $wpdb;
+
+		$table   = $wpdb->prefix . 'atora_h5p_library';
+		$charset = $wpdb->get_charset_collate();
+
+		$sql = "CREATE TABLE {$table} (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			machine_name varchar(120) NOT NULL,
+			major_version int(11) NOT NULL DEFAULT 0,
+			minor_version int(11) NOT NULL DEFAULT 0,
+			patch_version int(11) NOT NULL DEFAULT 0,
+			title varchar(255) NOT NULL DEFAULT '',
+			license varchar(100) NOT NULL DEFAULT '',
+			metadata_json longtext,
+			created_at datetime NOT NULL,
+			updated_at datetime NOT NULL,
+			PRIMARY KEY (id),
+			UNIQUE KEY lib_version (machine_name, major_version, minor_version, patch_version),
+			KEY machine_name (machine_name)
+		) {$charset};";
+
+		dbDelta( $sql );
+	}
+
+	private function create_h5p_tracking_table(): void {
+		global $wpdb;
+
+		$table   = $wpdb->prefix . 'atora_h5p_tracking';
+		$charset = $wpdb->get_charset_collate();
+
+		$sql = "CREATE TABLE {$table} (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			user_id bigint(20) unsigned NOT NULL,
+			lesson_id bigint(20) unsigned NOT NULL,
+			course_id bigint(20) unsigned NOT NULL DEFAULT 0,
+			h5p_content_id bigint(20) unsigned NOT NULL,
+			attempts int(11) NOT NULL DEFAULT 0,
+			score_raw decimal(10,2) DEFAULT NULL,
+			score_max decimal(10,2) DEFAULT NULL,
+			score_percent int(11) DEFAULT NULL,
+			completion_status varchar(20) NOT NULL DEFAULT '',
+			last_verb varchar(200) NOT NULL DEFAULT '',
+			first_event_at datetime DEFAULT NULL,
+			last_event_at datetime DEFAULT NULL,
+			last_statement_json longtext,
+			data_json longtext,
+			created_at datetime NOT NULL,
+			updated_at datetime NOT NULL,
+			PRIMARY KEY (id),
+			UNIQUE KEY user_lesson_content (user_id, lesson_id, h5p_content_id),
+			KEY course_id (course_id),
+			KEY lesson_id (lesson_id),
+			KEY last_event_at (last_event_at)
+		) {$charset};";
+
 		dbDelta( $sql );
 	}
 

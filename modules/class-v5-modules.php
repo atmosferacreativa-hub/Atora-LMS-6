@@ -109,6 +109,12 @@ class V5_Modules {
 			self::load_classroom();
 		}
 
+		// Epic 8: H5P (front/ajax/admin/rest).
+		if ( ( $ctx['is_admin'] || $ctx['is_front'] || $ctx['is_ajax'] || $ctx['is_rest'] )
+			&& self::module_active( 'h5p' ) ) {
+			self::load_h5p();
+		}
+
 		// Messaging: evitar carga en frontend público general.
 		if ( ( $ctx['is_admin'] || $ctx['is_cron'] || $ctx['is_rest'] || $ctx['is_ajax'] || $ctx['is_webhook'] )
 			&& self::module_active( 'messaging' ) ) {
@@ -223,6 +229,21 @@ class V5_Modules {
 
 		if ( class_exists( '\ATORA\Classroom\Classroom_Module' ) ) {
 			\ATORA\Classroom\Classroom_Module::init();
+		}
+	}
+
+	private static function load_h5p(): void {
+		$dir = ATORA_LMS_MODULES_DIR . 'h5p/';
+		self::require_file( $dir . 'class-h5p-content-manager.php' );
+		self::require_file( $dir . 'class-h5p-tracking-service.php' );
+		self::require_file( $dir . 'class-h5p-library-service.php' );
+		self::require_file( $dir . 'rest/class-h5p-content-controller.php' );
+		self::require_file( $dir . 'rest/class-h5p-library-controller.php' );
+		self::require_file( $dir . 'rest/class-h5p-tracking-controller.php' );
+		self::require_file( $dir . 'class-h5p-module.php' );
+
+		if ( class_exists( '\ATORA\H5P\H5P_Module' ) ) {
+			\ATORA\H5P\H5P_Module::init();
 		}
 	}
 

@@ -246,6 +246,17 @@ class CLMS_Module_Registry {
 				'tables'              => array( 'atora_student_analytics' ),
 				'core'                => true,
 			),
+			'h5p'           => array(
+				'label'               => 'H5P',
+				'description'         => 'H5P en lecciones: embed + tracking xAPI + auto-scoring + endpoints /h5p/* (MVP).',
+				'group'               => 'experience',
+				'requires'            => array( 'lms' ),
+				'provides_pages'      => array(),
+				'provides_shortcodes' => array( 'atora_h5p' ),
+				'provides_rest'       => array( '/h5p/contents', '/h5p/libraries', '/h5p/track' ),
+				'tables'              => array( 'atora_h5p_content', 'atora_h5p_tracking', 'atora_h5p_library' ),
+				'core'                => true,
+			),
 			'portfolios'    => array(
 				'label'               => 'Portafolios',
 				'description'         => 'E-portfolios por estudiante/curso: evidencias, reflexiones y feedback.',

@@ -50,6 +50,11 @@ trait CLMS_Metabox_Lesson_Save_Trait {
 		$task_description = isset( $_POST['lm_task_description'] ) ? wp_kses_post( wp_unslash( $_POST['lm_task_description'] ) ) : '';
 		$show_in_calendar = isset( $_POST['lm_show_in_calendar'] ) ? ( '1' === wp_unslash( $_POST['lm_show_in_calendar'] ) ? '1' : '0' ) : '0';
 
+		$h5p_content_id = isset( $_POST['_clms_h5p_content_id'] ) ? absint( wp_unslash( $_POST['_clms_h5p_content_id'] ) ) : 0;
+		$h5p_embed      = isset( $_POST['_clms_h5p_embed'] ) ? ( '1' === wp_unslash( $_POST['_clms_h5p_embed'] ) ? '1' : '0' ) : '0';
+		$h5p_track      = isset( $_POST['_clms_h5p_track'] ) ? ( '1' === wp_unslash( $_POST['_clms_h5p_track'] ) ? '1' : '0' ) : '0';
+		$h5p_autoscore  = isset( $_POST['_clms_h5p_autoscore'] ) ? ( '1' === wp_unslash( $_POST['_clms_h5p_autoscore'] ) ? '1' : '0' ) : '0';
+
 		$due_date  = isset( $_POST['lm_due_date'] ) ? $this->sanitize_date( wp_unslash( $_POST['lm_due_date'] ) ) : '';
 		$due_time  = isset( $_POST['lm_due_time'] ) ? $this->sanitize_time( wp_unslash( $_POST['lm_due_time'] ) ) : '';
 		$late_date = isset( $_POST['lm_late_date'] ) ? $this->sanitize_date( wp_unslash( $_POST['lm_late_date'] ) ) : '';
@@ -334,6 +339,11 @@ trait CLMS_Metabox_Lesson_Save_Trait {
 		update_post_meta( $post_id, '_clms_evidence_read_requirement', $evidence_read_requirement );
 		update_post_meta( $post_id, self::LESSON_SUPPORT_RESOURCES, $resources );
 		update_post_meta( $post_id, CLMS_Helper::LESSON_PREREQUISITES_META, array_values( array_diff( array_unique( $lesson_prerequisites ), array( (int) $post_id ) ) ) );
+
+		update_post_meta( $post_id, '_clms_h5p_content_id', $h5p_content_id );
+		update_post_meta( $post_id, '_clms_h5p_embed', $h5p_embed );
+		update_post_meta( $post_id, '_clms_h5p_track', $h5p_track );
+		update_post_meta( $post_id, '_clms_h5p_autoscore', $h5p_autoscore );
 
 		update_post_meta( $post_id, self::QUIZ_ENABLED_META_KEY, $quiz_enabled );
 		update_post_meta( $post_id, '_clms_evaluation_mode', $assessment_mode );
