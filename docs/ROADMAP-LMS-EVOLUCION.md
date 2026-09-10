@@ -188,13 +188,13 @@ Evolucionar ATORA LMS en ciclos continuos, priorizando (1) evaluación colaborat
 **Historias**
 - [x] Como estudiante, creo un portafolio por curso y agrego artefactos (submissions) con orden y tags.
 - [x] Como estudiante, escribo reflexiones por artefacto y a nivel portafolio (MVP: por artefacto).
-- [~] Como docente/pares, doy feedback al portafolio y puedo evaluarlo con rúbrica (MVP: feedback; evaluación con rúbrica queda pendiente).
+- [x] Como docente/pares, doy feedback al portafolio y puedo evaluarlo con rúbrica (MVP: evaluación final con override).
 - [x] Como estudiante, configuro visibilidad (privado, docentes, público) según política institucional.
 
 **Tareas**
 - [x] Modelo: tablas dedicadas `wp_atora_portfolios`, `wp_atora_portfolio_items`, `wp_atora_portfolio_feedback`.
 - [x] UI estudiante: builder por shortcode (CRUD básico + selector de artefactos + editor de reflexión/tags).
-- [~] UI docente: vista en panel admin + feedback (pendiente evaluación con rúbrica específica).
+- [x] UI docente: vista en panel admin + feedback + evaluación con rúbrica (override final).
 - [x] Permisos: visibilidad y control de acceso (incluye endpoint público de solo lectura).
 - [ ] Export: PDF/ZIP (nice-to-have) para acreditación.
 - [~] QA: privacidad y compatibilidad con cambios de matrícula (pendiente hardening + caching).
