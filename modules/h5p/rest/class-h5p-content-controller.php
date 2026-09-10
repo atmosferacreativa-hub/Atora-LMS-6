@@ -86,7 +86,8 @@ final class H5P_Content_Controller extends WP_REST_Controller {
 		return class_exists( 'CLMS_Access' ) && ( \CLMS_Access::can_manage_lessons() || \CLMS_Access::can_manage_courses() );
 	}
 
-	public function list_items( WP_REST_Request $request ) {
+	/** @param WP_REST_Request $request */
+	public function list_items( $request ) {
 		$search   = sanitize_text_field( (string) $request->get_param( 'search' ) );
 		$per_page = max( 1, min( 50, absint( $request->get_param( 'per_page' ) ) ) );
 		$page     = max( 1, absint( $request->get_param( 'page' ) ) );
@@ -123,7 +124,8 @@ final class H5P_Content_Controller extends WP_REST_Controller {
 		return new WP_REST_Response( array( 'items' => $items ), 200 );
 	}
 
-	public function create_item( WP_REST_Request $request ) {
+	/** @param WP_REST_Request $request */
+	public function create_item( $request ) {
 		$payload = (array) $request->get_json_params();
 		if ( empty( $payload ) ) {
 			$payload = $request->get_params();
@@ -137,7 +139,8 @@ final class H5P_Content_Controller extends WP_REST_Controller {
 		return new WP_REST_Response( array( 'id' => (int) $id ), 201 );
 	}
 
-	public function get_item( WP_REST_Request $request ) {
+	/** @param WP_REST_Request $request */
+	public function get_item( $request ) {
 		$id = absint( $request['id'] );
 		if ( ! $id || 'h5p_content' !== get_post_type( $id ) ) {
 			return new WP_Error( 'atora_h5p_not_found', __( 'Contenido no encontrado.', 'atora-lms' ), array( 'status' => 404 ) );
@@ -159,7 +162,8 @@ final class H5P_Content_Controller extends WP_REST_Controller {
 		);
 	}
 
-	public function update_item( WP_REST_Request $request ) {
+	/** @param WP_REST_Request $request */
+	public function update_item( $request ) {
 		$id = absint( $request['id'] );
 		if ( ! $id || 'h5p_content' !== get_post_type( $id ) ) {
 			return new WP_Error( 'atora_h5p_not_found', __( 'Contenido no encontrado.', 'atora-lms' ), array( 'status' => 404 ) );
@@ -187,7 +191,8 @@ final class H5P_Content_Controller extends WP_REST_Controller {
 		return new WP_REST_Response( array( 'ok' => true ), 200 );
 	}
 
-	public function delete_item( WP_REST_Request $request ) {
+	/** @param WP_REST_Request $request */
+	public function delete_item( $request ) {
 		$id = absint( $request['id'] );
 		if ( ! $id || 'h5p_content' !== get_post_type( $id ) ) {
 			return new WP_Error( 'atora_h5p_not_found', __( 'Contenido no encontrado.', 'atora-lms' ), array( 'status' => 404 ) );
@@ -197,4 +202,3 @@ final class H5P_Content_Controller extends WP_REST_Controller {
 		return new WP_REST_Response( array( 'ok' => $ok ), 200 );
 	}
 }
-

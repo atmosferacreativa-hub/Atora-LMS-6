@@ -71,7 +71,8 @@ final class H5P_Tracking_Controller extends WP_REST_Controller {
 		return true;
 	}
 
-	public function create_item( WP_REST_Request $request ) {
+	/** @param WP_REST_Request $request */
+	public function create_item( $request ) {
 		$user_id    = get_current_user_id();
 		$lesson_id  = absint( $request->get_param( 'lesson_id' ) );
 		$content_id = absint( $request->get_param( 'content_id' ) );
