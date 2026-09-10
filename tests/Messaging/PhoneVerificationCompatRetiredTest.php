@@ -116,7 +116,7 @@ class PhoneVerificationCompatRetiredTest extends TestCase {
 		$phone = '+58 412 1234567';
 		update_user_meta( 3, 'atora_phone', $phone );
 		update_user_meta( 3, \ATORA\Messaging\Preferences::META_PHONE_VERIFIED, true );
-		update_user_meta( 3, \ATORA\Messaging\Preferences::META_PHONE_VERIFIED_HASH, wp_hash( preg_replace( '/\D+/', '', $phone ) ) );
+		update_user_meta( 3, \ATORA\Messaging\Preferences::META_PHONE_VERIFIED_HASH, wp_hash( '+584121234567' )
 
 		$this->assertTrue( \ATORA\Messaging\Preferences::is_phone_verified( 3 ) );
 	}
