@@ -33,10 +33,10 @@ class InstallProfilesTest extends TestCase {
 	}
 
 	/** @test */
-	public function test_academia_includes_all_20_modules(): void {
-		// 6.13.0 (P10) añadió 'google' — 19 + 1.
+	public function test_academia_includes_all_28_modules(): void {
+		// 6.21.0 registra 28 módulos.
 		$modules = \CLMS_Install_Profiles::get_profile_modules( 'academia' );
-		$this->assertCount( 20, $modules );
+		$this->assertCount( 28, $modules );
 	}
 
 	/** @test */
@@ -78,15 +78,14 @@ class InstallProfilesTest extends TestCase {
 	}
 
 	/** @test */
-	public function test_creadores_equals_academia_module_set(): void {
+	public function test_creadores_is_a_subset_of_the_full_academia_profile(): void {
 		$creadores = \CLMS_Install_Profiles::get_profile_modules( 'creadores' );
 		$academia  = \CLMS_Install_Profiles::get_profile_modules( 'academia' );
 
-		sort( $creadores );
-		sort( $academia );
-		$this->assertSame( $academia, $creadores );
+		$this->assertSame( array(), array_values( array_diff( $creadores, $academia ) ) );
+		$this->assertContains( 'classroom', $academia );
+		$this->assertNotContains( 'classroom', $creadores );
 	}
-
 	/** @test */
 	public function test_get_profile_modules_unknown_profile_returns_null(): void {
 		$this->assertNull( \CLMS_Install_Profiles::get_profile_modules( 'bogus' ) );
