@@ -16,7 +16,7 @@
 |---|---|---|---|
 | 1 | **Panel de paridad VERDE** — 0 divergencias en los 5 lectores críticos durante 14 días corridos | Panel F3 en `Admin > Migración LMS`: todos los contadores en verde. | ⬜ PENDIENTE |
 | 2 | **`volume_ok = true`** — alumnos observados ≥ alumnos activos en tablas | Panel F3, barra de volumen al 100%. | ⬜ PENDIENTE |
-| 3 | **`reconcile()` en 0 pendientes/huérfanos** | Panel `Admin > Migración LMS`, tabla de reconciliación: todos en 0. | ⬜ PENDIENTE |
+| 3 | **`reconcile()` en 0 pendientes/huérfanos y vigente** — última ejecución ≤ 48 horas | Panel `Admin > Migración LMS`, tabla de reconciliación: todos en 0 y fecha reciente. | ⬜ PENDIENTE |
 | 4 | **`atora_lms_dualwrite = true` y funcionando** | Toggle en el panel muestra "● Activo". Prueba rápida: inscribir un usuario de test y verificar que la matrícula aparece en `atora_enrollments` Y en `_clms_enrolled_courses`. | ⬜ PENDIENTE |
 | 5 | **Backup de BD tomado y verificado** | No solo programado — restaurar un dump de prueba o verificar el checksum del archivo. | ⬜ PENDIENTE |
 
@@ -32,7 +32,7 @@
 | **Ejecutado por** | — |
 | **Divergencias en lectores críticos al momento del flip** | — |
 | **`volume_ok`** | — |
-| **Pendientes en `reconcile()`** | — |
+| **Pendientes en `reconcile()` y fecha UTC de ejecución** | — |
 | **`atora_lms_dualwrite`** | — |
 | **Backup confirmado** | — |
 | **Valor de `atora_lms_cutover_at` registrado** | — |
