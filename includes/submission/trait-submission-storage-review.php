@@ -640,21 +640,37 @@ trait CLMS_Submission_Storage_Review_Trait {
 		}
 
 		// Group Assessment: permitir ver adjuntos del submission master si el usuario
-		// pertenece al mismo grupo (los adjuntos se comparten a nivel grupal).
+		// tiene una shadow asociada a ese master (cambio de grupo post-entrega).
 		$submission_id = absint( get_post_meta( $file_id, '_clms_submission_id', true ) );
 		if ( $submission_id && '1' === (string) get_post_meta( $submission_id, '_clms_submission_group_master', true ) ) {
-			$group_id  = absint( get_post_meta( $submission_id, '_clms_submission_group_id', true ) );
-			$lesson_id = absint( get_post_meta( $submission_id, '_clms_submission_lesson_id', true ) );
-			$course_id = absint( get_post_meta( $submission_id, '_clms_submission_course_id', true ) );
-			if ( ! $course_id && $lesson_id && class_exists( 'CLMS_Helper' ) ) {
-				$course_id = absint( CLMS_Helper::get_lesson_course_id( $lesson_id ) );
-			}
+			$ids = get_posts(
+				array(
+					'post_type'      => self::CPT,
+					'post_status'    => array( 'publish', 'private' ),
+					'posts_per_page' => 1,
+					'fields'         => 'ids',
+					'no_found_rows'  => true,
+					'meta_query'     => array(
+						array(
+							'key'   => '_clms_submission_is_shadow',
+							'value' => '1',
+						),
+						array(
+							'key'   => '_clms_submission_user_id',
+							'value' => $user_id,
+							'type'  => 'NUMERIC',
+						),
+						array(
+							'key'   => '_clms_submission_group_master_id',
+							'value' => $submission_id,
+							'type'  => 'NUMERIC',
+						),
+					),
+				)
+			);
 
-			if ( $group_id && $course_id ) {
-				$user_group_id = absint( (int) apply_filters( 'atora/groups/user_group_id', 0, $user_id, $course_id, $lesson_id ) );
-				if ( $user_group_id && $user_group_id === $group_id ) {
-					return true;
-				}
+			if ( ! empty( $ids ) ) {
+				return true;
 			}
 		}
 

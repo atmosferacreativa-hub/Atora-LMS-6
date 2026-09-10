@@ -287,6 +287,8 @@ final class Groups_Module {
 			if ( $locked_at ) {
 				echo '<p class="description" style="margin:8px 0">' . esc_html__( 'Este grupo está bloqueado por entregas. Por defecto no se puede editar.', 'atora-lms' ) . '</p>';
 				echo '<label style="display:block;margin:6px 0"><input type="checkbox" name="force_add" value="1"> ' . esc_html__( 'Forzar: permitir agregar miembros (no remover)', 'atora-lms' ) . '</label>';
+				echo '<label style="display:block;margin:6px 0"><input type="checkbox" name="force_edit" value="1"> ' . esc_html__( 'Forzar (avanzado): permitir editar miembros (agregar y remover)', 'atora-lms' ) . '</label>';
+				echo '<p class="description" style="margin:6px 0">' . esc_html__( 'Recomendación: evita cambios retroactivos si ya hay entregas calificadas; para esos casos usa overrides individuales.', 'atora-lms' ) . '</p>';
 			}
 
 			echo '<p style="margin:8px 0"><button class="button button-primary" type="submit">' . esc_html__( 'Guardar', 'atora-lms' ) . '</button></p>';
@@ -342,13 +344,17 @@ final class Groups_Module {
 		$members   = isset( $_POST['members'] ) ? (array) wp_unslash( $_POST['members'] ) : array();
 		$members   = array_values( array_unique( array_filter( array_map( 'absint', $members ) ) ) );
 		$force_add = isset( $_POST['force_add'] ) ? ( '1' === (string) wp_unslash( $_POST['force_add'] ) ) : false;
+		$force_edit = isset( $_POST['force_edit'] ) ? ( '1' === (string) wp_unslash( $_POST['force_edit'] ) ) : false;
 
 		$service = new Group_Service();
 		$result  = $service->set_members_with_options(
 			$group_id,
 			$members,
 			get_current_user_id(),
-			array( 'force_add' => (bool) $force_add )
+			array(
+				'force_add'  => (bool) $force_add,
+				'force_edit' => (bool) $force_edit,
+			)
 		);
 
 		$flag = is_wp_error( $result ) ? ( 'error=' . rawurlencode( $result->get_error_code() ) ) : 'saved=1';

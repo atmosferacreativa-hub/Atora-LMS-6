@@ -95,7 +95,7 @@ Evolucionar ATORA LMS en ciclos continuos, priorizando (1) evaluación colaborat
 - [x] UI estudiante: pantalla de entrega que muestre grupo, estado, y “quién entregó”.
 - [x] Permisos: checks en REST para gestión de grupos y overrides.
 - [x] Reportes: export de calificaciones grupales e individuales (CSV mínimo).
-- [ ] QA: casos límite (cambio de grupo post-entrega, miembros sin entrega, retiro/abandono, reintentos).
+- [x] QA: casos límite (cambio de grupo post-entrega, miembros sin entrega, retiro/abandono, reintentos).
 
 **Dependencias**
 - E2E con evaluación existente (manual/rúbrica/peer review), `clms_submission`, engine de calificación.

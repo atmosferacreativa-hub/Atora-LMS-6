@@ -125,22 +125,11 @@ final class GroupSubmissionFetchTest extends TestCase {
 		$course_id    = 300;
 		$group_id     = 2;
 		$master_id    = 200;
+		$shadow_id    = 202;
 		$attachment_id = 501;
 
 		atora_test_set_post( $lesson_id, array( 'post_type' => 'lm_lesson' ) );
 		atora_test_set_post_meta( $lesson_id, '_clms_lesson_course_id', $course_id );
-
-		add_filter(
-			'atora/groups/user_group_id',
-			static function( $value, $uid, $cid, $lid ) use ( $user_id, $course_id, $lesson_id, $group_id ) {
-				if ( absint( $uid ) === $user_id && absint( $cid ) === $course_id && absint( $lid ) === $lesson_id ) {
-					return $group_id;
-				}
-				return $value;
-			},
-			10,
-			4
-		);
 
 		// Master submission meta referenced by attachment.
 		atora_test_set_post( $master_id, array( 'post_type' => 'clms_submission', 'post_status' => 'publish' ) );
@@ -148,6 +137,28 @@ final class GroupSubmissionFetchTest extends TestCase {
 		atora_test_set_post_meta( $master_id, '_clms_submission_group_id', $group_id );
 		atora_test_set_post_meta( $master_id, '_clms_submission_lesson_id', $lesson_id );
 		atora_test_set_post_meta( $master_id, '_clms_submission_course_id', $course_id );
+
+		// Shadow submission linking the student to the master.
+		atora_test_set_post( $shadow_id, array( 'post_type' => 'clms_submission', 'post_status' => 'private' ) );
+		atora_test_set_post_meta( $shadow_id, '_clms_submission_is_shadow', '1' );
+		atora_test_set_post_meta( $shadow_id, '_clms_submission_user_id', $user_id );
+		atora_test_set_post_meta( $shadow_id, '_clms_submission_group_master_id', $master_id );
+
+		Functions\when( 'get_posts' )->alias(
+			static function( array $args ) use ( $shadow_id ) {
+				$meta_query = $args['meta_query'] ?? array();
+				$keys = array();
+				foreach ( (array) $meta_query as $q ) {
+					if ( is_array( $q ) && isset( $q['key'] ) ) {
+						$keys[ (string) $q['key'] ] = $q;
+					}
+				}
+				if ( isset( $keys['_clms_submission_is_shadow'], $keys['_clms_submission_group_master_id'], $keys['_clms_submission_user_id'] ) ) {
+					return array( $shadow_id );
+				}
+				return array();
+			}
+		);
 
 		// Attachment owned by someone else, but linked to master submission.
 		atora_test_set_post( $attachment_id, array( 'post_type' => 'attachment', 'post_author' => 999 ) );
