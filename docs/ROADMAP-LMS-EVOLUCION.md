@@ -186,18 +186,18 @@ Evolucionar ATORA LMS en ciclos continuos, priorizando (1) evaluación colaborat
 **Estimación:** 4–5 semanas (≈700–900 líneas netas; depende de sharing/export).
 
 **Historias**
-- [ ] Como estudiante, creo un portafolio por curso/cohorte y agrego artefactos (submissions) con orden y tags.
-- [ ] Como estudiante, escribo reflexiones por artefacto y a nivel portafolio.
-- [ ] Como docente/pares, doy feedback al portafolio y puedo evaluarlo con rúbrica.
-- [ ] Como estudiante, configuro visibilidad (privado, docentes, público) según política institucional.
+- [x] Como estudiante, creo un portafolio por curso y agrego artefactos (submissions) con orden y tags.
+- [x] Como estudiante, escribo reflexiones por artefacto y a nivel portafolio (MVP: por artefacto).
+- [~] Como docente/pares, doy feedback al portafolio y puedo evaluarlo con rúbrica (MVP: feedback; evaluación con rúbrica queda pendiente).
+- [x] Como estudiante, configuro visibilidad (privado, docentes, público) según política institucional.
 
 **Tareas**
-- [ ] Modelo: CPT `clms_portfolio` + tablas para artefactos/feedback **o** tablas dedicadas (según volumen y reporting).
-- [ ] UI estudiante: CRUD portafolio + selector de artefactos + editor de reflexión.
-- [ ] UI docente: vista de portafolio + feedback + evaluación (rúbrica específica).
-- [ ] Permisos: visibilidad y control de acceso (incluye URLs públicas si aplica).
+- [x] Modelo: tablas dedicadas `wp_atora_portfolios`, `wp_atora_portfolio_items`, `wp_atora_portfolio_feedback`.
+- [x] UI estudiante: builder por shortcode (CRUD básico + selector de artefactos + editor de reflexión/tags).
+- [~] UI docente: vista en panel admin + feedback (pendiente evaluación con rúbrica específica).
+- [x] Permisos: visibilidad y control de acceso (incluye endpoint público de solo lectura).
 - [ ] Export: PDF/ZIP (nice-to-have) para acreditación.
-- [ ] QA: privacidad, caching, y compatibilidad con cambios de matrícula.
+- [~] QA: privacidad y compatibilidad con cambios de matrícula (pendiente hardening + caching).
 
 **Dependencias**
 - Epic 2 (rúbricas v2) si se evaluará portafolio con nuevas escalas/pesos.
