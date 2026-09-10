@@ -58,10 +58,10 @@ class MessagingBridgeResolutionTest extends TestCase {
 	public function test_v5_modules_uses_a_fully_qualified_reference(): void {
 		$source = file_get_contents( __DIR__ . '/../../modules/class-v5-modules.php' );
 
-		$this->assertMatchesRegularExpression(
-			"/class_exists\\(\\s*'\\\\\\\\CLMS_Academic_Messaging_Bridge'\\s*\\)/",
+		$this->assertStringContainsString(
+			"class_exists( '\\CLMS_Academic_Messaging_Bridge' )",
 			$source,
-			'el guard class_exists() debe usar el backslash calificador, consistente con la llamada real'
+			'el guard class_exists() debe apuntar explícitamente al namespace global'
 		);
 		$this->assertStringContainsString(
 			'\CLMS_Academic_Messaging_Bridge::init();',
