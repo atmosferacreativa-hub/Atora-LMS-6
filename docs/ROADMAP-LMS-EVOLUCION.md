@@ -1,7 +1,14 @@
 # Roadmap técnico — Evolución del LMS (rolling 6 meses)
 
-Última actualización: 2026-09-09  
-Base: ATORA LMS `6.13.3`
+Última actualización: 2026-09-10  
+Base: ATORA LMS `6.14.0`
+
+## Estado actual (implementado en 6.14.0)
+- Epic 1 (MVP): Group Assessment (grupos por curso + entregas grupales + propagación + overrides + CSV + REST).
+- Epic 2 (MVP): Rubrics v2 (pesos, escalas por curso con lock tras primera nota, holística, ejemplares, presets).
+- Epic 3 (MVP): Early Warning (entregas perdidas + notificación interna + REST + pantalla admin).
+
+**Pendiente (roadmap):** analítica de riesgo completa, coevaluación avanzada, portafolios, interoperabilidad (Classroom/Microsoft), H5P, hardening y QA ampliado.
 
 ## Objetivo
 Evolucionar ATORA LMS en ciclos continuos, priorizando (1) evaluación colaborativa, (2) calidad y auditabilidad de la evaluación, (3) analítica académica y alertas tempranas, y (4) evidencia de aprendizaje (portafolios), sin comprometer compatibilidad ni performance.
@@ -17,6 +24,12 @@ Evolucionar ATORA LMS en ciclos continuos, priorizando (1) evaluación colaborat
 3. Portafolio: ¿es feature “core” (ruta de egreso) o “diferenciador” para más adelante?
 4. Escalas: ¿se estandariza escala institucional (0–20/0–100/letras) o se deja por curso/docente?
 5. Privacidad: ¿anonimato por defecto en coevaluación (ciega/no ciega) y políticas de visibilidad de portafolios (privado/interno/público)?
+
+**Decisiones cerradas para 6.14.0 (MVP)**
+- Group Assessment: **sí** es core (integrado en el core; no feature flag).
+- Integraciones: **no** en este ciclo (se reevalúa luego).
+- Escala: se decide **al inicio del curso** y se bloquea tras la primera calificación.
+- Idiomas: **solo ES** por ahora (translate global después).
 
 ## Arquitectura (líneas guía)
 - **Capa de datos:** preferir tabla(s) para relaciones de alta cardinalidad (grupos↔usuarios↔curso↔lección) y auditoría; usar CPT/meta cuando el volumen sea bajo o el modelo sea editorial.
@@ -61,6 +74,8 @@ Evolucionar ATORA LMS en ciclos continuos, priorizando (1) evaluación colaborat
 **Resultado:** docente crea grupos por lección/actividad; una entrega representa al grupo; calificación y feedback se propagan a todos los miembros, con opción de “contribución individual”.
 **Estimación:** 3–4 semanas (≈600–800 líneas netas, según UI y auditoría).
 
+**Estado:** MVP implementado en `6.14.0` (gestión por curso, entrega grupal, propagación, overrides y REST). Pendiente: UI en contexto de lección, contribución individual, QA ampliado.
+
 **Historias**
 - [ ] Como docente, creo/edito grupos en el contexto de una lección (UI + API) y asigno estudiantes.
 - [ ] Como estudiante, entrego una vez por el grupo (con bloqueo/consenso configurable).
@@ -69,14 +84,14 @@ Evolucionar ATORA LMS en ciclos continuos, priorizando (1) evaluación colaborat
 - [ ] Como docente, opcionalmente registro contribución individual (self/peer report o log de actividad) para ajustar nota individual.
 
 **Tareas**
-- [ ] Datos: definir modelo (recomendado: tablas nuevas `wp_clms_groups`, `wp_clms_group_members`, `wp_clms_group_submissions`, `wp_clms_group_audit_log`).
-- [ ] Migración: extender `includes/class-clms-db-migration.php` (o migración nueva) con `dbDelta()` + bump de `SCHEMA_VERSION`.
-- [ ] Backend: extender flujo de `clms_submission` para soportar “submission tipo grupo” y mapping a miembros.
+- [x] Datos: definir modelo (tablas `wp_clms_groups`, `wp_clms_group_members`, `wp_clms_group_submissions`, `wp_clms_group_grade_overrides`, `wp_clms_group_audit_log`).
+- [x] Migración: extender `includes/class-clms-db-migration.php` con `dbDelta()` y sincronización de `clms_db_schema_version`.
+- [x] Backend: extender flujo de `clms_submission` para soportar “submission tipo grupo” y mapping a miembros.
 - [ ] Gradebook: ajustar “propagación de nota” (sin duplicar cálculos) y evitar double-grading.
 - [ ] UI docente: builder de grupos en metabox/lección (o pantalla dedicada) + validaciones.
 - [ ] UI estudiante: pantalla de entrega que muestre grupo, estado, y “quién entregó”.
-- [ ] Permisos: caps y checks en REST/AJAX para gestión de grupos y calificación.
-- [ ] Reportes: export de calificaciones grupales e individuales (CSV mínimo).
+- [x] Permisos: checks en REST para gestión de grupos y overrides.
+- [x] Reportes: export de calificaciones grupales e individuales (CSV mínimo).
 - [ ] QA: casos límite (cambio de grupo post-entrega, miembros sin entrega, retiro/abandono, reintentos).
 
 **Dependencias**
@@ -88,6 +103,8 @@ Evolucionar ATORA LMS en ciclos continuos, priorizando (1) evaluación colaborat
 **Resultado:** rúbricas con pesos por criterio, escalas configurables, ejemplares/benchmarks, holística vs analítica, versionado y presets reutilizables.
 **Estimación:** 2–3 semanas (≈400–600 líneas netas, según versionado/presets).
 
+**Estado:** MVP implementado en `6.14.0` (pesos + escalas + holística + ejemplares + presets). Pendiente: versionado/auditoría de rúbricas y QA ampliado.
+
 **Historias**
 - [ ] Como docente, asigno pesos por criterio y el total se normaliza automáticamente.
 - [ ] Como docente, elijo una escala (0–4, 0–5, 0–100, letras) y la UI/gradebook se ajusta.
@@ -96,12 +113,12 @@ Evolucionar ATORA LMS en ciclos continuos, priorizando (1) evaluación colaborat
 - [ ] Como docente, uso presets institucionales para acelerar creación.
 
 **Tareas**
-- [ ] Modelo: extender `clms_rubric` (hoy CPT + meta `CLMS_Rubric::META_CRITERIA`) con nuevos metadatos versionados (p.ej. `scale_type`, `is_holistic`, `version`, `exemplars`).
-- [ ] UI admin: extender builder en `includes/class-rubric.php` (pesos, escalas, holística, benchmarks).
-- [ ] Cálculo: actualizar servicios de grading para pesos + normalización (impacta `includes/grading/`).
+- [x] Modelo: extender `clms_rubric` (CPT + meta) con `scale_type`, `is_holistic`, pesos por criterio y ejemplares.
+- [x] UI admin: extender builder en `includes/class-rubric.php` (pesos, escalas, holística, benchmarks) + preset UI.
+- [x] Cálculo: actualizar servicios de grading para pesos + normalización (impacta `includes/grading/`).
 - [ ] Versionado: estrategia (snapshot por meta + “rubric_version_id”) o duplicado controlado del CPT con relación padre/hijo.
-- [ ] Presets: catálogo (p.ej. “presets” como CPT o JSON import/export) + permisos.
-- [ ] Migración: rutina de compatibilidad que interprete rúbricas existentes sin pesos explícitos (default = pesos iguales).
+- [x] Presets: catálogo (CPT `clms_rubric_preset`) + permisos.
+- [x] Migración: compatibilidad con rúbricas existentes sin pesos explícitos (default = pesos iguales).
 - [ ] QA: pruebas con escalas mixtas, rounding, y compatibilidad con SpeedGrade.
 
 **Dependencias**
@@ -114,6 +131,15 @@ Evolucionar ATORA LMS en ciclos continuos, priorizando (1) evaluación colaborat
 **Estimación:** 5–7 semanas (≈1.000–1.500 líneas netas, según UI/exportes/reglas).
 
 **Nota:** existe `modules/analytics/class-analytics-engine.php`, pero hoy está orientado a métricas de email/engagement global. Este epic agrega *learning analytics* (académico) y alertas operativas.
+
+**Estado:** Early Warning MVP implementado en `6.14.0` (solo “entregas perdidas”). Pendiente: risk scoring, fuentes de actividad, dashboard completo y export BI.
+
+**MVP 6.14.0 (completado)**
+- [x] Tabla `wp_atora_early_warning` + migración.
+- [x] Cron diario `atora_early_warning_daily_cron` (escaneo de entregas perdidas).
+- [x] Notificación interna a docente(s) (anti-spam básico).
+- [x] REST `GET /wp-json/atora/v1/early-warning?course_id=...`.
+- [x] Pantalla admin “Alertas tempranas”.
 
 **Historias**
 - [ ] Como coordinación, veo lista priorizada de estudiantes en riesgo (por curso/cohorte/docente).
