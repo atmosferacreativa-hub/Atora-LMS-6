@@ -62,6 +62,7 @@ if ( ! $atora_delete_all ) {
 // 2a) Tablas custom.
 $atora_tables = array(
 	'atora_2fa_tokens',
+	'atora_academic_periods',
 	'atora_abandoned_carts',
 	'atora_affiliate_clicks',
 	'atora_affiliate_commissions',
@@ -104,7 +105,12 @@ $atora_tables = array(
 	'atora_email_templates',
 	'atora_enrollments',
 	'atora_form_entries',
+	'atora_grade_rectifications',
 	'atora_gradebook',
+	'atora_gradebook_cycles',
+	'atora_gradebook_events',
+	'atora_grading_scales',
+	'atora_institutional_grades',
 	'atora_lesson_progress',
 	'atora_lessons',
 	'atora_lms_parity_log',
