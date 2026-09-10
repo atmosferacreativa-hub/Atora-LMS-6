@@ -265,7 +265,7 @@ class CLMS_Module_Registry {
 				'provides_pages'      => array( 'atora-classroom' ),
 				'provides_shortcodes' => array(),
 				'provides_rest'       => array( '/classroom' ),
-				'tables'              => array( 'atora_google_classroom_course_map', 'atora_google_classroom_sync_log' ),
+				'tables'              => array( 'atora_google_classroom_course_map', 'atora_google_classroom_sync_log', 'atora_google_classroom_coursework_map' ),
 				'core'                => false,
 			),
 			'security'       => array(

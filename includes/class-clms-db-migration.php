@@ -498,5 +498,27 @@ class CLMS_DB_Migration {
 			KEY created_at (created_at)
 		) {$charset};";
 		dbDelta( $sql );
+
+		$coursework = $wpdb->prefix . 'atora_google_classroom_coursework_map';
+		$sql = "CREATE TABLE {$coursework} (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			wp_course_id bigint(20) unsigned NOT NULL,
+			gc_course_id varchar(64) NOT NULL,
+			gc_coursework_id varchar(64) NOT NULL,
+			wp_lesson_id bigint(20) unsigned NOT NULL DEFAULT 0,
+			title varchar(255) DEFAULT NULL,
+			due_date varchar(20) DEFAULT NULL,
+			due_time varchar(20) DEFAULT NULL,
+			state varchar(30) DEFAULT NULL,
+			payload_json longtext,
+			created_at datetime NOT NULL,
+			updated_at datetime NOT NULL,
+			PRIMARY KEY (id),
+			UNIQUE KEY gc_coursework (gc_course_id, gc_coursework_id),
+			KEY wp_course_id (wp_course_id),
+			KEY wp_lesson_id (wp_lesson_id),
+			KEY updated_at (updated_at)
+		) {$charset};";
+		dbDelta( $sql );
 	}
 }

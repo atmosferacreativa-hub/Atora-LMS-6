@@ -1,7 +1,7 @@
 # Roadmap técnico — Evolución del LMS (rolling 6 meses)
 
 Última actualización: 2026-09-10  
-Base: ATORA LMS `6.18.0`
+Base: ATORA LMS `6.18.1`
 
 ## Estado actual (implementado en 6.14.0)
 - Epic 1 (MVP): Group Assessment (grupos por curso + entregas grupales + propagación + overrides + CSV + REST).
@@ -209,13 +209,14 @@ Evolucionar ATORA LMS en ciclos continuos, priorizando (1) evaluación colaborat
 **Estimación:** 2–3 semanas (≈300–500 líneas netas; depende de idempotencia y UI de sync).
 
 **Historias**
-- [~] Como docente, importo tareas de Classroom como actividades/lecciones en ATORA.
+- [~] Como docente, importo tareas de Classroom como actividades/lecciones en ATORA (MVP: import como lección).
 - [~] Como coordinación, sincronizo rosters (altas/bajas) y evito duplicados.
 - [ ] Como docente, devuelvo notas desde ATORA a Classroom.
 
 **Tareas**
 - [~] OAuth scopes (toggle en Google) y credenciales BYO (reusa Google module).
-- [~] Sync (MVP): mapeo `wp_course_id` ↔ `gc_course_id` + roster sync por email.
+- [~] Sync (MVP): mapeo `wp_course_id` ↔ `gc_course_id` + roster sync por email (solo altas).
+- [~] Import (MVP): listar `courseWork` y crear lecciones en curso WP (idempotente).
 - [x] Logs: tabla `wp_atora_google_classroom_sync_log` (MVP).
 - [~] UI: panel “Google Classroom” + acciones (MVP).
 - [ ] QA: límites de API, paginación y pruebas con sandbox de Google.

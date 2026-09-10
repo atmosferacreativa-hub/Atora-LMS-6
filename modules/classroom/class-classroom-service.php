@@ -25,6 +25,11 @@ final class Classroom_Service {
 		return $wpdb->prefix . 'atora_google_classroom_sync_log';
 	}
 
+	private function table_coursework_map(): string {
+		global $wpdb;
+		return $wpdb->prefix . 'atora_google_classroom_coursework_map';
+	}
+
 	public function get_access_token( int $user_id ): ?string {
 		$user_id = absint( $user_id );
 		if ( ! $user_id ) {
@@ -124,6 +129,267 @@ final class Classroom_Service {
 		}
 
 		return $out;
+	}
+
+	/**
+	 * Lista tareas (courseWork) de un curso Classroom.
+	 *
+	 * @param string $gc_course_id
+	 * @param int    $actor_user_id
+	 * @return array<int,array{gc_coursework_id:string,title:string,description:string,due_date:string,due_time:string,state:string,work_type:string,update_time:string}>
+	 */
+	public function list_coursework( string $gc_course_id, int $actor_user_id ): array {
+		$gc_course_id   = sanitize_text_field( trim( $gc_course_id ) );
+		$actor_user_id  = absint( $actor_user_id );
+		if ( '' === $gc_course_id || ! $actor_user_id ) {
+			return array();
+		}
+
+		$out = array();
+		$page_token = '';
+
+		for ( $i = 0; $i < 10; $i++ ) {
+			$q = array(
+				'pageSize' => 100,
+				'orderBy'  => 'updateTime desc',
+			);
+			if ( $page_token ) {
+				$q['pageToken'] = $page_token;
+			}
+
+			$data = $this->api_get( '/courses/' . rawurlencode( $gc_course_id ) . '/courseWork', $q, $actor_user_id );
+			if ( is_wp_error( $data ) ) {
+				break;
+			}
+
+			$items = isset( $data['courseWork'] ) && is_array( $data['courseWork'] ) ? $data['courseWork'] : array();
+			foreach ( $items as $cw ) {
+				if ( ! is_array( $cw ) ) {
+					continue;
+				}
+				$id = sanitize_text_field( (string) ( $cw['id'] ?? '' ) );
+				if ( '' === $id ) {
+					continue;
+				}
+
+				$due = $this->extract_due( $cw );
+				$out[] = array(
+					'gc_coursework_id' => $id,
+					'title'            => sanitize_text_field( (string) ( $cw['title'] ?? '' ) ),
+					'description'      => sanitize_textarea_field( (string) ( $cw['description'] ?? '' ) ),
+					'due_date'         => $due['date'],
+					'due_time'         => $due['time'],
+					'state'            => sanitize_key( (string) ( $cw['state'] ?? '' ) ),
+					'work_type'        => sanitize_key( (string) ( $cw['workType'] ?? '' ) ),
+					'update_time'      => sanitize_text_field( (string) ( $cw['updateTime'] ?? '' ) ),
+				);
+			}
+
+			$page_token = sanitize_text_field( (string) ( $data['nextPageToken'] ?? '' ) );
+			if ( '' === $page_token ) {
+				break;
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Importa una tarea (courseWork) como lección en el curso WP, idempotente por gc_coursework_id.
+	 *
+	 * @param int    $wp_course_id
+	 * @param string $gc_coursework_id
+	 * @param int    $actor_user_id
+	 * @param string $post_status 'draft'|'publish'
+	 * @return array{wp_lesson_id:int,created:bool}|WP_Error
+	 */
+	public function import_coursework_as_lesson( int $wp_course_id, string $gc_coursework_id, int $actor_user_id, string $post_status = 'draft' ) {
+		global $wpdb;
+
+		$wp_course_id     = absint( $wp_course_id );
+		$actor_user_id    = absint( $actor_user_id );
+		$gc_coursework_id = sanitize_text_field( trim( $gc_coursework_id ) );
+		$post_status      = sanitize_key( $post_status );
+
+		if ( ! $wp_course_id || ! $actor_user_id || '' === $gc_coursework_id ) {
+			return new WP_Error( 'invalid_params', __( 'Parámetros inválidos.', 'atora-lms' ) );
+		}
+		if ( ! in_array( $post_status, array( 'draft', 'publish' ), true ) ) {
+			$post_status = 'draft';
+		}
+
+		$map = $this->get_mapping_by_wp_course( $wp_course_id );
+		if ( empty( $map ) ) {
+			return new WP_Error( 'not_mapped', __( 'Este curso no tiene mapeo con Classroom.', 'atora-lms' ) );
+		}
+		$gc_course_id = sanitize_text_field( (string) ( $map['gc_course_id'] ?? '' ) );
+		if ( '' === $gc_course_id ) {
+			return new WP_Error( 'not_mapped', __( 'Mapeo inválido (gc_course_id vacío).', 'atora-lms' ) );
+		}
+
+		$data = $this->api_get( '/courses/' . rawurlencode( $gc_course_id ) . '/courseWork/' . rawurlencode( $gc_coursework_id ), array(), $actor_user_id );
+		if ( is_wp_error( $data ) ) {
+			$this->log_sync( $wp_course_id, $gc_course_id, 'coursework', 'error', $data->get_error_message(), array( 'code' => $data->get_error_code() ) );
+			return $data;
+		}
+
+		$title = sanitize_text_field( (string) ( $data['title'] ?? '' ) );
+		if ( '' === $title ) {
+			$title = __( 'Tarea importada de Classroom', 'atora-lms' );
+		}
+		$desc = (string) ( $data['description'] ?? '' );
+		$desc = wp_kses_post( $desc );
+
+		$due = $this->extract_due( $data );
+		$state = sanitize_key( (string) ( $data['state'] ?? '' ) );
+
+		$existing = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT id, wp_lesson_id FROM {$this->table_coursework_map()} WHERE gc_course_id = %s AND gc_coursework_id = %s LIMIT 1",
+				$gc_course_id,
+				$gc_coursework_id
+			),
+			ARRAY_A
+		);
+
+		$created = false;
+		$wp_lesson_id = absint( is_array( $existing ) ? ( $existing['wp_lesson_id'] ?? 0 ) : 0 );
+
+		if ( $wp_lesson_id && 'lm_lesson' === get_post_type( $wp_lesson_id ) ) {
+			wp_update_post( array(
+				'ID'           => $wp_lesson_id,
+				'post_title'   => $title,
+				'post_content' => $desc,
+			) );
+		} else {
+			$wp_lesson_id = wp_insert_post( array(
+				'post_type'    => 'lm_lesson',
+				'post_status'  => $post_status,
+				'post_title'   => $title,
+				'post_content' => $desc,
+				'post_author'  => $actor_user_id,
+			) );
+			if ( is_wp_error( $wp_lesson_id ) ) {
+				$this->log_sync( $wp_course_id, $gc_course_id, 'coursework', 'error', $wp_lesson_id->get_error_message(), array() );
+				return $wp_lesson_id;
+			}
+			$wp_lesson_id = absint( $wp_lesson_id );
+			$created = true;
+		}
+
+		if ( class_exists( '\CLMS_Helper' ) && method_exists( '\CLMS_Helper', 'set_course_id_for_lesson' ) ) {
+			\CLMS_Helper::set_course_id_for_lesson( $wp_lesson_id, $wp_course_id, true );
+		} else {
+			update_post_meta( $wp_lesson_id, '_clms_course_id', $wp_course_id );
+			update_post_meta( $wp_lesson_id, '_clms_lesson_course_id', $wp_course_id );
+			update_post_meta( $wp_lesson_id, 'course_id', $wp_course_id );
+		}
+
+		if ( '' !== $due['date'] ) {
+			update_post_meta( $wp_lesson_id, '_clms_due_date', $due['date'] );
+			update_post_meta( $wp_lesson_id, 'lm_due_date', $due['date'] );
+		}
+		if ( '' !== $due['time'] ) {
+			update_post_meta( $wp_lesson_id, '_clms_due_time', $due['time'] );
+		}
+
+		$now = current_time( 'mysql', true );
+		$payload_json = wp_json_encode( $data );
+
+		$payload = array(
+			'wp_course_id'     => $wp_course_id,
+			'gc_course_id'     => $gc_course_id,
+			'gc_coursework_id' => $gc_coursework_id,
+			'wp_lesson_id'     => $wp_lesson_id,
+			'title'            => $title,
+			'due_date'         => $due['date'] ?: null,
+			'due_time'         => $due['time'] ?: null,
+			'state'            => $state ?: null,
+			'payload_json'     => $payload_json ?: null,
+			'updated_at'       => $now,
+		);
+
+		if ( is_array( $existing ) && ! empty( $existing['id'] ) ) {
+			$wpdb->update( $this->table_coursework_map(), $payload, array( 'id' => absint( $existing['id'] ) ) );
+		} else {
+			$payload['created_at'] = $now;
+			$wpdb->insert( $this->table_coursework_map(), $payload );
+		}
+
+		$this->log_sync( $wp_course_id, $gc_course_id, 'coursework', 'ok', 'Import de tarea completado.', array(
+			'gc_coursework_id' => $gc_coursework_id,
+			'wp_lesson_id'     => $wp_lesson_id,
+			'created'          => $created,
+		) );
+
+		return array(
+			'wp_lesson_id' => $wp_lesson_id,
+			'created'      => $created,
+		);
+	}
+
+	public function get_coursework_map_for_course( int $wp_course_id ): array {
+		global $wpdb;
+		$wp_course_id = absint( $wp_course_id );
+		if ( ! $wp_course_id ) {
+			return array();
+		}
+
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT gc_coursework_id, wp_lesson_id, title, updated_at
+				 FROM {$this->table_coursework_map()}
+				 WHERE wp_course_id = %d",
+				$wp_course_id
+			),
+			ARRAY_A
+		);
+		$rows = is_array( $rows ) ? $rows : array();
+
+		$out = array();
+		foreach ( $rows as $r ) {
+			$gc_id = sanitize_text_field( (string) ( $r['gc_coursework_id'] ?? '' ) );
+			if ( '' === $gc_id ) {
+				continue;
+			}
+			$out[ $gc_id ] = array(
+				'wp_lesson_id' => absint( $r['wp_lesson_id'] ?? 0 ),
+				'title'        => sanitize_text_field( (string) ( $r['title'] ?? '' ) ),
+				'updated_at'   => sanitize_text_field( (string) ( $r['updated_at'] ?? '' ) ),
+			);
+		}
+
+		return $out;
+	}
+
+	/**
+	 * @param array $coursework Raw classroom courseWork object.
+	 * @return array{date:string,time:string}
+	 */
+	private function extract_due( array $coursework ): array {
+		$due_date = '';
+		$due_time = '';
+
+		$dd = isset( $coursework['dueDate'] ) && is_array( $coursework['dueDate'] ) ? $coursework['dueDate'] : array();
+		$dt = isset( $coursework['dueTime'] ) && is_array( $coursework['dueTime'] ) ? $coursework['dueTime'] : array();
+
+		$y = isset( $dd['year'] ) ? absint( $dd['year'] ) : 0;
+		$m = isset( $dd['month'] ) ? absint( $dd['month'] ) : 0;
+		$d = isset( $dd['day'] ) ? absint( $dd['day'] ) : 0;
+		if ( $y && $m && $d ) {
+			$due_date = sprintf( '%04d-%02d-%02d', $y, $m, $d );
+		}
+
+		$hh = isset( $dt['hours'] ) ? absint( $dt['hours'] ) : 0;
+		$mm = isset( $dt['minutes'] ) ? absint( $dt['minutes'] ) : 0;
+		if ( isset( $dt['hours'] ) || isset( $dt['minutes'] ) ) {
+			$due_time = sprintf( '%02d:%02d', max( 0, min( 23, $hh ) ), max( 0, min( 59, $mm ) ) );
+		}
+
+		return array(
+			'date' => $due_date,
+			'time' => $due_time,
+		);
 	}
 
 	/**
@@ -353,4 +619,3 @@ final class Classroom_Service {
 		);
 	}
 }
-
