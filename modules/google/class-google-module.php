@@ -30,13 +30,20 @@ class Google_Module {
 	/** Credenciales compartidas (client_id/client_secret) del proyecto propio de la instalación. */
 	const OPTION = 'atora_google_oauth';
 
-	/** Scopes que la instalación necesita — mostrados en la página de ajustes para copiar. */
+	/** Scopes base que la instalación necesita — mostrados en la página de ajustes para copiar. */
 	const SCOPES = array(
 		'openid',
 		'email',
 		'profile',
 		'https://www.googleapis.com/auth/calendar',
 		'https://www.googleapis.com/auth/drive.file',
+	);
+
+	/** Scopes adicionales para Epic 6 (Google Classroom). */
+	const CLASSROOM_SCOPES = array(
+		'https://www.googleapis.com/auth/classroom.courses.readonly',
+		'https://www.googleapis.com/auth/classroom.rosters.readonly',
+		'https://www.googleapis.com/auth/classroom.coursework.students.readonly',
 	);
 
 	public static function init(): void {
@@ -66,7 +73,7 @@ class Google_Module {
 
 	/**
 	 * @param mixed $input
-	 * @return array{client_id:string,client_secret:string,hd_domain:string,hd_auto_enroll:bool}
+	 * @return array{client_id:string,client_secret:string,hd_domain:string,hd_auto_enroll:bool,classroom_enabled:bool}
 	 */
 	public static function sanitize_options( $input ): array {
 		$input = is_array( $input ) ? $input : array();
@@ -77,6 +84,7 @@ class Google_Module {
 			// P10.3: restricción por dominio para el perfil 'institucion'.
 			'hd_domain'      => sanitize_text_field( (string) ( $input['hd_domain'] ?? '' ) ),
 			'hd_auto_enroll' => ! empty( $input['hd_auto_enroll'] ),
+			'classroom_enabled' => ! empty( $input['classroom_enabled'] ),
 		);
 
 		// Las mismas credenciales alimentan a Calendar_Sync — un solo
@@ -92,7 +100,7 @@ class Google_Module {
 	}
 
 	/**
-	 * @return array{client_id:string,client_secret:string,hd_domain:string,hd_auto_enroll:bool}
+	 * @return array{client_id:string,client_secret:string,hd_domain:string,hd_auto_enroll:bool,classroom_enabled:bool}
 	 */
 	public static function get_options(): array {
 		return wp_parse_args( get_option( self::OPTION, array() ), array(
@@ -100,7 +108,26 @@ class Google_Module {
 			'client_secret'  => '',
 			'hd_domain'      => '',
 			'hd_auto_enroll' => false,
+			'classroom_enabled' => false,
 		) );
+	}
+
+	/**
+	 * Scopes efectivos para la URL de autorización.
+	 *
+	 * Classroom se habilita explícitamente para evitar pedir scopes
+	 * adicionales en instalaciones que solo usan Calendar/Drive/Identity.
+	 *
+	 * @return array<int,string>
+	 */
+	public static function get_scopes(): array {
+		$opts = self::get_options();
+		$scopes = self::SCOPES;
+		if ( ! empty( $opts['classroom_enabled'] ) ) {
+			$scopes = array_merge( $scopes, self::CLASSROOM_SCOPES );
+		}
+		$scopes = array_values( array_unique( array_filter( array_map( 'trim', (array) $scopes ) ) ) );
+		return $scopes;
 	}
 
 	/**
@@ -141,7 +168,7 @@ class Google_Module {
 			'client_id'              => $client_id,
 			'redirect_uri'           => self::get_redirect_uri(),
 			'response_type'          => 'code',
-			'scope'                  => implode( ' ', self::SCOPES ),
+			'scope'                  => implode( ' ', self::get_scopes() ),
 			'access_type'            => 'offline',
 			'prompt'                 => 'consent',
 			// Mismo esquema de state que ya valida Calendar_Sync::handle_oauth_callback().

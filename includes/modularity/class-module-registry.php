@@ -257,6 +257,17 @@ class CLMS_Module_Registry {
 				'tables'              => array( 'atora_portfolios', 'atora_portfolio_assessments', 'atora_portfolio_items', 'atora_portfolio_feedback' ),
 				'core'                => true,
 			),
+			'classroom'     => array(
+				'label'               => 'Google Classroom',
+				'description'         => 'Epic 6: mapeo de cursos + sync de rosters y (luego) tareas/notas.',
+				'group'               => 'integrations',
+				'requires'            => array( 'google', 'lms' ),
+				'provides_pages'      => array( 'atora-classroom' ),
+				'provides_shortcodes' => array(),
+				'provides_rest'       => array( '/classroom' ),
+				'tables'              => array( 'atora_google_classroom_course_map', 'atora_google_classroom_sync_log' ),
+				'core'                => false,
+			),
 			'security'       => array(
 				'label'               => 'Seguridad',
 				'description'         => 'Registro extendido, CAPTCHA, 2FA. Autenticación base siempre activa.',

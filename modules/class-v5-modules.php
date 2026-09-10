@@ -103,6 +103,12 @@ class V5_Modules {
 			self::load_portfolios();
 		}
 
+		// Epic 6: Google Classroom (admin/rest/cron).
+		if ( ( $ctx['is_admin'] || $ctx['is_rest'] || $ctx['is_cron'] )
+			&& self::module_active( 'classroom' ) ) {
+			self::load_classroom();
+		}
+
 		// Messaging: evitar carga en frontend público general.
 		if ( ( $ctx['is_admin'] || $ctx['is_cron'] || $ctx['is_rest'] || $ctx['is_ajax'] || $ctx['is_webhook'] )
 			&& self::module_active( 'messaging' ) ) {
@@ -206,6 +212,17 @@ class V5_Modules {
 
 		if ( class_exists( '\ATORA\Portfolios\Portfolios_Module' ) ) {
 			\ATORA\Portfolios\Portfolios_Module::init();
+		}
+	}
+
+	/** @return void */
+	private static function load_classroom(): void {
+		$dir = ATORA_LMS_MODULES_DIR . 'classroom/';
+		self::require_file( $dir . 'class-classroom-service.php' );
+		self::require_file( $dir . 'class-classroom-module.php' );
+
+		if ( class_exists( '\ATORA\Classroom\Classroom_Module' ) ) {
+			\ATORA\Classroom\Classroom_Module::init();
 		}
 	}
 

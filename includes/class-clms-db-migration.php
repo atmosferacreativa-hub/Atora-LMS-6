@@ -57,6 +57,7 @@ class CLMS_DB_Migration {
 		$this->create_student_analytics_table();
 		$this->create_peer_review_audit_log_table();
 		$this->create_portfolios_tables();
+		$this->create_google_classroom_tables();
 
 		update_option( self::SCHEMA_VERSION_KEY, $this->get_schema_version() );
 
@@ -445,6 +446,55 @@ class CLMS_DB_Migration {
 			KEY portfolio_id (portfolio_id),
 			KEY item_id (item_id),
 			KEY author_id (author_id),
+			KEY created_at (created_at)
+		) {$charset};";
+		dbDelta( $sql );
+	}
+
+	/**
+	 * Epic 6 — Google Classroom: mapeo de curso WP ↔ Classroom + logs de sync.
+	 *
+	 * @return void
+	 */
+	private function create_google_classroom_tables(): void {
+		global $wpdb;
+
+		$charset = $wpdb->get_charset_collate();
+
+		$map = $wpdb->prefix . 'atora_google_classroom_course_map';
+		$sql = "CREATE TABLE {$map} (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			wp_course_id bigint(20) unsigned NOT NULL,
+			gc_course_id varchar(64) NOT NULL,
+			gc_course_name varchar(255) DEFAULT NULL,
+			owner_user_id bigint(20) unsigned NOT NULL DEFAULT 0,
+			last_roster_sync_at datetime DEFAULT NULL,
+			created_at datetime NOT NULL,
+			updated_at datetime NOT NULL,
+			PRIMARY KEY (id),
+			UNIQUE KEY wp_course_id (wp_course_id),
+			KEY gc_course_id (gc_course_id),
+			KEY owner_user_id (owner_user_id),
+			KEY last_roster_sync_at (last_roster_sync_at),
+			KEY updated_at (updated_at)
+		) {$charset};";
+		dbDelta( $sql );
+
+		$log = $wpdb->prefix . 'atora_google_classroom_sync_log';
+		$sql = "CREATE TABLE {$log} (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			wp_course_id bigint(20) unsigned NOT NULL DEFAULT 0,
+			gc_course_id varchar(64) NOT NULL DEFAULT '',
+			sync_type varchar(30) NOT NULL,
+			status varchar(20) NOT NULL,
+			message text,
+			meta_json longtext,
+			created_at datetime NOT NULL,
+			PRIMARY KEY (id),
+			KEY wp_course_id (wp_course_id),
+			KEY gc_course_id (gc_course_id),
+			KEY sync_type (sync_type),
+			KEY status (status),
 			KEY created_at (created_at)
 		) {$charset};";
 		dbDelta( $sql );
