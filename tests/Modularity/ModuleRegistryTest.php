@@ -27,17 +27,17 @@ class ModuleRegistryTest extends TestCase {
 	}
 
 	/** @test */
-	public function test_all_20_slugs_defined(): void {
-		// 6.13.0 (P10) añadió 'google' — 19 + 1.
-		$this->assertCount( 20, \CLMS_Module_Registry::get_modules() );
+	public function test_all_28_slugs_defined(): void {
+		// 6.21.0 integra 28 módulos registrados.
+		$this->assertCount( 28, \CLMS_Module_Registry::get_modules() );
 	}
 
 	/** @test */
-	public function test_core_slugs_are_lms_academic_gradebook_security(): void {
+	public function test_core_slugs_match_current_academic_platform(): void {
 		$modules = \CLMS_Module_Registry::get_modules();
 		$core    = array_keys( array_filter( $modules, fn( $m ) => ! empty( $m['core'] ) ) );
 		sort( $core );
-		$this->assertSame( array( 'academic', 'gradebook', 'lms', 'security' ), $core );
+		$this->assertSame( array( 'academic', 'early-warning', 'gradebook', 'groups', 'h5p', 'learning-analytics', 'lms', 'microsoft', 'portfolios', 'rubrics', 'security' ), $core );
 	}
 
 	/** @test */
