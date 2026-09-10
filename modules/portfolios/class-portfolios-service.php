@@ -741,4 +741,285 @@ final class Portfolios_Service {
 
 		return is_array( $row ) ? $row : array();
 	}
+
+	/**
+	 * Export (MVP): genera un ZIP con snapshot del portafolio (BI-friendly).
+	 *
+	 * @param int $portfolio_id
+	 * @return array{filename:string,content:string}|array
+	 */
+	public function export_portfolio_zip( int $portfolio_id ): array {
+		$portfolio_id = absint( $portfolio_id );
+		if ( ! $portfolio_id ) {
+			return array();
+		}
+
+		if ( ! class_exists( '\ZipArchive' ) ) {
+			return array();
+		}
+
+		$portfolio = $this->get_portfolio( $portfolio_id );
+		if ( empty( $portfolio ) ) {
+			return array();
+		}
+
+		$items      = $this->list_items( $portfolio_id );
+		$feedback   = $this->list_feedback( $portfolio_id, 500 );
+		$assessment = $this->get_final_assessment( $portfolio_id );
+
+		$payload = array(
+			'portfolio'  => $portfolio,
+			'items'      => $items,
+			'feedback'   => $feedback,
+			'assessment' => $assessment,
+			'exported_at'=> gmdate( 'Y-m-d H:i:s' ),
+		);
+
+		$tmp = function_exists( 'wp_tempnam' ) ? wp_tempnam( 'atora-portfolio-' . $portfolio_id . '.zip' ) : tempnam( sys_get_temp_dir(), 'atora-portfolio-' );
+		if ( ! $tmp ) {
+			return array();
+		}
+
+		$zip = new \ZipArchive();
+		$opened = $zip->open( $tmp, \ZipArchive::CREATE | \ZipArchive::OVERWRITE );
+		if ( true !== $opened ) {
+			return array();
+		}
+
+		$zip->addFromString( 'portfolio.json', wp_json_encode( $payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE ) );
+		$zip->addFromString( 'README.txt', $this->build_export_readme( $portfolio ) );
+		$zip->addFromString( 'portfolio.html', $this->build_export_html( $portfolio, $items, $assessment, $feedback ) );
+		$zip->addFromString( 'items.csv', $this->build_items_csv( $items ) );
+		$zip->addFromString( 'feedback.csv', $this->build_feedback_csv( $feedback ) );
+
+		foreach ( (array) $items as $item ) {
+			$item_id      = absint( $item['id'] ?? 0 );
+			$pos          = (int) ( $item['position'] ?? 0 );
+			$lesson_id    = absint( $item['lesson_id'] ?? 0 );
+			$submission_id= absint( $item['submission_id'] ?? 0 );
+			$lesson_title = sanitize_title( (string) ( $item['lesson_title'] ?? '' ) );
+			$lesson_title = $lesson_title ? $lesson_title : 'lesson';
+
+			$path = sprintf( 'items/%03d-%s-item-%d.txt', max( 0, $pos ), $lesson_title, $item_id );
+			$zip->addFromString( $path, $this->build_item_txt( $item ) );
+
+			if ( $submission_id ) {
+				$post = get_post( $submission_id );
+				if ( $post && 'clms_submission' === $post->post_type ) {
+					$html_path = sprintf( 'submissions/submission-%d.html', $submission_id );
+					$html = (string) $post->post_content;
+					$zip->addFromString( $html_path, $html );
+
+					$txt_path = sprintf( 'submissions/submission-%d.txt', $submission_id );
+					$zip->addFromString( $txt_path, $this->normalize_text( wp_strip_all_tags( $html, true ) ) );
+				}
+			}
+
+			if ( $lesson_id ) {
+				$lesson_post = get_post( $lesson_id );
+				if ( $lesson_post && 'lm_lesson' === $lesson_post->post_type ) {
+					$zip->addFromString( sprintf( 'lessons/lesson-%d-title.txt', $lesson_id ), (string) $lesson_post->post_title );
+				}
+			}
+		}
+
+		$zip->close();
+
+		$content = file_get_contents( $tmp ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		if ( is_string( $content ) ) {
+			@unlink( $tmp ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		}
+
+		if ( ! is_string( $content ) || '' === $content ) {
+			return array();
+		}
+
+		$course_id = absint( $portfolio['course_id'] ?? 0 );
+		$user_id   = absint( $portfolio['user_id'] ?? 0 );
+		$filename  = sanitize_file_name(
+			sprintf(
+				'atora-portfolio-course-%d-user-%d-%s.zip',
+				$course_id,
+				$user_id,
+				gmdate( 'Ymd-His' )
+			)
+		);
+
+		return array(
+			'filename' => $filename,
+			'content'  => $content,
+		);
+	}
+
+	private function normalize_text( string $text ): string {
+		$text = str_replace( array( "\r\n", "\r" ), "\n", $text );
+		$text = preg_replace( "/[ \t]+\n/", "\n", $text );
+		$text = preg_replace( "/\n{3,}/", "\n\n", $text );
+		return is_string( $text ) ? trim( $text ) : '';
+	}
+
+	private function build_export_readme( array $portfolio ): string {
+		$course_id = absint( $portfolio['course_id'] ?? 0 );
+		$user_id   = absint( $portfolio['user_id'] ?? 0 );
+		$title     = sanitize_text_field( (string) ( $portfolio['title'] ?? '' ) );
+
+		$lines = array(
+			'ATORA LMS — Export de Portafolio (MVP)',
+			'',
+			'Título: ' . $title,
+			'Curso: ' . ( $course_id ? (string) get_the_title( $course_id ) : '' ) . ' (#' . $course_id . ')',
+			'Estudiante user_id: #' . $user_id,
+			'Exportado (UTC): ' . gmdate( 'Y-m-d H:i:s' ),
+			'',
+			'Archivos:',
+			'- portfolio.json (snapshot completo)',
+			'- portfolio.html (vista imprimible / puedes guardar como PDF)',
+			'- items.csv (evidencias)',
+			'- feedback.csv (comentarios)',
+			'- items/*.txt (detalle por evidencia: reflexión + tags + referencia a submission)',
+			'- submissions/*.html y submissions/*.txt (contenido de la entrega, si existe)',
+		);
+
+		return implode( "\n", $lines ) . "\n";
+	}
+
+	private function build_items_csv( array $items ): string {
+		$stream = fopen( 'php://temp', 'w+' ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		if ( ! $stream ) {
+			return '';
+		}
+
+		fputcsv( $stream, array( 'item_id', 'position', 'lesson_id', 'lesson_title', 'submission_id', 'tags', 'reflection' ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+
+		foreach ( (array) $items as $item ) {
+			$tags = isset( $item['tags'] ) && is_array( $item['tags'] ) ? implode( '|', array_map( 'sanitize_text_field', (array) $item['tags'] ) ) : '';
+			fputcsv( // phpcs:ignore WordPress.WP.AlternativeFunctions
+				$stream,
+				array(
+					absint( $item['id'] ?? 0 ),
+					(int) ( $item['position'] ?? 0 ),
+					absint( $item['lesson_id'] ?? 0 ),
+					sanitize_text_field( (string) ( $item['lesson_title'] ?? '' ) ),
+					absint( $item['submission_id'] ?? 0 ),
+					$tags,
+					$this->normalize_text( sanitize_textarea_field( (string) ( $item['reflection'] ?? '' ) ) ),
+				)
+			);
+		}
+
+		rewind( $stream );
+		$csv = stream_get_contents( $stream ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		fclose( $stream ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		return is_string( $csv ) ? $csv : '';
+	}
+
+	private function build_feedback_csv( array $feedback ): string {
+		$stream = fopen( 'php://temp', 'w+' ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		if ( ! $stream ) {
+			return '';
+		}
+
+		fputcsv( $stream, array( 'feedback_id', 'portfolio_id', 'item_id', 'author_id', 'author_name', 'author_role', 'comment', 'created_at' ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+
+		foreach ( (array) $feedback as $f ) {
+			fputcsv( // phpcs:ignore WordPress.WP.AlternativeFunctions
+				$stream,
+				array(
+					absint( $f['id'] ?? 0 ),
+					absint( $f['portfolio_id'] ?? 0 ),
+					isset( $f['item_id'] ) && null !== $f['item_id'] ? absint( $f['item_id'] ) : '',
+					absint( $f['author_id'] ?? 0 ),
+					sanitize_text_field( (string) ( $f['author_name'] ?? '' ) ),
+					sanitize_key( (string) ( $f['author_role'] ?? '' ) ),
+					$this->normalize_text( wp_strip_all_tags( (string) ( $f['comment'] ?? '' ), true ) ),
+					sanitize_text_field( (string) ( $f['created_at'] ?? '' ) ),
+				)
+			);
+		}
+
+		rewind( $stream );
+		$csv = stream_get_contents( $stream ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		fclose( $stream ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		return is_string( $csv ) ? $csv : '';
+	}
+
+	private function build_item_txt( array $item ): string {
+		$tags = isset( $item['tags'] ) && is_array( $item['tags'] ) ? implode( ', ', array_map( 'sanitize_text_field', (array) $item['tags'] ) ) : '';
+		$lines = array(
+			'Item ID: #' . absint( $item['id'] ?? 0 ),
+			'Orden: ' . (string) (int) ( $item['position'] ?? 0 ),
+			'Lección: ' . sanitize_text_field( (string) ( $item['lesson_title'] ?? '' ) ) . ' (#' . absint( $item['lesson_id'] ?? 0 ) . ')',
+			'Submission: #' . absint( $item['submission_id'] ?? 0 ),
+			'Tags: ' . ( $tags ? $tags : '—' ),
+			'',
+			'Reflexión:',
+			$this->normalize_text( sanitize_textarea_field( (string) ( $item['reflection'] ?? '' ) ) ),
+			'',
+		);
+
+		return implode( "\n", $lines ) . "\n";
+	}
+
+	private function build_export_html( array $portfolio, array $items, array $assessment, array $feedback ): string {
+		$course_id = absint( $portfolio['course_id'] ?? 0 );
+		$user_id   = absint( $portfolio['user_id'] ?? 0 );
+		$title     = sanitize_text_field( (string) ( $portfolio['title'] ?? '' ) );
+		$course    = $course_id ? (string) get_the_title( $course_id ) : '';
+
+		$html  = '<!doctype html><html><head><meta charset="utf-8">';
+		$html .= '<title>' . esc_html( $title ) . '</title>';
+		$html .= '<style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:900px;margin:24px auto;line-height:1.4}';
+		$html .= 'h1,h2{margin:0 0 10px} .muted{color:#6b7280} .card{border:1px solid #e5e7eb;border-radius:12px;padding:14px;margin:12px 0}';
+		$html .= 'table{width:100%;border-collapse:collapse} td,th{border-top:1px solid #f3f4f6;padding:8px 6px;text-align:left;vertical-align:top}</style>';
+		$html .= '</head><body>';
+		$html .= '<h1>' . esc_html( $title ) . '</h1>';
+		$html .= '<p class="muted">Curso: ' . esc_html( $course ) . ' (#' . esc_html( (string) $course_id ) . ') · Estudiante user_id #' . esc_html( (string) $user_id ) . '</p>';
+		$html .= '<p class="muted">Exportado (UTC): ' . esc_html( gmdate( 'Y-m-d H:i:s' ) ) . '</p>';
+
+		if ( ! empty( $assessment ) ) {
+			$rubric_title = absint( $assessment['rubric_id'] ?? 0 ) ? (string) get_the_title( absint( $assessment['rubric_id'] ?? 0 ) ) : '';
+			$html .= '<div class="card"><h2>Evaluación</h2>';
+			$html .= '<p><strong>Nota final:</strong> ' . esc_html( (string) absint( $assessment['total_percent'] ?? 0 ) ) . '/100';
+			if ( $rubric_title ) {
+				$html .= ' <span class="muted">(' . esc_html( $rubric_title ) . ')</span>';
+			}
+			$html .= '</p>';
+			if ( ! empty( $assessment['comment'] ) ) {
+				$html .= '<p><strong>Comentario:</strong><br>' . nl2br( esc_html( (string) $assessment['comment'] ) ) . '</p>';
+			}
+			$html .= '</div>';
+		}
+
+		$html .= '<div class="card"><h2>Evidencias</h2>';
+		$html .= '<table><thead><tr><th>#</th><th>Lección</th><th>Reflexión</th><th>Tags</th></tr></thead><tbody>';
+		foreach ( (array) $items as $item ) {
+			$tags = isset( $item['tags'] ) && is_array( $item['tags'] ) ? implode( ', ', array_map( 'sanitize_text_field', (array) $item['tags'] ) ) : '';
+			$html .= '<tr>';
+			$html .= '<td>' . esc_html( (string) (int) ( $item['position'] ?? 0 ) ) . '</td>';
+			$html .= '<td>' . esc_html( sanitize_text_field( (string) ( $item['lesson_title'] ?? '' ) ) ) . '</td>';
+			$html .= '<td>' . nl2br( esc_html( $this->normalize_text( sanitize_textarea_field( (string) ( $item['reflection'] ?? '' ) ) ) ) ) . '</td>';
+			$html .= '<td>' . esc_html( $tags ) . '</td>';
+			$html .= '</tr>';
+		}
+		$html .= '</tbody></table></div>';
+
+		$html .= '<div class="card"><h2>Feedback</h2>';
+		if ( empty( $feedback ) ) {
+			$html .= '<p class="muted">No hay feedback.</p>';
+		} else {
+			$html .= '<table><thead><tr><th>Autor</th><th>Comentario</th><th>Fecha</th></tr></thead><tbody>';
+			foreach ( (array) $feedback as $f ) {
+				$html .= '<tr>';
+				$html .= '<td>' . esc_html( sanitize_text_field( (string) ( $f['author_name'] ?? '' ) ) ) . '<br><span class="muted">' . esc_html( sanitize_key( (string) ( $f['author_role'] ?? '' ) ) ) . '</span></td>';
+				$html .= '<td>' . nl2br( esc_html( $this->normalize_text( wp_strip_all_tags( (string) ( $f['comment'] ?? '' ), true ) ) ) ) . '</td>';
+				$html .= '<td><span class="muted">' . esc_html( sanitize_text_field( (string) ( $f['created_at'] ?? '' ) ) ) . '</span></td>';
+				$html .= '</tr>';
+			}
+			$html .= '</tbody></table>';
+		}
+		$html .= '</div>';
+
+		$html .= '</body></html>';
+		return $html;
+	}
 }

@@ -1,7 +1,7 @@
 # Roadmap técnico — Evolución del LMS (rolling 6 meses)
 
 Última actualización: 2026-09-10  
-Base: ATORA LMS `6.16.1`
+Base: ATORA LMS `6.17.2`
 
 ## Estado actual (implementado en 6.14.0)
 - Epic 1 (MVP): Group Assessment (grupos por curso + entregas grupales + propagación + overrides + CSV + REST).
@@ -196,7 +196,7 @@ Evolucionar ATORA LMS en ciclos continuos, priorizando (1) evaluación colaborat
 - [x] UI estudiante: builder por shortcode (CRUD básico + selector de artefactos + editor de reflexión/tags).
 - [x] UI docente: vista en panel admin + feedback + evaluación con rúbrica (override final).
 - [x] Permisos: visibilidad y control de acceso (incluye endpoint público de solo lectura).
-- [ ] Export: PDF/ZIP (nice-to-have) para acreditación.
+- [x] Export: ZIP (incluye HTML imprimible para guardar como PDF) para acreditación.
 - [~] QA: privacidad y compatibilidad con cambios de matrícula (pendiente hardening + caching).
 
 **Dependencias**

@@ -34,6 +34,7 @@ final class Portfolios_Module {
 		add_action( 'admin_post_atora_portfolio_reorder', array( __CLASS__, 'handle_reorder' ) );
 		add_action( 'admin_post_atora_portfolio_add_feedback', array( __CLASS__, 'handle_add_feedback' ) );
 		add_action( 'admin_post_atora_portfolio_assess', array( __CLASS__, 'handle_assess' ) );
+		add_action( 'admin_post_atora_portfolio_export_zip', array( __CLASS__, 'handle_export_zip' ) );
 	}
 
 	private static function service(): Portfolios_Service {
@@ -148,6 +149,12 @@ final class Portfolios_Module {
 			return;
 		}
 
+		$visibility = sanitize_key( (string) ( $portfolio['visibility'] ?? '' ) );
+		$owner_id   = absint( $portfolio['user_id'] ?? 0 );
+		if ( 'private' === $visibility && ! current_user_can( 'manage_options' ) && $viewer_id !== $owner_id ) {
+			wp_die( esc_html__( 'Este portafolio es privado.', 'atora-lms' ) );
+		}
+
 		$user_id = absint( $portfolio['user_id'] ?? 0 );
 		$u = $user_id ? get_userdata( $user_id ) : null;
 		$name = $u ? ( $u->display_name ? $u->display_name : $u->user_login ) : (string) $user_id;
@@ -156,7 +163,23 @@ final class Portfolios_Module {
 		echo '<h2>' . esc_html__( 'Detalle de portafolio', 'atora-lms' ) . '</h2>';
 		echo '<p><strong>' . esc_html( $name ) . '</strong> <span class="description">#' . esc_html( (string) $user_id ) . ' — ' . esc_html( (string) get_the_title( $course_id ) ) . '</span></p>';
 		echo '<p><strong>' . esc_html__( 'Título:', 'atora-lms' ) . '</strong> ' . esc_html( (string) ( $portfolio['title'] ?? '' ) ) . '</p>';
-		echo '<p><strong>' . esc_html__( 'Visibilidad:', 'atora-lms' ) . '</strong> ' . esc_html( sanitize_key( (string) ( $portfolio['visibility'] ?? '' ) ) ) . '</p>';
+		echo '<p><strong>' . esc_html__( 'Visibilidad:', 'atora-lms' ) . '</strong> ' . esc_html( $visibility ) . '</p>';
+
+		if ( class_exists( '\ZipArchive' ) ) {
+			$export_url = wp_nonce_url(
+				add_query_arg(
+					array(
+						'action'       => 'atora_portfolio_export_zip',
+						'portfolio_id' => $portfolio_id,
+					),
+					admin_url( 'admin-post.php' )
+				),
+				'atora_portfolio_export_zip_' . $portfolio_id
+			);
+			echo '<p style="margin:10px 0 0;"><a class="button" href="' . esc_url( $export_url ) . '">' . esc_html__( 'Exportar ZIP', 'atora-lms' ) . '</a> <span class="description">' . esc_html__( 'Incluye HTML imprimible (puedes guardar como PDF).', 'atora-lms' ) . '</span></p>';
+		} else {
+			echo '<p class="description" style="margin:10px 0 0;">' . esc_html__( 'Exportar ZIP no disponible (falta ext-zip en PHP).', 'atora-lms' ) . '</p>';
+		}
 
 		$items = $service->list_items( $portfolio_id );
 		if ( empty( $items ) ) {
@@ -418,6 +441,27 @@ final class Portfolios_Module {
 				</select>
 				<button type="submit" class="atora-btn atora-btn-secondary" style="margin-left: 8px;"><?php esc_html_e( 'Cargar', 'atora-lms' ); ?></button>
 			</form>
+
+			<div style="margin:0 0 18px 0;">
+				<?php if ( $portfolio_id && class_exists( '\\ZipArchive' ) ) : ?>
+					<?php
+					$export_url = wp_nonce_url(
+						add_query_arg(
+							array(
+								'action'       => 'atora_portfolio_export_zip',
+								'portfolio_id' => $portfolio_id,
+							),
+							admin_url( 'admin-post.php' )
+						),
+						'atora_portfolio_export_zip_' . $portfolio_id
+					);
+					?>
+					<a class="atora-btn atora-btn-secondary" href="<?php echo esc_url( $export_url ); ?>"><?php esc_html_e( 'Exportar ZIP', 'atora-lms' ); ?></a>
+					<span class="description" style="margin-left:8px;"><?php esc_html_e( 'Incluye HTML imprimible (puedes guardar como PDF).', 'atora-lms' ); ?></span>
+				<?php else : ?>
+					<span class="description"><?php esc_html_e( 'Exportar ZIP no disponible (falta ext-zip en PHP).', 'atora-lms' ); ?></span>
+				<?php endif; ?>
+			</div>
 
 			<?php
 			$assessment = $portfolio_id ? $service->get_final_assessment( $portfolio_id ) : array();
@@ -1236,5 +1280,63 @@ final class Portfolios_Module {
 				),
 			)
 		);
+	}
+
+	// ── Export ─────────────────────────────────────────────────────────────
+
+	public static function handle_export_zip(): void {
+		if ( ! is_user_logged_in() ) {
+			wp_die( esc_html__( 'Debes iniciar sesión.', 'atora-lms' ) );
+		}
+
+		$portfolio_id = isset( $_REQUEST['portfolio_id'] ) ? absint( wp_unslash( $_REQUEST['portfolio_id'] ) ) : 0;
+		if ( ! $portfolio_id ) {
+			wp_die( esc_html__( 'portfolio_id requerido.', 'atora-lms' ) );
+		}
+
+		check_admin_referer( 'atora_portfolio_export_zip_' . $portfolio_id );
+
+		if ( ! class_exists( '\ZipArchive' ) ) {
+			wp_die( esc_html__( 'Exportar ZIP no está disponible: falta ext-zip en PHP. Habilita ZipArchive en el contenedor/servidor.', 'atora-lms' ) );
+		}
+
+		$service   = self::service();
+		$portfolio = $service->get_portfolio( $portfolio_id );
+		if ( empty( $portfolio ) ) {
+			wp_die( esc_html__( 'Portafolio no encontrado.', 'atora-lms' ) );
+		}
+
+		$viewer_id  = get_current_user_id();
+		$owner_id   = absint( $portfolio['user_id'] ?? 0 );
+		$course_id  = absint( $portfolio['course_id'] ?? 0 );
+		$visibility = sanitize_key( (string) ( $portfolio['visibility'] ?? '' ) );
+
+		if ( $viewer_id !== $owner_id ) {
+			if ( ! $service->viewer_can_access_course( $viewer_id, $course_id ) ) {
+				wp_die( esc_html__( 'No tienes acceso a este curso.', 'atora-lms' ) );
+			}
+			if ( 'private' === $visibility && ! current_user_can( 'manage_options' ) ) {
+				wp_die( esc_html__( 'Este portafolio es privado.', 'atora-lms' ) );
+			}
+		}
+
+		$zip = $service->export_portfolio_zip( $portfolio_id );
+		$filename = isset( $zip['filename'] ) ? (string) $zip['filename'] : '';
+		$content  = isset( $zip['content'] ) ? $zip['content'] : null;
+
+		if ( '' === $filename || ! is_string( $content ) || '' === $content ) {
+			wp_die( esc_html__( 'No se pudo generar el ZIP.', 'atora-lms' ) );
+		}
+
+		while ( ob_get_level() ) {
+			ob_end_clean();
+		}
+
+		nocache_headers();
+		header( 'Content-Type: application/zip' );
+		header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
+		header( 'Content-Length: ' . (string) strlen( $content ) );
+		echo $content; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		exit;
 	}
 }
