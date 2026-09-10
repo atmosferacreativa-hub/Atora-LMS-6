@@ -140,6 +140,7 @@ trait CLMS_REST_Academics_Helpers_Trait {
 			'rubric_id'          => absint( get_post_meta( $post->ID, '_clms_rubric_id', true ) ),
 			'peer_review_enabled' => $this->sanitize_bool( get_post_meta( $post->ID, '_clms_peer_review_enabled', true ) ),
 			'peer_review_blind'   => $this->sanitize_bool( get_post_meta( $post->ID, '_clms_peer_review_blind', true ) ),
+			'peer_review_training_required' => $this->sanitize_bool( get_post_meta( $post->ID, '_clms_peer_review_training_required', true ) ),
 			'peer_review_calibration_enabled' => $this->sanitize_bool( get_post_meta( $post->ID, '_clms_pr_calibration_enabled', true ) ),
 			'peer_review_calibration_submission_id' => absint( get_post_meta( $post->ID, '_clms_pr_calibration_submission_id', true ) ),
 			'peer_review_calibration_teacher_grade' => absint( get_post_meta( $post->ID, '_clms_pr_calibration_teacher_grade', true ) ),
@@ -379,6 +380,9 @@ trait CLMS_REST_Academics_Helpers_Trait {
 		if ( array_key_exists( 'peer_review_blind', $data ) ) {
 			update_post_meta( $post_id, '_clms_peer_review_blind', $this->sanitize_bool( $data['peer_review_blind'] ) ? '1' : '0' );
 		}
+		if ( array_key_exists( 'peer_review_training_required', $data ) ) {
+			update_post_meta( $post_id, '_clms_peer_review_training_required', $this->sanitize_bool( $data['peer_review_training_required'] ) ? '1' : '0' );
+		}
 		if ( array_key_exists( 'peer_review_calibration_enabled', $data ) ) {
 			update_post_meta( $post_id, '_clms_pr_calibration_enabled', $this->sanitize_bool( $data['peer_review_calibration_enabled'] ) ? '1' : '0' );
 		}
@@ -440,6 +444,9 @@ trait CLMS_REST_Academics_Helpers_Trait {
 		}
 		if ( array_key_exists( 'peer_review_blind', $data ) ) {
 			$normalized['peer_review_blind'] = $this->sanitize_bool( $data['peer_review_blind'] );
+		}
+		if ( array_key_exists( 'peer_review_training_required', $data ) ) {
+			$normalized['peer_review_training_required'] = $this->sanitize_bool( $data['peer_review_training_required'] );
 		}
 		if ( array_key_exists( 'peer_review_calibration_enabled', $data ) ) {
 			$normalized['peer_review_calibration_enabled'] = $this->sanitize_bool( $data['peer_review_calibration_enabled'] );

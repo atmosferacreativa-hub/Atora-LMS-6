@@ -266,7 +266,12 @@ class CLMS_Peer_Review {
 
 			$percent = self::get_assignment_percent( $assignment_id, $lesson_id );
 			$delta   = (int) ( $percent - $peer_grade );
-			$flag    = abs( $delta ) >= 20 ? 'outlier' : 'ok';
+			$excluded = '1' === (string) get_post_meta( $assignment_id, '_clms_pr_excluded', true );
+			if ( $excluded ) {
+				$flag = 'excluded';
+			} else {
+				$flag = abs( $delta ) >= 20 ? 'outlier' : 'ok';
+			}
 
 			update_post_meta( $assignment_id, '_clms_pr_total_percent', $percent );
 			update_post_meta( $assignment_id, '_clms_pr_consistency_delta', $delta );
@@ -664,6 +669,7 @@ class CLMS_Peer_Review {
 
 		$peer_grade = absint( $calc['peer_grade'] ?? 0 );
 		$avg_scores = isset( $calc['avg_scores'] ) && is_array( $calc['avg_scores'] ) ? $calc['avg_scores'] : array();
+		$included_completed = absint( $calc['included_completed'] ?? 0 );
 
 		$teacher_grade = absint( get_post_meta( $submission_id, '_clms_submission_grade', true ) );
 		$final_grade   = $peer_grade;
@@ -682,7 +688,7 @@ class CLMS_Peer_Review {
 
 		// Notify the reviewee.
 		$reviewee_id = absint( get_post_meta( $submission_id, '_clms_submission_user_id', true ) );
-		if ( $reviewee_id ) {
+		if ( $reviewee_id && $included_completed > 0 ) {
 			$this->notify_reviewee( $reviewee_id, $lesson_id, $peer_grade );
 		}
 
@@ -984,6 +990,7 @@ class CLMS_Peer_Review {
 					'reviewer_id'    => $reviewer_id,
 					'completed'      => 0,
 					'pending'        => 0,
+					'excluded'       => 0,
 					'outliers'       => 0,
 					'avg_abs_delta'  => null,
 					'deltas'         => array(),
@@ -1010,6 +1017,10 @@ class CLMS_Peer_Review {
 			}
 
 			$flag = sanitize_key( (string) get_post_meta( $assignment_id, '_clms_pr_consistency_flag', true ) );
+			if ( 'excluded' === $flag || '1' === (string) get_post_meta( $assignment_id, '_clms_pr_excluded', true ) ) {
+				$by_reviewer[ $reviewer_id ]['excluded']++;
+				continue;
+			}
 			if ( 'outlier' === $flag ) {
 				$by_reviewer[ $reviewer_id ]['outliers']++;
 			}
@@ -1042,6 +1053,7 @@ class CLMS_Peer_Review {
 		echo '<th>' . esc_html__( 'Revisor', 'atora-lms' ) . '</th>';
 		echo '<th>' . esc_html__( 'Completadas', 'atora-lms' ) . '</th>';
 		echo '<th>' . esc_html__( 'Pendientes', 'atora-lms' ) . '</th>';
+		echo '<th>' . esc_html__( 'Excluidas', 'atora-lms' ) . '</th>';
 		echo '<th>' . esc_html__( 'Outliers', 'atora-lms' ) . '</th>';
 		echo '<th>' . esc_html__( 'Δ promedio', 'atora-lms' ) . '</th>';
 		echo '<th>' . esc_html__( 'Calibración', 'atora-lms' ) . '</th>';
@@ -1068,6 +1080,7 @@ class CLMS_Peer_Review {
 			echo '<td><strong>' . esc_html( $name ) . '</strong><br><span class="description">#' . esc_html( (string) $rid ) . '</span></td>';
 			echo '<td>' . esc_html( (string) absint( $row['completed'] ?? 0 ) ) . '</td>';
 			echo '<td>' . esc_html( (string) absint( $row['pending'] ?? 0 ) ) . '</td>';
+			echo '<td>' . esc_html( (string) absint( $row['excluded'] ?? 0 ) ) . '</td>';
 			echo '<td>' . esc_html( (string) absint( $row['outliers'] ?? 0 ) ) . '</td>';
 			echo '<td>' . esc_html( null !== ( $row['avg_abs_delta'] ?? null ) ? (string) $row['avg_abs_delta'] : '—' ) . '</td>';
 			echo '<td>' . esc_html( $cal_label ) . '</td>';
