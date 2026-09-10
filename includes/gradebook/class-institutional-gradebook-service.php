@@ -137,6 +137,13 @@ class CLMS_Institutional_Gradebook_Service {
 	public function create_cycle( $period_id, $course_id, $scale_id, $actor_id = 0 ) {
 		global $wpdb;
 
+		$period_id = absint( $period_id );
+		$course_id = absint( $course_id );
+		$scale_id  = absint( $scale_id );
+		if ( ! $period_id || ! $course_id || ! $scale_id ) {
+			return new WP_Error( 'clms_cycle_invalid_reference', __( 'Período, curso y escala son obligatorios.', 'atora-lms' ) );
+		}
+
 		$period = $this->get_row( 'atora_academic_periods', $period_id );
 		$scale  = $this->get_row( 'atora_grading_scales', $scale_id );
 		if ( empty( $period ) || 'open' !== $period['status'] ) {
@@ -144,6 +151,9 @@ class CLMS_Institutional_Gradebook_Service {
 		}
 		if ( empty( $scale ) || 'active' !== $scale['status'] ) {
 			return new WP_Error( 'clms_cycle_scale_inactive', __( 'La escala debe estar activa.', 'atora-lms' ) );
+		}
+		if ( absint( $period['academy_id'] ?? 0 ) !== absint( $scale['academy_id'] ?? 0 ) ) {
+			return new WP_Error( 'clms_cycle_academy_mismatch', __( 'El período y la escala pertenecen a academias diferentes.', 'atora-lms' ) );
 		}
 
 		$table = $wpdb->prefix . 'atora_gradebook_cycles';
@@ -273,12 +283,23 @@ class CLMS_Institutional_Gradebook_Service {
 			return new WP_Error( 'clms_cycle_empty', __( 'No se puede publicar o cerrar un ciclo sin calificaciones.', 'atora-lms' ) );
 		}
 
+		$snapshot_records = $records;
+		if ( in_array( $target_status, array( 'published', 'closed' ), true ) ) {
+			$snapshot_records = array_map(
+				static function ( $record ) use ( $target_status ) {
+					$record['status'] = $target_status;
+					return $record;
+				},
+				$records
+			);
+		}
+
 		$now  = current_time( 'mysql', true );
 		$data = array(
 			'status'        => $target_status,
 			'lock_version'  => $lock_version + 1,
-			'snapshot_hash' => CLMS_Institutional_Gradebook_Policy::canonical_snapshot_hash( $records ),
-			'snapshot_json' => wp_json_encode( $records ),
+			'snapshot_hash' => CLMS_Institutional_Gradebook_Policy::canonical_snapshot_hash( $snapshot_records ),
+			'snapshot_json' => wp_json_encode( $snapshot_records ),
 		);
 		$formats = array( '%s', '%d', '%s', '%s' );
 
