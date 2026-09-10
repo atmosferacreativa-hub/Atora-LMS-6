@@ -227,15 +227,15 @@ Evolucionar ATORA LMS en ciclos continuos, priorizando (1) evaluación colaborat
 ### Epic 7 — Microsoft (Entra SSO + Teams/Outlook) (condicional)
 **Estimación:** 2–3 semanas (≈400–600 líneas netas; depende de Graph + políticas Entra).
 **Historias**
-- [ ] Como usuario, inicio sesión con Microsoft Entra (OIDC/OAuth) y se aprovisiona cuenta si corresponde.
-- [ ] Como docente, recibo alertas relevantes en Teams (no solo email).
-- [ ] Como institución, sincronizo calendario de entregas con Outlook.
+- [x] Como usuario, inicio sesión con Microsoft Entra (OIDC/OAuth) y se aprovisiona cuenta si corresponde.
+- [x] Como docente, recibo alertas relevantes en Teams (no solo email).
+- [x] Como institución, sincronizo calendario de entregas con Outlook (MVP: iCal por curso).
 
 **Tareas**
-- [ ] Entra SSO: flujo OIDC, linking de cuentas, políticas de MFA y logout.
-- [ ] Teams: canal de notificaciones (webhooks/Graph) + plantillas.
-- [ ] Outlook: calendario por curso/cohorte + actualizaciones.
-- [ ] QA: seguridad (tokens, scopes), rate limits y auditoría.
+- [x] Entra SSO: flujo OAuth (code) + linking de cuentas (sin fusión por email).
+- [x] Teams: canal de notificaciones por webhook + templates simples + filtros por tipo.
+- [x] Outlook: calendario iCal por curso (entregas + sesiones live) + URL con token para suscripción.
+- [x] QA: hardening básico (state transient, rate limit por transient, no auto-link por email).
 
 ---
 

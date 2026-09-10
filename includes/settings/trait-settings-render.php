@@ -324,16 +324,18 @@ trait CLMS_Settings_Render_Trait {
 		$email     = isset( $channels['email'] ) && is_array( $channels['email'] ) ? $channels['email'] : self::get_email_engine_settings();
 		$whatsapp  = isset( $channels['whatsapp'] ) && is_array( $channels['whatsapp'] ) ? $channels['whatsapp'] : self::get_whatsapp_settings();
 		$telegram  = isset( $channels['telegram'] ) && is_array( $channels['telegram'] ) ? $channels['telegram'] : self::get_telegram_settings();
+		$teams     = isset( $channels['teams'] ) && is_array( $channels['teams'] ) ? $channels['teams'] : self::get_teams_settings();
 		$statuses  = isset( $channels['status'] ) && is_array( $channels['status'] ) ? $channels['status'] : array();
 
 		$email_ready    = ! empty( $statuses['email_ready'] );
 		$whatsapp_ready = ! empty( $statuses['whatsapp_ready'] );
 		$telegram_ready = ! empty( $statuses['telegram_ready'] );
+		$teams_ready    = ! empty( $statuses['teams_ready'] );
 		?>
 		<h2><?php esc_html_e( 'Canales de comunicación', 'atora-lms' ); ?></h2>
 		<p class="description"><?php esc_html_e( 'Configura Email, WhatsApp y Telegram desde una sola vista. Este panel opera en conjunto con CRM Hub y la bandeja unificada.', 'atora-lms' ); ?></p>
 
-		<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:16px 0 18px;max-width:980px;">
+			<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:16px 0 18px;max-width:980px;">
 			<div style="border:1px solid #d1fae5;background:#f0fdf4;border-radius:12px;padding:12px 14px;">
 				<strong style="display:block;color:#065f46;"><?php esc_html_e( 'Email Engine', 'atora-lms' ); ?></strong>
 				<span style="color:#047857;"><?php echo esc_html( $email_ready ? __( 'Listo para enviar', 'atora-lms' ) : __( 'Pendiente de configuración', 'atora-lms' ) ); ?></span>
@@ -342,11 +344,15 @@ trait CLMS_Settings_Render_Trait {
 				<strong style="display:block;color:#1e3a8a;"><?php esc_html_e( 'WhatsApp', 'atora-lms' ); ?></strong>
 				<span style="color:#1d4ed8;"><?php echo esc_html( $whatsapp_ready ? __( 'Conectado', 'atora-lms' ) : __( 'Sin credenciales completas', 'atora-lms' ) ); ?></span>
 			</div>
-			<div style="border:1px solid #ede9fe;background:#f5f3ff;border-radius:12px;padding:12px 14px;">
-				<strong style="display:block;color:#5b21b6;"><?php esc_html_e( 'Telegram', 'atora-lms' ); ?></strong>
-				<span style="color:#6d28d9;"><?php echo esc_html( $telegram_ready ? __( 'Conectado', 'atora-lms' ) : __( 'Sin token o secreto', 'atora-lms' ) ); ?></span>
+				<div style="border:1px solid #ede9fe;background:#f5f3ff;border-radius:12px;padding:12px 14px;">
+					<strong style="display:block;color:#5b21b6;"><?php esc_html_e( 'Telegram', 'atora-lms' ); ?></strong>
+					<span style="color:#6d28d9;"><?php echo esc_html( $telegram_ready ? __( 'Conectado', 'atora-lms' ) : __( 'Sin token o secreto', 'atora-lms' ) ); ?></span>
+				</div>
+				<div style="border:1px solid #fee2e2;background:#fff1f2;border-radius:12px;padding:12px 14px;">
+					<strong style="display:block;color:#9f1239;"><?php esc_html_e( 'Microsoft Teams', 'atora-lms' ); ?></strong>
+					<span style="color:#be123c;"><?php echo esc_html( $teams_ready ? __( 'Conectado', 'atora-lms' ) : __( 'Sin webhook', 'atora-lms' ) ); ?></span>
+				</div>
 			</div>
-		</div>
 
 		<h3 style="margin-top:22px"><?php esc_html_e( 'Email Engine e identidades por área', 'atora-lms' ); ?></h3>
 		<table class="form-table" role="presentation">
@@ -484,8 +490,8 @@ trait CLMS_Settings_Render_Trait {
 			</tr>
 		</table>
 
-		<h3 style="margin-top:26px"><?php esc_html_e( 'Telegram Bot', 'atora-lms' ); ?></h3>
-		<table class="form-table" role="presentation">
+			<h3 style="margin-top:26px"><?php esc_html_e( 'Telegram Bot', 'atora-lms' ); ?></h3>
+			<table class="form-table" role="presentation">
 			<tr>
 				<th><label for="clms_tg_token"><?php esc_html_e( 'Bot token', 'atora-lms' ); ?></label></th>
 				<td><input type="password" class="regular-text" autocomplete="off" id="clms_tg_token" name="clms_telegram[bot_token]" value="<?php echo esc_attr( (string) $telegram['bot_token'] ); ?>"></td>
@@ -647,6 +653,44 @@ trait CLMS_Settings_Render_Trait {
 					<td>
 						<input type="password" class="regular-text" id="whisper_api_key" name="whisper_api_key" value="<?php echo esc_attr( $whisper_key ); ?>" autocomplete="off">
 						<p class="description"><?php esc_html_e( 'Whisper requiere su propia API key en este campo. Sin esta key, la transcripción con Whisper permanecerá deshabilitada.', 'atora-lms' ); ?></p>
+					</td>
+				</tr>
+			</table>
+
+			<h3 style="margin-top:26px"><?php esc_html_e( 'Microsoft Teams (webhook)', 'atora-lms' ); ?></h3>
+			<table class="form-table" role="presentation">
+				<tr>
+					<th><?php esc_html_e( 'Activar', 'atora-lms' ); ?></th>
+					<td>
+						<label>
+							<input type="checkbox" name="clms_teams[enabled]" value="1" <?php checked( ! empty( $teams['enabled'] ) ); ?>>
+							<?php esc_html_e( 'Enviar alertas/notificaciones importantes a Teams', 'atora-lms' ); ?>
+						</label>
+					</td>
+				</tr>
+				<tr>
+					<th><label for="clms_teams_webhook"><?php esc_html_e( 'Webhook URL', 'atora-lms' ); ?></label></th>
+					<td>
+						<input type="url" class="large-text" id="clms_teams_webhook" name="clms_teams[webhook_url]" value="<?php echo esc_attr( (string) $teams['webhook_url'] ); ?>" placeholder="https://outlook.office.com/webhook/...">
+						<p class="description"><?php esc_html_e( 'Crea un Incoming Webhook en Teams y pega aquí la URL. Recomendado para coordinación y docentes.', 'atora-lms' ); ?></p>
+					</td>
+				</tr>
+				<tr>
+					<th><?php esc_html_e( 'Eventos a enviar', 'atora-lms' ); ?></th>
+					<td>
+						<?php $send_types = isset( $teams['send_types'] ) && is_array( $teams['send_types'] ) ? $teams['send_types'] : array(); ?>
+						<label style="display:block;margin:0 0 6px">
+							<input type="checkbox" name="clms_teams[send_types][]" value="early_warning" <?php checked( in_array( 'early_warning', $send_types, true ) ); ?>>
+							<?php esc_html_e( 'Alertas tempranas (entregas perdidas)', 'atora-lms' ); ?>
+						</label>
+						<label style="display:block;margin:0 0 6px">
+							<input type="checkbox" name="clms_teams[send_types][]" value="submission_created" <?php checked( in_array( 'submission_created', $send_types, true ) ); ?>>
+							<?php esc_html_e( 'Nueva entrega', 'atora-lms' ); ?>
+						</label>
+						<label style="display:block">
+							<input type="checkbox" name="clms_teams[send_types][]" value="submission_graded" <?php checked( in_array( 'submission_graded', $send_types, true ) ); ?>>
+							<?php esc_html_e( 'Entrega calificada', 'atora-lms' ); ?>
+						</label>
 					</td>
 				</tr>
 			</table>
@@ -852,6 +896,58 @@ trait CLMS_Settings_Render_Trait {
 				</td>
 			</tr>
 		</table>
+
+		<?php
+		$microsoft = get_option( self::OPTION_MICROSOFT, array() );
+		$microsoft = is_array( $microsoft ) ? $microsoft : array();
+		$ms_enabled = ! empty( $microsoft['enabled'] );
+		$ms_tenant  = sanitize_text_field( (string) ( $microsoft['tenant'] ?? 'common' ) );
+		$ms_client  = sanitize_text_field( (string) ( $microsoft['client_id'] ?? '' ) );
+		$ms_secret  = sanitize_text_field( (string) ( $microsoft['client_secret'] ?? '' ) );
+		$ms_domain  = sanitize_text_field( (string) ( $microsoft['allowed_domain'] ?? '' ) );
+		?>
+
+		<h3 style="margin-top:24px"><?php esc_html_e( 'Microsoft Entra (SSO)', 'atora-lms' ); ?></h3>
+		<table class="form-table" role="presentation">
+			<tr>
+				<th><?php esc_html_e( 'Activar', 'atora-lms' ); ?></th>
+				<td>
+					<label>
+						<input type="checkbox" name="microsoft_enabled" value="1" <?php checked( $ms_enabled, true ); ?>>
+						<?php esc_html_e( 'Habilitar inicio de sesión con Microsoft (Entra ID)', 'atora-lms' ); ?>
+					</label>
+				</td>
+			</tr>
+			<tr>
+				<th><label for="microsoft_tenant"><?php esc_html_e( 'Tenant', 'atora-lms' ); ?></label></th>
+				<td>
+					<input type="text" class="regular-text" id="microsoft_tenant" name="microsoft_tenant" value="<?php echo esc_attr( $ms_tenant ); ?>" placeholder="common">
+					<p class="description"><?php esc_html_e( 'Usa "common" para multi-tenant o coloca tu tenant ID/dominio para restringir.', 'atora-lms' ); ?></p>
+				</td>
+			</tr>
+			<tr>
+				<th><label for="microsoft_client_id"><?php esc_html_e( 'Client ID', 'atora-lms' ); ?></label></th>
+				<td><input type="text" class="regular-text" id="microsoft_client_id" name="microsoft_client_id" value="<?php echo esc_attr( $ms_client ); ?>"></td>
+			</tr>
+			<tr>
+				<th><label for="microsoft_client_secret"><?php esc_html_e( 'Client Secret', 'atora-lms' ); ?></label></th>
+				<td><input type="password" class="regular-text" autocomplete="off" id="microsoft_client_secret" name="microsoft_client_secret" value="<?php echo esc_attr( $ms_secret ); ?>"></td>
+			</tr>
+			<tr>
+				<th><label for="microsoft_allowed_domain"><?php esc_html_e( 'Dominio permitido (opcional)', 'atora-lms' ); ?></label></th>
+				<td>
+					<input type="text" class="regular-text" id="microsoft_allowed_domain" name="microsoft_allowed_domain" value="<?php echo esc_attr( $ms_domain ); ?>" placeholder="miinstitucion.edu">
+					<p class="description"><?php esc_html_e( 'Si se indica, solo se aceptan cuentas con email de ese dominio.', 'atora-lms' ); ?></p>
+				</td>
+			</tr>
+			<tr>
+				<th><?php esc_html_e( 'Redirect URI', 'atora-lms' ); ?></th>
+				<td>
+					<code><?php echo esc_html( rest_url( 'atora/v1/microsoft/oauth/callback' ) ); ?></code>
+				</td>
+			</tr>
+		</table>
+
 		<table class="form-table" role="presentation">
 			<tr>
 				<th><label for="enable_debug_log"><?php esc_html_e( 'Log de depuración', 'atora-lms' ); ?></label></th>

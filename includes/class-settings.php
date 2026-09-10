@@ -32,6 +32,8 @@ class CLMS_Settings {
 	const OPTION_EMAIL_ENGINE = 'atora_email_engine_options';
 	const OPTION_WHATSAPP     = 'atora_whatsapp_options';
 	const OPTION_TELEGRAM     = 'atora_telegram_options';
+	const OPTION_TEAMS        = 'atora_teams_options';
+	const OPTION_MICROSOFT    = 'atora_microsoft_options';
 	const PAGE_SLUG      = 'clms-settings';
 	const NONCE_ACTION   = 'clms_settings_save';
 

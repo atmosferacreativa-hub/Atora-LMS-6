@@ -356,6 +356,17 @@ class CLMS_Module_Registry {
 				'tables'              => array( 'atora_google_drive_files' ),
 				'core'                => false,
 			),
+			'microsoft'      => array(
+				'label'               => 'Microsoft',
+				'description'         => 'Entra SSO + Teams (webhook) + Outlook iCal por curso (MVP).',
+				'group'               => 'integrations',
+				'requires'            => array(),
+				'provides_pages'      => array(),
+				'provides_shortcodes' => array(),
+				'provides_rest'       => array( '/microsoft' ),
+				'tables'              => array(),
+				'core'                => false,
+			),
 			'mcp'            => array(
 				'label'               => 'MCP',
 				'description'         => 'API keys y servidor MCP para integraciones con agentes.',

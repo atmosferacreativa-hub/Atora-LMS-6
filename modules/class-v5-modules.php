@@ -135,6 +135,12 @@ class V5_Modules {
 		if ( self::module_active( 'google' ) ) {
 			self::load_google();
 		}
+
+		// Epic 7 (6.20.0): Microsoft (Entra SSO + Teams + Outlook iCal) —
+		// carga amplia por el botón de login (wp-login.php).
+		if ( self::module_active( 'microsoft' ) ) {
+			self::load_microsoft();
+		}
 	}
 
 	/**
@@ -163,6 +169,25 @@ class V5_Modules {
 		}
 		if ( class_exists( 'ATORA\Google\Google_Identity' ) ) {
 			\ATORA\Google\Google_Identity::init();
+		}
+	}
+
+	/** @return void */
+	private static function load_microsoft(): void {
+		$dir = ATORA_LMS_MODULES_DIR . 'microsoft/';
+		self::require_file( $dir . 'class-microsoft-module.php' );
+		self::require_file( $dir . 'class-microsoft-identity.php' );
+		self::require_file( $dir . 'class-microsoft-teams.php' );
+		self::require_file( $dir . 'class-microsoft-outlook.php' );
+
+		if ( class_exists( '\ATORA\Microsoft\Microsoft_Module' ) ) {
+			\ATORA\Microsoft\Microsoft_Module::init();
+		}
+		if ( class_exists( '\ATORA\Microsoft\Microsoft_Identity' ) ) {
+			\ATORA\Microsoft\Microsoft_Identity::init();
+		}
+		if ( class_exists( '\ATORA\Microsoft\Microsoft_Teams' ) ) {
+			\ATORA\Microsoft\Microsoft_Teams::init();
 		}
 	}
 
