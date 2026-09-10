@@ -2,7 +2,7 @@
 
 ATORA LMS es un sistema de gestión del aprendizaje modular para WordPress. Reúne creación de cursos y programas, matrículas, progreso, evaluación con rúbricas, SpeedGrade, certificados, seguimiento académico, clases en vivo, integraciones, mensajería y herramientas de crecimiento.
 
-> Estado (versión 6.20.0): sprint de estabilización pre-producción S0-S4 cerrado — bloqueantes de CI/loader, autorización y CSRF en Grupos, integridad de datos (transacciones, validación de override, migración segura), rendimiento de Alertas Tempranas (N×M→batch, timezone) e inyección de fórmulas CSV corregidos, cada uno con test automatizado ejecutado contra `composer test` (0 regresiones sobre 442 tests). **Pendiente antes de producción pública:** verificación manual en una instalación WordPress + MySQL real (onboarding, CRM, permalinks, creación de cursos) — toda la verificación de este sprint corrió contra PHPUnit con mocks, no contra WordPress en vivo.
+> Estado (versión 6.21.0): sprint de estabilización pre-producción S0-S5 cerrado — bloqueantes de CI/loader, autorización y CSRF en Grupos, integridad de datos (transacciones, validación de override, migración segura), rendimiento de Alertas Tempranas (N×M→batch, timezone) e inyección de fórmulas CSV corregidos, cada uno con test automatizado ejecutado contra `composer test` (0 regresiones sobre 442 tests). **Pendiente antes de producción pública:** verificación manual en una instalación WordPress + MySQL real (onboarding, CRM, permalinks, creación de cursos) — toda la verificación de este sprint corrió contra PHPUnit con mocks, no contra WordPress en vivo.
 
 ## Requisitos
 

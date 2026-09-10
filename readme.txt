@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 6.20.0
+Stable tag: 6.21.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,18 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.21.0 =
+* Sprint de estabilización pre-producción (S0-S5): bloqueantes de CI/loader, autorización y CSRF en Grupos, integridad de datos y rendimiento de Alertas Tempranas, saneamiento de exports CSV, y ampliación de la suite de tests automatizados.
+* CI: la versión del smoke test y del ZIP de distribución ahora se resuelve dinámicamente desde `atora_lms.php` en vez de estar hardcodeada.
+* Loader: corregido un fallo de activación de `CLMS_Student_Assistant` cuando el módulo de IA está desactivado.
+* Grupos: los handlers de crear/guardar miembros/autogenerar/exportar ahora verifican gestión real del curso (no solo `edit_posts`); exportación exige nonce; `guardar miembros` valida que el grupo pertenezca al curso del request.
+* Grupos: `set_members_with_options()` es transaccional (rollback ante fallo parcial); `set_override()` valida que el estudiante sea miembro del grupo y que la lección pertenezca a su curso.
+* H5P: ownership por-ítem en la API REST de contenido (leer/editar/borrar), listado filtrado por autor salvo administradores.
+* Alertas tempranas: el escaneo de entregas perdidas pasa de N consultas por estudiante×lección a una sola consulta por curso; las fechas límite respetan el huso horario configurado en WordPress en vez del huso del servidor.
+* Exportaciones CSV (grupos, alertas) saneadas contra inyección de fórmulas.
+* Migración de base de datos: ya no se marca como completa si faltan tablas esperadas tras `dbDelta()`.
+* Suite de tests: bootstrap de PHPUnit reparado y ampliado con cobertura nueva para Grupos, Alertas Tempranas, H5P, Rúbricas, Coevaluación, Portfolios, Classroom y Microsoft.
+
 = 6.20.0 =
 * Epic 7 (Microsoft): SSO con Entra ID (vincular/desvincular cuenta), webhooks de Teams y suscripción iCal de Outlook por curso (token de acceso scoped por curso, sin exponer datos de otros cursos).
 
