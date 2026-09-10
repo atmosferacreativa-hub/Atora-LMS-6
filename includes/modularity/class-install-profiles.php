@@ -55,8 +55,10 @@ class CLMS_Install_Profiles {
 	 * @return array<string,array{label:string,description:string,modules:string[]}>
 	 */
 	public static function get_profiles(): array {
-		$all         = array_keys( CLMS_Module_Registry::get_modules() );
-		$docente     = self::DOCENTE_BASE;
+		$modules     = CLMS_Module_Registry::get_modules();
+		$all         = array_keys( $modules );
+		$core        = array_keys( array_filter( $modules, static fn( $module ) => ! empty( $module['core'] ) ) );
+		$docente     = array_values( array_unique( array_merge( $core, self::DOCENTE_BASE ) ) );
 		$institucion = array_values( array_unique( array_merge( $docente, self::INSTITUCION_EXTRA ) ) );
 		$creadores   = array_values( array_unique( array_merge( $institucion, self::CREADORES_EXTRA ) ) );
 
