@@ -20,6 +20,21 @@ final class Early_Warning_Service {
 	}
 
 	/**
+	 * Scan a single course (helper for admin actions / REST).
+	 *
+	 * @param int  $course_id
+	 * @param bool $notify
+	 * @return void
+	 */
+	public function scan_course( int $course_id, bool $notify = true ): void {
+		$course_id = absint( $course_id );
+		if ( ! $course_id ) {
+			return;
+		}
+		$this->scan_course_missed_submissions( $course_id, $notify );
+	}
+
+	/**
 	 * Daily scan across published courses (MVP: minimal).
 	 *
 	 * @return void
@@ -42,31 +57,77 @@ final class Early_Warning_Service {
 		}
 	}
 
-	public function list_course_warnings( int $course_id ): array {
+	/**
+	 * List warnings for a course.
+	 *
+	 * @param int         $course_id
+	 * @param string|null $status 'open'|'closed'|'resolved' or null for any.
+	 * @return array<int,array<string,mixed>>
+	 */
+	public function list_course_warnings( int $course_id, ?string $status = 'open' ): array {
 		global $wpdb;
 		$course_id = absint( $course_id );
 		if ( ! $course_id ) {
 			return array();
 		}
 
-		$rows = $wpdb->get_results( $wpdb->prepare(
-			"SELECT user_id, warning_type, data, severity, status, created_at, updated_at
+		$where = "course_id = %d";
+		$args  = array( $course_id );
+		if ( null !== $status && '' !== trim( (string) $status ) ) {
+			$where .= ' AND status = %s';
+			$args[] = sanitize_key( (string) $status );
+		}
+
+		$sql = $wpdb->prepare(
+			"SELECT user_id, warning_type, data, severity, status, last_notified_at, created_at, updated_at
 			 FROM {$this->table()}
-			 WHERE course_id = %d AND status = 'open'
+			 WHERE {$where}
 			 ORDER BY severity DESC, updated_at DESC
 			 LIMIT 500",
-			$course_id
-		), ARRAY_A );
+			$args
+		);
+
+		$rows = $wpdb->get_results( $sql, ARRAY_A );
 
 		$rows = is_array( $rows ) ? $rows : array();
 		foreach ( $rows as &$row ) {
 			$row['user_id'] = absint( $row['user_id'] ?? 0 );
 			$row['course_id'] = $course_id;
 			$row['data'] = $row['data'] ? json_decode( (string) $row['data'], true ) : array();
+
+			$u = $row['user_id'] ? get_userdata( $row['user_id'] ) : null;
+			$row['student_name']  = $u ? (string) ( $u->display_name ?? '' ) : '';
+			$row['student_email'] = $u ? (string) ( $u->user_email ?? '' ) : '';
 		}
 		unset( $row );
 
 		return $rows;
+	}
+
+	/**
+	 * Resolve/dismiss a warning (teacher acknowledged).
+	 *
+	 * @param int    $course_id
+	 * @param int    $user_id
+	 * @param string $type
+	 * @return bool
+	 */
+	public function resolve_warning( int $course_id, int $user_id, string $type ): bool {
+		global $wpdb;
+		$course_id = absint( $course_id );
+		$user_id   = absint( $user_id );
+		$type      = sanitize_key( $type );
+		if ( ! $course_id || ! $user_id || '' === $type ) {
+			return false;
+		}
+
+		$updated = $wpdb->update(
+			$this->table(),
+			array( 'status' => 'resolved', 'updated_at' => current_time( 'mysql' ) ),
+			array( 'course_id' => $course_id, 'user_id' => $user_id, 'warning_type' => $type, 'status' => 'open' )
+		);
+
+		return false !== $updated;
 	}
 
 	/**
