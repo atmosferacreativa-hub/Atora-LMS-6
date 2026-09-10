@@ -132,6 +132,16 @@ trait CLMS_Loader_Module_Groups_Trait {
 					'dependencies' => array(),
 				),
 				array(
+					'file'         => 'includes/gradebook/class-institutional-gradebook-policy.php',
+					'class'        => 'CLMS_Institutional_Gradebook_Policy',
+					'dependencies' => array(),
+				),
+				array(
+					'file'         => 'includes/gradebook/class-institutional-gradebook-service.php',
+					'class'        => 'CLMS_Institutional_Gradebook_Service',
+					'dependencies' => array( 'CLMS_Institutional_Gradebook_Policy' ),
+				),
+				array(
 					'file'         => 'includes/gradebook/class-gradebook-audit-service.php',
 					'class'        => 'CLMS_Gradebook_Audit_Service',
 					'dependencies' => array( 'CLMS_Academic_Status_Map', 'CLMS_Gradebook_Bridge_Service' ),
