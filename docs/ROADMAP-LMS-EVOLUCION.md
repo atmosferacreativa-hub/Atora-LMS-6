@@ -197,7 +197,7 @@ Evolucionar ATORA LMS en ciclos continuos, priorizando (1) evaluación colaborat
 - [x] UI docente: vista en panel admin + feedback + evaluación con rúbrica (override final).
 - [x] Permisos: visibilidad y control de acceso (incluye endpoint público de solo lectura).
 - [x] Export: ZIP (incluye HTML imprimible para guardar como PDF) para acreditación.
-- [~] QA: privacidad y compatibilidad con cambios de matrícula (pendiente hardening + caching).
+- [x] QA: privacidad y compatibilidad con cambios de matrícula (hardening + caching por request).
 
 **Dependencias**
 - Epic 2 (rúbricas v2) si se evaluará portafolio con nuevas escalas/pesos.

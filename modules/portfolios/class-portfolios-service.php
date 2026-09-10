@@ -14,6 +14,18 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 final class Portfolios_Service {
 
+	/** @var array<int,array> Cache por request (portfolio_id => row). */
+	private static array $portfolio_cache = array();
+
+	/** @var array<int,array> Cache por request (portfolio_id => items[]). */
+	private static array $items_cache = array();
+
+	/** @var array<string,array> Cache por request ("{portfolio_id}:{limit}" => feedback[]). */
+	private static array $feedback_cache = array();
+
+	/** @var array<int,array> Cache por request (portfolio_id => assessment row). */
+	private static array $final_assessment_cache = array();
+
 	private function table_portfolios(): string {
 		global $wpdb;
 		return $wpdb->prefix . 'atora_portfolios';
@@ -80,6 +92,10 @@ final class Portfolios_Service {
 			return array();
 		}
 
+		if ( isset( self::$portfolio_cache[ $portfolio_id ] ) ) {
+			return self::$portfolio_cache[ $portfolio_id ];
+		}
+
 		$row = $wpdb->get_row(
 			$wpdb->prepare(
 				"SELECT id, course_id, user_id, title, visibility, public_slug, created_at, updated_at
@@ -91,7 +107,9 @@ final class Portfolios_Service {
 			ARRAY_A
 		);
 
-		return is_array( $row ) ? $row : array();
+		$row = is_array( $row ) ? $row : array();
+		self::$portfolio_cache[ $portfolio_id ] = $row;
+		return $row;
 	}
 
 	public function get_or_create_portfolio( int $course_id, int $user_id ): array {
@@ -115,6 +133,7 @@ final class Portfolios_Service {
 			ARRAY_A
 		);
 		if ( is_array( $existing ) && ! empty( $existing['id'] ) ) {
+			self::$portfolio_cache[ absint( $existing['id'] ) ] = $existing;
 			return $existing;
 		}
 
@@ -181,6 +200,7 @@ final class Portfolios_Service {
 		}
 
 		$ok = false !== $wpdb->update( $this->table_portfolios(), $updates, array( 'id' => $portfolio_id ) );
+		unset( self::$portfolio_cache[ $portfolio_id ] );
 		return (bool) $ok;
 	}
 
@@ -262,6 +282,10 @@ final class Portfolios_Service {
 			return array();
 		}
 
+		if ( isset( self::$items_cache[ $portfolio_id ] ) ) {
+			return self::$items_cache[ $portfolio_id ];
+		}
+
 		$sql = $wpdb->prepare(
 			"SELECT id, portfolio_id, submission_id, lesson_id, position, title_override, reflection, tags_json, created_at, updated_at
 			 FROM {$this->table_items()}
@@ -292,6 +316,7 @@ final class Portfolios_Service {
 		}
 		unset( $row );
 
+		self::$items_cache[ $portfolio_id ] = $rows;
 		return $rows;
 	}
 
@@ -301,6 +326,10 @@ final class Portfolios_Service {
 		$portfolio_id = absint( $portfolio_id );
 		if ( ! $portfolio_id ) {
 			return array();
+		}
+
+		if ( isset( self::$final_assessment_cache[ $portfolio_id ] ) ) {
+			return self::$final_assessment_cache[ $portfolio_id ];
 		}
 
 		$table = $this->table_assessments();
@@ -340,6 +369,7 @@ final class Portfolios_Service {
 		$assessor = $row['assessed_by'] ? get_userdata( $row['assessed_by'] ) : null;
 		$row['assessed_by_name'] = $assessor ? (string) ( $assessor->display_name ? $assessor->display_name : $assessor->user_login ) : '';
 
+		self::$final_assessment_cache[ $portfolio_id ] = $row;
 		return $row;
 	}
 
@@ -418,9 +448,10 @@ final class Portfolios_Service {
 				'scores_json'    => wp_json_encode( $normalized ),
 				'comment'        => $comment,
 				'created_at'     => current_time( 'mysql' ),
-			)
-		);
+				)
+			);
 
+		unset( self::$final_assessment_cache[ $portfolio_id ] );
 		return $this->get_final_assessment( $portfolio_id );
 	}
 
@@ -478,6 +509,7 @@ final class Portfolios_Service {
 
 		if ( $id ) {
 			$this->touch_portfolio( $portfolio_id );
+			unset( self::$items_cache[ $portfolio_id ] );
 		}
 
 		return $id ? $this->get_item( $id ) : array();
@@ -553,7 +585,15 @@ final class Portfolios_Service {
 
 		$ok = false !== $wpdb->update( $this->table_items(), $updates, array( 'id' => $item_id ) );
 		if ( $ok ) {
-			$this->touch_portfolio( absint( $item['portfolio_id'] ?? 0 ) );
+			$pid = absint( $item['portfolio_id'] ?? 0 );
+			$this->touch_portfolio( $pid );
+			if ( $pid ) {
+				unset( self::$items_cache[ $pid ] );
+				unset( self::$feedback_cache[ $pid . ':100' ] );
+				unset( self::$feedback_cache[ $pid . ':200' ] );
+				unset( self::$feedback_cache[ $pid . ':500' ] );
+				unset( self::$final_assessment_cache[ $pid ] );
+			}
 		}
 		return (bool) $ok;
 	}
@@ -572,7 +612,15 @@ final class Portfolios_Service {
 
 		$ok = false !== $wpdb->delete( $this->table_items(), array( 'id' => $item_id ) );
 		if ( $ok ) {
-			$this->touch_portfolio( absint( $item['portfolio_id'] ?? 0 ) );
+			$pid = absint( $item['portfolio_id'] ?? 0 );
+			$this->touch_portfolio( $pid );
+			if ( $pid ) {
+				unset( self::$items_cache[ $pid ] );
+				unset( self::$feedback_cache[ $pid . ':100' ] );
+				unset( self::$feedback_cache[ $pid . ':200' ] );
+				unset( self::$feedback_cache[ $pid . ':500' ] );
+				unset( self::$final_assessment_cache[ $pid ] );
+			}
 		}
 		return (bool) $ok;
 	}
@@ -604,6 +652,11 @@ final class Portfolios_Service {
 		}
 
 		$this->touch_portfolio( $portfolio_id );
+		unset( self::$items_cache[ $portfolio_id ] );
+		unset( self::$feedback_cache[ $portfolio_id . ':100' ] );
+		unset( self::$feedback_cache[ $portfolio_id . ':200' ] );
+		unset( self::$feedback_cache[ $portfolio_id . ':500' ] );
+		unset( self::$final_assessment_cache[ $portfolio_id ] );
 		return true;
 	}
 
@@ -619,6 +672,7 @@ final class Portfolios_Service {
 			array( 'updated_at' => current_time( 'mysql' ) ),
 			array( 'id' => $portfolio_id )
 		);
+		unset( self::$portfolio_cache[ $portfolio_id ] );
 	}
 
 	public function add_feedback( int $portfolio_id, int $author_id, string $comment, ?int $item_id = null, string $author_role = 'teacher' ): array {
@@ -650,6 +704,9 @@ final class Portfolios_Service {
 
 		if ( $id ) {
 			$this->touch_portfolio( $portfolio_id );
+			unset( self::$feedback_cache[ $portfolio_id . ':100' ] );
+			unset( self::$feedback_cache[ $portfolio_id . ':200' ] );
+			unset( self::$feedback_cache[ $portfolio_id . ':500' ] );
 		}
 
 		return $id ? $this->get_feedback( $id ) : array();
@@ -700,6 +757,11 @@ final class Portfolios_Service {
 			return array();
 		}
 
+		$cache_key = $portfolio_id . ':' . $limit;
+		if ( isset( self::$feedback_cache[ $cache_key ] ) ) {
+			return self::$feedback_cache[ $cache_key ];
+		}
+
 		$sql = $wpdb->prepare(
 			"SELECT id, portfolio_id, item_id, author_id, author_role, comment, created_at
 			 FROM {$this->table_feedback()}
@@ -718,6 +780,7 @@ final class Portfolios_Service {
 			$out[] = $this->get_feedback( absint( $row['id'] ?? 0 ) );
 		}
 
+		self::$feedback_cache[ $cache_key ] = $out;
 		return $out;
 	}
 

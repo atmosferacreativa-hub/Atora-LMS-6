@@ -402,25 +402,52 @@ final class Portfolios_Module {
 			$course_id = absint( wp_unslash( $_GET['course_id'] ) );
 		}
 
-		$courses = class_exists( '\ATORA\LMS\LMS_Compatibility_Layer' )
-			? (array) \ATORA\LMS\LMS_Compatibility_Layer::get_enrolled_courses( $user_id )
-			: ( class_exists( '\CLMS_Helper' ) && method_exists( '\CLMS_Helper', 'get_user_enrolled_courses' ) ? (array) \CLMS_Helper::get_user_enrolled_courses( $user_id ) : array() );
-		$courses = array_values( array_filter( array_map( 'absint', (array) $courses ) ) );
+			$enrolled = class_exists( '\ATORA\LMS\LMS_Compatibility_Layer' )
+				? (array) \ATORA\LMS\LMS_Compatibility_Layer::get_enrolled_courses( $user_id )
+				: ( class_exists( '\CLMS_Helper' ) && method_exists( '\CLMS_Helper', 'get_user_enrolled_courses' ) ? (array) \CLMS_Helper::get_user_enrolled_courses( $user_id ) : array() );
+			$enrolled = array_values( array_filter( array_map( 'absint', (array) $enrolled ) ) );
 
-		if ( empty( $courses ) ) {
-			return '<p class="atora-notice">' . esc_html__( 'No estás inscrito en cursos.', 'atora-lms' ) . '</p>';
-		}
+			// QA hardening: si cambió la matrícula, permitir ver/editar portafolios ya creados (solo del owner).
+			$my_portfolios = $service->list_my_portfolios( $user_id );
+			$portfolio_courses = array_values(
+				array_filter(
+					array_map(
+						static fn( $p ) => absint( is_array( $p ) ? ( $p['course_id'] ?? 0 ) : 0 ),
+						(array) $my_portfolios
+					)
+				)
+			);
+
+			$courses = array_values( array_unique( array_merge( $enrolled, $portfolio_courses ) ) );
+			$courses = array_values(
+				array_filter(
+					$courses,
+					static fn( $cid ) => $cid && 'lm_course' === get_post_type( $cid )
+				)
+			);
+
+			if ( empty( $courses ) ) {
+				return '<p class="atora-notice">' . esc_html__( 'No tienes cursos disponibles.', 'atora-lms' ) . '</p>';
+			}
 
 		if ( ! $course_id ) {
 			$course_id = absint( $courses[0] ?? 0 );
 		}
-		if ( ! in_array( $course_id, $courses, true ) ) {
-			return '<p class="atora-notice">' . esc_html__( 'No tienes acceso a este curso.', 'atora-lms' ) . '</p>';
-		}
+			if ( ! in_array( $course_id, $courses, true ) ) {
+				return '<p class="atora-notice">' . esc_html__( 'No tienes acceso a este curso.', 'atora-lms' ) . '</p>';
+			}
 
-		$portfolio = $service->get_or_create_portfolio( $course_id, $user_id );
-		$portfolio_id = absint( $portfolio['id'] ?? 0 );
-		$items = $portfolio_id ? $service->list_items( $portfolio_id ) : array();
+			$existing = $service->list_my_portfolios( $user_id, $course_id );
+			$portfolio = ! empty( $existing[0] ) && is_array( $existing[0] ) ? (array) $existing[0] : array();
+			if ( empty( $portfolio ) ) {
+				if ( in_array( $course_id, $enrolled, true ) ) {
+					$portfolio = $service->get_or_create_portfolio( $course_id, $user_id );
+				} else {
+					return '<p class="atora-notice">' . esc_html__( 'Ya no estás inscrito en este curso y no existe un portafolio previo.', 'atora-lms' ) . '</p>';
+				}
+			}
+			$portfolio_id = absint( $portfolio['id'] ?? 0 );
+			$items = $portfolio_id ? $service->list_items( $portfolio_id ) : array();
 
 		$public_slug = sanitize_text_field( (string) ( $portfolio['public_slug'] ?? '' ) );
 		$public_url  = $public_slug ? rest_url( 'atora/v1/portfolios/public/' . rawurlencode( $public_slug ) ) : '';
@@ -430,19 +457,25 @@ final class Portfolios_Module {
 		<div class="atora-portfolio" style="max-width: 980px; margin: 0 auto;">
 			<h2 style="margin:0 0 12px 0;"><?php echo esc_html__( 'Mi portafolio', 'atora-lms' ); ?></h2>
 
-			<form method="get" style="margin: 0 0 16px 0;">
-				<label><strong><?php esc_html_e( 'Curso', 'atora-lms' ); ?></strong></label><br>
-				<select name="course_id" style="min-width: 280px;">
-					<?php foreach ( $courses as $cid ) : ?>
-						<option value="<?php echo esc_attr( (string) $cid ); ?>" <?php selected( $course_id, $cid ); ?>>
-							<?php echo esc_html( get_the_title( $cid ) ? get_the_title( $cid ) : ( '#' . $cid ) ); ?>
-						</option>
-					<?php endforeach; ?>
-				</select>
-				<button type="submit" class="atora-btn atora-btn-secondary" style="margin-left: 8px;"><?php esc_html_e( 'Cargar', 'atora-lms' ); ?></button>
-			</form>
+				<form method="get" style="margin: 0 0 16px 0;">
+					<label><strong><?php esc_html_e( 'Curso', 'atora-lms' ); ?></strong></label><br>
+					<select name="course_id" style="min-width: 280px;">
+						<?php foreach ( $courses as $cid ) : ?>
+							<option value="<?php echo esc_attr( (string) $cid ); ?>" <?php selected( $course_id, $cid ); ?>>
+								<?php echo esc_html( get_the_title( $cid ) ? get_the_title( $cid ) : ( '#' . $cid ) ); ?>
+							</option>
+						<?php endforeach; ?>
+					</select>
+					<button type="submit" class="atora-btn atora-btn-secondary" style="margin-left: 8px;"><?php esc_html_e( 'Cargar', 'atora-lms' ); ?></button>
+				</form>
 
-			<div style="margin:0 0 18px 0;">
+				<?php if ( ! in_array( $course_id, $enrolled, true ) ) : ?>
+					<div class="atora-notice" style="margin:0 0 16px 0;">
+						<?php esc_html_e( 'Nota: ya no estás inscrito en este curso, pero tu portafolio previo sigue disponible para consulta/edición.', 'atora-lms' ); ?>
+					</div>
+				<?php endif; ?>
+
+				<div style="margin:0 0 18px 0;">
 				<?php if ( $portfolio_id && class_exists( '\\ZipArchive' ) ) : ?>
 					<?php
 					$export_url = wp_nonce_url(
