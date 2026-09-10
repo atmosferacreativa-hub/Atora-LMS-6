@@ -2,7 +2,7 @@
 
 ATORA LMS es un sistema de gestión del aprendizaje modular para WordPress. Reúne creación de cursos y programas, matrículas, progreso, evaluación con rúbricas, SpeedGrade, certificados, seguimiento académico, clases en vivo, integraciones, mensajería y herramientas de crecimiento.
 
-> Estado: beta técnica interna. La versión 6.13.3 debe completar pruebas dinámicas y funcionales antes de utilizarse en producción pública.
+> Estado: beta técnica interna. La versión 6.14.0 debe completar pruebas dinámicas y funcionales antes de utilizarse en producción pública.
 
 ## Requisitos
 

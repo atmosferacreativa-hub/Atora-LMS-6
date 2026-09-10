@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 6.13.3
+Stable tag: 6.14.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,11 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.14.0 =
+* Added Group Assessment (work in groups): course-level group management, group submissions, grade propagation to all members, per-student overrides, and CSV export.
+* Improved Rubrics: per-criterion weights (auto-normalized), configurable scales (0–4, 0–5, 0–20, 0–100, A–F), holistic flag, and exemplars/benchmarks per level. Added shared rubric presets.
+* Added Early Warning (MVP): detects missed submissions and sends internal notifications to teachers; includes REST endpoint for course warnings.
+
 = 6.13.3 =
 * Fixed Zoom attendance for students whose connection drops and reconnects mid-class — previously each reconnection was scored separately against the full class duration, so a student present the whole class could be marked "partial" instead of "present." Attendance is now aggregated per person before scoring, and duration is summed instead of overwritten by the last reconnection.
 * Version housekeeping: the plugin version constant, header, and changelog now match the actual release history (they had been stuck at 6.11.0 since 6.12.0). This constant also gates cache-busting for enqueued scripts/styles and the data sent to the licensing server, so keeping it accurate matters beyond cosmetics.
