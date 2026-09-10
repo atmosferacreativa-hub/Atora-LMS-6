@@ -66,9 +66,8 @@ jobs:
           retention-days: 7
 
   unit-tests:
-    name: PHPUnit legacy suite (diagnostic)
+    name: PHPUnit full suite (file-isolated)
     runs-on: ubuntu-latest
-    continue-on-error: true
 
     steps:
       - name: Check out source
@@ -84,13 +83,37 @@ jobs:
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
 
-      - name: Run complete PHPUnit suite
-        run: composer test
+      - name: Run PHPUnit suite with file isolation
+        run: bash scripts/run-phpunit-files.sh
 
-      - name: Record diagnostic status
-        if: failure()
+
+  lms-migrator-tests:
+    name: LMS migrator and F4 gate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.1"
+          coverage: none
+          tools: composer:v2
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Run blocking migrator tests
         run: |
-          echo "::warning::The inherited PHPUnit suite has known bootstrap and isolation debt. Blocking syntax and dynamic WordPress smoke checks still run independently."
+          vendor/bin/phpunit \
+            tests/LMS/ReadRouterTest.php \
+            tests/LMS/EnrollmentServiceReadersTest.php \
+            tests/LMS/CutoverReadyGateTest.php \
+            tests/LMS/MigrationWindowDiscrepancyTest.php \
+            tests/LMS/TelegramLinksMigrationTest.php
+
 
   wordpress-smoke:
     name: WordPress ${{ matrix.wordpress }} / PHP 8.1

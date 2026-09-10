@@ -85,6 +85,14 @@ class FormsThrottleTest extends TestCase {
 
 	protected function setUp(): void {
 		parent::setUp();
+		\Brain\Monkey\Functions\when( 'apply_filters' )->alias(
+			static function( string $hook, $value, ...$args ) {
+				foreach ( $GLOBALS['__atora_test_filters'][ $hook ] ?? array() as $entry ) {
+					$value = call_user_func( $entry['cb'], $value, ...$args );
+				}
+				return $value;
+			}
+		);
 		atora_test_reset_post_meta();
 		atora_test_reset_filters();
 		$_SERVER['REMOTE_ADDR'] = '203.0.113.10';
@@ -210,7 +218,7 @@ class FormsThrottleTest extends TestCase {
 		// defecto ("PRIVATE IP ≠ TRUSTED PROXY") — se configura
 		// explícitamente para este test, igual que tendría que hacerlo
 		// un sitio real detrás de un proxy en una IP privada.
-		add_filter( 'atora_client_ip_trusted_proxies', static function () { return array( '10.0.0.5' ); } );
+		$GLOBALS['__atora_test_filters']['atora_client_ip_trusted_proxies'][] = array( 'cb' => static function () { return array( '10.0.0.5' ); } );
 
 		$_SERVER['REMOTE_ADDR']         = '10.0.0.5'; // proxy explícitamente confiable para este test.
 		$_SERVER['HTTP_X_FORWARDED_FOR'] = '198.51.100.77';

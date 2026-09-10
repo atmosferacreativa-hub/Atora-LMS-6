@@ -1,6 +1,6 @@
 <?php
 /**
- * PHPUnit Bootstrap — ATORA LMS v6.0.0
+ * PHPUnit Bootstrap — ATORA LMS v6.21.0
  *
  * Usa Brain\Monkey para mockear funciones de WordPress sin necesitar
  * una instalación completa. Compatible con PHPUnit 10+ y PHP 8.1+.
@@ -27,7 +27,7 @@ require_once $autoload;
 
 // Definir constantes WP mínimas
 if ( ! defined( 'ABSPATH' ) )         { define( 'ABSPATH', '/tmp/wp/' ); }
-if ( ! defined( 'ATORA_LMS_VERSION' ) ) { define( 'ATORA_LMS_VERSION', '6.0.0' ); }
+if ( ! defined( 'ATORA_LMS_VERSION' ) ) { define( 'ATORA_LMS_VERSION', '6.21.0' ); }
 if ( ! defined( 'DAY_IN_SECONDS' ) )  { define( 'DAY_IN_SECONDS', 86400 ); }
 if ( ! defined( 'HOUR_IN_SECONDS' ) ) { define( 'HOUR_IN_SECONDS', 3600 ); }
 if ( ! defined( 'MINUTE_IN_SECONDS' ) ) { define( 'MINUTE_IN_SECONDS', 60 ); }
@@ -98,7 +98,19 @@ if ( ! function_exists( 'wp_generate_uuid4' ) ) {
 	}
 }
 if ( ! function_exists( 'do_action' ) )        { function do_action( string $hook, ...$args ): void {} }
-if ( ! function_exists( 'clms_core' ) )        { function clms_core( string $service ) { return null; } }
+if ( ! function_exists( 'clms_core' ) ) {
+	function clms_core( string $service ) {
+		static $instances = array();
+		if ( isset( $instances[ $service ] ) ) {
+			return $instances[ $service ];
+		}
+		if ( class_exists( $service ) ) {
+			$instances[ $service ] = new $service();
+			return $instances[ $service ];
+		}
+		return null;
+	}
+}
 if ( ! function_exists( 'wp_timezone' ) ) {
 	function wp_timezone(): \DateTimeZone {
 		return new \DateTimeZone( $GLOBALS['__atora_test_timezone'] ?? 'UTC' );
@@ -145,6 +157,38 @@ if ( ! function_exists( 'update_option' ) )    {
 }
 if ( ! function_exists( 'atora_test_reset_options' ) ) {
 	function atora_test_reset_options(): void { $GLOBALS['__atora_test_options'] = array(); }
+}
+if ( ! function_exists( 'delete_option' ) ) {
+	function delete_option( string $k ): bool {
+		$exists = array_key_exists( $k, $GLOBALS['__atora_test_options'] );
+		unset( $GLOBALS['__atora_test_options'][ $k ] );
+		return $exists;
+	}
+}
+if ( ! function_exists( 'wp_parse_args' ) ) {
+	function wp_parse_args( $args, array $defaults = array() ): array {
+		if ( is_object( $args ) ) {
+			$args = get_object_vars( $args );
+		} elseif ( is_string( $args ) ) {
+			parse_str( $args, $args );
+		}
+		return array_merge( $defaults, is_array( $args ) ? $args : array() );
+	}
+}
+if ( ! function_exists( 'wp_list_pluck' ) ) {
+	function wp_list_pluck( array $list, $field, $index_key = null ): array {
+		$result = array();
+		foreach ( $list as $item ) {
+			$value = is_array( $item ) ? ( $item[ $field ] ?? null ) : ( $item->{$field} ?? null );
+			if ( null === $index_key ) {
+				$result[] = $value;
+				continue;
+			}
+			$key = is_array( $item ) ? ( $item[ $index_key ] ?? null ) : ( $item->{$index_key} ?? null );
+			$result[ $key ] = $value;
+		}
+		return $result;
+	}
 }
 $GLOBALS['__atora_test_user_meta'] = array();
 if ( ! function_exists( 'get_user_meta' ) )    {
@@ -462,6 +506,11 @@ if ( ! function_exists( 'atora_test_reset_transients' ) ) {
 if ( ! function_exists( 'wp_cache_get' ) )     { function wp_cache_get( string $k, string $g = '' ) { return false; } }
 if ( ! function_exists( 'wp_cache_set' ) )     { function wp_cache_set( string $k, $v, string $g = '', int $ttl = 0 ): bool { return true; } }
 if ( ! function_exists( 'wp_cache_delete' ) )  { function wp_cache_delete( string $k, string $g = '' ): bool { return true; } }
+if ( ! function_exists( 'get_bloginfo' ) ) {
+	function get_bloginfo( string $show = '', string $filter = 'raw' ): string {
+		return 'name' === $show ? 'ATORA Test' : '';
+	}
+}
 if ( ! function_exists( 'number_format_i18n' ) ) { function number_format_i18n( $n, int $dec = 0 ): string { return number_format( (float) $n, $dec ); } }
 if ( ! function_exists( '__' ) )               { function __( string $s, string $d = '' ): string { return $s; } }
 if ( ! function_exists( 'esc_html' ) )         { function esc_html( string $s ): string { return htmlspecialchars( $s, ENT_QUOTES ); } }
@@ -560,11 +609,17 @@ if ( ! function_exists( 'add_filter' ) ) {
 	}
 }
 
+$contacts_core_file = __DIR__ . '/../includes/contacts-core/class-contacts-core-service.php';
+if ( file_exists( $contacts_core_file ) ) {
+	require_once $contacts_core_file;
+}
+
 // Cargar servicios bajo test
 $services_dir = __DIR__ . '/../modules/crm-v2/services/';
 foreach ( array(
 	'class-db-service.php',
 	'class-contact-service.php',
+	'class-activity-service.php',
 	'class-scoring-service.php',
 	'class-company-service.php',
 	'class-list-service.php',

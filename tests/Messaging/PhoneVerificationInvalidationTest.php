@@ -100,7 +100,7 @@ class PhoneVerificationInvalidationTest extends TestCase {
 		update_user_meta(
 			$user_id,
 			\ATORA\Messaging\Preferences::META_PHONE_VERIFIED_HASH,
-			wp_hash( preg_replace( '/\D+/', '', $phone ) )
+			wp_hash( ( 0 === strpos( $phone, '+' ) ? '+' : '' ) . preg_replace( '/\\D+/', '', $phone ) )
 		);
 	}
 

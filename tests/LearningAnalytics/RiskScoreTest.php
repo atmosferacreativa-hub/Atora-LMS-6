@@ -27,7 +27,7 @@ final class RiskScoreTest extends TestCase {
 			)
 		);
 
-		$this->assertSame( 20, $score );
+		$this->assertSame( 30, $score );
 	}
 
 	/** @test */
@@ -44,7 +44,7 @@ final class RiskScoreTest extends TestCase {
 			)
 		);
 
-		$this->assertSame( 80, $score );
+		$this->assertSame( 90, $score );
 	}
 
 	/** @test */

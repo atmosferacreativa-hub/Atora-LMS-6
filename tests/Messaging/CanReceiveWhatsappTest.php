@@ -44,6 +44,7 @@ class CanReceiveWhatsappTest extends TestCase {
 		update_user_meta( $user_id, 'atora_consent_whatsapp', 1 );
 		update_user_meta( $user_id, 'atora_phone', '+58 412 1234567' );
 		update_user_meta( $user_id, 'atora_phone_verified', 1 );
+		update_user_meta( $user_id, \ATORA\Messaging\Preferences::META_PHONE_VERIFIED_HASH, wp_hash( '+584121234567' ) );
 	}
 
 	/** @test */

@@ -152,6 +152,7 @@ class PreferencesTest extends TestCase {
 		update_user_meta( 3, 'atora_consent_whatsapp', true );
 		update_user_meta( 3, 'atora_phone', '+584121234567' );
 		update_user_meta( 3, \ATORA\Messaging\Preferences::META_PHONE_VERIFIED, true );
+		update_user_meta( 3, \ATORA\Messaging\Preferences::META_PHONE_VERIFIED_HASH, wp_hash( '+584121234567' ) );
 
 		$this->assertTrue( \ATORA\Messaging\Preferences::is_whatsapp_active( 3 ) );
 	}

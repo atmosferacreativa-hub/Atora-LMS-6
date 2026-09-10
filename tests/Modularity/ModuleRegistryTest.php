@@ -15,6 +15,14 @@ class ModuleRegistryTest extends TestCase {
 
 	protected function setUp(): void {
 		parent::setUp();
+		\Brain\Monkey\Functions\when( 'apply_filters' )->alias(
+			static function( string $hook, $value, ...$args ) {
+				foreach ( $GLOBALS['__atora_test_filters'][ $hook ] ?? array() as $entry ) {
+					$value = call_user_func( $entry['cb'], $value, ...$args );
+				}
+				return $value;
+			}
+		);
 		atora_test_reset_options();
 		\CLMS_Module_Registry::flush_cache();
 	}
@@ -27,17 +35,17 @@ class ModuleRegistryTest extends TestCase {
 	}
 
 	/** @test */
-	public function test_all_20_slugs_defined(): void {
-		// 6.13.0 (P10) añadió 'google' — 19 + 1.
-		$this->assertCount( 20, \CLMS_Module_Registry::get_modules() );
+	public function test_all_28_slugs_defined(): void {
+		// 6.21.0 integra 28 módulos registrados.
+		$this->assertCount( 28, \CLMS_Module_Registry::get_modules() );
 	}
 
 	/** @test */
-	public function test_core_slugs_are_lms_academic_gradebook_security(): void {
+	public function test_core_slugs_match_current_academic_platform(): void {
 		$modules = \CLMS_Module_Registry::get_modules();
 		$core    = array_keys( array_filter( $modules, fn( $m ) => ! empty( $m['core'] ) ) );
 		sort( $core );
-		$this->assertSame( array( 'academic', 'gradebook', 'lms', 'security' ), $core );
+		$this->assertSame( array( 'academic', 'early-warning', 'gradebook', 'groups', 'h5p', 'learning-analytics', 'lms', 'microsoft', 'portfolios', 'rubrics', 'security' ), $core );
 	}
 
 	/** @test */
@@ -130,7 +138,7 @@ class ModuleRegistryTest extends TestCase {
 		\CLMS_Module_Registry::flush_cache();
 		$this->assertTrue( \CLMS_Module_Registry::is_active( 'crm' ) );
 
-		add_filter( 'atora/profile/allowed_modules', static fn( $active ) => array_diff( $active, array( 'crm' ) ) );
+		$GLOBALS['__atora_test_filters']['atora/profile/allowed_modules'][] = array( 'cb' => static fn( $active ) => array_diff( $active, array( 'crm' ) ) );
 		\CLMS_Module_Registry::flush_cache();
 
 		$this->assertFalse( \CLMS_Module_Registry::is_active( 'crm' ) );
@@ -143,7 +151,7 @@ class ModuleRegistryTest extends TestCase {
 		update_option( 'atora_active_modules', array( 'lms', 'academic', 'gradebook', 'security' ) );
 		\CLMS_Module_Registry::flush_cache();
 
-		add_filter( 'atora/profile/allowed_modules', static fn( $active ) => array() );
+		$GLOBALS['__atora_test_filters']['atora/profile/allowed_modules'][] = array( 'cb' => static fn( $active ) => array() );
 		\CLMS_Module_Registry::flush_cache();
 
 		$this->assertTrue( \CLMS_Module_Registry::is_active( 'lms' ) );

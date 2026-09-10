@@ -43,8 +43,12 @@ class MigrationWindowDiscrepancyTest extends TestCase {
 
 			public function prepare( string $sql, ...$args ): string {
 				$i = 0;
-				return preg_replace_callback( '/%[ds]/', function() use ( &$i, $args ) {
-					return isset( $args[ $i ] ) ? (string) $args[ $i++ ] : '?';
+				return preg_replace_callback( '/%[ds]/', function( $match ) use ( &$i, $args ) {
+					if ( ! isset( $args[ $i ] ) ) {
+						return '?';
+					}
+					$value = $args[ $i++ ];
+					return '%s' === $match[0] ? "'" . $value . "'" : (string) $value;
 				}, $sql );
 			}
 
@@ -137,9 +141,9 @@ class MigrationWindowDiscrepancyTest extends TestCase {
 		$this->invoke( 800, 999 );
 
 		global $wpdb;
-		foreach ( $wpdb->inserted as $call ) {
-			$this->assertStringNotContainsString( 'atora_courses', $call['table'], 'nunca debe escribir en atora_courses — solo registrar' );
-		}
+		$this->assertCount( 1, $wpdb->inserted, 'una discrepancia debe producir exactamente una entrada de auditoría' );
+		$this->assertSame( 'wp_atora_lms_parity_log', $wpdb->inserted[0]['table'] );
+		$this->assertStringNotContainsString( 'atora_courses', $wpdb->inserted[0]['table'], 'nunca debe escribir en atora_courses — solo registrar' );
 
 		$this->restore_wpdb( $original );
 	}

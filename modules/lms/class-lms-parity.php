@@ -506,13 +506,14 @@ class LMS_Parity {
 	 */
 	const CORE_TABLES = array( 'atora_courses', 'atora_lessons', 'atora_enrollments', 'atora_program_enrollments' );
 
+	/** Máxima antigüedad aceptada para la reconciliación previa al cutover. */
+	const RECONCILE_MAX_AGE = 2 * DAY_IN_SECONDS;
+
 	/**
 	 * Evalúa si el cutover a lectura de tablas puede ejecutarse (D-006).
 	 *
-	 * Condiciones: `atora_lms_dualwrite` activo, 0 divergencias en los
-	 * últimos 14 días, reconciliación diaria sin pendientes, y las 4 tablas
-	 * núcleo con filas > 0. No usa estado en caché aparte de la option de
-	 * reconciliación, que ya se refresca por cron diario (F2.4).
+	 * Exige dual-write activo, cero divergencias, reconciliación reciente y
+	 * limpia, volumen observado representativo y tablas núcleo pobladas.
 	 *
 	 * @return array{ready:bool, reasons:string[]}
 	 */
@@ -536,6 +537,22 @@ class LMS_Parity {
 			if ( $pending > 0 ) {
 				$reasons[] = sprintf( 'La última reconciliación reportó %d pendiente(s)/huérfano(s).', $pending );
 			}
+
+			$checked_at = isset( $reconcile['checked_at'] ) ? strtotime( (string) $reconcile['checked_at'] . ' UTC' ) : false;
+			if ( ! $checked_at ) {
+				$reasons[] = 'La reconciliación no tiene una fecha de verificación válida.';
+			} elseif ( ( time() - $checked_at ) > self::RECONCILE_MAX_AGE ) {
+				$reasons[] = 'La reconciliación está vencida; debe ejecutarse nuevamente antes del cutover.';
+			}
+		}
+
+		$volume = self::get_volume_stats();
+		if ( empty( $volume['volume_ok'] ) ) {
+			$reasons[] = sprintf(
+				'Volumen de paridad insuficiente: %d de %d usuario(s) activo(s) observados.',
+				absint( $volume['observed_users'] ?? 0 ),
+				absint( $volume['active_users'] ?? 0 )
+			);
 		}
 
 		foreach ( self::core_table_counts() as $table => $count ) {

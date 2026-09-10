@@ -20,6 +20,14 @@ final class GroupSubmissionFetchTest extends TestCase {
 
 	protected function setUp(): void {
 		parent::setUp();
+		\Brain\Monkey\Functions\when( 'apply_filters' )->alias(
+			static function( string $hook, $value, ...$args ) {
+				foreach ( $GLOBALS['__atora_test_filters'][ $hook ] ?? array() as $entry ) {
+					$value = call_user_func( $entry['cb'], $value, ...$args );
+				}
+				return $value;
+			}
+		);
 		atora_test_reset_filters();
 		atora_test_reset_post_meta();
 		atora_test_reset_posts();
@@ -43,16 +51,13 @@ final class GroupSubmissionFetchTest extends TestCase {
 		atora_test_set_post_meta( $lesson_id, '_clms_evaluation_mode', 'group' );
 		atora_test_set_post_meta( $lesson_id, '_clms_lesson_course_id', $course_id );
 
-		add_filter(
-			'atora/groups/user_group_id',
-			static function( $value, $uid, $cid, $lid ) use ( $user_id, $course_id, $lesson_id, $group_id ) {
+		$GLOBALS['__atora_test_filters']['atora/groups/user_group_id'][] = array(
+			'cb' => static function( $value, $uid, $cid, $lid ) use ( $user_id, $course_id, $lesson_id, $group_id ) {
 				if ( absint( $uid ) === $user_id && absint( $cid ) === $course_id && absint( $lid ) === $lesson_id ) {
 					return $group_id;
 				}
 				return $value;
 			},
-			10,
-			4
 		);
 
 		// Stub get_posts() para resolver master + shadow correctos.
