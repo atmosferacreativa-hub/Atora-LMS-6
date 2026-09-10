@@ -145,6 +145,7 @@ trait CLMS_Submission_Core_Trait {
 		$max_files    = absint( $this->max_files );
 		$max_size     = absint( $this->max_file_size );
 		$max_size_txt = size_format( $max_size );
+		$block_submit = false;
 		?>
 		<div class="clms-submission-box">
 			<?php if ( '' !== trim( $task_title ) || '' !== trim( $task_description ) ) : ?>
@@ -167,6 +168,7 @@ trait CLMS_Submission_Core_Trait {
 
 				$groups_enabled = $course_id ? ( '1' === (string) get_post_meta( $course_id, '_clms_course_groups_enabled', true ) ) : false;
 				$group_id       = $course_id ? absint( (int) apply_filters( 'atora/groups/user_group_id', 0, $user_id, $course_id, $lesson_id ) ) : 0;
+				$block_submit   = ( ! $groups_enabled || ! $group_id );
 
 				$group_name   = '';
 				$member_names = array();
@@ -328,6 +330,7 @@ trait CLMS_Submission_Core_Trait {
 				<?php endif; ?>
 			<?php endif; ?>
 
+			<?php if ( ! $block_submit ) : ?>
 			<form method="post" enctype="multipart/form-data" class="clms-submission-form">
 				<?php wp_nonce_field( 'clms_submit_assignment_' . $lesson_id, 'clms_submission_nonce' ); ?>
 				<input type="hidden" name="clms_action" value="submit_assignment">
@@ -395,6 +398,11 @@ trait CLMS_Submission_Core_Trait {
 					<button type="submit"><?php esc_html_e( 'Enviar tarea', 'atora-lms' ); ?></button>
 				</p>
 			</form>
+			<?php else : ?>
+				<div class="clms-message clms-message-error">
+					<?php esc_html_e( 'No puedes enviar esta tarea hasta tener un grupo asignado y que el curso tenga habilitada la evaluación por grupos.', 'atora-lms' ); ?>
+				</div>
+			<?php endif; ?>
 		</div>
 		<?php
 		return ob_get_clean();
