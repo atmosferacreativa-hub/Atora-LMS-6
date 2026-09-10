@@ -65,6 +65,44 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+
+  security-gate:
+    name: Security gate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.1"
+          coverage: none
+          tools: composer:v2
+
+      - name: Install locked dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Audit Composer dependencies
+        run: composer audit --locked --no-interaction
+
+      - name: Run repository security gate
+        run: bash scripts/security-gate.sh
+
+      - name: Run security and authorization regression suite
+        run: |
+          vendor/bin/phpunit \
+            tests/Security \
+            tests/CRM/CRMRestPermissionsTest.php \
+            tests/Groups/AdminPostAuthorizationTest.php \
+            tests/H5P/ContentControllerOwnershipTest.php \
+            tests/LMS/EnrollmentAjaxOwnershipTest.php \
+            tests/LMS/GradeAppealOwnershipTest.php \
+            tests/LMS/LMSCourseOwnershipTest.php \
+            tests/LMS/LMSCourseVisibilityTest.php \
+            tests/Rest/WebhookPermissionsTest.php
+
   unit-tests:
     name: PHPUnit full suite (file-isolated)
     runs-on: ubuntu-latest
