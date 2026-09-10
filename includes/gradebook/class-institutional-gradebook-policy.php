@@ -118,7 +118,7 @@ class CLMS_Institutional_Gradebook_Policy {
 		for ( $index = 1; $index <= $last; $index++ ) {
 			$previous_max = (float) $normalized[ $index - 1 ]['max'];
 			$current_min  = (float) $normalized[ $index ]['min'];
-			if ( $current_min < $previous_max || ( $current_min - $previous_max ) > 1.00001 ) {
+			if ( $current_min <= $previous_max || ( $current_min - $previous_max ) > 1.00001 ) {
 				return new WP_Error( 'clms_scale_discontinuous', __( 'Las bandas de la escala tienen huecos o solapamientos.', 'atora-lms' ) );
 			}
 		}
