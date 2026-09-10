@@ -19,6 +19,7 @@ class CutoverReadyGateTest extends WpdbSwapTestCase {
 	private function queue_all_green( FakeWpdbF4 $fake ): void {
 		$fake->get_var_queue = array(
 			0,                              // total_divergences()
+			5, 5,                           // usuarios observados + activos
 			'wp_atora_courses', 5,          // core table 1: exists + count
 			'wp_atora_lessons', 5,          // core table 2
 			'wp_atora_enrollments', 5,      // core table 3
@@ -31,7 +32,7 @@ class CutoverReadyGateTest extends WpdbSwapTestCase {
 		$fake = $this->swap_wpdb();
 		$this->queue_all_green( $fake );
 		update_option( 'atora_lms_dualwrite', true );
-		update_option( 'atora_lms_reconcile_result', array( 'total' => 0 ) );
+		update_option( 'atora_lms_reconcile_result', array( 'total' => 0, 'checked_at' => gmdate( 'Y-m-d H:i:s' ) ) );
 
 		$gate = \ATORA\LMS\LMS_Parity::cutover_ready();
 
@@ -44,7 +45,7 @@ class CutoverReadyGateTest extends WpdbSwapTestCase {
 		$fake = $this->swap_wpdb();
 		$this->queue_all_green( $fake );
 		update_option( 'atora_lms_dualwrite', false );
-		update_option( 'atora_lms_reconcile_result', array( 'total' => 0 ) );
+		update_option( 'atora_lms_reconcile_result', array( 'total' => 0, 'checked_at' => gmdate( 'Y-m-d H:i:s' ) ) );
 
 		$gate = \ATORA\LMS\LMS_Parity::cutover_ready();
 
@@ -57,13 +58,14 @@ class CutoverReadyGateTest extends WpdbSwapTestCase {
 		$fake = $this->swap_wpdb();
 		$fake->get_var_queue = array(
 			3,                              // total_divergences() > 0
+			5, 5,                           // usuarios observados + activos
 			'wp_atora_courses', 5,
 			'wp_atora_lessons', 5,
 			'wp_atora_enrollments', 5,
 			'wp_atora_program_enrollments', 5,
 		);
 		update_option( 'atora_lms_dualwrite', true );
-		update_option( 'atora_lms_reconcile_result', array( 'total' => 0 ) );
+		update_option( 'atora_lms_reconcile_result', array( 'total' => 0, 'checked_at' => gmdate( 'Y-m-d H:i:s' ) ) );
 
 		$gate = \ATORA\LMS\LMS_Parity::cutover_ready();
 
@@ -89,7 +91,7 @@ class CutoverReadyGateTest extends WpdbSwapTestCase {
 		$fake = $this->swap_wpdb();
 		$this->queue_all_green( $fake );
 		update_option( 'atora_lms_dualwrite', true );
-		update_option( 'atora_lms_reconcile_result', array( 'total' => 4 ) );
+		update_option( 'atora_lms_reconcile_result', array( 'total' => 4, 'checked_at' => gmdate( 'Y-m-d H:i:s' ) ) );
 
 		$gate = \ATORA\LMS\LMS_Parity::cutover_ready();
 
@@ -102,13 +104,14 @@ class CutoverReadyGateTest extends WpdbSwapTestCase {
 		$fake = $this->swap_wpdb();
 		$fake->get_var_queue = array(
 			0,
+			5, 5,
 			'wp_atora_courses', 0,          // tabla existe pero 0 filas
 			'wp_atora_lessons', 5,
 			'wp_atora_enrollments', 5,
 			'wp_atora_program_enrollments', 5,
 		);
 		update_option( 'atora_lms_dualwrite', true );
-		update_option( 'atora_lms_reconcile_result', array( 'total' => 0 ) );
+		update_option( 'atora_lms_reconcile_result', array( 'total' => 0, 'checked_at' => gmdate( 'Y-m-d H:i:s' ) ) );
 
 		$gate = \ATORA\LMS\LMS_Parity::cutover_ready();
 
@@ -116,11 +119,65 @@ class CutoverReadyGateTest extends WpdbSwapTestCase {
 		$this->assertNotEmpty( array_filter( $gate['reasons'], fn( $r ) => str_contains( $r, 'no tiene filas' ) ) );
 	}
 
+
+	/** @test */
+	public function test_not_ready_when_reconcile_timestamp_is_missing(): void {
+		$fake = $this->swap_wpdb();
+		$this->queue_all_green( $fake );
+		update_option( 'atora_lms_dualwrite', true );
+		update_option( 'atora_lms_reconcile_result', array( 'total' => 0 ) );
+
+		$gate = \ATORA\LMS\LMS_Parity::cutover_ready();
+
+		$this->assertFalse( $gate['ready'] );
+		$this->assertNotEmpty( array_filter( $gate['reasons'], fn( $r ) => str_contains( $r, 'fecha de verificación válida' ) ) );
+	}
+
+	/** @test */
+	public function test_not_ready_when_reconcile_is_stale(): void {
+		$fake = $this->swap_wpdb();
+		$this->queue_all_green( $fake );
+		update_option( 'atora_lms_dualwrite', true );
+		update_option(
+			'atora_lms_reconcile_result',
+			array(
+				'total'      => 0,
+				'checked_at' => gmdate( 'Y-m-d H:i:s', time() - ( 3 * DAY_IN_SECONDS ) ),
+			)
+		);
+
+		$gate = \ATORA\LMS\LMS_Parity::cutover_ready();
+
+		$this->assertFalse( $gate['ready'] );
+		$this->assertNotEmpty( array_filter( $gate['reasons'], fn( $r ) => str_contains( $r, 'vencida' ) ) );
+	}
+
+	/** @test */
+	public function test_not_ready_when_observed_volume_is_below_active_users(): void {
+		$fake = $this->swap_wpdb();
+		$fake->get_var_queue = array(
+			0,
+			2, 5,                           // solo 2 de 5 alumnos activos observados
+			'wp_atora_courses', 5,
+			'wp_atora_lessons', 5,
+			'wp_atora_enrollments', 5,
+			'wp_atora_program_enrollments', 5,
+		);
+		update_option( 'atora_lms_dualwrite', true );
+		update_option( 'atora_lms_reconcile_result', array( 'total' => 0, 'checked_at' => gmdate( 'Y-m-d H:i:s' ) ) );
+
+		$gate = \ATORA\LMS\LMS_Parity::cutover_ready();
+
+		$this->assertFalse( $gate['ready'] );
+		$this->assertNotEmpty( array_filter( $gate['reasons'], fn( $r ) => str_contains( $r, 'Volumen de paridad insuficiente' ) ) );
+	}
+
 	/** @test */
 	public function test_reasons_accumulate_multiple_failures(): void {
 		$fake = $this->swap_wpdb();
 		$fake->get_var_queue = array(
 			2,                              // divergencias
+			5, 5,                           // usuarios observados + activos
 			'wp_atora_courses', 5,
 			'wp_atora_lessons', 5,
 			'wp_atora_enrollments', 5,
