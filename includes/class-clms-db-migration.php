@@ -303,6 +303,10 @@ class CLMS_DB_Migration {
 			user_id bigint(20) unsigned NOT NULL,
 			risk_level varchar(20) NOT NULL DEFAULT 'unknown',
 			risk_score int(10) unsigned NOT NULL DEFAULT 0,
+			risk_score_prev int(10) unsigned DEFAULT NULL,
+			risk_score_delta int(11) DEFAULT NULL,
+			risk_trend varchar(10) NOT NULL DEFAULT 'new',
+			last_alert_type varchar(30) DEFAULT NULL,
 			signals_json longtext,
 			last_activity_at datetime DEFAULT NULL,
 			last_notified_at datetime DEFAULT NULL,
@@ -313,6 +317,7 @@ class CLMS_DB_Migration {
 			KEY course_id (course_id),
 			KEY user_id (user_id),
 			KEY risk_score (risk_score),
+			KEY risk_trend (risk_trend),
 			KEY updated_at (updated_at)
 		) {$charset};";
 

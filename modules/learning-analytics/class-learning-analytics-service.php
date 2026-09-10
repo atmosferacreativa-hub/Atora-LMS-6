@@ -241,6 +241,19 @@ final class Learning_Analytics_Service {
 
 		$rows = 0;
 		foreach ( $student_ids as $student_id ) {
+			$existing = $wpdb->get_row(
+				$wpdb->prepare(
+					"SELECT id, risk_score, risk_level, last_notified_at, last_alert_type FROM {$this->table()} WHERE course_id = %d AND user_id = %d LIMIT 1",
+					$course_id,
+					$student_id
+				),
+				ARRAY_A
+			);
+			$existing = is_array( $existing ) ? $existing : array();
+			$existing_id = absint( $existing['id'] ?? 0 );
+			$prev_score  = isset( $existing['risk_score'] ) ? absint( $existing['risk_score'] ) : null;
+			$prev_level  = sanitize_key( (string) ( $existing['risk_level'] ?? '' ) );
+
 			$status = (array) $status_service->get_student_course_status(
 				$student_id,
 				$course_id,
@@ -251,6 +264,19 @@ final class Learning_Analytics_Service {
 
 			$risk_level = sanitize_key( (string) ( $status['risk_level'] ?? 'unknown' ) );
 			$risk_score = self::calculate_risk_score_from_status( $status );
+			$risk_score_prev  = ( null !== $prev_score ) ? absint( $prev_score ) : null;
+			$risk_score_delta = ( null !== $prev_score ) ? (int) ( $risk_score - absint( $prev_score ) ) : null;
+			$risk_trend       = null === $prev_score ? 'new' : ( ( $risk_score_delta ?? 0 ) > 0 ? 'up' : ( ( $risk_score_delta ?? 0 ) < 0 ? 'down' : 'flat' ) );
+
+			$threshold_days = absint( get_option( 'clms_inactivity_days_threshold', 14 ) );
+			if ( $threshold_days <= 0 ) {
+				$threshold_days = 14;
+			}
+			$threshold_days = absint( apply_filters( 'clms_inactivity_days_threshold', $threshold_days ) );
+			if ( $threshold_days <= 0 ) {
+				$threshold_days = 14;
+			}
+
 			$signals    = array(
 				'progress_percent'   => absint( $status['progress_percent'] ?? 0 ),
 				'final_average'      => ( isset( $status['final_average'] ) && is_numeric( $status['final_average'] ) ) ? absint( $status['final_average'] ) : null,
@@ -259,28 +285,47 @@ final class Learning_Analytics_Service {
 				'course_time_seconds'=> absint( $status['course_time_seconds'] ?? 0 ),
 				'risk_reasons'       => isset( $status['risk_reasons'] ) && is_array( $status['risk_reasons'] ) ? array_values( array_map( 'sanitize_text_field', $status['risk_reasons'] ) ) : array(),
 				'recommended_action' => sanitize_text_field( (string) ( $status['recommended_action'] ?? '' ) ),
+				'risk_score_prev'    => $risk_score_prev,
+				'risk_score_delta'   => $risk_score_delta,
+				'risk_trend'         => $risk_trend,
 			);
+
+			$alert_type = '';
+			$last_access_raw = (string) ( $signals['last_access_at'] ?? '' );
+			$last_access_ts = $last_access_raw ? strtotime( $last_access_raw ) : 0;
+			$is_inactive = false;
+			if ( $last_access_ts ) {
+				$is_inactive = ( time() - $last_access_ts ) >= ( $threshold_days * DAY_IN_SECONDS );
+			} else {
+				$is_inactive = true;
+			}
+
+			if ( 'high' === $risk_level ) {
+				$alert_type = 'high_risk';
+			} elseif ( $is_inactive && $risk_score >= 60 ) {
+				$alert_type = 'inactivity';
+			} elseif ( null !== $risk_score_delta && $risk_score_delta >= 20 && $risk_score >= 60 ) {
+				$alert_type = 'risk_spike';
+			} elseif ( '' !== $prev_level && $prev_level !== $risk_level && ( 'medium' === $risk_level || 'high' === $risk_level ) ) {
+				$alert_type = 'risk_level_change';
+			}
 
 			$payload = array(
 				'course_id'        => $course_id,
 				'user_id'          => $student_id,
 				'risk_level'       => $risk_level ? $risk_level : 'unknown',
 				'risk_score'       => $risk_score,
+				'risk_score_prev'  => $risk_score_prev,
+				'risk_score_delta' => $risk_score_delta,
+				'risk_trend'       => $risk_trend,
+				'last_alert_type'  => $alert_type ? $alert_type : null,
 				'signals_json'     => wp_json_encode( $signals ),
 				'last_activity_at' => $signals['last_access_at'],
 				'updated_at'       => current_time( 'mysql' ),
 			);
 
-			$existing = $wpdb->get_var(
-				$wpdb->prepare(
-					"SELECT id FROM {$this->table()} WHERE course_id = %d AND user_id = %d LIMIT 1",
-					$course_id,
-					$student_id
-				)
-			);
-
-			if ( $existing ) {
-				$wpdb->update( $this->table(), $payload, array( 'id' => absint( $existing ) ) );
+			if ( $existing_id ) {
+				$wpdb->update( $this->table(), $payload, array( 'id' => $existing_id ) );
 			} else {
 				$payload['created_at'] = current_time( 'mysql' );
 				$wpdb->insert( $this->table(), $payload );
@@ -288,8 +333,9 @@ final class Learning_Analytics_Service {
 
 			++$rows;
 
-			if ( $notify && 'high' === $risk_level ) {
-				$this->notify_teachers_if_needed( $course_id, $student_id, $signals, $existing ? absint( $existing ) : absint( $wpdb->insert_id ) );
+			$row_id = $existing_id ? $existing_id : absint( $wpdb->insert_id );
+			if ( $notify && '' !== $alert_type ) {
+				$this->notify_teachers_if_needed( $course_id, $student_id, $signals, $row_id, $alert_type );
 			}
 		}
 
@@ -339,7 +385,7 @@ final class Learning_Analytics_Service {
 		}
 
 		$sql = $wpdb->prepare(
-			"SELECT id, user_id, risk_level, risk_score, signals_json, last_activity_at, last_notified_at, created_at, updated_at
+			"SELECT id, user_id, risk_level, risk_score, risk_score_prev, risk_score_delta, risk_trend, last_alert_type, signals_json, last_activity_at, last_notified_at, created_at, updated_at
 			 FROM {$this->table()}
 			 WHERE course_id = %d
 			 ORDER BY risk_score DESC, updated_at DESC
@@ -412,7 +458,7 @@ final class Learning_Analytics_Service {
 
 		// phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
 		$sql = $wpdb->prepare(
-			"SELECT id, course_id, user_id, risk_level, risk_score, signals_json, last_activity_at, last_notified_at, created_at, updated_at
+			"SELECT id, course_id, user_id, risk_level, risk_score, risk_score_prev, risk_score_delta, risk_trend, last_alert_type, signals_json, last_activity_at, last_notified_at, created_at, updated_at
 			 FROM {$this->table()}
 			 WHERE {$where_sql}
 			 ORDER BY risk_score DESC, updated_at DESC
@@ -497,6 +543,10 @@ final class Learning_Analytics_Service {
 				'student_email'      => sanitize_email( (string) ( $row['student_email'] ?? '' ) ),
 				'risk_level'         => sanitize_key( (string) ( $row['risk_level'] ?? 'unknown' ) ),
 				'risk_score'         => absint( $row['risk_score'] ?? 0 ),
+				'risk_score_prev'    => isset( $row['risk_score_prev'] ) ? ( null !== $row['risk_score_prev'] ? absint( $row['risk_score_prev'] ) : null ) : null,
+				'risk_score_delta'   => isset( $row['risk_score_delta'] ) ? ( null !== $row['risk_score_delta'] ? (int) $row['risk_score_delta'] : null ) : null,
+				'risk_trend'         => sanitize_key( (string) ( $row['risk_trend'] ?? '' ) ),
+				'alert_type'         => sanitize_key( (string) ( $row['last_alert_type'] ?? '' ) ),
 				'progress_percent'   => absint( $signals['progress_percent'] ?? 0 ),
 				'final_average'      => ( null !== ( $signals['final_average'] ?? null ) ? absint( $signals['final_average'] ) : null ),
 				'pending_activities' => absint( $signals['pending_activities'] ?? 0 ),
@@ -547,6 +597,9 @@ final class Learning_Analytics_Service {
 				__( 'Email', 'atora-lms' ),
 				__( 'Riesgo', 'atora-lms' ),
 				__( 'Score', 'atora-lms' ),
+				__( 'Trend', 'atora-lms' ),
+				__( 'Delta', 'atora-lms' ),
+				__( 'Alert type', 'atora-lms' ),
 				__( 'Progreso', 'atora-lms' ),
 				__( 'Promedio', 'atora-lms' ),
 				__( 'Pendientes', 'atora-lms' ),
@@ -561,6 +614,9 @@ final class Learning_Analytics_Service {
 				__( 'Email', 'atora-lms' ),
 				__( 'Riesgo', 'atora-lms' ),
 				__( 'Score', 'atora-lms' ),
+				__( 'Trend', 'atora-lms' ),
+				__( 'Delta', 'atora-lms' ),
+				__( 'Alert type', 'atora-lms' ),
 				__( 'Progreso', 'atora-lms' ),
 				__( 'Promedio', 'atora-lms' ),
 				__( 'Pendientes', 'atora-lms' ),
@@ -581,6 +637,9 @@ final class Learning_Analytics_Service {
 				$item['student_email'],
 				$item['risk_level'],
 				absint( $item['risk_score'] ),
+				sanitize_key( (string) ( $item['risk_trend'] ?? '' ) ),
+				( null !== ( $item['risk_score_delta'] ?? null ) ? (int) $item['risk_score_delta'] : '' ),
+				sanitize_key( (string) ( $item['alert_type'] ?? '' ) ),
 				absint( $item['progress_percent'] ) . '%',
 				( null !== ( $item['final_average'] ?? null ) ? absint( $item['final_average'] ) . '%' : '—' ),
 				absint( $item['pending_activities'] ),
@@ -698,12 +757,13 @@ final class Learning_Analytics_Service {
 		return $out;
 	}
 
-	private function notify_teachers_if_needed( int $course_id, int $student_id, array $signals, int $row_id ): void {
+	private function notify_teachers_if_needed( int $course_id, int $student_id, array $signals, int $row_id, string $alert_type = 'high_risk' ): void {
 		global $wpdb;
 
 		$row_id    = absint( $row_id );
 		$course_id = absint( $course_id );
 		$student_id = absint( $student_id );
+		$alert_type = sanitize_key( $alert_type );
 		if ( ! $row_id || ! $course_id || ! $student_id ) {
 			return;
 		}
@@ -744,6 +804,30 @@ final class Learning_Analytics_Service {
 
 		$reasons = isset( $signals['risk_reasons'] ) && is_array( $signals['risk_reasons'] ) ? array_values( array_filter( array_map( 'sanitize_text_field', $signals['risk_reasons'] ) ) ) : array();
 		$summary = $reasons ? implode( ' ', array_slice( $reasons, 0, 2 ) ) : __( 'Revisar progreso y pendientes.', 'atora-lms' );
+		$course_title = (string) get_the_title( $course_id );
+
+		$delta = isset( $signals['risk_score_delta'] ) && null !== $signals['risk_score_delta'] ? (int) $signals['risk_score_delta'] : null;
+		$delta_label = null !== $delta ? ( ( $delta > 0 ? '+' : '' ) . (string) $delta ) : '';
+
+		$title = __( 'Alerta: estudiante en riesgo', 'atora-lms' );
+		if ( 'high_risk' === $alert_type ) {
+			$title = __( 'Alerta: riesgo alto', 'atora-lms' );
+		} elseif ( 'inactivity' === $alert_type ) {
+			$title = __( 'Alerta: inactividad', 'atora-lms' );
+		} elseif ( 'risk_spike' === $alert_type ) {
+			$title = __( 'Alerta: aumento de riesgo', 'atora-lms' );
+		} elseif ( 'risk_level_change' === $alert_type ) {
+			$title = __( 'Alerta: cambio de nivel de riesgo', 'atora-lms' );
+		}
+
+		$message = sprintf(
+			/* translators: 1: student name, 2: course title, 3: delta, 4: summary */
+			__( '%1$s requiere atención en %2$s. %3$s%4$s', 'atora-lms' ),
+			$student_name,
+			$course_title ? $course_title : ( '#' . $course_id ),
+			$delta_label ? ( 'Δ ' . $delta_label . '. ' ) : '',
+			$summary
+		);
 
 		foreach ( array_values( array_unique( $teacher_ids ) ) as $teacher_id ) {
 			$teacher_id = absint( $teacher_id );
@@ -755,13 +839,8 @@ final class Learning_Analytics_Service {
 				$teacher_id,
 				array(
 					'type'      => 'learning_analytics',
-					'title'     => __( 'Alerta: estudiante en riesgo alto', 'atora-lms' ),
-					'message'   => sprintf(
-						/* translators: 1: student name, 2: summary */
-						__( '%1$s requiere atención. %2$s', 'atora-lms' ),
-						$student_name,
-						$summary
-					),
+					'title'     => $title,
+					'message'   => $message,
 					'link'      => admin_url( 'admin.php?page=atora-learning-analytics&course_id=' . $course_id ),
 					'course_id' => $course_id,
 					'user_id'   => $student_id,
@@ -769,6 +848,13 @@ final class Learning_Analytics_Service {
 			);
 		}
 
-		$wpdb->update( $this->table(), array( 'last_notified_at' => current_time( 'mysql' ) ), array( 'id' => $row_id ) );
+		$wpdb->update(
+			$this->table(),
+			array(
+				'last_notified_at' => current_time( 'mysql' ),
+				'last_alert_type'  => $alert_type ? $alert_type : null,
+			),
+			array( 'id' => $row_id )
+		);
 	}
 }

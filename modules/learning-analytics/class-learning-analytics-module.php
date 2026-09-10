@@ -229,7 +229,13 @@ final class Learning_Analytics_Module {
 				echo '<td><strong>' . esc_html( $course_title ? $course_title : (string) $row_course_id ) . '</strong><br><span class="description">#' . esc_html( (string) $row_course_id ) . '</span></td>';
 			}
 			echo '<td>' . esc_html( sanitize_key( (string) ( $row['risk_level'] ?? 'unknown' ) ) ) . ( $reasons ? '<br><span class="description">' . esc_html( implode( ' ', array_slice( $reasons, 0, 2 ) ) ) . '</span>' : '' ) . '</td>';
-			echo '<td>' . esc_html( (string) absint( $row['risk_score'] ?? 0 ) ) . '</td>';
+			$delta = isset( $row['risk_score_delta'] ) && null !== $row['risk_score_delta'] ? (int) $row['risk_score_delta'] : null;
+			$trend = sanitize_key( (string) ( $row['risk_trend'] ?? '' ) );
+			$score_label = (string) absint( $row['risk_score'] ?? 0 );
+			if ( null !== $delta ) {
+				$score_label .= ' (' . ( $delta > 0 ? '+' : '' ) . (string) $delta . ')';
+			}
+			echo '<td>' . esc_html( $score_label ) . ( $trend ? '<br><span class="description">' . esc_html( $trend ) . '</span>' : '' ) . '</td>';
 			echo '<td><span class="description">' . esc_html( $signals_line ) . '</span></td>';
 			echo '<td>' . esc_html( sanitize_text_field( (string) ( $signals['recommended_action'] ?? '' ) ) ) . '</td>';
 			echo '<td><a class="button button-small" href="' . esc_url( $detail_url ) . '">' . esc_html__( 'Ver', 'atora-lms' ) . '</a></td>';
