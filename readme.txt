@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 6.15.0
+Stable tag: 6.15.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,10 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.15.1 =
+* Learning Analytics: filtros por cohorte/docente, listado multi-curso, export CSV multi-curso y vista de detalle por estudiante.
+* Learning Analytics REST: endpoints por cohorte/docente y scan por cohorte/docente.
+
 = 6.15.0 =
 * Added Learning Analytics (MVP): risk snapshots per student/course (DB table + daily cron + REST + admin dashboard + CSV export).
 * Added internal notifications (MVP): alerts teachers when a student reaches high risk (daily anti-spam).

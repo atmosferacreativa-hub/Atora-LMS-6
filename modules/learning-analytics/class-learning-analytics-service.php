@@ -20,6 +20,96 @@ final class Learning_Analytics_Service {
 	}
 
 	/**
+	 * Cursos donde un docente participa (autor o listado en meta de docentes).
+	 *
+	 * @param int $teacher_id
+	 * @return array<int,int>
+	 */
+	public function get_course_ids_for_teacher( int $teacher_id ): array {
+		$teacher_id = absint( $teacher_id );
+		if ( ! $teacher_id ) {
+			return array();
+		}
+
+		$course_ids = get_posts(
+			array(
+				'post_type'      => 'lm_course',
+				'post_status'    => array( 'publish', 'private', 'draft' ),
+				'posts_per_page' => -1,
+				'fields'         => 'ids',
+				'author'         => $teacher_id,
+				'no_found_rows'  => true,
+			)
+		);
+
+		$course_ids = array_values( array_filter( array_map( 'absint', (array) $course_ids ) ) );
+
+		$meta_courses = get_posts(
+			array(
+				'post_type'      => 'lm_course',
+				'post_status'    => array( 'publish', 'private', 'draft' ),
+				'posts_per_page' => -1,
+				'fields'         => 'ids',
+				'no_found_rows'  => true,
+				'meta_query'     => array(
+					array(
+						'key'     => '_clms_course_teacher_ids',
+						'value'   => (string) $teacher_id,
+						'compare' => 'LIKE',
+					),
+				),
+			)
+		);
+
+		foreach ( (array) $meta_courses as $cid ) {
+			$cid = absint( $cid );
+			if ( $cid ) {
+				$course_ids[] = $cid;
+			}
+		}
+
+		$course_ids = array_values( array_unique( array_filter( $course_ids ) ) );
+		sort( $course_ids );
+		return $course_ids;
+	}
+
+	/**
+	 * Cursos asociados a cohorte.
+	 *
+	 * @param int $cohort_id
+	 * @return array<int,int>
+	 */
+	public function get_course_ids_for_cohort( int $cohort_id ): array {
+		$cohort_id = absint( $cohort_id );
+		if ( ! $cohort_id || ! class_exists( 'CLMS_Cohort_Service' ) ) {
+			return array();
+		}
+		$service = new \CLMS_Cohort_Service();
+		$ids     = $service->get_cohort_course_ids( $cohort_id );
+		$ids     = array_values( array_filter( array_map( 'absint', (array) $ids ) ) );
+		sort( $ids );
+		return $ids;
+	}
+
+	/**
+	 * Estudiantes asociados a cohorte.
+	 *
+	 * @param int $cohort_id
+	 * @return array<int,int>
+	 */
+	public function get_student_ids_for_cohort( int $cohort_id ): array {
+		$cohort_id = absint( $cohort_id );
+		if ( ! $cohort_id || ! class_exists( 'CLMS_Cohort_Service' ) ) {
+			return array();
+		}
+		$service = new \CLMS_Cohort_Service();
+		$ids     = $service->get_cohort_student_ids( $cohort_id );
+		$ids     = array_values( array_filter( array_map( 'absint', (array) $ids ) ) );
+		sort( $ids );
+		return $ids;
+	}
+
+	/**
 	 * Valida acceso a un curso para viewer (admin/coordinación/docente).
 	 *
 	 * @param int $viewer_id
@@ -276,6 +366,82 @@ final class Learning_Analytics_Service {
 	}
 
 	/**
+	 * Lista snapshots con filtros (múltiples cursos opcionales).
+	 *
+	 * @param array<string,mixed> $filters course_ids[], student_ids[], limit
+	 * @return array<int,array<string,mixed>>
+	 */
+	public function list_students( array $filters ): array {
+		global $wpdb;
+
+		$filters = is_array( $filters ) ? $filters : array();
+		$course_ids  = isset( $filters['course_ids'] ) && is_array( $filters['course_ids'] ) ? $filters['course_ids'] : array();
+		$student_ids = isset( $filters['student_ids'] ) && is_array( $filters['student_ids'] ) ? $filters['student_ids'] : array();
+		$limit       = isset( $filters['limit'] ) ? absint( $filters['limit'] ) : 1000;
+
+		$course_ids  = array_values( array_filter( array_map( 'absint', $course_ids ) ) );
+		$student_ids = array_values( array_filter( array_map( 'absint', $student_ids ) ) );
+		if ( $limit <= 0 ) {
+			$limit = 1000;
+		}
+
+		$where = array();
+		$args  = array();
+
+		if ( ! empty( $course_ids ) ) {
+			$placeholders = implode( ',', array_fill( 0, count( $course_ids ), '%d' ) );
+			$where[] = "course_id IN ({$placeholders})";
+			foreach ( $course_ids as $cid ) {
+				$args[] = absint( $cid );
+			}
+		}
+
+		if ( ! empty( $student_ids ) ) {
+			$placeholders = implode( ',', array_fill( 0, count( $student_ids ), '%d' ) );
+			$where[] = "user_id IN ({$placeholders})";
+			foreach ( $student_ids as $sid ) {
+				$args[] = absint( $sid );
+			}
+		}
+
+		if ( empty( $where ) ) {
+			return array();
+		}
+
+		$where_sql = implode( ' AND ', $where );
+
+		// phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+		$sql = $wpdb->prepare(
+			"SELECT id, course_id, user_id, risk_level, risk_score, signals_json, last_activity_at, last_notified_at, created_at, updated_at
+			 FROM {$this->table()}
+			 WHERE {$where_sql}
+			 ORDER BY risk_score DESC, updated_at DESC
+			 LIMIT %d",
+			array_merge( $args, array( $limit ) )
+		);
+
+		$rows = $wpdb->get_results( $sql, ARRAY_A );
+		$rows = is_array( $rows ) ? $rows : array();
+
+		foreach ( $rows as &$row ) {
+			$user_id   = absint( $row['user_id'] ?? 0 );
+			$course_id = absint( $row['course_id'] ?? 0 );
+
+			$row['signals'] = $row['signals_json'] ? json_decode( (string) $row['signals_json'], true ) : array();
+			unset( $row['signals_json'] );
+
+			$u = $user_id ? get_userdata( $user_id ) : null;
+			$row['student_name']  = $u ? (string) ( $u->display_name ?? '' ) : '';
+			$row['student_email'] = $u ? (string) ( $u->user_email ?? '' ) : '';
+
+			$row['course_title'] = $course_id ? (string) get_the_title( $course_id ) : '';
+		}
+		unset( $row );
+
+		return $rows;
+	}
+
+	/**
 	 * Export CSV sencillo (BI-friendly) basado en snapshots.
 	 *
 	 * @param int $course_id
@@ -420,4 +586,3 @@ final class Learning_Analytics_Service {
 		$wpdb->update( $this->table(), array( 'last_notified_at' => current_time( 'mysql' ) ), array( 'id' => $row_id ) );
 	}
 }
-
