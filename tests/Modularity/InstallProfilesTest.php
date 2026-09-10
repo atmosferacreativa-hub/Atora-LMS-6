@@ -40,14 +40,20 @@ class InstallProfilesTest extends TestCase {
 	}
 
 	/** @test */
-	public function test_docente_is_the_minimal_teaching_set(): void {
+	public function test_docente_contains_the_teaching_set_and_every_core_module(): void {
 		$modules = \CLMS_Install_Profiles::get_profile_modules( 'docente' );
-		$this->assertSame(
-			array( 'lms', 'academic', 'gradebook', 'security', 'certificates', 'calendar', 'google' ),
-			$modules
-		);
-	}
+		foreach ( array( 'lms', 'academic', 'gradebook', 'security', 'certificates', 'calendar', 'google' ) as $required ) {
+			$this->assertContains( $required, $modules );
+		}
 
+		$core = array_keys(
+			array_filter(
+				\CLMS_Module_Registry::get_modules(),
+				static fn( $module ) => ! empty( $module['core'] )
+			)
+		);
+		$this->assertSame( array(), array_values( array_diff( $core, $modules ) ) );
+	}
 	/** @test */
 	public function test_institucion_extends_docente_without_commercial_modules(): void {
 		$docente     = \CLMS_Install_Profiles::get_profile_modules( 'docente' );
