@@ -235,6 +235,17 @@ class CLMS_Module_Registry {
 				'tables'              => array( 'atora_early_warning' ),
 				'core'                => true,
 			),
+			'learning-analytics' => array(
+				'label'               => 'Learning Analytics',
+				'description'         => 'Scoring de riesgo y snapshots académicos por estudiante/curso.',
+				'group'               => 'reports',
+				'requires'            => array( 'lms', 'academic' ),
+				'provides_pages'      => array( 'atora-learning-analytics' ),
+				'provides_shortcodes' => array(),
+				'provides_rest'       => array( '/learning-analytics' ),
+				'tables'              => array( 'atora_student_analytics' ),
+				'core'                => true,
+			),
 			'security'       => array(
 				'label'               => 'Seguridad',
 				'description'         => 'Registro extendido, CAPTCHA, 2FA. Autenticación base siempre activa.',

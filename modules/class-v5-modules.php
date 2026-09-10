@@ -91,6 +91,12 @@ class V5_Modules {
 			self::load_early_warning();
 		}
 
+		// Learning Analytics: cron/rest/admin.
+		if ( ( $ctx['is_admin'] || $ctx['is_rest'] || $ctx['is_cron'] )
+			&& self::module_active( 'learning-analytics' ) ) {
+			self::load_learning_analytics();
+		}
+
 		// Messaging: evitar carga en frontend público general.
 		if ( ( $ctx['is_admin'] || $ctx['is_cron'] || $ctx['is_rest'] || $ctx['is_ajax'] || $ctx['is_webhook'] )
 			&& self::module_active( 'messaging' ) ) {
@@ -172,6 +178,17 @@ class V5_Modules {
 
 		if ( class_exists( '\ATORA\EarlyWarning\Early_Warning_Module' ) ) {
 			\ATORA\EarlyWarning\Early_Warning_Module::init();
+		}
+	}
+
+	/** @return void */
+	private static function load_learning_analytics(): void {
+		$dir = ATORA_LMS_MODULES_DIR . 'learning-analytics/';
+		self::require_file( $dir . 'class-learning-analytics-service.php' );
+		self::require_file( $dir . 'class-learning-analytics-module.php' );
+
+		if ( class_exists( '\ATORA\LearningAnalytics\Learning_Analytics_Module' ) ) {
+			\ATORA\LearningAnalytics\Learning_Analytics_Module::init();
 		}
 	}
 

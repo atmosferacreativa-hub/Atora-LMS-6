@@ -54,6 +54,7 @@ class CLMS_DB_Migration {
 		$this->create_gamification_profiles_table();
 		$this->create_groups_tables();
 		$this->create_early_warning_table();
+		$this->create_student_analytics_table();
 
 		update_option( self::SCHEMA_VERSION_KEY, $this->get_schema_version() );
 
@@ -280,6 +281,39 @@ class CLMS_DB_Migration {
 			KEY status (status),
 			KEY course_id (course_id),
 			KEY user_id (user_id)
+		) {$charset};";
+
+		dbDelta( $sql );
+	}
+
+	/**
+	 * Snapshots de analítica académica (riesgo) por estudiante/curso.
+	 *
+	 * @return void
+	 */
+	private function create_student_analytics_table(): void {
+		global $wpdb;
+
+		$table   = $wpdb->prefix . 'atora_student_analytics';
+		$charset = $wpdb->get_charset_collate();
+
+		$sql = "CREATE TABLE {$table} (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			course_id bigint(20) unsigned NOT NULL,
+			user_id bigint(20) unsigned NOT NULL,
+			risk_level varchar(20) NOT NULL DEFAULT 'unknown',
+			risk_score int(10) unsigned NOT NULL DEFAULT 0,
+			signals_json longtext,
+			last_activity_at datetime DEFAULT NULL,
+			last_notified_at datetime DEFAULT NULL,
+			created_at datetime NOT NULL,
+			updated_at datetime NOT NULL,
+			PRIMARY KEY (id),
+			UNIQUE KEY course_user (course_id, user_id),
+			KEY course_id (course_id),
+			KEY user_id (user_id),
+			KEY risk_score (risk_score),
+			KEY updated_at (updated_at)
 		) {$charset};";
 
 		dbDelta( $sql );

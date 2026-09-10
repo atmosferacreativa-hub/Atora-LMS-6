@@ -1,12 +1,15 @@
 # Roadmap técnico — Evolución del LMS (rolling 6 meses)
 
 Última actualización: 2026-09-10  
-Base: ATORA LMS `6.14.1`
+Base: ATORA LMS `6.15.0`
 
 ## Estado actual (implementado en 6.14.0)
 - Epic 1 (MVP): Group Assessment (grupos por curso + entregas grupales + propagación + overrides + CSV + REST).
 - Epic 2 (MVP): Rubrics v2 (pesos, escalas por curso con lock tras primera nota, holística, ejemplares, presets).
 - Epic 3 (MVP): Early Warning (entregas perdidas + notificación interna + REST + pantalla admin).
+
+## Estado actual (implementado en 6.15.0)
+- Epic 3 (MVP, ampliación): Learning Analytics (snapshots de riesgo por estudiante/curso + cron + REST + dashboard + CSV).
 
 **Pendiente (roadmap):** analítica de riesgo completa, coevaluación avanzada, portafolios, interoperabilidad (Classroom/Microsoft), H5P, hardening y QA ampliado.
 
