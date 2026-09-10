@@ -365,7 +365,7 @@ class CLMS_Module_Registry {
 				'provides_shortcodes' => array(),
 				'provides_rest'       => array( '/microsoft' ),
 				'tables'              => array(),
-				'core'                => false,
+				'core'                => true,
 			),
 			'mcp'            => array(
 				'label'               => 'MCP',
