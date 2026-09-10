@@ -14,7 +14,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 class CLMS_Rubric {
 
 	const CPT          = 'clms_rubric';
+	const PRESET_CPT   = 'clms_rubric_preset';
 	const META_CRITERIA = '_clms_rubric_criteria';
+	const META_SCALE    = '_clms_rubric_scale_type';
+	const META_HOLISTIC = '_clms_rubric_is_holistic';
 	const NONCE_ACTION = 'clms_save_rubric_meta';
 	const NONCE_NAME   = 'clms_rubric_nonce';
 
@@ -22,6 +25,7 @@ class CLMS_Rubric {
 		add_action( 'init',             array( $this, 'register_post_type' ) );
 		add_action( 'add_meta_boxes',   array( $this, 'add_meta_boxes' ) );
 		add_action( 'save_post_' . self::CPT, array( $this, 'save_meta_boxes' ), 20, 2 );
+		add_action( 'save_post_' . self::PRESET_CPT, array( $this, 'save_meta_boxes' ), 20, 2 );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
 		add_filter( 'manage_' . self::CPT . '_posts_columns',       array( $this, 'columns' ) );
 		add_action( 'manage_' . self::CPT . '_posts_custom_column', array( $this, 'column_content' ), 10, 2 );
@@ -104,6 +108,14 @@ class CLMS_Rubric {
 			'normal',
 			'high'
 		);
+		add_meta_box(
+			'clms_rubric_preset_criteria',
+			__( 'Criterios del preset', 'atora-lms' ),
+			array( $this, 'render_meta_box' ),
+			self::PRESET_CPT,
+			'normal',
+			'high'
+		);
 	}
 
 	public function enqueue_admin_assets( $hook ) {
@@ -112,7 +124,7 @@ class CLMS_Rubric {
 		}
 
 		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
-		if ( ! $screen || self::CPT !== $screen->post_type ) {
+		if ( ! $screen || ! in_array( $screen->post_type, array( self::CPT, self::PRESET_CPT ), true ) ) {
 			return;
 		}
 
@@ -125,27 +137,63 @@ class CLMS_Rubric {
 		);
 	}
 
-	public function render_meta_box( $post ) {
-		wp_nonce_field( self::NONCE_ACTION, self::NONCE_NAME );
+		public function render_meta_box( $post ) {
+			wp_nonce_field( self::NONCE_ACTION, self::NONCE_NAME );
 
-		$criteria = self::get_criteria( $post->ID );
-		if ( empty( $criteria ) ) {
-			$criteria = array(
-				array(
-					'name'        => '',
-					'description' => '',
-					'max_points'  => 10,
-					'levels'      => self::get_default_levels( 10 ),
-				),
+			$criteria = self::get_criteria( $post->ID );
+			$scale_type  = sanitize_key( (string) get_post_meta( $post->ID, self::META_SCALE, true ) );
+			$is_holistic = '1' === (string) get_post_meta( $post->ID, self::META_HOLISTIC, true );
+
+			$allowed_scales = array(
+				''      => __( '0–100 (interno)', 'atora-lms' ),
+				'0_4'   => __( '0–4', 'atora-lms' ),
+				'0_5'   => __( '0–5', 'atora-lms' ),
+				'0_20'  => __( '0–20', 'atora-lms' ),
+				'0_100' => __( '0–100', 'atora-lms' ),
+				'a_f'   => __( 'A–F', 'atora-lms' ),
 			);
+			if ( ! array_key_exists( $scale_type, $allowed_scales ) ) {
+				$scale_type = '';
+			}
+
+			$preset_posts = get_posts( array(
+				'post_type'      => class_exists( '\ATORA\Rubrics\Rubrics_Module' ) ? \ATORA\Rubrics\Rubrics_Module::PRESET_CPT : 'clms_rubric_preset',
+				'post_status'    => array( 'publish', 'private', 'draft' ),
+				'posts_per_page' => 100,
+				'orderby'        => 'title',
+				'order'          => 'ASC',
+			) );
+			$preset_payloads = array();
+			foreach ( (array) $preset_posts as $preset_post ) {
+				$preset_payloads[] = array(
+					'id'         => absint( $preset_post->ID ),
+					'title'      => (string) $preset_post->post_title,
+					'criteria'   => (array) get_post_meta( $preset_post->ID, self::META_CRITERIA, true ),
+					'scale_type' => sanitize_key( (string) get_post_meta( $preset_post->ID, self::META_SCALE, true ) ),
+					'is_holistic' => '1' === (string) get_post_meta( $preset_post->ID, self::META_HOLISTIC, true ),
+				);
+			}
+			if ( empty( $criteria ) ) {
+				$criteria = array(
+					array(
+						'name'        => '',
+						'description' => '',
+						'weight'      => 100,
+						'max_points'  => 10,
+						'levels'      => self::get_default_levels( 10 ),
+					),
+				);
 		}
 
-		foreach ( $criteria as $index => $criterion ) {
-			$max_points = isset( $criterion['max_points'] ) ? max( 1, absint( $criterion['max_points'] ) ) : 10;
-			if ( empty( $criterion['levels'] ) || ! is_array( $criterion['levels'] ) ) {
-				$criteria[ $index ]['levels'] = self::get_default_levels( $max_points );
+			foreach ( $criteria as $index => $criterion ) {
+				$max_points = isset( $criterion['max_points'] ) ? max( 1, absint( $criterion['max_points'] ) ) : 10;
+				if ( empty( $criterion['levels'] ) || ! is_array( $criterion['levels'] ) ) {
+					$criteria[ $index ]['levels'] = self::get_default_levels( $max_points );
+				}
+				if ( ! isset( $criterion['weight'] ) ) {
+					$criteria[ $index ]['weight'] = 0;
+				}
 			}
-		}
 
 		$default_level_labels = array(
 			__( 'Inicial', 'atora-lms' ),
@@ -157,7 +205,7 @@ class CLMS_Rubric {
 		<style>
 		.clms-rubric-builder{display:flex;flex-direction:column;gap:12px}
 		.clms-rubric-criterion{border:1px solid #dcdcde;border-radius:8px;background:#fff}
-		.clms-rubric-criterion-header{display:grid;grid-template-columns:24px minmax(0,1fr)95px auto auto auto;gap:8px;align-items:center;padding:10px;border-bottom:1px solid #f0f0f1}
+		.clms-rubric-criterion-header{display:grid;grid-template-columns:24px minmax(0,1fr)95px 80px auto auto auto;gap:8px;align-items:center;padding:10px;border-bottom:1px solid #f0f0f1}
 		.clms-rubric-drag-handle{cursor:grab;font-size:15px;color:#646970;text-align:center;user-select:none}
 		.clms-rubric-criterion-header input[type="text"],.clms-rubric-description textarea{width:100%;box-sizing:border-box}
 		.clms-rubric-criterion-header input[type="number"]{width:100%}
@@ -166,7 +214,7 @@ class CLMS_Rubric {
 		.clms-rubric-icon-btn.is-danger{color:#d63638}
 		.clms-rubric-description{padding:10px}
 		.clms-rubric-levels{padding:10px;border-top:1px dashed #dcdcde;background:#fbfbfc}
-		.clms-rubric-level{display:grid;grid-template-columns:minmax(0,180px)90px minmax(0,1fr)34px;gap:8px;align-items:start;margin-bottom:8px}
+		.clms-rubric-level{display:grid;grid-template-columns:minmax(0,160px)80px minmax(0,1fr) minmax(0,1fr)34px;gap:8px;align-items:start;margin-bottom:8px}
 		.clms-rubric-level textarea{width:100%;box-sizing:border-box;resize:vertical}
 		.clms-rubric-level input[type="number"]{width:100%}
 		.clms-rubric-controls{display:flex;gap:8px;margin-top:10px}
@@ -183,12 +231,46 @@ class CLMS_Rubric {
 		}
 		</style>
 
+		<div class="clms-rubric-preview" style="margin-top:0;margin-bottom:12px">
+			<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+				<p style="margin:0">
+					<label for="clms_rubric_scale_type"><strong><?php esc_html_e( 'Escala', 'atora-lms' ); ?></strong></label><br>
+					<select id="clms_rubric_scale_type" name="<?php echo esc_attr( self::META_SCALE ); ?>" style="width:100%">
+						<?php foreach ( $allowed_scales as $k => $label ) : ?>
+							<option value="<?php echo esc_attr( $k ); ?>" <?php selected( $scale_type, $k ); ?>><?php echo esc_html( $label ); ?></option>
+						<?php endforeach; ?>
+					</select>
+				</p>
+				<p style="margin:0">
+					<label>
+						<input type="checkbox" name="<?php echo esc_attr( self::META_HOLISTIC ); ?>" value="1" <?php checked( $is_holistic, true ); ?>>
+						<strong><?php esc_html_e( 'Rúbrica holística', 'atora-lms' ); ?></strong>
+					</label><br>
+					<span class="description"><?php esc_html_e( 'MVP: se guarda como configuración; el cálculo sigue siendo por criterios.', 'atora-lms' ); ?></span>
+				</p>
+			</div>
+			<div style="display:flex;gap:8px;align-items:end;margin-top:10px">
+				<p style="margin:0;flex:1">
+					<label for="clms_rubric_preset_select"><strong><?php esc_html_e( 'Preset', 'atora-lms' ); ?></strong></label><br>
+					<select id="clms_rubric_preset_select" style="width:100%">
+						<option value=""><?php esc_html_e( '— Sin preset —', 'atora-lms' ); ?></option>
+						<?php foreach ( (array) $preset_payloads as $preset ) : ?>
+							<option value="<?php echo esc_attr( (string) $preset['id'] ); ?>"><?php echo esc_html( (string) $preset['title'] ); ?></option>
+						<?php endforeach; ?>
+					</select>
+					<span class="description"><?php esc_html_e( 'Aplica un preset para copiar criterios y configuración.', 'atora-lms' ); ?></span>
+				</p>
+				<button type="button" class="button" id="clms_rubric_apply_preset"><?php esc_html_e( 'Aplicar preset', 'atora-lms' ); ?></button>
+			</div>
+		</div>
+
 		<div id="clms-rubric-builder" class="clms-rubric-builder">
 			<?php foreach ( $criteria as $i => $c ) :
 				$name    = isset( $c['name'] ) ? $c['name'] : '';
 				$desc    = isset( $c['description'] ) ? $c['description'] : '';
 				$competency = isset( $c['competency'] ) ? $c['competency'] : '';
 				$improvement_tip = isset( $c['improvement_tip'] ) ? $c['improvement_tip'] : '';
+				$weight  = isset( $c['weight'] ) ? (float) $c['weight'] : 0;
 				$max_pts = isset( $c['max_points'] ) ? max( 1, absint( $c['max_points'] ) ) : 10;
 				$levels  = isset( $c['levels'] ) && is_array( $c['levels'] ) ? array_values( $c['levels'] ) : array();
 			?>
@@ -209,6 +291,16 @@ class CLMS_Rubric {
 							class="clms-rubric-max-pts"
 							name="_clms_rubric_criteria[<?php echo esc_attr( $i ); ?>][max_points]"
 							value="<?php echo esc_attr( $max_pts ); ?>"
+						>
+						<input
+							type="number"
+							min="0"
+							max="100"
+							step="0.1"
+							class="clms-rubric-weight"
+							name="_clms_rubric_criteria[<?php echo esc_attr( $i ); ?>][weight]"
+							value="<?php echo esc_attr( (string) $weight ); ?>"
+							title="<?php echo esc_attr__( 'Peso (%)', 'atora-lms' ); ?>"
 						>
 						<button type="button" class="clms-rubric-icon-btn clms-rubric-duplicate" title="<?php echo esc_attr__( 'Duplicar criterio', 'atora-lms' ); ?>">⊕</button>
 						<button type="button" class="clms-rubric-icon-btn is-danger clms-rubric-delete" title="<?php echo esc_attr__( 'Eliminar criterio', 'atora-lms' ); ?>">✕</button>
@@ -241,18 +333,20 @@ class CLMS_Rubric {
 
 					<div class="clms-rubric-levels" hidden>
 						<div class="clms-rubric-levels-list">
-							<?php foreach ( $levels as $li => $level ) :
-								$label      = isset( $level['label'] ) ? (string) $level['label'] : '';
-								$points     = isset( $level['points'] ) ? max( 0, absint( $level['points'] ) ) : 0;
-								$descriptor = isset( $level['descriptor'] ) ? (string) $level['descriptor'] : '';
-							?>
-								<div class="clms-rubric-level">
-									<input type="text" name="_clms_rubric_criteria[<?php echo esc_attr( $i ); ?>][levels][<?php echo esc_attr( $li ); ?>][label]" value="<?php echo esc_attr( $label ); ?>" placeholder="<?php echo esc_attr__( 'Nivel', 'atora-lms' ); ?>">
-									<input type="number" min="0" max="999" name="_clms_rubric_criteria[<?php echo esc_attr( $i ); ?>][levels][<?php echo esc_attr( $li ); ?>][points]" value="<?php echo esc_attr( $points ); ?>">
-									<textarea rows="1" name="_clms_rubric_criteria[<?php echo esc_attr( $i ); ?>][levels][<?php echo esc_attr( $li ); ?>][descriptor]" placeholder="<?php echo esc_attr__( 'Descriptor del nivel', 'atora-lms' ); ?>"><?php echo esc_textarea( $descriptor ); ?></textarea>
-									<button type="button" class="clms-rubric-icon-btn is-danger clms-rubric-delete-level" title="<?php echo esc_attr__( 'Eliminar nivel', 'atora-lms' ); ?>">✕</button>
-								</div>
-							<?php endforeach; ?>
+								<?php foreach ( $levels as $li => $level ) :
+									$label      = isset( $level['label'] ) ? (string) $level['label'] : '';
+									$points     = isset( $level['points'] ) ? max( 0, absint( $level['points'] ) ) : 0;
+									$descriptor = isset( $level['descriptor'] ) ? (string) $level['descriptor'] : '';
+									$exemplar   = isset( $level['exemplar'] ) ? (string) $level['exemplar'] : '';
+								?>
+									<div class="clms-rubric-level">
+										<input type="text" name="_clms_rubric_criteria[<?php echo esc_attr( $i ); ?>][levels][<?php echo esc_attr( $li ); ?>][label]" value="<?php echo esc_attr( $label ); ?>" placeholder="<?php echo esc_attr__( 'Nivel', 'atora-lms' ); ?>">
+										<input type="number" min="0" max="999" name="_clms_rubric_criteria[<?php echo esc_attr( $i ); ?>][levels][<?php echo esc_attr( $li ); ?>][points]" value="<?php echo esc_attr( $points ); ?>">
+										<textarea rows="1" name="_clms_rubric_criteria[<?php echo esc_attr( $i ); ?>][levels][<?php echo esc_attr( $li ); ?>][descriptor]" placeholder="<?php echo esc_attr__( 'Descriptor del nivel', 'atora-lms' ); ?>"><?php echo esc_textarea( $descriptor ); ?></textarea>
+										<textarea rows="1" name="_clms_rubric_criteria[<?php echo esc_attr( $i ); ?>][levels][<?php echo esc_attr( $li ); ?>][exemplar]" placeholder="<?php echo esc_attr__( 'Ejemplar / benchmark (opcional)', 'atora-lms' ); ?>"><?php echo esc_textarea( $exemplar ); ?></textarea>
+										<button type="button" class="clms-rubric-icon-btn is-danger clms-rubric-delete-level" title="<?php echo esc_attr__( 'Eliminar nivel', 'atora-lms' ); ?>">✕</button>
+									</div>
+								<?php endforeach; ?>
 						</div>
 						<button type="button" class="button clms-rubric-add-level"><?php echo esc_html__( '+ Nivel', 'atora-lms' ); ?></button>
 					</div>
@@ -272,21 +366,25 @@ class CLMS_Rubric {
 		<div id="clms-rubric-preview" class="clms-rubric-preview" hidden></div>
 
 		<script>
-		(function(){
-			var builder     = document.getElementById('clms-rubric-builder');
-			var addBtn      = document.getElementById('clms-add-criterion');
-			var previewBtn  = document.getElementById('clms-preview-rubric');
-			var previewBox  = document.getElementById('clms-rubric-preview');
-			var totalEl     = document.getElementById('clms-rubric-total-pts');
-			var i18n        = {
-				namePlaceholder: <?php echo wp_json_encode( __( 'Nombre del criterio', 'atora-lms' ) ); ?>,
-				descPlaceholder: <?php echo wp_json_encode( __( 'Indicadores de logro...', 'atora-lms' ) ); ?>,
-				levelPlaceholder: <?php echo wp_json_encode( __( 'Nivel', 'atora-lms' ) ); ?>,
-				levelDescPlaceholder: <?php echo wp_json_encode( __( 'Descriptor del nivel', 'atora-lms' ) ); ?>,
-				addLevel: <?php echo wp_json_encode( __( '+ Nivel', 'atora-lms' ) ); ?>,
-				removeCriterion: <?php echo wp_json_encode( __( 'Eliminar criterio', 'atora-lms' ) ); ?>,
-				duplicateCriterion: <?php echo wp_json_encode( __( 'Duplicar criterio', 'atora-lms' ) ); ?>,
-				showLevels: <?php echo wp_json_encode( __( 'Mostrar niveles', 'atora-lms' ) ); ?>,
+			(function(){
+				var builder     = document.getElementById('clms-rubric-builder');
+				var addBtn      = document.getElementById('clms-add-criterion');
+				var previewBtn  = document.getElementById('clms-preview-rubric');
+				var previewBox  = document.getElementById('clms-rubric-preview');
+				var totalEl     = document.getElementById('clms-rubric-total-pts');
+				var presetSelect = document.getElementById('clms_rubric_preset_select');
+				var applyPresetBtn = document.getElementById('clms_rubric_apply_preset');
+				var presetData = <?php echo wp_json_encode( $preset_payloads ); ?>;
+				var i18n        = {
+					namePlaceholder: <?php echo wp_json_encode( __( 'Nombre del criterio', 'atora-lms' ) ); ?>,
+					descPlaceholder: <?php echo wp_json_encode( __( 'Indicadores de logro...', 'atora-lms' ) ); ?>,
+					levelPlaceholder: <?php echo wp_json_encode( __( 'Nivel', 'atora-lms' ) ); ?>,
+					levelDescPlaceholder: <?php echo wp_json_encode( __( 'Descriptor del nivel', 'atora-lms' ) ); ?>,
+					levelExemplarPlaceholder: <?php echo wp_json_encode( __( 'Ejemplar / benchmark (opcional)', 'atora-lms' ) ); ?>,
+					addLevel: <?php echo wp_json_encode( __( '+ Nivel', 'atora-lms' ) ); ?>,
+					removeCriterion: <?php echo wp_json_encode( __( 'Eliminar criterio', 'atora-lms' ) ); ?>,
+					duplicateCriterion: <?php echo wp_json_encode( __( 'Duplicar criterio', 'atora-lms' ) ); ?>,
+					showLevels: <?php echo wp_json_encode( __( 'Mostrar niveles', 'atora-lms' ) ); ?>,
 				hideLevels: <?php echo wp_json_encode( __( 'Ocultar niveles', 'atora-lms' ) ); ?>,
 				deleteLevel: <?php echo wp_json_encode( __( 'Eliminar nivel', 'atora-lms' ) ); ?>,
 				previewEmpty: <?php echo wp_json_encode( __( 'Agrega al menos un criterio con nombre para previsualizar la rúbrica.', 'atora-lms' ) ); ?>,
@@ -326,9 +424,9 @@ class CLMS_Rubric {
 			function reindexAllCriteria() {
 				builder.querySelectorAll('.clms-rubric-criterion').forEach(function(criterion, criterionIndex) {
 					criterion.dataset.index = String(criterionIndex);
-					criterion.querySelectorAll('.clms-rubric-name, .clms-rubric-max-pts, .clms-rubric-description-input, .clms-rubric-competency-input, .clms-rubric-improvement-input').forEach(function(field) {
-						field.name = field.name.replace(/_clms_rubric_criteria\[\d+\]/g, '_clms_rubric_criteria[' + criterionIndex + ']');
-					});
+						criterion.querySelectorAll('.clms-rubric-name, .clms-rubric-max-pts, .clms-rubric-weight, .clms-rubric-description-input, .clms-rubric-competency-input, .clms-rubric-improvement-input').forEach(function(field) {
+							field.name = field.name.replace(/_clms_rubric_criteria\[\d+\]/g, '_clms_rubric_criteria[' + criterionIndex + ']');
+						});
 					criterion.querySelectorAll('.clms-rubric-level').forEach(function(levelRow, levelIndex) {
 						levelRow.querySelectorAll('input, textarea').forEach(function(field) {
 							field.name = field.name
@@ -339,15 +437,16 @@ class CLMS_Rubric {
 				});
 			}
 
-			function buildLevelHtml(index, levelIndex, levelData) {
-				var data = levelData || { label: '', points: 0, descriptor: '' };
-				return '<div class="clms-rubric-level">'
-					+ '<input type="text" name="_clms_rubric_criteria[' + index + '][levels][' + levelIndex + '][label]" value="' + escapeHtml(data.label || '') + '" placeholder="' + escapeHtml(i18n.levelPlaceholder) + '">'
-					+ '<input type="number" min="0" max="999" name="_clms_rubric_criteria[' + index + '][levels][' + levelIndex + '][points]" value="' + escapeHtml(String(toInt(data.points, 0))) + '">'
-					+ '<textarea rows="1" name="_clms_rubric_criteria[' + index + '][levels][' + levelIndex + '][descriptor]" placeholder="' + escapeHtml(i18n.levelDescPlaceholder) + '">' + escapeHtml(data.descriptor || '') + '</textarea>'
-					+ '<button type="button" class="clms-rubric-icon-btn is-danger clms-rubric-delete-level" title="' + escapeHtml(i18n.deleteLevel) + '">✕</button>'
-					+ '</div>';
-			}
+				function buildLevelHtml(index, levelIndex, levelData) {
+					var data = levelData || { label: '', points: 0, descriptor: '' };
+					return '<div class="clms-rubric-level">'
+						+ '<input type="text" name="_clms_rubric_criteria[' + index + '][levels][' + levelIndex + '][label]" value="' + escapeHtml(data.label || '') + '" placeholder="' + escapeHtml(i18n.levelPlaceholder) + '">'
+						+ '<input type="number" min="0" max="999" name="_clms_rubric_criteria[' + index + '][levels][' + levelIndex + '][points]" value="' + escapeHtml(String(toInt(data.points, 0))) + '">'
+						+ '<textarea rows="1" name="_clms_rubric_criteria[' + index + '][levels][' + levelIndex + '][descriptor]" placeholder="' + escapeHtml(i18n.levelDescPlaceholder) + '">' + escapeHtml(data.descriptor || '') + '</textarea>'
+						+ '<textarea rows="1" name="_clms_rubric_criteria[' + index + '][levels][' + levelIndex + '][exemplar]" placeholder="' + escapeHtml(i18n.levelExemplarPlaceholder) + '">' + escapeHtml(data.exemplar || '') + '</textarea>'
+						+ '<button type="button" class="clms-rubric-icon-btn is-danger clms-rubric-delete-level" title="' + escapeHtml(i18n.deleteLevel) + '">✕</button>'
+						+ '</div>';
+				}
 
 			function buildCriterionHtml(index, seed) {
 				var data = seed || {};
@@ -357,14 +456,15 @@ class CLMS_Rubric {
 					return buildLevelHtml(index, levelIndex, level);
 				}).join('');
 
-				return '<div class="clms-rubric-criterion" data-index="' + index + '">'
-					+ '<div class="clms-rubric-criterion-header">'
-					+ '<span class="clms-rubric-drag-handle" title="☰">☰</span>'
-					+ '<input type="text" class="clms-rubric-name" name="_clms_rubric_criteria[' + index + '][name]" value="' + escapeHtml(data.name || '') + '" placeholder="' + escapeHtml(i18n.namePlaceholder) + '">'
-					+ '<input type="number" min="1" max="999" class="clms-rubric-max-pts" name="_clms_rubric_criteria[' + index + '][max_points]" value="' + escapeHtml(String(maxPoints)) + '">'
-					+ '<button type="button" class="clms-rubric-icon-btn clms-rubric-duplicate" title="' + escapeHtml(i18n.duplicateCriterion) + '">⊕</button>'
-					+ '<button type="button" class="clms-rubric-icon-btn is-danger clms-rubric-delete" title="' + escapeHtml(i18n.removeCriterion) + '">✕</button>'
-					+ '<button type="button" class="clms-rubric-icon-btn clms-rubric-toggle-levels" title="' + escapeHtml(i18n.showLevels) + '" aria-expanded="false">▸</button>'
+					return '<div class="clms-rubric-criterion" data-index="' + index + '">'
+						+ '<div class="clms-rubric-criterion-header">'
+						+ '<span class="clms-rubric-drag-handle" title="☰">☰</span>'
+						+ '<input type="text" class="clms-rubric-name" name="_clms_rubric_criteria[' + index + '][name]" value="' + escapeHtml(data.name || '') + '" placeholder="' + escapeHtml(i18n.namePlaceholder) + '">'
+						+ '<input type="number" min="1" max="999" class="clms-rubric-max-pts" name="_clms_rubric_criteria[' + index + '][max_points]" value="' + escapeHtml(String(maxPoints)) + '">'
+						+ '<input type="number" min="0" max="100" step="0.1" class="clms-rubric-weight" name="_clms_rubric_criteria[' + index + '][weight]" value="' + escapeHtml(String((data.weight !== undefined && data.weight !== null) ? data.weight : '')) + '" title="Peso (%)">'
+						+ '<button type="button" class="clms-rubric-icon-btn clms-rubric-duplicate" title="' + escapeHtml(i18n.duplicateCriterion) + '">⊕</button>'
+						+ '<button type="button" class="clms-rubric-icon-btn is-danger clms-rubric-delete" title="' + escapeHtml(i18n.removeCriterion) + '">✕</button>'
+						+ '<button type="button" class="clms-rubric-icon-btn clms-rubric-toggle-levels" title="' + escapeHtml(i18n.showLevels) + '" aria-expanded="false">▸</button>'
 					+ '</div>'
 					+ '<div class="clms-rubric-description">'
 					+ '<textarea rows="2" class="clms-rubric-description-input" name="_clms_rubric_criteria[' + index + '][description]" placeholder="' + escapeHtml(i18n.descPlaceholder) + '">' + escapeHtml(data.description || '') + '</textarea>'
@@ -384,24 +484,26 @@ class CLMS_Rubric {
 					.replace(/'/g, '&#039;');
 			}
 
-			function getCriterionPayload(criterion) {
-				var levels = [];
-				criterion.querySelectorAll('.clms-rubric-level').forEach(function(level) {
-					levels.push({
-						label: level.querySelector('input[name*="[label]"]') ? level.querySelector('input[name*="[label]"]').value : '',
-						points: toInt(level.querySelector('input[name*="[points]"]') ? level.querySelector('input[name*="[points]"]').value : 0, 0),
-						descriptor: level.querySelector('textarea[name*="[descriptor]"]') ? level.querySelector('textarea[name*="[descriptor]"]').value : ''
+				function getCriterionPayload(criterion) {
+					var levels = [];
+					criterion.querySelectorAll('.clms-rubric-level').forEach(function(level) {
+						levels.push({
+							label: level.querySelector('input[name*="[label]"]') ? level.querySelector('input[name*="[label]"]').value : '',
+							points: toInt(level.querySelector('input[name*="[points]"]') ? level.querySelector('input[name*="[points]"]').value : 0, 0),
+							descriptor: level.querySelector('textarea[name*="[descriptor]"]') ? level.querySelector('textarea[name*="[descriptor]"]').value : '',
+							exemplar: level.querySelector('textarea[name*="[exemplar]"]') ? level.querySelector('textarea[name*="[exemplar]"]').value : ''
+						});
 					});
-				});
-				return {
-					name: criterion.querySelector('.clms-rubric-name') ? criterion.querySelector('.clms-rubric-name').value : '',
-					description: criterion.querySelector('.clms-rubric-description-input') ? criterion.querySelector('.clms-rubric-description-input').value : '',
-					competency: criterion.querySelector('.clms-rubric-competency-input') ? criterion.querySelector('.clms-rubric-competency-input').value : '',
-					improvement_tip: criterion.querySelector('.clms-rubric-improvement-input') ? criterion.querySelector('.clms-rubric-improvement-input').value : '',
-					max_points: toInt(criterion.querySelector('.clms-rubric-max-pts') ? criterion.querySelector('.clms-rubric-max-pts').value : 10, 10),
-					levels: levels
-				};
-			}
+					return {
+						name: criterion.querySelector('.clms-rubric-name') ? criterion.querySelector('.clms-rubric-name').value : '',
+						description: criterion.querySelector('.clms-rubric-description-input') ? criterion.querySelector('.clms-rubric-description-input').value : '',
+						competency: criterion.querySelector('.clms-rubric-competency-input') ? criterion.querySelector('.clms-rubric-competency-input').value : '',
+						improvement_tip: criterion.querySelector('.clms-rubric-improvement-input') ? criterion.querySelector('.clms-rubric-improvement-input').value : '',
+						weight: criterion.querySelector('.clms-rubric-weight') ? criterion.querySelector('.clms-rubric-weight').value : '',
+						max_points: toInt(criterion.querySelector('.clms-rubric-max-pts') ? criterion.querySelector('.clms-rubric-max-pts').value : 10, 10),
+						levels: levels
+					};
+				}
 
 			function addCriterion(seed) {
 				var idx = builder.querySelectorAll('.clms-rubric-criterion').length;
@@ -509,15 +611,45 @@ class CLMS_Rubric {
 				}
 			});
 
-			addBtn.addEventListener('click', function() {
-				addCriterion({});
-			});
+				addBtn.addEventListener('click', function() {
+					addCriterion({});
+				});
 
-			previewBtn.addEventListener('click', function() {
-				if (previewBox.hidden) {
-					renderPreview();
-					return;
+				if (applyPresetBtn) {
+					applyPresetBtn.addEventListener('click', function() {
+						var id = presetSelect ? presetSelect.value : '';
+						if (!id) {
+							return;
+						}
+						var preset = (presetData || []).find(function(p) { return String(p.id) === String(id); });
+						if (!preset) {
+							return;
+						}
+						var scaleEl = document.getElementById('clms_rubric_scale_type');
+						if (scaleEl) {
+							scaleEl.value = preset.scale_type || '';
+						}
+						var holisticEl = document.querySelector('input[name="<?php echo esc_js( self::META_HOLISTIC ); ?>"]');
+						if (holisticEl) {
+							holisticEl.checked = !!preset.is_holistic;
+						}
+						builder.innerHTML = '';
+						var criteria = Array.isArray(preset.criteria) ? preset.criteria : [];
+						if (!criteria.length) {
+							addCriterion({});
+							return;
+						}
+						criteria.forEach(function(c) { addCriterion(c || {}); });
+						reindexAllCriteria();
+						calcTotal();
+					});
 				}
+
+				previewBtn.addEventListener('click', function() {
+					if (previewBox.hidden) {
+						renderPreview();
+						return;
+					}
 				previewBox.hidden = true;
 			});
 
@@ -542,7 +674,7 @@ class CLMS_Rubric {
 	public function save_meta_boxes( $post_id, $post ) {
 		$post_id = absint( $post_id );
 
-		if ( ! $post_id || ! $post || self::CPT !== $post->post_type ) {
+		if ( ! $post_id || ! $post || ! in_array( $post->post_type, array( self::CPT, self::PRESET_CPT ), true ) ) {
 			return;
 		}
 
@@ -561,6 +693,16 @@ class CLMS_Rubric {
 		if ( ! CLMS_Helper::user_can_manage_lms( $post_id ) ) {
 			return;
 		}
+
+		$allowed_scales = array( '', '0_4', '0_5', '0_20', '0_100', 'a_f' );
+		$scale_type = isset( $_POST[ self::META_SCALE ] ) ? sanitize_key( (string) wp_unslash( $_POST[ self::META_SCALE ] ) ) : '';
+		if ( ! in_array( $scale_type, $allowed_scales, true ) ) {
+			$scale_type = '';
+		}
+		update_post_meta( $post_id, self::META_SCALE, $scale_type );
+
+		$is_holistic = ! empty( $_POST[ self::META_HOLISTIC ] ) ? '1' : '0';
+		update_post_meta( $post_id, self::META_HOLISTIC, $is_holistic );
 
 		$raw      = isset( $_POST['_clms_rubric_criteria'] ) ? wp_unslash( $_POST['_clms_rubric_criteria'] ) : array();
 		$criteria = $this->sanitize_criteria( $raw );
@@ -582,6 +724,8 @@ class CLMS_Rubric {
 			$competency = isset( $item['competency'] ) ? sanitize_text_field( $item['competency'] ) : '';
 			$competency_id = isset( $item['competency_id'] ) ? sanitize_key( $item['competency_id'] ) : sanitize_key( sanitize_title( $competency ) );
 			$improvement_tip = isset( $item['improvement_tip'] ) ? sanitize_textarea_field( $item['improvement_tip'] ) : '';
+			$weight_raw = $item['weight'] ?? '';
+			$weight     = '' !== (string) $weight_raw && is_numeric( $weight_raw ) ? max( 0.0, min( 100.0, (float) $weight_raw ) ) : 0.0;
 			$max    = isset( $item['max_points'] ) ? max( 1, absint( $item['max_points'] ) ) : 10;
 			$levels = isset( $item['levels'] ) && is_array( $item['levels'] ) ? array_values( $item['levels'] ) : array();
 
@@ -598,8 +742,9 @@ class CLMS_Rubric {
 				$label      = isset( $level['label'] ) ? sanitize_text_field( $level['label'] ) : '';
 				$points     = isset( $level['points'] ) ? max( 0, absint( $level['points'] ) ) : 0;
 				$descriptor = isset( $level['descriptor'] ) ? sanitize_textarea_field( $level['descriptor'] ) : '';
+				$exemplar   = isset( $level['exemplar'] ) ? sanitize_textarea_field( $level['exemplar'] ) : '';
 
-				if ( '' === $label && '' === $descriptor && 0 === $points ) {
+				if ( '' === $label && '' === $descriptor && '' === $exemplar && 0 === $points ) {
 					continue;
 				}
 
@@ -607,6 +752,7 @@ class CLMS_Rubric {
 					'label'      => $label,
 					'points'     => $points,
 					'descriptor' => $descriptor,
+					'exemplar'   => $exemplar,
 				);
 			}
 
@@ -616,9 +762,31 @@ class CLMS_Rubric {
 					'competency' => $competency,
 					'competency_id' => $competency_id,
 					'improvement_tip' => $improvement_tip,
+					'weight'     => $weight,
 					'max_points' => $max,
 					'levels'     => $clean_levels,
 				);
+		}
+
+		// Normalizar pesos a 100%.
+		$sum = 0.0;
+		foreach ( $clean as $row ) {
+			$sum += (float) ( $row['weight'] ?? 0 );
+		}
+		$count = count( $clean );
+		if ( $count > 0 ) {
+			if ( $sum <= 0.0 ) {
+				$equal = 100.0 / $count;
+				foreach ( $clean as &$row ) {
+					$row['weight'] = round( $equal, 2 );
+				}
+				unset( $row );
+			} else {
+				foreach ( $clean as &$row ) {
+					$row['weight'] = round( ( (float) ( $row['weight'] ?? 0 ) / $sum ) * 100.0, 2 );
+				}
+				unset( $row );
+			}
 		}
 
 		return $clean;

@@ -37,6 +37,10 @@ class CLMS_Notifications {
 		$lesson_id     = absint( $lesson_id );
 		$student_id    = absint( $student_id );
 
+		if ( $submission_id && '1' === (string) get_post_meta( $submission_id, '_clms_submission_is_shadow', true ) ) {
+			return;
+		}
+
 		if ( ! $lesson_id && $submission_id ) {
 			$lesson_id = absint( get_post_meta( $submission_id, '_clms_submission_lesson_id', true ) );
 		}

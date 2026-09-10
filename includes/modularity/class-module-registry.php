@@ -31,7 +31,7 @@ class CLMS_Module_Registry {
 	private static array $unknown_slug_logged = array();
 
 	/**
-	 * Definición declarativa de los 19 módulos del plugin.
+	 * Definición declarativa de los módulos del plugin.
 	 *
 	 * `requires`: otros slugs que deben estar activos para que este lo esté
 	 * (usado para bloquear desactivación de un módulo del que otros dependen,
@@ -74,6 +74,28 @@ class CLMS_Module_Registry {
 				'group'               => 'core',
 				'requires'            => array( 'lms' ),
 				'provides_pages'      => array( 'clms-academic-hub', 'clms-academic-content', 'clms-instructor-profile', 'clms-academic-wizard', 'clms-academic-reports' ),
+				'provides_shortcodes' => array(),
+				'provides_rest'       => array(),
+				'tables'              => array(),
+				'core'                => true,
+			),
+			'groups'         => array(
+				'label'               => 'Grupos',
+				'description'         => 'Evaluación por grupos (Group Assessment): gestión de grupos, entregas grupales y reportes.',
+				'group'               => 'core',
+				'requires'            => array( 'lms', 'gradebook' ),
+				'provides_pages'      => array( 'atora-groups' ),
+				'provides_shortcodes' => array(),
+				'provides_rest'       => array( '/groups' ),
+				'tables'              => array( 'clms_groups', 'clms_group_members', 'clms_group_submissions', 'clms_group_grade_overrides', 'clms_group_audit_log' ),
+				'core'                => true,
+			),
+			'rubrics'        => array(
+				'label'               => 'Rúbricas v2',
+				'description'         => 'Rúbricas con pesos, escalas y presets reutilizables.',
+				'group'               => 'core',
+				'requires'            => array( 'lms', 'gradebook' ),
+				'provides_pages'      => array(),
 				'provides_shortcodes' => array(),
 				'provides_rest'       => array(),
 				'tables'              => array(),
@@ -201,6 +223,17 @@ class CLMS_Module_Registry {
 				'provides_rest'       => array( '/analytics' ),
 				'tables'              => array( 'atora_user_engagement', 'atora_form_entries', 'atora_form_throttle' ),
 				'core'                => false,
+			),
+			'early-warning'  => array(
+				'label'               => 'Early Warning',
+				'description'         => 'Alertas tempranas para docentes (riesgo por curso).',
+				'group'               => 'reports',
+				'requires'            => array( 'lms' ),
+				'provides_pages'      => array( 'atora-early-warning' ),
+				'provides_shortcodes' => array(),
+				'provides_rest'       => array( '/early-warning' ),
+				'tables'              => array( 'atora_early_warning' ),
+				'core'                => true,
 			),
 			'security'       => array(
 				'label'               => 'Seguridad',

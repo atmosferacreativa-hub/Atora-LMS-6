@@ -22,11 +22,107 @@ trait CLMS_Submission_Storage_Review_Trait {
 			return new WP_Error( 'cannot_submit', __( 'No tienes permisos para enviar esta tarea.', 'atora-lms' ) );
 		}
 
-		$course_id = $this->get_course_id_for_lesson( $lesson_id );
-		$comment   = isset( $data['comment'] ) ? wp_kses_post( (string) $data['comment'] ) : '';
+			$course_id = $this->get_course_id_for_lesson( $lesson_id );
+			$comment   = isset( $data['comment'] ) ? wp_kses_post( (string) $data['comment'] ) : '';
+			$evaluation_mode = sanitize_key( (string) get_post_meta( $lesson_id, '_clms_evaluation_mode', true ) );
 
-		$submission_id = $this->get_existing_submission_id( $user_id, $lesson_id );
-		$is_new        = false;
+			// Group assessment: one master submission per group + shadow submissions for members.
+			if ( 'group' === $evaluation_mode ) {
+				$groups_enabled = $course_id ? ( '1' === (string) get_post_meta( $course_id, '_clms_course_groups_enabled', true ) ) : false;
+				if ( ! $groups_enabled ) {
+					return new WP_Error( 'group_disabled', __( 'Este curso no tiene habilitada la evaluación por grupos.', 'atora-lms' ) );
+				}
+
+				$group_id = (int) apply_filters( 'atora/groups/user_group_id', 0, $user_id, absint( $course_id ), $lesson_id );
+				$group_id = absint( $group_id );
+				if ( ! $group_id ) {
+					return new WP_Error( 'no_group', __( 'No tienes un grupo asignado para esta actividad.', 'atora-lms' ) );
+				}
+
+				$submission_id = $this->get_existing_group_master_submission_id( $group_id, $lesson_id );
+				$is_new        = false;
+
+				if ( $submission_id ) {
+					wp_update_post(
+						array(
+							'ID'         => $submission_id,
+							'post_title' => sprintf( 'Entrega (grupo): %s - %s', get_the_title( $lesson_id ), wp_date( 'Y-m-d H:i:s' ) ),
+						)
+					);
+				} else {
+					$submission_id = wp_insert_post(
+						array(
+							'post_type'   => self::CPT,
+							'post_status' => 'publish',
+							'post_author' => $user_id,
+							'post_title'  => sprintf( 'Entrega (grupo): %s - %s', get_the_title( $lesson_id ), wp_date( 'Y-m-d H:i:s' ) ),
+						),
+						true
+					);
+
+					if ( is_wp_error( $submission_id ) || ! $submission_id ) {
+						return new WP_Error( 'submission_create_failed', __( 'No se pudo crear la entrega grupal.', 'atora-lms' ) );
+					}
+
+					$is_new = true;
+				}
+
+				update_post_meta( $submission_id, '_clms_submission_user_id', $user_id );
+				update_post_meta( $submission_id, '_clms_submission_lesson_id', $lesson_id );
+				update_post_meta( $submission_id, '_clms_submission_course_id', $course_id );
+				update_post_meta( $submission_id, '_clms_submission_comment', $comment );
+				update_post_meta( $submission_id, '_clms_submission_status', 'submitted' );
+				update_post_meta( $submission_id, '_clms_submission_submitted_at', current_time( 'mysql' ) );
+				update_post_meta( $submission_id, '_clms_submission_group_id', $group_id );
+				update_post_meta( $submission_id, '_clms_submission_group_master', '1' );
+
+				$stale_review_meta = array(
+					'_clms_submission_grade',
+					'_clms_submission_feedback',
+					'_clms_submission_rubric_scores',
+					'_clms_peer_grade',
+					'_clms_peer_scores',
+					'_clms_peer_grade_at',
+					'_clms_final_grade',
+				);
+
+				foreach ( $stale_review_meta as $meta_key ) {
+					delete_post_meta( $submission_id, $meta_key );
+				}
+
+				$attachment_ids = $this->handle_uploaded_files( $submission_id, $user_id, $files_data );
+
+				if ( is_wp_error( $attachment_ids ) ) {
+					return $attachment_ids;
+				}
+
+				if ( ! empty( $attachment_ids ) ) {
+					update_post_meta( $submission_id, '_clms_submission_files', $attachment_ids );
+					update_post_meta( $submission_id, '_clms_submission_attachments', $attachment_ids );
+				}
+
+				$this->reset_ai_review_data( $submission_id );
+
+				if ( $is_new ) {
+					do_action( 'clms_submission_created', $submission_id, $lesson_id, $user_id );
+				}
+
+				do_action( 'clms_submission_saved', $submission_id, $user_id, $lesson_id, $course_id );
+				do_action( 'atora/groups/master_submission_saved', $group_id, $submission_id, $lesson_id, absint( $course_id ), $user_id );
+
+				return $submission_id;
+			}
+
+			$evaluation_mode = sanitize_key( (string) get_post_meta( $lesson_id, '_clms_evaluation_mode', true ) );
+			if ( 'group' === $evaluation_mode ) {
+				$course_id = $this->get_course_id_for_lesson( $lesson_id );
+				$group_id  = (int) apply_filters( 'atora/groups/user_group_id', 0, $user_id, absint( $course_id ), $lesson_id );
+				$group_id  = absint( $group_id );
+				$submission_id = $group_id ? $this->get_existing_group_master_submission_id( $group_id, $lesson_id ) : 0;
+			} else {
+				$submission_id = $this->get_existing_submission_id( $user_id, $lesson_id );
+			}
+			$is_new        = false;
 
 		if ( $submission_id ) {
 			wp_update_post(
@@ -799,6 +895,52 @@ trait CLMS_Submission_Storage_Review_Trait {
 		);
 
 		return ! empty( $submission_ids ) ? absint( $submission_ids[0] ) : 0;
+	}
+
+	/**
+	 * Obtiene el ID de la entrega master del grupo para una lección.
+	 *
+	 * @param int $group_id
+	 * @param int $lesson_id
+	 * @return int
+	 */
+	protected function get_existing_group_master_submission_id( int $group_id, int $lesson_id ): int {
+		$group_id  = absint( $group_id );
+		$lesson_id = absint( $lesson_id );
+
+		if ( ! $group_id || ! $lesson_id ) {
+			return 0;
+		}
+
+		$ids = get_posts(
+			array(
+				'post_type'      => self::CPT,
+				'post_status'    => array( 'publish', 'private' ),
+				'posts_per_page' => 1,
+				'fields'         => 'ids',
+				'orderby'        => 'date',
+				'order'          => 'DESC',
+				'no_found_rows'  => true,
+				'meta_query'     => array(
+					array(
+						'key'   => '_clms_submission_group_master',
+						'value' => '1',
+					),
+					array(
+						'key'   => '_clms_submission_group_id',
+						'value' => $group_id,
+						'type'  => 'NUMERIC',
+					),
+					array(
+						'key'   => '_clms_submission_lesson_id',
+						'value' => $lesson_id,
+						'type'  => 'NUMERIC',
+					),
+				),
+			)
+		);
+
+		return ! empty( $ids ) ? absint( $ids[0] ) : 0;
 	}
 
 	/**

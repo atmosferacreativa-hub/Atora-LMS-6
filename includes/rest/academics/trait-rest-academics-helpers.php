@@ -348,7 +348,7 @@ trait CLMS_REST_Academics_Helpers_Trait {
 
 		if ( array_key_exists( 'evaluation_mode', $data ) ) {
 			$mode = sanitize_key( (string) $data['evaluation_mode'] );
-			$mode = in_array( $mode, array( 'manual', 'ai_assisted', 'ai_auto_grade', 'peer_review', 'hybrid' ), true ) ? $mode : 'manual';
+			$mode = in_array( $mode, array( 'manual', 'ai_assisted', 'ai_auto_grade', 'peer_review', 'group', 'hybrid' ), true ) ? $mode : 'manual';
 			update_post_meta( $post_id, '_clms_evaluation_mode', $mode );
 		}
 

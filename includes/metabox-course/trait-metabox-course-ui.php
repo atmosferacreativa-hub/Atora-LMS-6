@@ -79,6 +79,7 @@ trait CLMS_Metabox_Course_UI_Trait {
 					'ai_assisted'   => __( 'AI assisted', 'atora-lms' ),
 					'ai_auto_grade' => __( 'AI auto grade', 'atora-lms' ),
 					'peer_review'   => __( 'Peer review', 'atora-lms' ),
+					'group'         => __( 'Trabajo en grupo', 'atora-lms' ),
 					'hybrid'        => __( 'Hybrid', 'atora-lms' ),
 				),
 				'activityModes' => array(
@@ -690,6 +691,54 @@ trait CLMS_Metabox_Course_UI_Trait {
 			</label><br>
 			<span class="description"><?php esc_html_e( 'Al asignar el rol "lms_student" a un usuario sin cursos, se le inscribe aquí automáticamente.', 'atora-lms' ); ?></span>
 		</p>
+		<details style="margin-top:12px;border-top:1px solid #e5e7eb;padding-top:12px" open>
+			<summary><strong><?php esc_html_e( 'Evaluación (curso)', 'atora-lms' ); ?></strong></summary>
+			<div style="display:grid;gap:10px;margin-top:10px">
+				<?php
+				$scale = sanitize_key( (string) get_post_meta( $post->ID, '_clms_course_grade_scale', true ) );
+				$locked = '1' === (string) get_post_meta( $post->ID, '_clms_course_grade_scale_locked', true );
+				$allowed_scales = array(
+					'0_4'   => __( '0–4', 'atora-lms' ),
+					'0_5'   => __( '0–5', 'atora-lms' ),
+					'0_20'  => __( '0–20', 'atora-lms' ),
+					'0_100' => __( '0–100', 'atora-lms' ),
+					'a_f'   => __( 'A–F', 'atora-lms' ),
+				);
+				if ( ! array_key_exists( $scale, $allowed_scales ) ) {
+					$scale = '';
+				}
+				?>
+				<p style="margin:0">
+					<label for="_clms_course_grade_scale"><strong><?php esc_html_e( 'Escala del curso', 'atora-lms' ); ?></strong></label><br>
+					<select id="_clms_course_grade_scale" name="_clms_course_grade_scale" style="width:100%" <?php disabled( $locked, true ); ?>>
+						<option value=""><?php esc_html_e( 'Sin definir (0–100 interno)', 'atora-lms' ); ?></option>
+						<?php foreach ( $allowed_scales as $key => $label ) : ?>
+							<option value="<?php echo esc_attr( $key ); ?>" <?php selected( $scale, $key ); ?>>
+								<?php echo esc_html( $label ); ?>
+							</option>
+						<?php endforeach; ?>
+					</select>
+					<?php if ( $locked ) : ?>
+						<span class="description"><?php esc_html_e( 'La escala se bloqueó porque ya existen calificaciones publicadas en este curso.', 'atora-lms' ); ?></span>
+					<?php else : ?>
+						<span class="description"><?php esc_html_e( 'Se define al inicio del curso. Internamente ATORA sigue calculando en 0–100.', 'atora-lms' ); ?></span>
+					<?php endif; ?>
+				</p>
+				<p style="margin:0">
+					<label>
+						<input type="checkbox" name="_clms_course_groups_enabled" value="1" <?php checked( '1', (string) get_post_meta( $post->ID, '_clms_course_groups_enabled', true ) ); ?>>
+						<strong><?php esc_html_e( 'Habilitar evaluación por grupos', 'atora-lms' ); ?></strong>
+					</label><br>
+					<span class="description">
+						<?php esc_html_e( 'Luego puedes marcar lecciones específicas como "Trabajo en grupo" desde la malla.', 'atora-lms' ); ?>
+						<?php
+						$link = admin_url( 'admin.php?page=atora-groups&course_id=' . absint( $post->ID ) );
+						?>
+						<br><a href="<?php echo esc_url( $link ); ?>"><?php esc_html_e( 'Gestionar grupos del curso', 'atora-lms' ); ?></a>
+					</span>
+				</p>
+			</div>
+		</details>
 		<details style="margin-top:12px;border-top:1px solid #e5e7eb;padding-top:12px" open>
 			<summary><strong><?php esc_html_e( 'Ficha académica del curso', 'atora-lms' ); ?></strong></summary>
 			<div style="display:grid;gap:10px;margin-top:10px">

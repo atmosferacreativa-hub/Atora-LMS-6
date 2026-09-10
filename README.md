@@ -75,6 +75,10 @@ Estas comprobaciones son una barrera técnica mínima. No reemplazan la matriz f
 
 El resultado se genera en `dist/atora-lms-<version>.zip`. Consulta [docs/EMPAQUETADO.md](docs/EMPAQUETADO.md) antes de publicar una versión.
 
+## Roadmaps
+
+- Evolución del LMS (rolling 6 meses): [docs/ROADMAP-LMS-EVOLUCION.md](docs/ROADMAP-LMS-EVOLUCION.md)
+
 ## Seguridad y datos
 
 La desinstalación conserva los datos por defecto. El borrado profundo solo se ejecuta cuando el administrador activa expresamente la opción correspondiente.

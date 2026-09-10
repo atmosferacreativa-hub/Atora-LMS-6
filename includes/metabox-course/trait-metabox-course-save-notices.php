@@ -97,6 +97,20 @@ trait CLMS_Metabox_Course_Save_Notices_Trait {
 			$auto_enroll      = isset( $_POST['_clms_auto_enroll'] ) ? '1' : '0';
 			update_post_meta( $post_id, '_clms_auto_enroll', $auto_enroll );
 
+			// Evaluación (curso): escala (se bloquea tras primera calificación) y habilitar grupos.
+			$groups_enabled = ! empty( $_POST['_clms_course_groups_enabled'] ) ? '1' : '0';
+			update_post_meta( $post_id, '_clms_course_groups_enabled', $groups_enabled );
+
+			$scale_locked = '1' === (string) get_post_meta( $post_id, '_clms_course_grade_scale_locked', true );
+			$allowed_scales = array( '', '0_4', '0_5', '0_20', '0_100', 'a_f' );
+			$new_scale = isset( $_POST['_clms_course_grade_scale'] ) ? sanitize_key( (string) wp_unslash( $_POST['_clms_course_grade_scale'] ) ) : '';
+			if ( ! in_array( $new_scale, $allowed_scales, true ) ) {
+				$new_scale = '';
+			}
+			if ( ! $scale_locked ) {
+				update_post_meta( $post_id, '_clms_course_grade_scale', $new_scale );
+			}
+
 			CLMS_Helper::assign_course_to_programs( $post_id, $program_ids );
 			update_post_meta( $post_id, CLMS_Helper::COURSE_PREREQUISITES_META, array_values( array_diff( array_unique( $prerequisite_ids ), array( (int) $post_id ) ) ) );
 

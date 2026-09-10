@@ -605,11 +605,14 @@ trait CLMS_Grading_SpeedGrade_Trait {
 			$raw_scores  = is_array( $raw_scores ) ? $raw_scores : array();
 			$total_pts   = 0;
 			$earned_pts  = 0;
+			$total_weight = 0.0;
+			$earned_weight = 0.0;
 			$total_criteria = is_array( $criteria ) ? count( $criteria ) : 0;
 			$scored_criteria = 0;
 
 			foreach ( $criteria as $i => $c ) {
 				$max            = isset( $c['max_points'] ) ? absint( $c['max_points'] ) : 0;
+				$weight         = isset( $c['weight'] ) ? (float) $c['weight'] : 0.0;
 				$score_raw      = isset( $raw_scores[ $i ] ) ? trim( (string) $raw_scores[ $i ] ) : '';
 				$score          = '' !== $score_raw ? max( 0, min( $max, absint( $score_raw ) ) ) : '';
 				$rubric_fb_raw  = isset( $_POST['rubric_feedback'][ $i ] ) ? wp_unslash( $_POST['rubric_feedback'][ $i ] ) : '';
@@ -618,8 +621,12 @@ trait CLMS_Grading_SpeedGrade_Trait {
 					: sanitize_textarea_field( (string) $rubric_fb_raw );
 
 				$total_pts  += $max;
+				$total_weight += max( 0.0, min( 100.0, $weight ) );
 				if ( '' !== (string) $score ) {
 					$earned_pts += absint( $score );
+					if ( $max > 0 ) {
+						$earned_weight += ( (float) absint( $score ) / (float) $max ) * max( 0.0, min( 100.0, $weight ) );
+					}
 					++$scored_criteria;
 				}
 				if ( '' !== (string) $score || '' !== trim( (string) $rubric_fb_safe ) ) {
@@ -637,7 +644,11 @@ trait CLMS_Grading_SpeedGrade_Trait {
 			// Derive overall grade 0-100 proportionally from rubric, only if all criteria scored
 			$all_scored = $total_criteria > 0 && $scored_criteria === $total_criteria;
 			if ( $all_scored && $total_pts > 0 ) {
-				$grade_from_rubric = (int) round( ( $earned_pts / $total_pts ) * 100 );
+				if ( $total_weight > 0.0 ) {
+					$grade_from_rubric = (int) round( ( $earned_weight / $total_weight ) * 100 );
+				} else {
+					$grade_from_rubric = (int) round( ( $earned_pts / $total_pts ) * 100 );
+				}
 			}
 		}
 

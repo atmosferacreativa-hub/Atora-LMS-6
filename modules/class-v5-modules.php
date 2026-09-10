@@ -74,6 +74,23 @@ class V5_Modules {
 			self::load_analytics( $ctx );
 		}
 
+		// Groups (Group Assessment): admin/rest/front para entregas grupales.
+		if ( ( $ctx['is_admin'] || $ctx['is_rest'] || $ctx['is_front'] || $ctx['is_ajax'] )
+			&& self::module_active( 'groups' ) ) {
+			self::load_groups();
+		}
+
+		// Rubrics v2: presets y helpers (admin).
+		if ( $ctx['is_admin'] && self::module_active( 'rubrics' ) ) {
+			self::load_rubrics();
+		}
+
+		// Early warning: cron/rest/admin.
+		if ( ( $ctx['is_admin'] || $ctx['is_rest'] || $ctx['is_cron'] )
+			&& self::module_active( 'early-warning' ) ) {
+			self::load_early_warning();
+		}
+
 		// Messaging: evitar carga en frontend público general.
 		if ( ( $ctx['is_admin'] || $ctx['is_cron'] || $ctx['is_rest'] || $ctx['is_ajax'] || $ctx['is_webhook'] )
 			&& self::module_active( 'messaging' ) ) {
@@ -122,6 +139,39 @@ class V5_Modules {
 		}
 		if ( class_exists( 'ATORA\Google\Google_Identity' ) ) {
 			\ATORA\Google\Google_Identity::init();
+		}
+	}
+
+	/** @return void */
+	private static function load_groups(): void {
+		$dir = ATORA_LMS_MODULES_DIR . 'groups/';
+		self::require_file( $dir . 'class-group-service.php' );
+		self::require_file( $dir . 'class-group-report-service.php' );
+		self::require_file( $dir . 'class-groups-module.php' );
+
+		if ( class_exists( '\ATORA\Groups\Groups_Module' ) ) {
+			\ATORA\Groups\Groups_Module::init();
+		}
+	}
+
+	/** @return void */
+	private static function load_rubrics(): void {
+		$dir = ATORA_LMS_MODULES_DIR . 'rubrics/';
+		self::require_file( $dir . 'class-rubrics-module.php' );
+
+		if ( class_exists( '\ATORA\Rubrics\Rubrics_Module' ) ) {
+			\ATORA\Rubrics\Rubrics_Module::init();
+		}
+	}
+
+	/** @return void */
+	private static function load_early_warning(): void {
+		$dir = ATORA_LMS_MODULES_DIR . 'early-warning/';
+		self::require_file( $dir . 'class-early-warning-service.php' );
+		self::require_file( $dir . 'class-early-warning-module.php' );
+
+		if ( class_exists( '\ATORA\EarlyWarning\Early_Warning_Module' ) ) {
+			\ATORA\EarlyWarning\Early_Warning_Module::init();
 		}
 	}
 
