@@ -582,6 +582,10 @@ class CLMS_REST_Extensions_Controller {
 		$is_calibration = '1' === (string) get_post_meta( $post->ID, '_clms_pr_is_calibration', true );
 		$is_blind      = (bool) get_post_meta( $lesson_id, '_clms_peer_review_blind', true );
 		$excluded      = '1' === (string) get_post_meta( $post->ID, '_clms_pr_excluded', true );
+		$excluded_reason = '';
+		if ( $include_sensitive ) {
+			$excluded_reason = sanitize_text_field( (string) get_post_meta( $post->ID, '_clms_pr_excluded_reason', true ) );
+		}
 
 		$reviewer_name = '';
 		$reviewee_name = '';
@@ -603,6 +607,7 @@ class CLMS_REST_Extensions_Controller {
 			'is_calibration'=> $is_calibration,
 			'is_blind'      => $is_blind,
 			'excluded'      => $excluded,
+			'excluded_reason' => $include_sensitive ? $excluded_reason : '',
 			'status'        => get_post_meta( $post->ID, '_clms_pr_status', true ) ?: 'pending',
 			'scores'        => (array) get_post_meta( $post->ID, '_clms_pr_scores', true ),
 			'comment'       => get_post_meta( $post->ID, '_clms_pr_comment', true ) ?: '',

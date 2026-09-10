@@ -1149,6 +1149,7 @@ class CLMS_Peer_Review {
 		}
 
 		$lesson_id = isset( $_GET['lesson_id'] ) ? absint( wp_unslash( $_GET['lesson_id'] ) ) : 0;
+		$focus_assignment_id = isset( $_GET['assignment_id'] ) ? absint( wp_unslash( $_GET['assignment_id'] ) ) : 0;
 
 		echo '<div class="wrap"><h1>' . esc_html__( 'Coevaluación — Reporte', 'atora-lms' ) . '</h1>';
 		echo '<p class="description">' . esc_html__( 'MVP: calibración + consistencia (outliers) + auditoría básica.', 'atora-lms' ) . '</p>';
@@ -1216,6 +1217,94 @@ class CLMS_Peer_Review {
 			echo '<div class="notice notice-info"><p>' . esc_html__( 'No hay asignaciones de peer review para esta lección.', 'atora-lms' ) . '</p></div>';
 			echo '</div>';
 			return;
+		}
+
+		if ( $focus_assignment_id ) {
+			$assignment = get_post( $focus_assignment_id );
+			if ( $assignment && 'clms_peer_review' === $assignment->post_type ) {
+				$assignment_lesson_id = absint( get_post_meta( $focus_assignment_id, '_clms_pr_lesson_id', true ) );
+				if ( $assignment_lesson_id === $lesson_id ) {
+					echo '<div class="notice notice-info" style="padding: 12px 14px;">';
+					echo '<p style="margin:0 0 8px 0"><strong>' . esc_html__( 'Detalle de asignación', 'atora-lms' ) . '</strong> <span class="description">#' . esc_html( (string) $focus_assignment_id ) . '</span></p>';
+
+					$rid = absint( get_post_meta( $focus_assignment_id, '_clms_pr_reviewer_id', true ) );
+					$eid = absint( get_post_meta( $focus_assignment_id, '_clms_pr_reviewee_id', true ) );
+					$is_cal = '1' === (string) get_post_meta( $focus_assignment_id, '_clms_pr_is_calibration', true );
+					$status = sanitize_key( (string) get_post_meta( $focus_assignment_id, '_clms_pr_status', true ) );
+					$submitted_at = (string) get_post_meta( $focus_assignment_id, '_clms_pr_submitted_at', true );
+					$excluded = '1' === (string) get_post_meta( $focus_assignment_id, '_clms_pr_excluded', true );
+					$exclude_reason = sanitize_text_field( (string) get_post_meta( $focus_assignment_id, '_clms_pr_excluded_reason', true ) );
+
+					$ruser = $rid ? get_userdata( $rid ) : null;
+					$euser = $eid ? get_userdata( $eid ) : null;
+					$rname = $ruser ? ( $ruser->display_name ? $ruser->display_name : $ruser->user_login ) : (string) $rid;
+					$ename = $euser ? ( $euser->display_name ? $euser->display_name : $euser->user_login ) : ( $is_cal ? __( 'Ejemplar', 'atora-lms' ) : (string) $eid );
+
+					$delta = $is_cal ? get_post_meta( $focus_assignment_id, '_clms_pr_calibration_delta', true ) : get_post_meta( $focus_assignment_id, '_clms_pr_consistency_delta', true );
+					$flag  = $is_cal ? sanitize_key( (string) get_post_meta( $focus_assignment_id, '_clms_pr_calibration_status', true ) ) : sanitize_key( (string) get_post_meta( $focus_assignment_id, '_clms_pr_consistency_flag', true ) );
+					$delta_i = ( '' !== (string) $delta && is_numeric( $delta ) ) ? (int) $delta : null;
+
+					$quality = absint( get_post_meta( $focus_assignment_id, '_clms_pr_quality_score', true ) );
+					$qstatus = sanitize_key( (string) get_post_meta( $focus_assignment_id, '_clms_pr_quality_status', true ) );
+					$qflags  = (array) get_post_meta( $focus_assignment_id, '_clms_pr_quality_flags', true );
+					$qflags  = array_values( array_filter( array_map( 'sanitize_text_field', (array) $qflags ) ) );
+
+					$saved_scores  = (array) get_post_meta( $focus_assignment_id, '_clms_pr_scores', true );
+					$saved_comment = sanitize_textarea_field( (string) get_post_meta( $focus_assignment_id, '_clms_pr_comment', true ) );
+
+					echo '<table class="widefat striped" style="max-width: 1100px; background: #fff;">';
+					echo '<tbody>';
+					echo '<tr><th style="width:220px">' . esc_html__( 'Revisor', 'atora-lms' ) . '</th><td>' . esc_html( $rname ) . ' <span class="description">#' . esc_html( (string) $rid ) . '</span></td></tr>';
+					echo '<tr><th>' . esc_html__( 'Reviewee', 'atora-lms' ) . '</th><td>' . esc_html( $ename ) . ( $eid ? ' <span class="description">#' . esc_html( (string) $eid ) . '</span>' : '' ) . '</td></tr>';
+					echo '<tr><th>' . esc_html__( 'Tipo', 'atora-lms' ) . '</th><td>' . esc_html( $is_cal ? __( 'Calibración', 'atora-lms' ) : __( 'Normal', 'atora-lms' ) ) . '</td></tr>';
+					echo '<tr><th>' . esc_html__( 'Estado', 'atora-lms' ) . '</th><td>' . esc_html( $status ? $status : 'pending' ) . ( $submitted_at ? ' <span class="description">(' . esc_html( $submitted_at ) . ')</span>' : '' ) . '</td></tr>';
+					echo '<tr><th>' . esc_html__( 'Δ / flag', 'atora-lms' ) . '</th><td>' . esc_html( $flag ? $flag : '—' ) . ( null !== $delta_i ? ' <span class="description">Δ ' . esc_html( ( $delta_i > 0 ? '+' : '' ) . (string) $delta_i ) . '</span>' : '' ) . '</td></tr>';
+					echo '<tr><th>' . esc_html__( 'Calidad', 'atora-lms' ) . '</th><td>' . esc_html( $quality ? ( (string) $quality . '/100' ) : '—' ) . ( $qstatus ? ' <span class="description">(' . esc_html( $qstatus ) . ')</span>' : '' ) . ( $qflags ? '<br><span class="description">' . esc_html( implode( ' | ', $qflags ) ) . '</span>' : '' ) . '</td></tr>';
+					echo '<tr><th>' . esc_html__( 'Excluida', 'atora-lms' ) . '</th><td>' . esc_html( $excluded ? __( 'sí', 'atora-lms' ) : __( 'no', 'atora-lms' ) ) . ( $exclude_reason ? '<br><span class="description">' . esc_html__( 'Motivo:', 'atora-lms' ) . ' ' . esc_html( $exclude_reason ) . '</span>' : '' ) . '</td></tr>';
+					echo '</tbody></table>';
+
+					if ( ! $is_cal ) {
+						echo '<div style="margin-top:10px;padding:12px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;">';
+						echo '<p style="margin:0 0 8px 0"><strong>' . esc_html__( 'Acción docente', 'atora-lms' ) . '</strong></p>';
+
+						echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
+						echo '<input type="hidden" name="action" value="clms_peer_review_toggle_exclude">';
+						echo '<input type="hidden" name="lesson_id" value="' . esc_attr( (string) $lesson_id ) . '">';
+						echo '<input type="hidden" name="assignment_id" value="' . esc_attr( (string) $focus_assignment_id ) . '">';
+						echo '<input type="hidden" name="exclude" value="' . esc_attr( (string) ( $excluded ? 0 : 1 ) ) . '">';
+						wp_nonce_field( 'clms_peer_review_toggle_exclude_' . $focus_assignment_id );
+
+						if ( ! $excluded ) {
+							echo '<label for="clms_pr_exclude_reason"><strong>' . esc_html__( 'Motivo (opcional)', 'atora-lms' ) . '</strong></label><br>';
+							echo '<input type="text" name="reason" id="clms_pr_exclude_reason" value="" maxlength="240" style="width: 520px; max-width: 100%;" placeholder="' . esc_attr( __( 'Ej: outlier extremo / comentario inapropiado / plagio', 'atora-lms' ) ) . '">';
+							echo '<br><span class="description">' . esc_html__( 'Se guardará en auditoría y en el export.', 'atora-lms' ) . '</span><br><br>';
+							echo '<button class="button button-secondary" type="submit" onclick="return confirm(\'' . esc_js( __( '¿Excluir esta revisión del cálculo?', 'atora-lms' ) ) . '\')">' . esc_html__( 'Excluir del cálculo', 'atora-lms' ) . '</button>';
+						} else {
+							echo '<button class="button button-secondary" type="submit" onclick="return confirm(\'' . esc_js( __( '¿Reincluir esta revisión en el cálculo?', 'atora-lms' ) ) . '\')">' . esc_html__( 'Reincluir en el cálculo', 'atora-lms' ) . '</button>';
+						}
+						echo '</form>';
+						echo '</div>';
+					}
+
+					if ( ! empty( $saved_scores ) || $saved_comment ) {
+						echo '<div style="margin-top:12px">';
+						echo '<p style="margin:0 0 6px 0"><strong>' . esc_html__( 'Contenido de la revisión', 'atora-lms' ) . '</strong></p>';
+						if ( ! empty( $saved_scores ) ) {
+							echo '<ul style="margin:0 0 6px 18px">';
+							foreach ( (array) $saved_scores as $crit => $pts ) {
+								echo '<li><strong>' . esc_html( (string) $crit ) . ':</strong> ' . esc_html( (string) absint( $pts ) ) . '</li>';
+							}
+							echo '</ul>';
+						}
+						if ( $saved_comment ) {
+							echo '<blockquote style="margin:0;padding:10px 12px;background:#f9fafb;border-left:4px solid #e5e7eb;">' . esc_html( $saved_comment ) . '</blockquote>';
+						}
+						echo '</div>';
+					}
+
+					echo '</div>';
+				}
+			}
 		}
 
 		$by_reviewer = array();
@@ -1377,6 +1466,15 @@ class CLMS_Peer_Review {
 			}
 
 			$excluded = '1' === (string) get_post_meta( $assignment_id, '_clms_pr_excluded', true );
+			$exclude_reason = sanitize_text_field( (string) get_post_meta( $assignment_id, '_clms_pr_excluded_reason', true ) );
+			$detail_url = add_query_arg(
+				array(
+					'page'          => 'clms-peer-review-reports',
+					'lesson_id'     => $lesson_id,
+					'assignment_id' => $assignment_id,
+				),
+				admin_url( 'admin.php' )
+			);
 			$toggle_url = wp_nonce_url(
 				admin_url(
 					'admin-post.php?action=clms_peer_review_toggle_exclude'
@@ -1388,7 +1486,7 @@ class CLMS_Peer_Review {
 			);
 
 			echo '<tr>';
-			echo '<td>#' . esc_html( (string) $assignment_id ) . '</td>';
+			echo '<td><a href="' . esc_url( $detail_url ) . '">#' . esc_html( (string) $assignment_id ) . '</a>' . ( $excluded ? '<br><span class="description">' . esc_html__( 'excluida', 'atora-lms' ) . ( $exclude_reason ? ': ' . esc_html( $exclude_reason ) : '' ) . '</span>' : '' ) . '</td>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 			echo '<td><strong>' . esc_html( $rname ) . '</strong><br><span class="description">#' . esc_html( (string) $rid ) . '</span></td>';
 			echo '<td><strong>' . esc_html( $ename ) . '</strong><br><span class="description">' . ( $eid ? '#' . esc_html( (string) $eid ) : '—' ) . '</span></td>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 			echo '<td>' . esc_html( $is_cal ? __( 'Calibración', 'atora-lms' ) : __( 'Normal', 'atora-lms' ) ) . '</td>';
@@ -1499,6 +1597,7 @@ class CLMS_Peer_Review {
 				'assignment_id',
 				'is_calibration',
 				'excluded',
+				'excluded_reason',
 				'reviewer_id',
 				'reviewee_id',
 				'status',
@@ -1517,6 +1616,7 @@ class CLMS_Peer_Review {
 			$assignment_id = absint( $assignment_id );
 			$is_cal = '1' === (string) get_post_meta( $assignment_id, '_clms_pr_is_calibration', true );
 			$excluded = '1' === (string) get_post_meta( $assignment_id, '_clms_pr_excluded', true );
+			$exclude_reason = sanitize_text_field( (string) get_post_meta( $assignment_id, '_clms_pr_excluded_reason', true ) );
 			fputcsv( // phpcs:ignore WordPress.WP.AlternativeFunctions
 				$stream,
 				array(
@@ -1524,6 +1624,7 @@ class CLMS_Peer_Review {
 					$assignment_id,
 					$is_cal ? 1 : 0,
 					$excluded ? 1 : 0,
+					$exclude_reason,
 					absint( get_post_meta( $assignment_id, '_clms_pr_reviewer_id', true ) ),
 					absint( get_post_meta( $assignment_id, '_clms_pr_reviewee_id', true ) ),
 					sanitize_key( (string) get_post_meta( $assignment_id, '_clms_pr_status', true ) ),
@@ -1555,9 +1656,15 @@ class CLMS_Peer_Review {
 			wp_die( esc_html__( 'No tienes permisos.', 'atora-lms' ) );
 		}
 
-		$lesson_id     = isset( $_GET['lesson_id'] ) ? absint( wp_unslash( $_GET['lesson_id'] ) ) : 0;
-		$assignment_id = isset( $_GET['assignment_id'] ) ? absint( wp_unslash( $_GET['assignment_id'] ) ) : 0;
-		$exclude       = isset( $_GET['exclude'] ) ? absint( wp_unslash( $_GET['exclude'] ) ) : 0;
+		$lesson_id     = isset( $_REQUEST['lesson_id'] ) ? absint( wp_unslash( $_REQUEST['lesson_id'] ) ) : 0;
+		$assignment_id = isset( $_REQUEST['assignment_id'] ) ? absint( wp_unslash( $_REQUEST['assignment_id'] ) ) : 0;
+		$exclude       = isset( $_REQUEST['exclude'] ) ? absint( wp_unslash( $_REQUEST['exclude'] ) ) : 0;
+		$reason        = isset( $_REQUEST['reason'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['reason'] ) ) : '';
+		if ( function_exists( 'mb_substr' ) ) {
+			$reason = mb_substr( $reason, 0, 240 );
+		} else {
+			$reason = substr( $reason, 0, 240 );
+		}
 
 		check_admin_referer( 'clms_peer_review_toggle_exclude_' . $assignment_id );
 
@@ -1582,6 +1689,13 @@ class CLMS_Peer_Review {
 		}
 
 		update_post_meta( $assignment_id, '_clms_pr_excluded', $exclude ? '1' : '0' );
+		if ( $exclude ) {
+			update_post_meta( $assignment_id, '_clms_pr_excluded_reason', $reason );
+			update_post_meta( $assignment_id, '_clms_pr_excluded_at', gmdate( 'Y-m-d H:i:s' ) );
+			update_post_meta( $assignment_id, '_clms_pr_excluded_by', absint( get_current_user_id() ) );
+		} else {
+			update_post_meta( $assignment_id, '_clms_pr_excluded_reason', '' );
+		}
 
 		$submission_id = absint( get_post_meta( $assignment_id, '_clms_pr_submission_id', true ) );
 		$reviewer_id   = absint( get_post_meta( $assignment_id, '_clms_pr_reviewer_id', true ) );
@@ -1598,6 +1712,7 @@ class CLMS_Peer_Review {
 				'actor_id'      => get_current_user_id(),
 				'meta'          => array(
 					'excluded' => $exclude ? 1 : 0,
+					'reason'   => $reason,
 				),
 			)
 		);
@@ -1606,7 +1721,7 @@ class CLMS_Peer_Review {
 			self::recalculate_submission_grade( $submission_id, $lesson_id );
 		}
 
-		wp_safe_redirect( admin_url( 'admin.php?page=clms-peer-review-reports&lesson_id=' . $lesson_id ) );
+		wp_safe_redirect( admin_url( 'admin.php?page=clms-peer-review-reports&lesson_id=' . $lesson_id . '&assignment_id=' . $assignment_id ) );
 		exit;
 	}
 
