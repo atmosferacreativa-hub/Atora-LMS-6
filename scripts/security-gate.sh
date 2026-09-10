@@ -60,10 +60,9 @@ secret_hits="$(
 $secret_hits"
 pass "sin secretos de alta confianza en producción"
 
-if git grep -I -n -E -- 'define[[:space:]]*\([[:space:]]*['"'"'"]ATORA_DEV_MODE['"'"'"][[:space:]]*,[[:space:]]*true' -- '*.php' >/tmp/atora-security-gate-dev-mode.txt; then
-	fail "ATORA_DEV_MODE está forzado a true:
-$(cat /tmp/atora-security-gate-dev-mode.txt)"
-fi
+dev_mode_hits="$(git grep -I -n -E -- 'define[[:space:]]*\\([[:space:]]*['"'"'"]ATORA_DEV_MODE['"'"'"][[:space:]]*,[[:space:]]*true' -- '*.php' | grep -Ev ':[0-9]+:[[:space:]]*(//|#|\\*)' || true)"
+[[ -z "$dev_mode_hits" ]] || fail "ATORA_DEV_MODE está forzado a true:
+$dev_mode_hits"
 pass "modo de desarrollo no forzado"
 
 printf 'SECURITY GATE: OK\n'
