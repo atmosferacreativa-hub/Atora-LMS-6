@@ -3,7 +3,11 @@
          xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/10.0/phpunit.xsd"
          bootstrap="tests/bootstrap.php"
          colors="true"
-         testdox="true">
+         testdox="true"
+         processIsolation="true"
+         preserveGlobalState="false"
+         failOnWarning="true"
+         failOnRisky="true">
     <testsuites>
         <testsuite name="ATORA LMS Unit Tests">
             <directory>tests/</directory>
