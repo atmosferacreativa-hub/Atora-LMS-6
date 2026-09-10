@@ -98,7 +98,19 @@ if ( ! function_exists( 'wp_generate_uuid4' ) ) {
 	}
 }
 if ( ! function_exists( 'do_action' ) )        { function do_action( string $hook, ...$args ): void {} }
-if ( ! function_exists( 'clms_core' ) )        { function clms_core( string $service ) { return null; } }
+if ( ! function_exists( 'clms_core' ) ) {
+	function clms_core( string $service ) {
+		static $instances = array();
+		if ( isset( $instances[ $service ] ) ) {
+			return $instances[ $service ];
+		}
+		if ( class_exists( $service ) ) {
+			$instances[ $service ] = new $service();
+			return $instances[ $service ];
+		}
+		return null;
+	}
+}
 if ( ! function_exists( 'wp_timezone' ) ) {
 	function wp_timezone(): \DateTimeZone {
 		return new \DateTimeZone( $GLOBALS['__atora_test_timezone'] ?? 'UTC' );
@@ -590,6 +602,11 @@ if ( ! function_exists( 'add_filter' ) ) {
 		$GLOBALS['__atora_test_filters'][ $hook ][] = array( 'cb' => $cb, 'priority' => $priority, 'args' => $args );
 		return true;
 	}
+}
+
+$contacts_core_file = __DIR__ . '/../includes/contacts-core/class-contacts-core-service.php';
+if ( file_exists( $contacts_core_file ) ) {
+	require_once $contacts_core_file;
 }
 
 // Cargar servicios bajo test
