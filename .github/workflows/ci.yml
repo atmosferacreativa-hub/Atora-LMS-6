@@ -66,9 +66,8 @@ jobs:
           retention-days: 7
 
   unit-tests:
-    name: PHPUnit legacy suite (diagnostic)
+    name: PHPUnit legacy regression baseline
     runs-on: ubuntu-latest
-    continue-on-error: true
 
     steps:
       - name: Check out source
@@ -86,11 +85,6 @@ jobs:
 
       - name: Run PHPUnit suite with file isolation
         run: bash scripts/run-phpunit-files.sh
-
-      - name: Record diagnostic status
-        if: failure()
-        run: |
-          echo "::warning::The inherited PHPUnit suite has known bootstrap and isolation debt. Blocking syntax and dynamic WordPress smoke checks still run independently."
 
 
   lms-migrator-tests:
