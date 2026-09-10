@@ -135,7 +135,7 @@ Evolucionar ATORA LMS en ciclos continuos, priorizando (1) evaluación colaborat
 
 **Nota:** existe `modules/analytics/class-analytics-engine.php`, pero hoy está orientado a métricas de email/engagement global. Este epic agrega *learning analytics* (académico) y alertas operativas.
 
-**Estado:** Early Warning MVP implementado en `6.14.0` (solo “entregas perdidas”). Pendiente: risk scoring, fuentes de actividad, dashboard completo y export BI.
+**Estado:** Early Warning (entregas perdidas) + Learning Analytics (risk scoring + dashboard + export BI) implementado (MVP). Pendiente: ampliar señales (mensajes/lecturas), reglas avanzadas y canales extra (Teams/webhooks).
 
 **MVP 6.14.0 (completado)**
 - [x] Tabla `wp_atora_early_warning` + migración.
@@ -145,18 +145,18 @@ Evolucionar ATORA LMS en ciclos continuos, priorizando (1) evaluación colaborat
 - [x] Pantalla admin “Alertas tempranas”.
 
 **Historias**
-- [ ] Como coordinación, veo lista priorizada de estudiantes en riesgo (por curso/cohorte/docente).
-- [ ] Como docente, recibo alertas por inactividad y entregas perdidas con acciones sugeridas.
-- [ ] Como institución, exporto dataset para BI (CSV/JSON) con métricas clave.
+- [x] Como coordinación, veo lista priorizada de estudiantes en riesgo (por curso/cohorte/docente).
+- [x] Como docente, recibo alertas por inactividad y entregas perdidas con acciones sugeridas.
+- [x] Como institución, exporto dataset para BI (CSV/JSON) con métricas clave.
 
 **Tareas**
-- [ ] Modelo: tabla(s) tipo `wp_atora_student_analytics` (por `user_id`, `course_id`, `risk_score`, `last_activity`, `trend`, `alert_type`, timestamps).
-- [ ] Motor: calculador de señales (inactividad, missing submissions, caída de notas, no lectura de mensajes).
-- [ ] Alerting: reglas + canales (panel, email, opcional webhooks/Teams) con anti-spam (cooldown).
-- [ ] REST: endpoints académicos (p.ej. `/atora/v1/academics/early-warning`) con filtros (curso/cohorte/periodo).
-- [ ] UI: dashboard simple (tabla + filtros + drill-down).
-- [ ] Export: CSV (mínimo) y contrato de esquema (BI-friendly).
-- [ ] QA: performance (batch jobs), consistencia de timestamps/timezones, y permisos.
+- [x] Modelo: tabla `wp_atora_student_analytics` (por `user_id`, `course_id`, `risk_score`, `trend`, `alert_type`, timestamps).
+- [~] Motor: calculador de señales (MVP: inactividad + missed submissions + progreso + promedio + pendientes; pendiente: mensajes/lecturas).
+- [x] Alerting: notificación interna (panel) con anti-spam (cooldown diario).
+- [x] REST: endpoints `atora/v1/learning-analytics*` + `atora/v1/early-warning`.
+- [x] UI: dashboard simple (tabla + filtros + drill-down).
+- [x] Export: CSV/JSON (BI-friendly).
+- [~] QA: performance y consistencia (pendiente reforzar batch jobs y permisos multi-rol).
 
 **Dependencias**
 - Identificar fuentes de “actividad” (lecciones, mensajes, submissions, calendario).
@@ -168,16 +168,16 @@ Evolucionar ATORA LMS en ciclos continuos, priorizando (1) evaluación colaborat
 **Estimación:** 2–3 semanas (≈400–600 líneas netas; depende de reportes y anonimato).
 
 **Historias**
-- [ ] Como docente, activo calibración (todos evalúan un ejemplar) y el sistema calcula “calibration score”.
-- [ ] Como docente, veo incoherencias (desviación vs promedio/docente) y puedo intervenir.
-- [ ] Como institución, audito quién evaluó a quién, cuándo, con modo ciego/no ciego.
+- [x] Como docente, activo calibración (todos evalúan un ejemplar) y el sistema calcula “calibration score”.
+- [x] Como docente, veo incoherencias (desviación vs promedio/docente) y puedo intervenir.
+- [x] Como institución, audito quién evaluó a quién, cuándo, con modo ciego/no ciego.
 
 **Tareas**
-- [ ] Datos: agregar metadatos/campos para `calibration_score`, `consistency_check`, `is_blind`, `review_audit_log`.
-- [ ] Flujo: training obligatorio antes de habilitar reviews reales (si aplica).
-- [ ] Reportes: mapa reviewer↔reviewee + distribución de notas y desviaciones.
-- [ ] Permisos/privacidad: ocultar identidad según modo; controles anti-abuso.
-- [ ] QA: fairness (asignación), anonimato y edge cases (no completan reviews).
+- [x] Datos: agregar metadatos/campos para `calibration_score`, `consistency_check`, `is_blind`, `review_audit_log`.
+- [x] Flujo: training obligatorio antes de habilitar reviews reales (si aplica).
+- [x] Reportes: mapa reviewer↔reviewee + distribución de notas y desviaciones (incluye export CSV).
+- [x] Permisos/privacidad: ocultar identidad según modo; controles anti-abuso (exclusión manual con motivo).
+- [x] QA: fairness (asignación), anonimato y edge cases (no completan reviews).
 
 ---
 
