@@ -21,12 +21,16 @@ class CLMS_REST_Gradebook_Controller {
 	/** @var CLMS_Gradebook_Export_Service|null */
 	protected $export_service;
 
+	/** @var CLMS_Institutional_Gradebook_Service|null */
+	protected $institutional_service;
+
 	public function __construct( CLMS_REST_Permissions $permissions ) {
 		$this->permissions      = $permissions;
 		$this->gradebook_service = class_exists( 'CLMS_Gradebook_Service' ) ? new CLMS_Gradebook_Service() : null;
 		$this->schema_service    = class_exists( 'CLMS_Gradebook_Schema_Service' ) ? new CLMS_Gradebook_Schema_Service() : null;
 		$this->save_service      = class_exists( 'CLMS_Gradebook_Save_Service' ) ? new CLMS_Gradebook_Save_Service() : null;
 		$this->export_service    = class_exists( 'CLMS_Gradebook_Export_Service' ) ? new CLMS_Gradebook_Export_Service() : null;
+		$this->institutional_service = class_exists( 'CLMS_Institutional_Gradebook_Service' ) ? new CLMS_Institutional_Gradebook_Service() : null;
 	}
 
 	/**
@@ -329,6 +333,114 @@ class CLMS_REST_Gradebook_Controller {
 		$detail = apply_filters( 'clms_gradebook_cell_detail', $detail, $submission_id, $request );
 
 		return new WP_REST_Response( $detail, 200 );
+	}
+
+	/**
+	 * GET /gradebook/institutional
+	 */
+	public function get_institutional_context( WP_REST_Request $request ) {
+		if ( ! $this->institutional_service ) {
+			return new WP_Error( 'clms_institutional_gradebook_unavailable', __( 'El núcleo institucional no está disponible.', 'atora-lms' ), array( 'status' => 500 ) );
+		}
+
+		return new WP_REST_Response(
+			$this->institutional_service->get_context(
+				absint( $request->get_param( 'academy_id' ) ),
+				absint( $request->get_param( 'course_id' ) ),
+				absint( $request->get_param( 'cycle_id' ) )
+			),
+			200
+		);
+	}
+
+	public function create_institutional_period( WP_REST_Request $request ) {
+		return $this->institutional_created_response(
+			$this->institutional_service
+				? $this->institutional_service->create_period( $request->get_json_params(), get_current_user_id() )
+				: new WP_Error( 'clms_institutional_gradebook_unavailable', __( 'El núcleo institucional no está disponible.', 'atora-lms' ) )
+		);
+	}
+
+	public function transition_institutional_period( WP_REST_Request $request ) {
+		return $this->institutional_result_response(
+			$this->institutional_service
+				? $this->institutional_service->transition_period( absint( $request['id'] ), $request->get_param( 'status' ), get_current_user_id() )
+				: new WP_Error( 'clms_institutional_gradebook_unavailable', __( 'El núcleo institucional no está disponible.', 'atora-lms' ) )
+		);
+	}
+
+	public function create_institutional_scale( WP_REST_Request $request ) {
+		return $this->institutional_created_response(
+			$this->institutional_service
+				? $this->institutional_service->create_scale( $request->get_json_params(), get_current_user_id() )
+				: new WP_Error( 'clms_institutional_gradebook_unavailable', __( 'El núcleo institucional no está disponible.', 'atora-lms' ) )
+		);
+	}
+
+	public function create_institutional_cycle( WP_REST_Request $request ) {
+		return $this->institutional_created_response(
+			$this->institutional_service
+				? $this->institutional_service->create_cycle( $request->get_param( 'period_id' ), $request->get_param( 'course_id' ), $request->get_param( 'scale_id' ), get_current_user_id() )
+				: new WP_Error( 'clms_institutional_gradebook_unavailable', __( 'El núcleo institucional no está disponible.', 'atora-lms' ) )
+		);
+	}
+
+	public function save_institutional_grade( WP_REST_Request $request ) {
+		return $this->institutional_result_response(
+			$this->institutional_service
+				? $this->institutional_service->save_grade(
+					absint( $request['id'] ),
+					$request->get_param( 'student_id' ),
+					$request->get_param( 'grade' ),
+					$request->get_param( 'expected_revision' ),
+					get_current_user_id(),
+					(array) $request->get_param( 'source' )
+				)
+				: new WP_Error( 'clms_institutional_gradebook_unavailable', __( 'El núcleo institucional no está disponible.', 'atora-lms' ) )
+		);
+	}
+
+	public function transition_institutional_cycle( WP_REST_Request $request ) {
+		return $this->institutional_result_response(
+			$this->institutional_service
+				? $this->institutional_service->transition_cycle( absint( $request['id'] ), $request->get_param( 'status' ), $request->get_param( 'expected_lock_version' ), get_current_user_id() )
+				: new WP_Error( 'clms_institutional_gradebook_unavailable', __( 'El núcleo institucional no está disponible.', 'atora-lms' ) )
+		);
+	}
+
+	public function request_grade_rectification( WP_REST_Request $request ) {
+		return $this->institutional_created_response(
+			$this->institutional_service
+				? $this->institutional_service->request_rectification( $request->get_param( 'grade_id' ), $request->get_param( 'proposed_grade' ), $request->get_param( 'reason' ), get_current_user_id() )
+				: new WP_Error( 'clms_institutional_gradebook_unavailable', __( 'El núcleo institucional no está disponible.', 'atora-lms' ) )
+		);
+	}
+
+	public function decide_grade_rectification( WP_REST_Request $request ) {
+		return $this->institutional_result_response(
+			$this->institutional_service
+				? $this->institutional_service->decide_rectification( absint( $request['id'] ), $request->get_param( 'decision' ), get_current_user_id() )
+				: new WP_Error( 'clms_institutional_gradebook_unavailable', __( 'El núcleo institucional no está disponible.', 'atora-lms' ) )
+		);
+	}
+
+	public function can_manage_institutional_gradebook( WP_REST_Request $request ) {
+		unset( $request );
+		return current_user_can( 'manage_options' )
+			? true
+			: new WP_Error( 'rest_forbidden', __( 'La gestión académica institucional requiere permisos de administración.', 'atora-lms' ), array( 'status' => 403 ) );
+	}
+
+	protected function institutional_created_response( $result ) {
+		return is_wp_error( $result )
+			? $result
+			: new WP_REST_Response( array( 'id' => absint( $result ) ), 201 );
+	}
+
+	protected function institutional_result_response( $result ) {
+		return is_wp_error( $result )
+			? $result
+			: new WP_REST_Response( array( 'result' => $result ), 200 );
 	}
 
 	/**
