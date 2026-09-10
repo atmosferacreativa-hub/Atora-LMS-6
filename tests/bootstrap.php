@@ -506,6 +506,11 @@ if ( ! function_exists( 'atora_test_reset_transients' ) ) {
 if ( ! function_exists( 'wp_cache_get' ) )     { function wp_cache_get( string $k, string $g = '' ) { return false; } }
 if ( ! function_exists( 'wp_cache_set' ) )     { function wp_cache_set( string $k, $v, string $g = '', int $ttl = 0 ): bool { return true; } }
 if ( ! function_exists( 'wp_cache_delete' ) )  { function wp_cache_delete( string $k, string $g = '' ): bool { return true; } }
+if ( ! function_exists( 'get_bloginfo' ) ) {
+	function get_bloginfo( string $show = '', string $filter = 'raw' ): string {
+		return 'name' === $show ? 'ATORA Test' : '';
+	}
+}
 if ( ! function_exists( 'number_format_i18n' ) ) { function number_format_i18n( $n, int $dec = 0 ): string { return number_format( (float) $n, $dec ); } }
 if ( ! function_exists( '__' ) )               { function __( string $s, string $d = '' ): string { return $s; } }
 if ( ! function_exists( 'esc_html' ) )         { function esc_html( string $s ): string { return htmlspecialchars( $s, ENT_QUOTES ); } }
