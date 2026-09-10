@@ -108,7 +108,7 @@ $effective_scopes = Google_Module::get_scopes();
 						<?php esc_html_e( 'Habilitar Google Classroom (agrega scopes a la conexión; requiere reconectar).', 'atora-lms' ); ?>
 					</label>
 					<p class="description">
-						<?php esc_html_e( 'Al habilitar Classroom, debes: (1) activar la API de Google Classroom en tu proyecto, y (2) volver a “Conectar con Google” para consentir los nuevos scopes.', 'atora-lms' ); ?>
+						<?php esc_html_e( 'Al habilitar Classroom, debes: (1) activar la API de Google Classroom en tu proyecto, y (2) volver a “Conectar con Google” para consentir los nuevos scopes (incluye publicación de notas).', 'atora-lms' ); ?>
 					</p>
 				</td>
 			</tr>

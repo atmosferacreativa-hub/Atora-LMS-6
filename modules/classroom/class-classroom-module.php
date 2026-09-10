@@ -28,6 +28,7 @@ final class Classroom_Module {
 		add_action( 'admin_post_atora_classroom_delete_mapping', array( __CLASS__, 'handle_delete_mapping' ) );
 		add_action( 'admin_post_atora_classroom_sync_roster', array( __CLASS__, 'handle_sync_roster' ) );
 		add_action( 'admin_post_atora_classroom_import_coursework', array( __CLASS__, 'handle_import_coursework' ) );
+		add_action( 'admin_post_atora_classroom_push_grades', array( __CLASS__, 'handle_push_grades' ) );
 	}
 
 	private static function service(): Classroom_Service {
@@ -291,6 +292,7 @@ final class Classroom_Module {
 		echo '<th>' . esc_html__( 'Vence', 'atora-lms' ) . '</th>';
 		echo '<th>' . esc_html__( 'Estado', 'atora-lms' ) . '</th>';
 		echo '<th>' . esc_html__( 'Importado', 'atora-lms' ) . '</th>';
+		echo '<th>' . esc_html__( 'Notas', 'atora-lms' ) . '</th>';
 		echo '</tr></thead><tbody>';
 
 		foreach ( $coursework as $cw ) {
@@ -321,6 +323,25 @@ final class Classroom_Module {
 			echo '<td>';
 			if ( $wp_lesson_id && $lesson_link ) {
 				echo '<a href="' . esc_url( $lesson_link ) . '">' . esc_html__( 'Lección', 'atora-lms' ) . '</a> <span class="description">#' . esc_html( (string) $wp_lesson_id ) . '</span>';
+			} else {
+				echo '<span class="description">—</span>';
+			}
+			echo '</td>';
+
+			echo '<td>';
+			if ( $wp_lesson_id ) {
+				$push_url = wp_nonce_url(
+					add_query_arg(
+						array(
+							'action'          => 'atora_classroom_push_grades',
+							'wp_course_id'    => $wp_course_id,
+							'gc_coursework_id'=> $gc_id,
+						),
+						admin_url( 'admin-post.php' )
+					),
+					'atora_classroom_push_grades_' . $wp_course_id . '_' . $gc_id
+				);
+				echo '<a class="button button-small" href="' . esc_url( $push_url ) . '" onclick="return confirm(\'' . esc_js( __( '¿Enviar notas a Classroom y publicarlas (:return)?', 'atora-lms' ) ) . '\')">' . esc_html__( 'Enviar notas', 'atora-lms' ) . '</a>';
 			} else {
 				echo '<span class="description">—</span>';
 			}
@@ -490,6 +511,42 @@ final class Classroom_Module {
 			'page'         => 'atora-classroom',
 			'wp_course_id' => $wp_course_id,
 			'notice'       => $errors ? 'error' : 'ok',
+			'message'      => rawurlencode( $msg ),
+		), admin_url( 'admin.php' ) ) );
+		exit;
+	}
+
+	public static function handle_push_grades(): void {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Sin permisos.', 'atora-lms' ) );
+		}
+
+		$wp_course_id = isset( $_GET['wp_course_id'] ) ? absint( wp_unslash( $_GET['wp_course_id'] ) ) : 0;
+		$gc_coursework_id = isset( $_GET['gc_coursework_id'] ) ? sanitize_text_field( (string) wp_unslash( $_GET['gc_coursework_id'] ) ) : '';
+
+		if ( ! $wp_course_id || '' === trim( $gc_coursework_id ) ) {
+			wp_safe_redirect( add_query_arg( array( 'page' => 'atora-classroom', 'notice' => 'error', 'message' => rawurlencode( __( 'Parámetros requeridos.', 'atora-lms' ) ) ), admin_url( 'admin.php' ) ) );
+			exit;
+		}
+
+		check_admin_referer( 'atora_classroom_push_grades_' . $wp_course_id . '_' . $gc_coursework_id );
+
+		$service = self::service();
+		$res = $service->push_grades_for_coursework( $wp_course_id, $gc_coursework_id, get_current_user_id(), true );
+
+		$msg = sprintf(
+			/* translators: 1: updated 2: skipped_no_grade 3: skipped_no_user 4: errors */
+			__( 'Notas enviadas: actualizadas=%1$d, sin nota=%2$d, sin usuario=%3$d, errores=%4$d.', 'atora-lms' ),
+			(int) ( $res['updated'] ?? 0 ),
+			(int) ( $res['skipped_no_grade'] ?? 0 ),
+			(int) ( $res['skipped_no_user'] ?? 0 ),
+			(int) ( $res['errors'] ?? 0 )
+		);
+
+		wp_safe_redirect( add_query_arg( array(
+			'page'         => 'atora-classroom',
+			'wp_course_id' => $wp_course_id,
+			'notice'       => ( (int) ( $res['errors'] ?? 0 ) ) > 0 ? 'error' : 'ok',
 			'message'      => rawurlencode( $msg ),
 		), admin_url( 'admin.php' ) ) );
 		exit;

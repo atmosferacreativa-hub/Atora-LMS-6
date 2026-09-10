@@ -44,6 +44,8 @@ class Google_Module {
 		'https://www.googleapis.com/auth/classroom.courses.readonly',
 		'https://www.googleapis.com/auth/classroom.rosters.readonly',
 		'https://www.googleapis.com/auth/classroom.coursework.students.readonly',
+		// Para publicar notas (draft + return) se necesita scope de escritura.
+		'https://www.googleapis.com/auth/classroom.coursework.students',
 	);
 
 	public static function init(): void {

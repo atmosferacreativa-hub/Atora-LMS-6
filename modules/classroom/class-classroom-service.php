@@ -82,6 +82,52 @@ final class Classroom_Service {
 	}
 
 	/**
+	 * @param string $method
+	 * @param string $path
+	 * @param array  $query
+	 * @param array  $body
+	 * @param int    $user_id
+	 * @return array|WP_Error
+	 */
+	public function api_request( string $method, string $path, array $query, array $body, int $user_id ) {
+		$method = strtoupper( trim( $method ) );
+		$token = $this->get_access_token( $user_id );
+		if ( ! $token ) {
+			return new WP_Error( 'not_connected', __( 'Google no está conectado para este usuario.', 'atora-lms' ) );
+		}
+
+		$url = 'https://classroom.googleapis.com/v1' . $path;
+		if ( ! empty( $query ) ) {
+			$url = add_query_arg( $query, $url );
+		}
+
+		$res = wp_remote_request( $url, array(
+			'method'  => $method,
+			'headers' => array(
+				'Authorization' => 'Bearer ' . $token,
+				'Accept'        => 'application/json',
+				'Content-Type'  => 'application/json',
+			),
+			'body'    => wp_json_encode( $body ),
+			'timeout' => 25,
+		) );
+		if ( is_wp_error( $res ) ) {
+			return $res;
+		}
+
+		$code = (int) wp_remote_retrieve_response_code( $res );
+		$raw  = (string) wp_remote_retrieve_body( $res );
+		$data = '' !== trim( $raw ) ? json_decode( $raw, true ) : array();
+
+		if ( $code < 200 || $code >= 300 ) {
+			$msg = is_array( $data ) && isset( $data['error']['message'] ) ? (string) $data['error']['message'] : __( 'Error al llamar Google Classroom.', 'atora-lms' );
+			return new WP_Error( 'classroom_api_error', $msg, array( 'status' => $code ) );
+		}
+
+		return is_array( $data ) ? $data : array();
+	}
+
+	/**
 	 * Lista cursos visibles para el usuario (teacher).
 	 *
 	 * @param int $user_id
@@ -120,6 +166,54 @@ final class Classroom_Service {
 					'name'         => sanitize_text_field( (string) ( $c['name'] ?? '' ) ),
 					'section'      => sanitize_text_field( (string) ( $c['section'] ?? '' ) ),
 				);
+			}
+
+			$page_token = sanitize_text_field( (string) ( $data['nextPageToken'] ?? '' ) );
+			if ( '' === $page_token ) {
+				break;
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * @param string $gc_course_id
+	 * @param int    $actor_user_id
+	 * @return array<string,string> Map userId => email
+	 */
+	public function get_course_student_email_map( string $gc_course_id, int $actor_user_id ): array {
+		$gc_course_id  = sanitize_text_field( trim( $gc_course_id ) );
+		$actor_user_id = absint( $actor_user_id );
+		if ( '' === $gc_course_id || ! $actor_user_id ) {
+			return array();
+		}
+
+		$page_token = '';
+		$out = array();
+
+		for ( $i = 0; $i < 12; $i++ ) {
+			$q = array( 'pageSize' => 200 );
+			if ( $page_token ) {
+				$q['pageToken'] = $page_token;
+			}
+
+			$data = $this->api_get( '/courses/' . rawurlencode( $gc_course_id ) . '/students', $q, $actor_user_id );
+			if ( is_wp_error( $data ) ) {
+				break;
+			}
+
+			$students = isset( $data['students'] ) && is_array( $data['students'] ) ? $data['students'] : array();
+			foreach ( $students as $s ) {
+				if ( ! is_array( $s ) ) {
+					continue;
+				}
+				$profile = isset( $s['profile'] ) && is_array( $s['profile'] ) ? $s['profile'] : array();
+				$user_id = sanitize_text_field( (string) ( $profile['id'] ?? '' ) );
+				$email   = sanitize_email( (string) ( $profile['emailAddress'] ?? '' ) );
+				if ( $user_id && $email ) {
+					$out[ $user_id ] = strtolower( $email );
+				}
 			}
 
 			$page_token = sanitize_text_field( (string) ( $data['nextPageToken'] ?? '' ) );
@@ -182,6 +276,7 @@ final class Classroom_Service {
 					'state'            => sanitize_key( (string) ( $cw['state'] ?? '' ) ),
 					'work_type'        => sanitize_key( (string) ( $cw['workType'] ?? '' ) ),
 					'update_time'      => sanitize_text_field( (string) ( $cw['updateTime'] ?? '' ) ),
+					'max_points'       => absint( $cw['maxPoints'] ?? 0 ),
 				);
 			}
 
@@ -242,6 +337,7 @@ final class Classroom_Service {
 
 		$due = $this->extract_due( $data );
 		$state = sanitize_key( (string) ( $data['state'] ?? '' ) );
+		$max_points = absint( $data['maxPoints'] ?? 0 );
 
 		$existing = $wpdb->get_row(
 			$wpdb->prepare(
@@ -291,6 +387,11 @@ final class Classroom_Service {
 		}
 		if ( '' !== $due['time'] ) {
 			update_post_meta( $wp_lesson_id, '_clms_due_time', $due['time'] );
+		}
+
+		if ( $max_points > 0 ) {
+			update_post_meta( $wp_lesson_id, '_clms_gradebook_points', $max_points );
+			update_post_meta( $wp_lesson_id, '_clms_max_points', $max_points );
 		}
 
 		$now = current_time( 'mysql', true );
@@ -360,6 +461,250 @@ final class Classroom_Service {
 		}
 
 		return $out;
+	}
+
+	/**
+	 * Publica notas desde ATORA → Classroom para una tarea (courseWork) importada.
+	 *
+	 * Regla actual (MVP): solo empuja notas para estudiantes que:
+	 * - existen en WordPress (matching por email), y
+	 * - tienen una entrega `clms_submission` asociada a la lección importada, y
+	 * - tienen nota registrada en `_clms_submission_grade` o `_clms_final_grade`.
+	 *
+	 * @param int    $wp_course_id
+	 * @param string $gc_coursework_id
+	 * @param int    $actor_user_id
+	 * @param bool   $return_grade Si true, hace :return para publicar al estudiante.
+	 * @return array{updated:int,skipped_no_user:int,skipped_no_grade:int,errors:int}
+	 */
+	public function push_grades_for_coursework( int $wp_course_id, string $gc_coursework_id, int $actor_user_id, bool $return_grade = true ): array {
+		global $wpdb;
+
+		$wp_course_id     = absint( $wp_course_id );
+		$actor_user_id    = absint( $actor_user_id );
+		$gc_coursework_id = sanitize_text_field( trim( $gc_coursework_id ) );
+
+		$out = array(
+			'updated'          => 0,
+			'skipped_no_user'  => 0,
+			'skipped_no_grade' => 0,
+			'errors'           => 0,
+		);
+
+		if ( ! $wp_course_id || ! $actor_user_id || '' === $gc_coursework_id ) {
+			return $out;
+		}
+
+		$map = $this->get_mapping_by_wp_course( $wp_course_id );
+		if ( empty( $map ) ) {
+			return $out;
+		}
+		$gc_course_id = sanitize_text_field( (string) ( $map['gc_course_id'] ?? '' ) );
+		if ( '' === $gc_course_id ) {
+			return $out;
+		}
+
+		$cw_row = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT wp_lesson_id FROM {$this->table_coursework_map()} WHERE gc_course_id = %s AND gc_coursework_id = %s LIMIT 1",
+				$gc_course_id,
+				$gc_coursework_id
+			),
+			ARRAY_A
+		);
+		$wp_lesson_id = absint( is_array( $cw_row ) ? ( $cw_row['wp_lesson_id'] ?? 0 ) : 0 );
+		if ( ! $wp_lesson_id || 'lm_lesson' !== get_post_type( $wp_lesson_id ) ) {
+			$this->log_sync( $wp_course_id, $gc_course_id, 'grades', 'error', 'No hay lección importada para este courseWork.', array( 'gc_coursework_id' => $gc_coursework_id ) );
+			return $out;
+		}
+
+		$coursework = $this->api_get(
+			'/courses/' . rawurlencode( $gc_course_id ) . '/courseWork/' . rawurlencode( $gc_coursework_id ),
+			array(),
+			$actor_user_id
+		);
+		if ( is_wp_error( $coursework ) ) {
+			$this->log_sync( $wp_course_id, $gc_course_id, 'grades', 'error', $coursework->get_error_message(), array( 'gc_coursework_id' => $gc_coursework_id ) );
+			return $out;
+		}
+
+		$classroom_max = is_array( $coursework ) ? absint( $coursework['maxPoints'] ?? 0 ) : 0;
+		$lesson_max = absint( get_post_meta( $wp_lesson_id, '_clms_gradebook_points', true ) );
+		if ( ! $lesson_max ) {
+			$lesson_max = absint( get_post_meta( $wp_lesson_id, '_clms_max_points', true ) );
+		}
+
+		$email_map = $this->get_course_student_email_map( $gc_course_id, $actor_user_id );
+
+		$page_token = '';
+		for ( $page = 0; $page < 12; $page++ ) {
+			$q = array( 'pageSize' => 200 );
+			if ( $page_token ) {
+				$q['pageToken'] = $page_token;
+			}
+
+			$data = $this->api_get(
+				'/courses/' . rawurlencode( $gc_course_id ) . '/courseWork/' . rawurlencode( $gc_coursework_id ) . '/studentSubmissions',
+				$q,
+				$actor_user_id
+			);
+			if ( is_wp_error( $data ) ) {
+				$out['errors']++;
+				$this->log_sync( $wp_course_id, $gc_course_id, 'grades', 'error', $data->get_error_message(), array( 'gc_coursework_id' => $gc_coursework_id ) );
+				break;
+			}
+
+			$subs = isset( $data['studentSubmissions'] ) && is_array( $data['studentSubmissions'] ) ? $data['studentSubmissions'] : array();
+			foreach ( $subs as $sub ) {
+				if ( ! is_array( $sub ) ) {
+					continue;
+				}
+				$student_submission_id = sanitize_text_field( (string) ( $sub['id'] ?? '' ) );
+				$gc_user_id            = sanitize_text_field( (string) ( $sub['userId'] ?? '' ) );
+				if ( '' === $student_submission_id || '' === $gc_user_id ) {
+					continue;
+				}
+
+				$email = isset( $email_map[ $gc_user_id ] ) ? (string) $email_map[ $gc_user_id ] : '';
+				$email = sanitize_email( $email );
+				if ( '' === $email ) {
+					$out['skipped_no_user']++;
+					continue;
+				}
+
+				$wp_user = get_user_by( 'email', $email );
+				if ( ! $wp_user instanceof \WP_User ) {
+					$out['skipped_no_user']++;
+					continue;
+				}
+
+				$raw_grade = $this->get_wp_submission_grade_for_lesson( absint( $wp_user->ID ), $wp_lesson_id );
+				if ( null === $raw_grade ) {
+					$out['skipped_no_grade']++;
+					continue;
+				}
+
+				$points = $this->normalize_grade_to_classroom_points( (float) $raw_grade, $lesson_max, $classroom_max );
+				if ( null === $points ) {
+					$out['skipped_no_grade']++;
+					continue;
+				}
+
+				$patched = $this->api_request(
+					'PATCH',
+					'/courses/' . rawurlencode( $gc_course_id ) . '/courseWork/' . rawurlencode( $gc_coursework_id ) . '/studentSubmissions/' . rawurlencode( $student_submission_id ),
+					array( 'updateMask' => 'draftGrade' ),
+					array( 'draftGrade' => $points ),
+					$actor_user_id
+				);
+				if ( is_wp_error( $patched ) ) {
+					$out['errors']++;
+					continue;
+				}
+
+				if ( $return_grade ) {
+					$returned = $this->api_request(
+						'POST',
+						'/courses/' . rawurlencode( $gc_course_id ) . '/courseWork/' . rawurlencode( $gc_coursework_id ) . '/studentSubmissions/' . rawurlencode( $student_submission_id ) . ':return',
+						array(),
+						array(),
+						$actor_user_id
+					);
+					if ( is_wp_error( $returned ) ) {
+						$out['errors']++;
+						continue;
+					}
+				}
+
+				$out['updated']++;
+			}
+
+			$page_token = sanitize_text_field( (string) ( $data['nextPageToken'] ?? '' ) );
+			if ( '' === $page_token ) {
+				break;
+			}
+		}
+
+		$this->log_sync( $wp_course_id, $gc_course_id, 'grades', 'ok', 'Push de notas completado.', array_merge( array( 'gc_coursework_id' => $gc_coursework_id, 'wp_lesson_id' => $wp_lesson_id ), $out ) );
+		return $out;
+	}
+
+	private function get_wp_submission_grade_for_lesson( int $student_id, int $lesson_id ): ?float {
+		$student_id = absint( $student_id );
+		$lesson_id  = absint( $lesson_id );
+		if ( ! $student_id || ! $lesson_id ) {
+			return null;
+		}
+
+		$q = new \WP_Query( array(
+			'post_type'      => 'clms_submission',
+			'post_status'    => 'any',
+			'posts_per_page' => 1,
+			'orderby'        => 'date',
+			'order'          => 'DESC',
+			'fields'         => 'ids',
+			'no_found_rows'  => true,
+			'meta_query'     => array(
+				array(
+					'key'   => '_clms_submission_user_id',
+					'value' => $student_id,
+				),
+				array(
+					'key'   => '_clms_submission_lesson_id',
+					'value' => $lesson_id,
+				),
+			),
+		) );
+
+		$ids = $q->posts;
+		$submission_id = ! empty( $ids[0] ) ? absint( $ids[0] ) : 0;
+		if ( ! $submission_id ) {
+			return null;
+		}
+
+		$grade = get_post_meta( $submission_id, '_clms_submission_grade', true );
+		if ( '' === (string) $grade ) {
+			$grade = get_post_meta( $submission_id, '_clms_final_grade', true );
+		}
+		if ( '' === (string) $grade || null === $grade ) {
+			return null;
+		}
+		if ( ! is_numeric( $grade ) ) {
+			return null;
+		}
+		return (float) $grade;
+	}
+
+	/**
+	 * @param float $raw_grade Nota en ATORA (puntos, o % si no hay max_points).
+	 * @param int   $lesson_max_points
+	 * @param int   $classroom_max_points
+	 * @return float|null
+	 */
+	private function normalize_grade_to_classroom_points( float $raw_grade, int $lesson_max_points, int $classroom_max_points ): ?float {
+		$raw_grade = (float) $raw_grade;
+		$lesson_max_points = absint( $lesson_max_points );
+		$classroom_max_points = absint( $classroom_max_points );
+
+		if ( $raw_grade < 0 ) {
+			$raw_grade = 0.0;
+		}
+		if ( $classroom_max_points <= 0 ) {
+			return null;
+		}
+
+		if ( $lesson_max_points > 0 ) {
+			$percent = min( 1.0, max( 0.0, $raw_grade / (float) $lesson_max_points ) );
+			$points  = $percent * (float) $classroom_max_points;
+		} else {
+			// Sin max_points en la lección: tratar raw como porcentaje (legado).
+			$percent = min( 1.0, max( 0.0, $raw_grade / 100.0 ) );
+			$points  = $percent * (float) $classroom_max_points;
+		}
+
+		$points = round( $points, 2 );
+		$points = max( 0.0, min( (float) $classroom_max_points, $points ) );
+		return $points;
 	}
 
 	/**
