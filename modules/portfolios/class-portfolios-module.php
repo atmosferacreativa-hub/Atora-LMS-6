@@ -88,6 +88,14 @@ final class Portfolios_Module {
 		}
 
 		$rows = $service->list_course_portfolios( $course_id, 300 );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			$rows = array_values(
+				array_filter(
+					(array) $rows,
+					static fn( $r ) => 'private' !== sanitize_key( (string) ( is_array( $r ) ? ( $r['visibility'] ?? '' ) : '' ) )
+				)
+			);
+		}
 		if ( empty( $rows ) ) {
 			echo '<div class="notice notice-info"><p>' . esc_html__( 'No hay portafolios aún para este curso.', 'atora-lms' ) . '</p></div>';
 			echo '</div>';
@@ -706,6 +714,9 @@ final class Portfolios_Module {
 		if ( ! $service->viewer_can_access_course( $viewer, $course_id ) ) {
 			wp_die( esc_html__( 'No tienes permisos.', 'atora-lms' ) );
 		}
+		if ( ! current_user_can( 'manage_options' ) && 'private' === sanitize_key( (string) ( $portfolio['visibility'] ?? '' ) ) ) {
+			wp_die( esc_html__( 'Este portafolio es privado.', 'atora-lms' ) );
+		}
 
 		$comment = isset( $_POST['comment'] ) ? (string) wp_unslash( $_POST['comment'] ) : '';
 		$service->add_feedback( $portfolio_id, $viewer, $comment, null, 'teacher' );
@@ -820,7 +831,16 @@ final class Portfolios_Module {
 		if ( absint( $portfolio['user_id'] ?? 0 ) === $viewer ) {
 			return true;
 		}
-		return $service->viewer_can_access_course( $viewer, absint( $portfolio['course_id'] ?? 0 ) );
+
+		if ( ! $service->viewer_can_access_course( $viewer, absint( $portfolio['course_id'] ?? 0 ) ) ) {
+			return false;
+		}
+
+		if ( current_user_can( 'manage_options' ) ) {
+			return true;
+		}
+
+		return 'private' !== sanitize_key( (string) ( $portfolio['visibility'] ?? '' ) );
 	}
 
 	public static function rest_can_manage_portfolio( WP_REST_Request $r ): bool {
@@ -846,7 +866,13 @@ final class Portfolios_Module {
 		if ( empty( $portfolio ) ) {
 			return false;
 		}
-		return $service->viewer_can_access_course( get_current_user_id(), absint( $portfolio['course_id'] ?? 0 ) );
+		if ( ! $service->viewer_can_access_course( get_current_user_id(), absint( $portfolio['course_id'] ?? 0 ) ) ) {
+			return false;
+		}
+		if ( current_user_can( 'manage_options' ) ) {
+			return true;
+		}
+		return 'private' !== sanitize_key( (string) ( $portfolio['visibility'] ?? '' ) );
 	}
 
 	public static function rest_get_portfolio( WP_REST_Request $r ) {
