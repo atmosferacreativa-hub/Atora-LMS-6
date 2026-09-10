@@ -36,7 +36,7 @@ stable_version="$(sed -nE 's/^Stable tag:[[:space:]]*([^[:space:]]+).*/\1/p' rea
 [[ "$plugin_version" == "$stable_version" ]] || fail "Version y Stable tag no coinciden"
 pass "versiones sincronizadas ($plugin_version)"
 
-for required in 	tests/Security/AtoraSecurityRateLimitTest.php 	tests/Security/ClientIpTest.php 	tests/Security/RateLimiterConcurrencyTest.php 	tests/Security/SecurityMaintenanceTest.php 	tests/Security/TokenCryptoTest.php 	tests/Security/TwoFaRateLimitTest.php 	tests/CRM/CRMRestPermissionsTest.php 	tests/Groups/AdminPostAuthorizationTest.php 	tests/H5P/ContentControllerOwnershipTest.php 	tests/LMS/EnrollmentAjaxOwnershipTest.php 	tests/LMS/GradeAppealOwnershipTest.php 	tests/LMS/LMSCourseOwnershipTest.php 	tests/LMS/LMSCourseVisibilityTest.php 	tests/Rest/WebhookPermissionsTest.php
+for required in 	tests/Security/AtoraSecurityRateLimitTest.php 	tests/Security/ClientIpTest.php 	tests/Security/RateLimiterConcurrencyTest.php 	tests/Security/SecurityMaintenanceTest.php 	tests/Security/TokenCryptoTest.php 	tests/Security/TwoFaRateLimitTest.php 	tests/CRM/CRMRestPermissionsTest.php 	tests/Groups/AdminPostAuthorizationTest.php 	tests/Gradebook/InstitutionalGradebookPolicyTest.php 	tests/Gradebook/InstitutionalGradebookSchemaTest.php 	tests/H5P/ContentControllerOwnershipTest.php 	tests/LMS/EnrollmentAjaxOwnershipTest.php 	tests/LMS/GradeAppealOwnershipTest.php 	tests/LMS/LMSCourseOwnershipTest.php 	tests/LMS/LMSCourseVisibilityTest.php 	tests/Rest/WebhookPermissionsTest.php
 do
 	[[ -f "$required" ]] || fail "falta prueba crítica: $required"
 done

@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class V5_Installer {
 
 	/** Versión del esquema. Incrementar para forzar re-instalación. */
-	const SCHEMA_VERSION = '5.2.0-attendance-schema-fixes';
+	const SCHEMA_VERSION = '6.22.0-institutional-gradebook';
 
 	/** Option key que almacena la versión instalada. */
 	const OPTION_KEY = 'atora_v5_schema_version';
@@ -1457,6 +1457,121 @@ class V5_Installer {
 			KEY status             (status)
 		) $charset_collate;" );
 
+		// ── Gradebook institucional (6.22.0) ────────────────────────────────
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_academic_periods (
+			id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			academy_id  BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			code        VARCHAR(60) NOT NULL,
+			name        VARCHAR(190) NOT NULL,
+			starts_at   DATE NOT NULL,
+			ends_at     DATE NOT NULL,
+			status      VARCHAR(20) NOT NULL DEFAULT 'draft',
+			created_by  BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			UNIQUE KEY academy_code (academy_id, code),
+			KEY status (status),
+			KEY dates (starts_at, ends_at)
+		) $charset_collate;" );
+
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_grading_scales (
+			id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			academy_id  BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			code        VARCHAR(60) NOT NULL,
+			name        VARCHAR(190) NOT NULL,
+			minimum     DECIMAL(9,4) NOT NULL DEFAULT 0,
+			maximum     DECIMAL(9,4) NOT NULL DEFAULT 100,
+			bands_json  LONGTEXT NOT NULL,
+			status      VARCHAR(20) NOT NULL DEFAULT 'active',
+			version     INT UNSIGNED NOT NULL DEFAULT 1,
+			created_by  BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			UNIQUE KEY academy_code_version (academy_id, code, version),
+			KEY status (status)
+		) $charset_collate;" );
+
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_gradebook_cycles (
+			id             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			academy_id     BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			period_id      BIGINT UNSIGNED NOT NULL,
+			course_id      BIGINT UNSIGNED NOT NULL,
+			scale_id       BIGINT UNSIGNED NOT NULL,
+			status         VARCHAR(20) NOT NULL DEFAULT 'draft',
+			lock_version   INT UNSIGNED NOT NULL DEFAULT 1,
+			snapshot_hash  CHAR(64) NOT NULL DEFAULT '',
+			snapshot_json  LONGTEXT NULL DEFAULT NULL,
+			published_at   DATETIME NULL DEFAULT NULL,
+			published_by   BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			closed_at      DATETIME NULL DEFAULT NULL,
+			closed_by      BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			created_by     BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			UNIQUE KEY period_course (period_id, course_id),
+			KEY academy_status (academy_id, status),
+			KEY course_id (course_id),
+			KEY scale_id (scale_id)
+		) $charset_collate;" );
+
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_institutional_grades (
+			id             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			cycle_id       BIGINT UNSIGNED NOT NULL,
+			student_id     BIGINT UNSIGNED NOT NULL,
+			course_id      BIGINT UNSIGNED NOT NULL,
+			grade          DECIMAL(9,4) NULL DEFAULT NULL,
+			scale_code     VARCHAR(60) NOT NULL DEFAULT '',
+			status         VARCHAR(20) NOT NULL DEFAULT 'draft',
+			revision       INT UNSIGNED NOT NULL DEFAULT 1,
+			source_json    LONGTEXT NULL DEFAULT NULL,
+			last_actor_id  BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			UNIQUE KEY cycle_student (cycle_id, student_id),
+			KEY student_id (student_id),
+			KEY course_id (course_id),
+			KEY status (status)
+		) $charset_collate;" );
+
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_grade_rectifications (
+			id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			cycle_id        BIGINT UNSIGNED NOT NULL,
+			grade_id        BIGINT UNSIGNED NOT NULL,
+			student_id      BIGINT UNSIGNED NOT NULL,
+			previous_grade  DECIMAL(9,4) NOT NULL,
+			proposed_grade  DECIMAL(9,4) NOT NULL,
+			reason          TEXT NOT NULL,
+			status          VARCHAR(20) NOT NULL DEFAULT 'requested',
+			requested_by    BIGINT UNSIGNED NOT NULL,
+			decided_by      BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			decided_at      DATETIME NULL DEFAULT NULL,
+			applied_at      DATETIME NULL DEFAULT NULL,
+			created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			KEY cycle_status (cycle_id, status),
+			KEY grade_id (grade_id),
+			KEY student_id (student_id)
+		) $charset_collate;" );
+
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_gradebook_events (
+			id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			actor_id      BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			action        VARCHAR(60) NOT NULL,
+			object_type   VARCHAR(40) NOT NULL,
+			object_id     BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			details_json  LONGTEXT NULL DEFAULT NULL,
+			created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			KEY actor_id (actor_id),
+			KEY action (action),
+			KEY object_ref (object_type, object_id),
+			KEY created_at (created_at)
+		) $charset_collate;" );
+
 		// Calificaciones finales por alumno/curso (D-002; migra _clms_gradebook_course_{id}).
 		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_gradebook (
 			id              BIGINT UNSIGNED  NOT NULL AUTO_INCREMENT,
@@ -1908,6 +2023,13 @@ class V5_Installer {
 			// Security.
 			"{$wpdb->prefix}atora_2fa_tokens",
 			"{$wpdb->prefix}atora_trusted_devices",
+			// Gradebook institucional.
+			"{$wpdb->prefix}atora_academic_periods",
+			"{$wpdb->prefix}atora_grading_scales",
+			"{$wpdb->prefix}atora_gradebook_cycles",
+			"{$wpdb->prefix}atora_institutional_grades",
+			"{$wpdb->prefix}atora_grade_rectifications",
+			"{$wpdb->prefix}atora_gradebook_events",
 			// Affiliates.
 			"{$wpdb->prefix}atora_affiliates",
 			"{$wpdb->prefix}atora_affiliate_clicks",
