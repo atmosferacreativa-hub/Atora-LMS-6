@@ -357,7 +357,7 @@ if ( ! defined( 'ATORA_LMS_MODULES_URL' ) ) {
 }
 
 if ( ! defined( 'ATORA_LMS_BUILD_SIGNATURE' ) ) {
-	define( 'ATORA_LMS_BUILD_SIGNATURE', 'atora-lms-6.16.1' );
+	define( 'ATORA_LMS_BUILD_SIGNATURE', 'atora-lms-' . ATORA_LMS_VERSION );
 }
 
 /**

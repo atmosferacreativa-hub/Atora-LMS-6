@@ -6,6 +6,22 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 trait CLMS_Helper_Utilities_Trait {
 	/**
+	 * Sanea un valor antes de escribirlo en una celda CSV para evitar
+	 * inyección de fórmulas (Excel/LibreOffice ejecutan celdas que
+	 * empiezan con = + - @ como fórmulas al abrir el archivo).
+	 *
+	 * @param mixed $value Valor a escribir en la celda.
+	 * @return string
+	 */
+	public static function csv_safe_field( $value ): string {
+		$value = (string) $value;
+		if ( '' !== $value && false !== strpos( "=+-@\t\r", $value[0] ) ) {
+			$value = "'" . $value;
+		}
+		return $value;
+	}
+
+	/**
 	 * Helper meta: busca primera key válida.
 	 *
 	 * @param int   $post_id Post ID.

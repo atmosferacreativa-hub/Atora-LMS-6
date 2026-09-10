@@ -47,6 +47,57 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.20.0 =
+* Epic 7 (Microsoft): SSO con Entra ID (vincular/desvincular cuenta), webhooks de Teams y suscripción iCal de Outlook por curso (token de acceso scoped por curso, sin exponer datos de otros cursos).
+
+= 6.19.0 =
+* H5P: módulo standalone con endpoints REST de gestión de contenido, tracking de intentos (xAPI) y autoscore hacia el libro de calificaciones.
+
+= 6.18.11 =
+* Grupos: hardening de casos límite (cambios de grupo, invalidación de caché, unicidad de membresía por curso).
+
+= 6.18.10 =
+* Grupos: bloquea el envío de una entrega grupal si el estudiante no tiene grupo o asignación válida.
+
+= 6.18.9 =
+* Fix: evita que queden entregas "sombra" huérfanas cuando un estudiante cambia de grupo.
+
+= 6.18.8 =
+* Grupos: vista de estudiante, adjuntos compartidos entre miembros del grupo, y hardening general del módulo.
+
+= 6.18.7 =
+* Fix: evita el recálculo duplicado de notas al calificar la entrega maestra de un grupo.
+
+= 6.18.6 =
+* Rúbricas: snapshot por entrega para mantener versionado consistente en SpeedGrade aunque la rúbrica cambie después.
+
+= 6.18.5 =
+* Learning Analytics: nuevas señales de mensajes/lecturas y hardening del procesamiento batch.
+
+= 6.18.4 =
+* Portfolios: hardening de QA (cambios de inscripción) y caché por request.
+
+= 6.18.3 =
+* Classroom: hardening de QA (retry/backoff en llamadas a la API) y hoja de ruta.
+
+= 6.18.2 =
+* Classroom: push de notas hacia Google Classroom (borrador + devolución).
+
+= 6.18.1 =
+* Classroom: importar coursework de Google Classroom como lecciones (MVP).
+
+= 6.18.0 =
+* Classroom: MVP de mapeo de cursos ATORA↔Google Classroom y sincronización de roster por email.
+
+= 6.17.2 =
+* Portfolios: exportación en ZIP (snapshot) y hardening de acceso privado.
+
+= 6.17.1 =
+* Portfolios: evaluación final con rúbrica (override).
+
+= 6.17.0 =
+* Epic 5 (MVP): Portfolios de estudiante (sin CPT dedicado) + tablas de base de datos nuevas.
+
 = 6.16.1 =
 * Peer review: calibración bloquea revisiones hasta completarse (pass/warn), con fallback seguro.
 

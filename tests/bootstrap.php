@@ -67,6 +67,13 @@ if ( ! $wpdb ) {
 // Stubs de funciones WP más usadas
 if ( ! function_exists( 'absint' ) )           { function absint( $v ): int { return abs( (int) $v ); } }
 if ( ! function_exists( 'sanitize_text_field' ) ) { function sanitize_text_field( $s ): string { return trim( strip_tags( (string) $s ) ); } }
+if ( ! function_exists( 'sanitize_title' ) ) {
+	function sanitize_title( $s ): string {
+		$s = strtolower( trim( (string) $s ) );
+		$s = preg_replace( '/[^a-z0-9]+/', '-', $s );
+		return trim( (string) $s, '-' );
+	}
+}
 if ( ! function_exists( 'sanitize_email' ) )   { function sanitize_email( $s ): string { return filter_var( (string) $s, FILTER_SANITIZE_EMAIL ) ?: ''; } }
 if ( ! function_exists( 'sanitize_key' ) )     { function sanitize_key( $s ): string { return strtolower( preg_replace( '/[^a-z0-9_\-]/i', '', (string) $s ) ); } }
 if ( ! function_exists( 'esc_url_raw' ) )      { function esc_url_raw( $s ): string { return filter_var( (string) $s, FILTER_SANITIZE_URL ) ?: ''; } }
@@ -91,6 +98,15 @@ if ( ! function_exists( 'wp_generate_uuid4' ) ) {
 	}
 }
 if ( ! function_exists( 'do_action' ) )        { function do_action( string $hook, ...$args ): void {} }
+if ( ! function_exists( 'clms_core' ) )        { function clms_core( string $service ) { return null; } }
+if ( ! function_exists( 'wp_timezone' ) ) {
+	function wp_timezone(): \DateTimeZone {
+		return new \DateTimeZone( $GLOBALS['__atora_test_timezone'] ?? 'UTC' );
+	}
+}
+if ( ! function_exists( 'atora_test_set_timezone' ) ) {
+	function atora_test_set_timezone( string $tz ): void { $GLOBALS['__atora_test_timezone'] = $tz; }
+}
 // PT-1 (6.5.8): apply_filters() ahora despacha de verdad contra
 // callbacks registrados con add_filter() (ver más abajo) — antes era
 // un passthrough puro, así que ningún test podía configurar un filtro
@@ -221,7 +237,7 @@ if ( ! function_exists( 'get_post_field' ) ) {
 	function get_post_field( string $field, $post = 0 ) {
 		$id   = is_object( $post ) ? absint( $post->ID ?? 0 ) : absint( $post );
 		$row  = $GLOBALS['__atora_test_posts'][ $id ] ?? null;
-		return $row[ $field ] ?? '';
+		return $row->{$field} ?? '';
 	}
 }
 if ( ! function_exists( 'atora_test_set_post' ) ) {
@@ -322,6 +338,20 @@ if ( ! function_exists( 'is_email' ) ) {
 if ( ! function_exists( 'get_user_by' ) ) {
 	function get_user_by( string $field, $value ) { return false; }
 }
+if ( ! class_exists( 'WP_User' ) ) {
+	class WP_User {
+		public int $ID;
+		public string $user_email;
+		public string $display_name;
+		public string $user_login;
+		public function __construct( int $id, string $email = '', string $display_name = '' ) {
+			$this->ID           = $id;
+			$this->user_email   = $email;
+			$this->display_name = $display_name ?: $email;
+			$this->user_login   = $email;
+		}
+	}
+}
 if ( ! function_exists( 'wpautop' ) ) {
 	function wpautop( string $s ): string { return '<p>' . $s . '</p>'; }
 }
@@ -333,6 +363,24 @@ if ( ! function_exists( 'wp_strip_all_tags' ) ) {
 }
 
 /** Stub mínimo de WP_REST_Response — solo lo que usan los controllers CRM bajo test. */
+if ( ! class_exists( 'WP_REST_Controller' ) ) {
+	class WP_REST_Controller {
+		protected $namespace;
+		protected $rest_base;
+	}
+}
+if ( ! class_exists( 'WP_REST_Server' ) ) {
+	class WP_REST_Server {
+		const READABLE   = 'GET';
+		const CREATABLE  = 'POST';
+		const EDITABLE   = 'PUT, PATCH';
+		const DELETABLE  = 'DELETE';
+		const ALLMETHODS = 'GET, POST, PUT, PATCH, DELETE';
+	}
+}
+if ( ! function_exists( 'register_rest_route' ) ) {
+	function register_rest_route( $namespace, $route, $args = array(), $override = false ): bool { return true; }
+}
 if ( ! class_exists( 'WP_REST_Response' ) ) {
 	class WP_REST_Response {
 		private $data;
@@ -352,7 +400,7 @@ if ( ! function_exists( 'rest_ensure_response' ) ) {
 }
 /** Stub mínimo de WP_REST_Request — parámetros planos, sin rutas/sanitización de WP real. */
 if ( ! class_exists( 'WP_REST_Request' ) ) {
-	class WP_REST_Request {
+	class WP_REST_Request implements \ArrayAccess {
 		private array $params;
 		private array $headers;
 		private string $route;
@@ -366,6 +414,12 @@ if ( ! class_exists( 'WP_REST_Request' ) ) {
 		public function get_json_params(): array { return $this->params; }
 		public function get_header( string $name ) { return $this->headers[ $name ] ?? null; }
 		public function get_route(): string { return $this->route; }
+		public function offsetExists( $offset ): bool { return isset( $this->params[ $offset ] ); }
+		public function offsetGet( $offset ): mixed { return $this->params[ $offset ] ?? null; }
+		public function offsetSet( $offset, $value ): void {
+			if ( null === $offset ) { $this->params[] = $value; } else { $this->params[ $offset ] = $value; }
+		}
+		public function offsetUnset( $offset ): void { unset( $this->params[ $offset ] ); }
 	}
 }
 if ( ! class_exists( 'WP_Error' ) ) {
@@ -425,6 +479,55 @@ if ( ! function_exists( 'wp_create_nonce' ) ) {
 		return $nonce;
 	}
 }
+// Stubs de admin/nonce/URL — suficientes para probar handlers admin-post
+// (wp_die() lanza una excepción capturable en vez de terminar el proceso,
+// como es estándar en tests de WordPress).
+if ( ! class_exists( 'ATORA_Test_WPDieException' ) ) {
+	final class ATORA_Test_WPDieException extends \Exception {}
+}
+if ( ! function_exists( 'wp_die' ) ) {
+	function wp_die( $message = '', $title = '', $args = array() ) {
+		throw new ATORA_Test_WPDieException( is_string( $message ) ? $message : 'wp_die' );
+	}
+}
+if ( ! function_exists( 'admin_url' ) ) {
+	function admin_url( string $path = '' ): string { return 'https://example.test/wp-admin/' . ltrim( $path, '/' ); }
+}
+if ( ! function_exists( 'esc_url' ) )          { function esc_url( string $s ): string { return $s; } }
+if ( ! function_exists( 'esc_html__' ) )       { function esc_html__( string $s, string $d = '' ): string { return $s; } }
+if ( ! function_exists( 'esc_attr__' ) )       { function esc_attr__( string $s, string $d = '' ): string { return $s; } }
+if ( ! function_exists( 'nocache_headers' ) )  { function nocache_headers(): void {} }
+if ( ! function_exists( 'is_admin' ) )         { function is_admin(): bool { return true; } }
+if ( ! function_exists( 'add_submenu_page' ) ) { function add_submenu_page( ...$args ): void {} }
+$GLOBALS['__atora_test_wp_redirects'] = array();
+if ( ! function_exists( 'wp_safe_redirect' ) ) {
+	function wp_safe_redirect( string $location, int $status = 302 ): bool {
+		$GLOBALS['__atora_test_wp_redirects'][] = $location;
+		return true;
+	}
+}
+if ( ! function_exists( 'atora_test_last_redirect' ) ) {
+	function atora_test_last_redirect(): ?string {
+		$r = $GLOBALS['__atora_test_wp_redirects'] ?? array();
+		return $r ? (string) end( $r ) : null;
+	}
+}
+if ( ! function_exists( 'wp_nonce_url' ) ) {
+	function wp_nonce_url( string $url, $action = -1, string $name = '_wpnonce' ): string {
+		$nonce = wp_create_nonce( $action );
+		$sep   = false === strpos( $url, '?' ) ? '?' : '&';
+		return $url . $sep . $name . '=' . $nonce;
+	}
+}
+if ( ! function_exists( 'check_admin_referer' ) ) {
+	function check_admin_referer( $action = -1, string $query_arg = '_wpnonce' ) {
+		$nonce = $_REQUEST[ $query_arg ] ?? '';
+		if ( ! wp_verify_nonce( $nonce, $action ) ) {
+			wp_die( 'Nonce inválido.' );
+		}
+		return true;
+	}
+}
 if ( ! function_exists( 'wp_verify_nonce' ) ) {
 	function wp_verify_nonce( $nonce, $action = -1 ): bool {
 		$nonce = (string) $nonce;
@@ -466,6 +569,7 @@ foreach ( array(
 	'class-company-service.php',
 	'class-list-service.php',
 	'class-campaign-service.php',
+	'class-sequence-service.php',
 ) as $svc ) {
 	if ( file_exists( $services_dir . $svc ) ) {
 		require_once $services_dir . $svc;
@@ -484,6 +588,11 @@ foreach ( array(
 	if ( file_exists( $lms_dir . $lms ) ) {
 		require_once $lms_dir . $lms;
 	}
+}
+
+$learning_analytics_service_file = __DIR__ . '/../modules/learning-analytics/class-learning-analytics-service.php';
+if ( file_exists( $learning_analytics_service_file ) ) {
+	require_once $learning_analytics_service_file;
 }
 
 $messaging_router_file = __DIR__ . '/../modules/messaging/class-messaging-router.php';

@@ -62,9 +62,76 @@ class CLMS_DB_Migration {
 		$this->create_h5p_library_table();
 		$this->create_h5p_tracking_table();
 
+		if ( ! $this->schema_is_complete() ) {
+			// No se marca la migración como completa: si dbDelta() falló en
+			// crear alguna tabla esperada (p. ej. por permisos de DB), la
+			// opción de versión de esquema se queda como está para que
+			// maybe_run() lo vuelva a intentar en la siguiente carga.
+			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			error_log( '[ATORA][DB_MIGRATION] Migración incompleta: faltan tablas esperadas tras dbDelta().' );
+			add_action( 'admin_notices', array( $this, 'render_incomplete_migration_notice' ) );
+			return;
+		}
+
 		update_option( self::SCHEMA_VERSION_KEY, $this->get_schema_version() );
 
 		do_action( 'clms_db_migration_completed', $this->get_schema_version() );
+	}
+
+	/**
+	 * Nombres de tabla (sin prefijo) que la migración debe dejar creados.
+	 *
+	 * @return string[]
+	 */
+	private function expected_tables(): array {
+		return array(
+			'clms_grade_appeals',
+			'clms_progress_tracking',
+			'clms_learning_resources',
+			'clms_gamification_profiles',
+			'clms_groups',
+			'clms_group_members',
+			'clms_group_submissions',
+			'clms_group_grade_overrides',
+			'clms_group_audit_log',
+			'atora_early_warning',
+			'atora_student_analytics',
+			'clms_peer_review_audit_log',
+			'atora_portfolios',
+			'atora_portfolio_assessments',
+			'atora_portfolio_items',
+			'atora_portfolio_feedback',
+			'atora_google_classroom_course_map',
+			'atora_google_classroom_sync_log',
+			'atora_google_classroom_coursework_map',
+			'atora_h5p_content',
+			'atora_h5p_library',
+			'atora_h5p_tracking',
+		);
+	}
+
+	/**
+	 * Verifica que todas las tablas esperadas existan realmente en la DB.
+	 */
+	private function schema_is_complete(): bool {
+		global $wpdb;
+		foreach ( $this->expected_tables() as $suffix ) {
+			$table = $wpdb->prefix . $suffix;
+			$found = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) );
+			if ( $found !== $table ) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * Aviso en el admin cuando la migración no pudo completarse.
+	 */
+	public function render_incomplete_migration_notice(): void {
+		echo '<div class="notice notice-error"><p>' .
+			esc_html__( 'ATORA LMS: la migración de base de datos no se completó correctamente. Revisa los permisos de la base de datos y recarga esta página para reintentar.', 'atora-lms' ) .
+			'</p></div>';
 	}
 
 	// ── Tablas ───────────────────────────────────────────────────────────────

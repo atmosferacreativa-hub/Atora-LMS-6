@@ -93,19 +93,22 @@ final class H5P_Content_Controller extends WP_REST_Controller {
 		$page     = max( 1, absint( $request->get_param( 'page' ) ) );
 		$offset   = ( $page - 1 ) * $per_page;
 
-		$ids = get_posts(
-			array(
-				'post_type'      => 'h5p_content',
-				'post_status'    => 'any',
-				'numberposts'    => $per_page,
-				'offset'         => $offset,
-				'orderby'        => 'date',
-				'order'          => 'DESC',
-				's'              => $search,
-				'fields'         => 'ids',
-				'no_found_rows'  => true,
-			)
+		$query_args = array(
+			'post_type'      => 'h5p_content',
+			'post_status'    => 'any',
+			'numberposts'    => $per_page,
+			'offset'         => $offset,
+			'orderby'        => 'date',
+			'order'          => 'DESC',
+			's'              => $search,
+			'fields'         => 'ids',
+			'no_found_rows'  => true,
 		);
+		if ( ! current_user_can( 'manage_options' ) ) {
+			$query_args['author'] = get_current_user_id();
+		}
+
+		$ids = get_posts( $query_args );
 		$ids = is_array( $ids ) ? array_values( array_filter( array_map( 'absint', $ids ) ) ) : array();
 
 		$items = array();
@@ -145,6 +148,9 @@ final class H5P_Content_Controller extends WP_REST_Controller {
 		if ( ! $id || 'h5p_content' !== get_post_type( $id ) ) {
 			return new WP_Error( 'atora_h5p_not_found', __( 'Contenido no encontrado.', 'atora-lms' ), array( 'status' => 404 ) );
 		}
+		if ( ! current_user_can( 'edit_post', $id ) ) {
+			return new WP_Error( 'atora_h5p_forbidden', __( 'No tienes permisos sobre este contenido.', 'atora-lms' ), array( 'status' => 403 ) );
+		}
 
 		$row = $this->content->get_by_wp_post_id( $id );
 		return new WP_REST_Response(
@@ -167,6 +173,9 @@ final class H5P_Content_Controller extends WP_REST_Controller {
 		$id = absint( $request['id'] );
 		if ( ! $id || 'h5p_content' !== get_post_type( $id ) ) {
 			return new WP_Error( 'atora_h5p_not_found', __( 'Contenido no encontrado.', 'atora-lms' ), array( 'status' => 404 ) );
+		}
+		if ( ! current_user_can( 'edit_post', $id ) ) {
+			return new WP_Error( 'atora_h5p_forbidden', __( 'No tienes permisos sobre este contenido.', 'atora-lms' ), array( 'status' => 403 ) );
 		}
 
 		$payload = (array) $request->get_json_params();
@@ -196,6 +205,9 @@ final class H5P_Content_Controller extends WP_REST_Controller {
 		$id = absint( $request['id'] );
 		if ( ! $id || 'h5p_content' !== get_post_type( $id ) ) {
 			return new WP_Error( 'atora_h5p_not_found', __( 'Contenido no encontrado.', 'atora-lms' ), array( 'status' => 404 ) );
+		}
+		if ( ! current_user_can( 'delete_post', $id ) ) {
+			return new WP_Error( 'atora_h5p_forbidden', __( 'No tienes permisos sobre este contenido.', 'atora-lms' ), array( 'status' => 403 ) );
 		}
 
 		$ok = (bool) wp_delete_post( $id, true );

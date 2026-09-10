@@ -80,11 +80,11 @@ final class Group_Report_Service {
 			fputcsv( $out, array(
 				$course_id,
 				absint( $row['group_id'] ?? 0 ),
-				(string) ( $row['group_name'] ?? '' ),
+				\CLMS_Helper::csv_safe_field( $row['group_name'] ?? '' ),
 				absint( $row['lesson_id'] ?? 0 ),
 				$submission_id,
 				$student_id,
-				$student_name,
+				\CLMS_Helper::csv_safe_field( $student_name ),
 				'' !== (string) $group_grade ? (int) $group_grade : '',
 				'' !== (string) $override ? (int) $override : '',
 				'' !== (string) $final ? (int) $final : '',

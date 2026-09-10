@@ -120,6 +120,17 @@ jobs:
       - name: Check out plugin
         uses: actions/checkout@v4
 
+      - name: Resolve plugin version
+        id: plugin_version
+        shell: bash
+        run: |
+          VERSION=$(grep -m1 '^ \* Version:' atora_lms.php | sed -E 's/.*Version:\s*//' | tr -d '[:space:]')
+          if [ -z "$VERSION" ]; then
+            echo "No se pudo determinar la version desde atora_lms.php" >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
       - name: Set up PHP and WP-CLI
         uses: shivammathur/setup-php@v2
         with:
@@ -162,9 +173,12 @@ jobs:
 
       - name: Verify runtime bootstrap
         shell: bash
+        env:
+          EXPECTED_VERSION: ${{ steps.plugin_version.outputs.version }}
         run: |
           wp eval '
-            if ( ! defined( "ATORA_LMS_VERSION" ) || "6.13.3" !== ATORA_LMS_VERSION ) {
+            $expected = getenv( "EXPECTED_VERSION" );
+            if ( ! defined( "ATORA_LMS_VERSION" ) || $expected !== ATORA_LMS_VERSION ) {
               fwrite( STDERR, "Unexpected ATORA LMS version\n" );
               exit( 1 );
             }
@@ -259,19 +273,32 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
+      - name: Resolve plugin version
+        id: plugin_version
+        shell: bash
+        run: |
+          VERSION=$(grep -m1 '^ \* Version:' atora_lms.php | sed -E 's/.*Version:\s*//' | tr -d '[:space:]')
+          if [ -z "$VERSION" ]; then
+            echo "No se pudo determinar la version desde atora_lms.php" >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
       - name: Build ZIP
-        run: ./scripts/build-dist.sh 6.13.3
+        run: ./scripts/build-dist.sh "${{ steps.plugin_version.outputs.version }}"
 
       - name: Inspect ZIP
         shell: bash
+        env:
+          VERSION: ${{ steps.plugin_version.outputs.version }}
         run: |
-          unzip -t dist/atora-lms-6.13.3.zip
-          ! unzip -Z1 dist/atora-lms-6.13.3.zip | grep -E '(^|/)(\.git|\.claude|tests|docs|vendor|composer\.(json|lock)|phpunit\.xml)(/|$)'
+          unzip -t "dist/atora-lms-${VERSION}.zip"
+          ! unzip -Z1 "dist/atora-lms-${VERSION}.zip" | grep -E '(^|/)(\.git|\.claude|tests|docs|vendor|composer\.(json|lock)|phpunit\.xml)(/|$)'
 
       - name: Upload distribution
         uses: actions/upload-artifact@v4
         with:
-          name: atora-lms-6.13.3
-          path: dist/atora-lms-6.13.3.zip
+          name: atora-lms-${{ steps.plugin_version.outputs.version }}
+          path: dist/atora-lms-${{ steps.plugin_version.outputs.version }}.zip
           if-no-files-found: error
           retention-days: 7

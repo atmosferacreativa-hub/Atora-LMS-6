@@ -197,8 +197,8 @@ final class Early_Warning_Module {
 			$csv .= sprintf(
 				"%d,%s,%s,%s,%d,%s,%d,%s,%s,%s\n",
 				absint( $row['user_id'] ?? 0 ),
-				str_replace( '"', '""', '"' . (string) ( $row['student_name'] ?? '' ) . '"' ),
-				str_replace( '"', '""', '"' . (string) ( $row['student_email'] ?? '' ) . '"' ),
+				str_replace( '"', '""', '"' . \CLMS_Helper::csv_safe_field( $row['student_name'] ?? '' ) . '"' ),
+				str_replace( '"', '""', '"' . \CLMS_Helper::csv_safe_field( $row['student_email'] ?? '' ) . '"' ),
 				(string) ( $row['warning_type'] ?? '' ),
 				absint( $data['count'] ?? 0 ),
 				str_replace( '"', '""', '"' . $missed_lessons_str . '"' ),

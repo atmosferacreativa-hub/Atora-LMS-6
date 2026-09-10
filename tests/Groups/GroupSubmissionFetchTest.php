@@ -8,21 +8,7 @@
 declare( strict_types = 1 );
 
 namespace {
-	// Stubs mínimos para CLMS_Helper usados por los traits.
-	if ( ! class_exists( 'CLMS_Helper' ) ) {
-		final class CLMS_Helper {
-			public static function user_can_manage_lms( $post_id = 0 ): bool {
-				unset( $post_id );
-				return false;
-			}
-			public static function get_course_id_from_lesson( int $lesson_id ): int {
-				return absint( get_post_meta( $lesson_id, '_clms_lesson_course_id', true ) );
-			}
-			public static function get_lesson_course_id( int $lesson_id ): int {
-				return self::get_course_id_from_lesson( $lesson_id );
-			}
-		}
-	}
+	require_once __DIR__ . '/../stubs/class-clms-helper-stub.php';
 }
 
 namespace ATORA\Tests\Groups {
@@ -37,6 +23,7 @@ final class GroupSubmissionFetchTest extends TestCase {
 		atora_test_reset_filters();
 		atora_test_reset_post_meta();
 		atora_test_reset_posts();
+		\atora_test_reset_clms_helper_stub();
 	}
 
 	/** @test */
