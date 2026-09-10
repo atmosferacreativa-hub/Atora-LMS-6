@@ -51,8 +51,10 @@ class InboxReplyEmailTest extends TestCase {
 
 			public function prepare( string $sql, ...$args ): string {
 				$i = 0;
-				return preg_replace_callback( '/%[ds]/', function() use ( &$i, $args ) {
-					return isset( $args[ $i ] ) ? (string) $args[ $i++ ] : '?';
+				return preg_replace_callback( '/%[ds]/', function( $match ) use ( &$i, $args ) {
+					if ( ! isset( $args[ $i ] ) ) { return '?'; }
+					$value = $args[ $i++ ];
+					return '%s' === $match[0] ? "'" . $value . "'" : (string) $value;
 				}, $sql );
 			}
 
