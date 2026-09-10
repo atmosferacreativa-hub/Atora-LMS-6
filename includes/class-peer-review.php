@@ -43,6 +43,8 @@ class CLMS_Peer_Review {
 
 		if ( is_admin() ) {
 			add_action( 'atora_lms_admin_menu', array( $this, 'register_admin_menu' ) );
+			add_action( 'admin_post_clms_peer_review_assign_now', array( $this, 'handle_assign_now' ) );
+			add_action( 'admin_notices', array( $this, 'render_assign_now_notice' ) );
 		}
 	}
 
@@ -98,6 +100,7 @@ class CLMS_Peer_Review {
 		$cal_enabled    = (bool) get_post_meta( $post->ID, '_clms_pr_calibration_enabled', true );
 		$cal_submission = absint( get_post_meta( $post->ID, '_clms_pr_calibration_submission_id', true ) );
 		$teacher_grade  = max( 0, min( 100, absint( get_post_meta( $post->ID, '_clms_pr_calibration_teacher_grade', true ) ) ) );
+		$default_reviews_per_student = 2;
 		?>
 		<p style="margin:0 0 10px;color:#555;font-size:13px">
 			<?php esc_html_e( 'Configura coevaluación por lección: modo ciego, entrenamiento y calibración.', 'atora-lms' ); ?>
@@ -109,6 +112,30 @@ class CLMS_Peer_Review {
 				<strong><?php esc_html_e( 'Activar coevaluación en esta lección', 'atora-lms' ); ?></strong>
 			</label>
 		</p>
+
+		<div style="margin:10px 0 14px;padding:12px;border:1px solid #e5e7eb;border-radius:10px;background:#f9fafb;">
+			<p style="margin:0 0 8px"><strong><?php esc_html_e( 'Asignación (docente)', 'atora-lms' ); ?></strong></p>
+			<p style="margin:0 0 10px;color:#666;font-size:12px">
+				<?php esc_html_e( 'Cuando la fecha de entrega ya pasó, asigna revisiones a los estudiantes. (También disponible vía REST).', 'atora-lms' ); ?>
+			</p>
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<input type="hidden" name="action" value="clms_peer_review_assign_now">
+				<input type="hidden" name="lesson_id" value="<?php echo esc_attr( (string) absint( $post->ID ) ); ?>">
+				<?php wp_nonce_field( 'clms_peer_review_assign_' . absint( $post->ID ), 'clms_peer_review_assign_nonce' ); ?>
+				<label for="clms_peer_review_reviews_per_student"><strong><?php esc_html_e( 'Revisiones por estudiante', 'atora-lms' ); ?></strong></label><br>
+				<input
+					type="number"
+					min="1"
+					max="5"
+					step="1"
+					name="reviews_per_student"
+					id="clms_peer_review_reviews_per_student"
+					value="<?php echo esc_attr( (string) $default_reviews_per_student ); ?>"
+					style="width: 120px;"
+				>
+				<button type="submit" class="button button-secondary" style="margin-left:8px"><?php esc_html_e( 'Asignar ahora', 'atora-lms' ); ?></button>
+			</form>
+		</div>
 
 		<p>
 			<label>
@@ -210,6 +237,72 @@ class CLMS_Peer_Review {
 		$teacher_grade = isset( $_POST['clms_pr_calibration_teacher_grade'] ) ? absint( wp_unslash( $_POST['clms_pr_calibration_teacher_grade'] ) ) : 0;
 		$teacher_grade = max( 0, min( 100, $teacher_grade ) );
 		update_post_meta( $post_id, '_clms_pr_calibration_teacher_grade', $teacher_grade );
+	}
+
+	public function handle_assign_now(): void {
+		$lesson_id = isset( $_POST['lesson_id'] ) ? absint( wp_unslash( $_POST['lesson_id'] ) ) : 0;
+		if ( ! $lesson_id ) {
+			wp_die( esc_html__( 'Lección inválida.', 'atora-lms' ) );
+		}
+
+		if ( ! isset( $_POST['clms_peer_review_assign_nonce'] ) ) {
+			wp_die( esc_html__( 'Nonce faltante.', 'atora-lms' ) );
+		}
+
+		check_admin_referer( 'clms_peer_review_assign_' . $lesson_id, 'clms_peer_review_assign_nonce' );
+
+		if ( class_exists( 'CLMS_Helper' ) && ! CLMS_Helper::user_can_manage_lms( $lesson_id ) ) {
+			wp_die( esc_html__( 'No tienes permisos.', 'atora-lms' ) );
+		}
+
+		$per_student = isset( $_POST['reviews_per_student'] ) ? absint( wp_unslash( $_POST['reviews_per_student'] ) ) : 2;
+		$per_student = max( 1, min( 5, $per_student ) );
+
+		$result = self::assign_for_lesson( $lesson_id, $per_student );
+
+		$redirect = admin_url( 'post.php?post=' . $lesson_id . '&action=edit' );
+		if ( is_wp_error( $result ) ) {
+			$redirect = add_query_arg(
+				array(
+					'clms_pr_assign' => 'error',
+					'code'          => sanitize_key( $result->get_error_code() ),
+				),
+				$redirect
+			);
+			wp_safe_redirect( $redirect );
+			exit;
+		}
+
+		$redirect = add_query_arg(
+			array(
+				'clms_pr_assign' => 'ok',
+				'assigned'       => absint( $result['assigned'] ?? 0 ),
+				'skipped'        => absint( $result['skipped'] ?? 0 ),
+			),
+			$redirect
+		);
+		wp_safe_redirect( $redirect );
+		exit;
+	}
+
+	public function render_assign_now_notice(): void {
+		if ( empty( $_GET['clms_pr_assign'] ) ) {
+			return;
+		}
+
+		$status = sanitize_key( (string) wp_unslash( $_GET['clms_pr_assign'] ) );
+		if ( 'ok' === $status ) {
+			$assigned = isset( $_GET['assigned'] ) ? absint( wp_unslash( $_GET['assigned'] ) ) : 0;
+			$skipped  = isset( $_GET['skipped'] ) ? absint( wp_unslash( $_GET['skipped'] ) ) : 0;
+			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html( sprintf( __( 'Coevaluación asignada. Nuevas: %d — Omitidas: %d.', 'atora-lms' ), $assigned, $skipped ) ) . '</p></div>';
+			return;
+		}
+
+		if ( 'error' === $status ) {
+			$code = isset( $_GET['code'] ) ? sanitize_key( (string) wp_unslash( $_GET['code'] ) ) : 'error';
+			echo '<div class="notice notice-error is-dismissible"><p>' . esc_html( sprintf( __( 'No se pudo asignar coevaluación (%s). Revisa que haya suficientes entregas y que esté habilitada.', 'atora-lms' ), $code ) ) . '</p></div>';
+			return;
+		}
 	}
 
 	/* ----------------------------------------------------------------
