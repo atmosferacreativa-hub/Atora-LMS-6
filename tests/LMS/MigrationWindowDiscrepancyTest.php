@@ -137,9 +137,9 @@ class MigrationWindowDiscrepancyTest extends TestCase {
 		$this->invoke( 800, 999 );
 
 		global $wpdb;
-		foreach ( $wpdb->inserted as $call ) {
-			$this->assertStringNotContainsString( 'atora_courses', $call['table'], 'nunca debe escribir en atora_courses — solo registrar' );
-		}
+		$this->assertCount( 1, $wpdb->inserted, 'una discrepancia debe producir exactamente una entrada de auditoría' );
+		$this->assertSame( 'wp_atora_lms_parity_log', $wpdb->inserted[0]['table'] );
+		$this->assertStringNotContainsString( 'atora_courses', $wpdb->inserted[0]['table'], 'nunca debe escribir en atora_courses — solo registrar' );
 
 		$this->restore_wpdb( $original );
 	}
