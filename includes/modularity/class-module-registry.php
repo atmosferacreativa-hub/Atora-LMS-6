@@ -246,6 +246,17 @@ class CLMS_Module_Registry {
 				'tables'              => array( 'atora_student_analytics' ),
 				'core'                => true,
 			),
+			'portfolios'    => array(
+				'label'               => 'Portafolios',
+				'description'         => 'E-portfolios por estudiante/curso: evidencias, reflexiones y feedback.',
+				'group'               => 'experience',
+				'requires'            => array( 'lms' ),
+				'provides_pages'      => array( 'atora-portfolios' ),
+				'provides_shortcodes' => array( 'atora_portfolio', 'atora_portfolio_public' ),
+				'provides_rest'       => array( '/portfolios' ),
+				'tables'              => array( 'atora_portfolios', 'atora_portfolio_items', 'atora_portfolio_feedback' ),
+				'core'                => true,
+			),
 			'security'       => array(
 				'label'               => 'Seguridad',
 				'description'         => 'Registro extendido, CAPTCHA, 2FA. Autenticación base siempre activa.',

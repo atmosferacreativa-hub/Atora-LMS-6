@@ -56,6 +56,7 @@ class CLMS_DB_Migration {
 		$this->create_early_warning_table();
 		$this->create_student_analytics_table();
 		$this->create_peer_review_audit_log_table();
+		$this->create_portfolios_tables();
 
 		update_option( self::SCHEMA_VERSION_KEY, $this->get_schema_version() );
 
@@ -356,6 +357,76 @@ class CLMS_DB_Migration {
 			KEY created_at (created_at)
 		) {$charset};";
 
+		dbDelta( $sql );
+	}
+
+	/**
+	 * Portafolios (E-portfolios): colecciones de evidencias por estudiante/curso.
+	 *
+	 * @return void
+	 */
+	private function create_portfolios_tables(): void {
+		global $wpdb;
+
+		$charset = $wpdb->get_charset_collate();
+
+		$portfolios = $wpdb->prefix . 'atora_portfolios';
+		$sql = "CREATE TABLE {$portfolios} (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			course_id bigint(20) unsigned NOT NULL,
+			user_id bigint(20) unsigned NOT NULL,
+			title varchar(255) NOT NULL,
+			visibility varchar(20) NOT NULL DEFAULT 'teachers',
+			public_slug varchar(64) DEFAULT NULL,
+			created_at datetime NOT NULL,
+			updated_at datetime NOT NULL,
+			PRIMARY KEY (id),
+			UNIQUE KEY course_user (course_id, user_id),
+			UNIQUE KEY public_slug (public_slug),
+			KEY course_id (course_id),
+			KEY user_id (user_id),
+			KEY visibility (visibility),
+			KEY updated_at (updated_at)
+		) {$charset};";
+		dbDelta( $sql );
+
+		$items = $wpdb->prefix . 'atora_portfolio_items';
+		$sql = "CREATE TABLE {$items} (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			portfolio_id bigint(20) unsigned NOT NULL,
+			submission_id bigint(20) unsigned NOT NULL,
+			lesson_id bigint(20) unsigned NOT NULL DEFAULT 0,
+			position int(11) NOT NULL DEFAULT 0,
+			title_override varchar(255) DEFAULT NULL,
+			reflection longtext,
+			tags_json longtext,
+			created_at datetime NOT NULL,
+			updated_at datetime NOT NULL,
+			PRIMARY KEY (id),
+			UNIQUE KEY portfolio_submission (portfolio_id, submission_id),
+			KEY portfolio_id (portfolio_id),
+			KEY submission_id (submission_id),
+			KEY lesson_id (lesson_id),
+			KEY position (position),
+			KEY updated_at (updated_at)
+		) {$charset};";
+		dbDelta( $sql );
+
+		$feedback = $wpdb->prefix . 'atora_portfolio_feedback';
+		$sql = "CREATE TABLE {$feedback} (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			portfolio_id bigint(20) unsigned NOT NULL,
+			item_id bigint(20) unsigned DEFAULT NULL,
+			author_id bigint(20) unsigned NOT NULL,
+			author_role varchar(20) NOT NULL DEFAULT 'teacher',
+			comment longtext NOT NULL,
+			created_at datetime NOT NULL,
+			PRIMARY KEY (id),
+			KEY portfolio_id (portfolio_id),
+			KEY item_id (item_id),
+			KEY author_id (author_id),
+			KEY created_at (created_at)
+		) {$charset};";
 		dbDelta( $sql );
 	}
 }

@@ -97,6 +97,12 @@ class V5_Modules {
 			self::load_learning_analytics();
 		}
 
+		// Portafolios: admin/rest/front/ajax (estudiantes gestionan desde shortcode).
+		if ( ( $ctx['is_admin'] || $ctx['is_rest'] || $ctx['is_front'] || $ctx['is_ajax'] )
+			&& self::module_active( 'portfolios' ) ) {
+			self::load_portfolios();
+		}
+
 		// Messaging: evitar carga en frontend público general.
 		if ( ( $ctx['is_admin'] || $ctx['is_cron'] || $ctx['is_rest'] || $ctx['is_ajax'] || $ctx['is_webhook'] )
 			&& self::module_active( 'messaging' ) ) {
@@ -189,6 +195,17 @@ class V5_Modules {
 
 		if ( class_exists( '\ATORA\LearningAnalytics\Learning_Analytics_Module' ) ) {
 			\ATORA\LearningAnalytics\Learning_Analytics_Module::init();
+		}
+	}
+
+	/** @return void */
+	private static function load_portfolios(): void {
+		$dir = ATORA_LMS_MODULES_DIR . 'portfolios/';
+		self::require_file( $dir . 'class-portfolios-service.php' );
+		self::require_file( $dir . 'class-portfolios-module.php' );
+
+		if ( class_exists( '\ATORA\Portfolios\Portfolios_Module' ) ) {
+			\ATORA\Portfolios\Portfolios_Module::init();
 		}
 	}
 
