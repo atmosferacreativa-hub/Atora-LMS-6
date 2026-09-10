@@ -38,6 +38,8 @@ class CLMS_Peer_Review {
 		add_shortcode( 'clms_peer_review_training', array( $this, 'render_training_module' ) );
 		add_action( 'clms_peer_review_completed', array( $this, 'maybe_aggregate' ), 10, 2 );
 		add_action( 'clms_peer_review_completed', array( $this, 'capture_review_quality' ), 20, 2 );
+		add_action( 'add_meta_boxes', array( $this, 'register_lesson_metabox' ) );
+		add_action( 'save_post_lm_lesson', array( $this, 'save_lesson_metabox' ) );
 
 		if ( is_admin() ) {
 			add_action( 'atora_lms_admin_menu', array( $this, 'register_admin_menu' ) );
@@ -62,6 +64,152 @@ class CLMS_Peer_Review {
 			'capability_type'     => 'post',
 			'map_meta_cap'        => true,
 		) );
+	}
+
+	/* ----------------------------------------------------------------
+	 * LESSON SETTINGS (metabox)
+	 * -------------------------------------------------------------- */
+
+	public function register_lesson_metabox(): void {
+		add_meta_box(
+			'clms_peer_review_settings',
+			__( 'Coevaluación (Peer review)', 'atora-lms' ),
+			array( $this, 'render_lesson_metabox' ),
+			'lm_lesson',
+			'normal',
+			'default'
+		);
+	}
+
+	public function render_lesson_metabox( $post ): void {
+		if ( ! $post || empty( $post->ID ) ) {
+			return;
+		}
+
+		if ( class_exists( 'CLMS_Helper' ) && ! CLMS_Helper::user_can_manage_lms( $post->ID ) ) {
+			return;
+		}
+
+		wp_nonce_field( 'clms_peer_review_settings_save', 'clms_peer_review_settings_nonce' );
+
+		$peer_enabled   = (bool) get_post_meta( $post->ID, '_clms_peer_review_enabled', true );
+		$blind          = (bool) get_post_meta( $post->ID, '_clms_peer_review_blind', true );
+		$training_req   = self::is_training_required_for_lesson( absint( $post->ID ) );
+		$cal_enabled    = (bool) get_post_meta( $post->ID, '_clms_pr_calibration_enabled', true );
+		$cal_submission = absint( get_post_meta( $post->ID, '_clms_pr_calibration_submission_id', true ) );
+		$teacher_grade  = max( 0, min( 100, absint( get_post_meta( $post->ID, '_clms_pr_calibration_teacher_grade', true ) ) ) );
+		?>
+		<p style="margin:0 0 10px;color:#555;font-size:13px">
+			<?php esc_html_e( 'Configura coevaluación por lección: modo ciego, entrenamiento y calibración.', 'atora-lms' ); ?>
+		</p>
+
+		<p>
+			<label>
+				<input type="checkbox" name="clms_peer_review_enabled" value="1" <?php checked( $peer_enabled ); ?>>
+				<strong><?php esc_html_e( 'Activar coevaluación en esta lección', 'atora-lms' ); ?></strong>
+			</label>
+		</p>
+
+		<p>
+			<label>
+				<input type="checkbox" name="clms_peer_review_blind" value="1" <?php checked( $blind ); ?>>
+				<?php esc_html_e( 'Modo ciego (oculta identidades a estudiantes)', 'atora-lms' ); ?>
+			</label>
+		</p>
+
+		<p>
+			<label>
+				<input type="checkbox" name="clms_peer_review_training_required" value="1" <?php checked( $training_req ); ?>>
+				<?php esc_html_e( 'Requiere completar entrenamiento antes de revisar', 'atora-lms' ); ?>
+			</label>
+		</p>
+
+		<hr style="margin:12px 0;">
+
+		<p style="margin:0 0 8px"><strong><?php esc_html_e( 'Calibración (opcional)', 'atora-lms' ); ?></strong></p>
+		<p style="margin:0 0 10px;color:#666;font-size:12px">
+			<?php esc_html_e( 'Si está activa, cada revisor evalúa un ejemplar y el sistema calcula un score de calibración. Para aprobar el envío de reviews reales, el revisor debe completar esta calibración.', 'atora-lms' ); ?>
+		</p>
+
+		<p>
+			<label>
+				<input type="checkbox" name="clms_pr_calibration_enabled" value="1" <?php checked( $cal_enabled ); ?>>
+				<?php esc_html_e( 'Activar calibración', 'atora-lms' ); ?>
+			</label>
+		</p>
+
+		<p>
+			<label for="clms_pr_calibration_submission_id"><strong><?php esc_html_e( 'Submission ID del ejemplar', 'atora-lms' ); ?></strong></label><br>
+			<input
+				type="number"
+				min="0"
+				step="1"
+				name="clms_pr_calibration_submission_id"
+				id="clms_pr_calibration_submission_id"
+				value="<?php echo esc_attr( (string) $cal_submission ); ?>"
+				style="width: 220px;"
+				placeholder="0"
+			>
+			<span class="description"><?php esc_html_e( 'Debe ser un post `clms_submission`.', 'atora-lms' ); ?></span>
+		</p>
+
+		<p>
+			<label for="clms_pr_calibration_teacher_grade"><strong><?php esc_html_e( 'Pauta docente (0–100)', 'atora-lms' ); ?></strong></label><br>
+			<input
+				type="number"
+				min="0"
+				max="100"
+				step="1"
+				name="clms_pr_calibration_teacher_grade"
+				id="clms_pr_calibration_teacher_grade"
+				value="<?php echo esc_attr( (string) $teacher_grade ); ?>"
+				style="width: 120px;"
+			>
+		</p>
+		<?php
+	}
+
+	public function save_lesson_metabox( $post_id ): void {
+		$post_id = absint( $post_id );
+		if ( ! $post_id ) {
+			return;
+		}
+
+		if ( ! isset( $_POST['clms_peer_review_settings_nonce'] ) ) {
+			return;
+		}
+
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['clms_peer_review_settings_nonce'] ) ), 'clms_peer_review_settings_save' ) ) {
+			return;
+		}
+
+		if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+			return;
+		}
+
+		if ( class_exists( 'CLMS_Helper' ) && ! CLMS_Helper::user_can_manage_lms( $post_id ) ) {
+			return;
+		}
+
+		$peer_enabled = ! empty( $_POST['clms_peer_review_enabled'] ) ? '1' : '0';
+		$blind        = ! empty( $_POST['clms_peer_review_blind'] ) ? '1' : '0';
+		$training_req = ! empty( $_POST['clms_peer_review_training_required'] ) ? '1' : '0';
+		$cal_enabled  = ! empty( $_POST['clms_pr_calibration_enabled'] ) ? '1' : '0';
+
+		update_post_meta( $post_id, '_clms_peer_review_enabled', $peer_enabled );
+		update_post_meta( $post_id, '_clms_peer_review_blind', $blind );
+		update_post_meta( $post_id, '_clms_peer_review_training_required', $training_req );
+		update_post_meta( $post_id, '_clms_pr_calibration_enabled', $cal_enabled );
+
+		$submission_id = isset( $_POST['clms_pr_calibration_submission_id'] ) ? absint( wp_unslash( $_POST['clms_pr_calibration_submission_id'] ) ) : 0;
+		if ( $submission_id && 'clms_submission' !== get_post_type( $submission_id ) ) {
+			$submission_id = 0;
+		}
+		update_post_meta( $post_id, '_clms_pr_calibration_submission_id', $submission_id );
+
+		$teacher_grade = isset( $_POST['clms_pr_calibration_teacher_grade'] ) ? absint( wp_unslash( $_POST['clms_pr_calibration_teacher_grade'] ) ) : 0;
+		$teacher_grade = max( 0, min( 100, $teacher_grade ) );
+		update_post_meta( $post_id, '_clms_pr_calibration_teacher_grade', $teacher_grade );
 	}
 
 	/* ----------------------------------------------------------------
