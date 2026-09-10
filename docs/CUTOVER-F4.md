@@ -29,13 +29,15 @@ motivo por separado.
 
 ## 2. Condiciones del gate (D-006)
 
-Las cuatro se evalúan juntas en `LMS_Parity::cutover_ready()`:
+Las cinco se evalúan juntas en `LMS_Parity::cutover_ready()`:
 
 1. `atora_lms_dualwrite` activo (toggle F2 en el mismo panel).
 2. 0 divergencias registradas en `atora_lms_parity_log` en los últimos 14 días.
 3. La última reconciliación diaria (`atora_lms_reconcile_result`, cron
-   `atora_lms_reconcile_check`) reportó 0 pendientes/huérfanos.
-4. Las 4 tablas núcleo (`atora_courses`, `atora_lessons`,
+   `atora_lms_reconcile_check`) reportó 0 pendientes/huérfanos y fue ejecutada
+   hace no más de 48 horas.
+4. El volumen de paridad cubre a todos los alumnos activos (`volume_ok = true`).
+5. Las 4 tablas núcleo (`atora_courses`, `atora_lessons`,
    `atora_enrollments`, `atora_program_enrollments`) tienen filas.
 
 Si cualquiera falla, el flip está bloqueado — tanto en el botón del panel
