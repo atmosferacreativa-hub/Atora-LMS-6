@@ -648,74 +648,36 @@ class CLMS_Peer_Review {
 
 		$lesson_id = absint( get_post_meta( $assignment_id, '_clms_pr_lesson_id', true ) );
 
-		// Get all peer review assignments for this submission.
-		$all = get_posts( array(
-			'post_type'      => 'clms_peer_review',
-			'post_status'    => array( 'publish', 'draft' ),
-			'posts_per_page' => -1,
-			'fields'         => 'ids',
-			'meta_query'     => array(
-				array( 'key' => '_clms_pr_submission_id', 'value' => $submission_id, 'type' => 'NUMERIC' ),
-			),
-		) );
-
-		if ( empty( $all ) ) {
+		// El ejemplar de calibración nunca debe afectar calificaciones.
+		if ( self::is_submission_calibration_exemplar( absint( $submission_id ), $lesson_id ) ) {
 			return;
 		}
 
-		$completed    = 0;
-		$total_scores = array();
-
-		foreach ( $all as $pr_id ) {
-			if ( 'completed' !== get_post_meta( $pr_id, '_clms_pr_status', true ) ) {
-				continue;
-			}
-			++$completed;
-			$scores = (array) get_post_meta( $pr_id, '_clms_pr_scores', true );
-			foreach ( $scores as $criterion => $points ) {
-				if ( ! isset( $total_scores[ $criterion ] ) ) {
-					$total_scores[ $criterion ] = array();
-				}
-				$total_scores[ $criterion ][] = absint( $points );
-			}
-		}
-
-		if ( $completed < count( $all ) ) {
-			// Not all reviewers done yet.
+		$calc = self::compute_peer_grade_for_submission( absint( $submission_id ), $lesson_id );
+		if ( empty( $calc['expected'] ) ) {
 			return;
 		}
 
-		// Average each criterion.
-		$avg_scores = array();
-		$grand_total = 0;
-		foreach ( $total_scores as $criterion => $values ) {
-			$avg                     = array_sum( $values ) / count( $values );
-			$avg_scores[ $criterion ] = round( $avg, 1 );
-			$grand_total             += $avg;
+		if ( absint( $calc['completed'] ?? 0 ) < absint( $calc['expected'] ?? 0 ) ) {
+			return;
 		}
 
-		$rubric_id = absint( get_post_meta( $lesson_id, '_clms_rubric_id', true ) );
-		$max_score = 100;
+		$peer_grade = absint( $calc['peer_grade'] ?? 0 );
+		$avg_scores = isset( $calc['avg_scores'] ) && is_array( $calc['avg_scores'] ) ? $calc['avg_scores'] : array();
 
-		if ( $rubric_id && class_exists( 'CLMS_Rubric' ) ) {
-			$derived = CLMS_Rubric::get_total_points( $rubric_id );
-			if ( $derived > 0 ) {
-				$max_score = $derived;
-			}
-		}
-
-		$peer_grade = $max_score > 0 ? min( 100, round( ( $grand_total / $max_score ) * 100 ) ) : 0;
-
-		// Merge with any teacher grade (teacher grade takes priority if set).
 		$teacher_grade = absint( get_post_meta( $submission_id, '_clms_submission_grade', true ) );
-		$final_grade   = $teacher_grade > 0 ? round( ( $teacher_grade * 0.6 ) + ( $peer_grade * 0.4 ) ) : $peer_grade;
+		$final_grade   = $peer_grade;
+		if ( $teacher_grade > 0 && $peer_grade > 0 ) {
+			$final_grade = round( ( $teacher_grade * 0.6 ) + ( $peer_grade * 0.4 ) );
+		} elseif ( $teacher_grade > 0 && 0 === $peer_grade ) {
+			$final_grade = $teacher_grade;
+		}
 
-		update_post_meta( $submission_id, '_clms_peer_grade',     $peer_grade );
-		update_post_meta( $submission_id, '_clms_peer_scores',    $avg_scores );
-		update_post_meta( $submission_id, '_clms_peer_grade_at',  gmdate( 'Y-m-d H:i:s' ) );
-		update_post_meta( $submission_id, '_clms_final_grade',    $final_grade );
+		update_post_meta( $submission_id, '_clms_peer_grade',    $peer_grade );
+		update_post_meta( $submission_id, '_clms_peer_scores',   $avg_scores );
+		update_post_meta( $submission_id, '_clms_peer_grade_at', gmdate( 'Y-m-d H:i:s' ) );
+		update_post_meta( $submission_id, '_clms_final_grade',   $final_grade );
 
-		// Consistency scoring: store deltas per reviewer assignment vs peer mean.
 		self::score_consistency_for_submission( $submission_id, $peer_grade, $lesson_id );
 
 		// Notify the reviewee.
@@ -929,6 +891,9 @@ class CLMS_Peer_Review {
 			'clms-peer-review-reports',
 			array( $this, 'render_admin_reports_page' )
 		);
+
+		add_action( 'admin_post_clms_peer_review_export', array( $this, 'handle_export_csv' ) );
+		add_action( 'admin_post_clms_peer_review_toggle_exclude', array( $this, 'handle_toggle_exclude_assignment' ) );
 	}
 
 	public function render_admin_reports_page(): void {
@@ -977,6 +942,14 @@ class CLMS_Peer_Review {
 			echo esc_html__( 'pauta', 'atora-lms' ) . ': ' . esc_html( (string) absint( $calibration['teacher_grade'] ?? 0 ) ) . '/100)';
 			echo '</span>';
 		}
+		echo '</p>';
+
+		$export_url = wp_nonce_url(
+			admin_url( 'admin-post.php?action=clms_peer_review_export&lesson_id=' . $lesson_id ),
+			'clms_peer_review_export_' . $lesson_id
+		);
+		echo '<p style="margin: 10px 0">';
+		echo '<a class="button" href="' . esc_url( $export_url ) . '">' . esc_html__( 'Exportar CSV', 'atora-lms' ) . '</a>';
 		echo '</p>';
 
 		$assignments = get_posts(
@@ -1102,12 +1075,432 @@ class CLMS_Peer_Review {
 		}
 
 		echo '</tbody></table>';
+
+		// Mapa reviewer ↔ reviewee.
+		echo '<h3 style="margin-top:18px">' . esc_html__( 'Mapa reviewer ↔ reviewee', 'atora-lms' ) . '</h3>';
+		echo '<table class="widefat striped" style="max-width: 1200px">';
+		echo '<thead><tr>';
+		echo '<th>' . esc_html__( 'Asignación', 'atora-lms' ) . '</th>';
+		echo '<th>' . esc_html__( 'Revisor', 'atora-lms' ) . '</th>';
+		echo '<th>' . esc_html__( 'Reviewee', 'atora-lms' ) . '</th>';
+		echo '<th>' . esc_html__( 'Tipo', 'atora-lms' ) . '</th>';
+		echo '<th>' . esc_html__( 'Estado', 'atora-lms' ) . '</th>';
+		echo '<th>' . esc_html__( 'Δ / flag', 'atora-lms' ) . '</th>';
+		echo '<th>' . esc_html__( 'Calidad', 'atora-lms' ) . '</th>';
+		echo '<th>' . esc_html__( 'Enviado', 'atora-lms' ) . '</th>';
+		echo '<th>' . esc_html__( 'Acción', 'atora-lms' ) . '</th>';
+		echo '</tr></thead><tbody>';
+
+		foreach ( $assignments as $assignment_id ) {
+			$assignment_id = absint( $assignment_id );
+			$rid = absint( get_post_meta( $assignment_id, '_clms_pr_reviewer_id', true ) );
+			$eid = absint( get_post_meta( $assignment_id, '_clms_pr_reviewee_id', true ) );
+			$is_cal = '1' === (string) get_post_meta( $assignment_id, '_clms_pr_is_calibration', true );
+			$status = sanitize_key( (string) get_post_meta( $assignment_id, '_clms_pr_status', true ) );
+			$submitted_at = (string) get_post_meta( $assignment_id, '_clms_pr_submitted_at', true );
+
+			$ruser = $rid ? get_userdata( $rid ) : null;
+			$euser = $eid ? get_userdata( $eid ) : null;
+			$rname = $ruser ? ( $ruser->display_name ? $ruser->display_name : $ruser->user_login ) : (string) $rid;
+			$ename = $euser ? ( $euser->display_name ? $euser->display_name : $euser->user_login ) : ( $is_cal ? __( 'Ejemplar', 'atora-lms' ) : (string) $eid );
+
+			$delta = $is_cal ? get_post_meta( $assignment_id, '_clms_pr_calibration_delta', true ) : get_post_meta( $assignment_id, '_clms_pr_consistency_delta', true );
+			$flag  = $is_cal ? sanitize_key( (string) get_post_meta( $assignment_id, '_clms_pr_calibration_status', true ) ) : sanitize_key( (string) get_post_meta( $assignment_id, '_clms_pr_consistency_flag', true ) );
+			$delta_i = ( '' !== (string) $delta && is_numeric( $delta ) ) ? (int) $delta : null;
+
+			$quality = absint( get_post_meta( $assignment_id, '_clms_pr_quality_score', true ) );
+			$qstatus = sanitize_key( (string) get_post_meta( $assignment_id, '_clms_pr_quality_status', true ) );
+
+			$delta_label = '—';
+			if ( null !== $delta_i ) {
+				$delta_label = ( $delta_i > 0 ? '+' : '' ) . (string) $delta_i;
+			}
+			$flag_label = $flag ? $flag : '—';
+
+			$q_label = $quality ? ( (string) $quality . '/100' ) : '—';
+			if ( $qstatus ) {
+				$q_label .= ' (' . $qstatus . ')';
+			}
+
+			$excluded = '1' === (string) get_post_meta( $assignment_id, '_clms_pr_excluded', true );
+			$toggle_url = wp_nonce_url(
+				admin_url(
+					'admin-post.php?action=clms_peer_review_toggle_exclude'
+					. '&lesson_id=' . $lesson_id
+					. '&assignment_id=' . $assignment_id
+					. '&exclude=' . ( $excluded ? 0 : 1 )
+				),
+				'clms_peer_review_toggle_exclude_' . $assignment_id
+			);
+
+			echo '<tr>';
+			echo '<td>#' . esc_html( (string) $assignment_id ) . '</td>';
+			echo '<td><strong>' . esc_html( $rname ) . '</strong><br><span class="description">#' . esc_html( (string) $rid ) . '</span></td>';
+			echo '<td><strong>' . esc_html( $ename ) . '</strong><br><span class="description">' . ( $eid ? '#' . esc_html( (string) $eid ) : '—' ) . '</span></td>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+			echo '<td>' . esc_html( $is_cal ? __( 'Calibración', 'atora-lms' ) : __( 'Normal', 'atora-lms' ) ) . '</td>';
+			echo '<td>' . esc_html( $status ? $status : 'pending' ) . '</td>';
+			echo '<td><strong>' . esc_html( $flag_label ) . '</strong><br><span class="description">Δ ' . esc_html( $delta_label ) . '</span></td>';
+			echo '<td>' . esc_html( $q_label ) . '</td>';
+			echo '<td><span class="description">' . esc_html( $submitted_at ? $submitted_at : '—' ) . '</span></td>';
+			if ( $is_cal ) {
+				echo '<td><span class="description">—</span></td>';
+			} else {
+				echo '<td><a class="button button-small" href="' . esc_url( $toggle_url ) . '">' . esc_html( $excluded ? __( 'Reincluir', 'atora-lms' ) : __( 'Excluir', 'atora-lms' ) ) . '</a></td>';
+			}
+			echo '</tr>';
+		}
+
+		echo '</tbody></table>';
+
+		// Auditoría básica desde tabla.
+		global $wpdb;
+		$audit_table = $wpdb->prefix . 'clms_peer_review_audit_log';
+		$exists = $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $audit_table ) );
+		if ( $exists ) {
+			$logs = $wpdb->get_results(
+				$wpdb->prepare(
+					"SELECT event_type, reviewer_id, reviewee_id, assignment_id, submission_id, actor_id, created_at
+					 FROM {$audit_table}
+					 WHERE lesson_id = %d
+					 ORDER BY id DESC
+					 LIMIT 50",
+					$lesson_id
+				),
+				ARRAY_A
+			);
+			$logs = is_array( $logs ) ? $logs : array();
+
+			echo '<h3 style="margin-top:18px">' . esc_html__( 'Auditoría (últimos 50 eventos)', 'atora-lms' ) . '</h3>';
+			if ( empty( $logs ) ) {
+				echo '<p class="description">' . esc_html__( 'No hay eventos aún.', 'atora-lms' ) . '</p>';
+			} else {
+				echo '<table class="widefat striped" style="max-width: 1200px">';
+				echo '<thead><tr>';
+				echo '<th>' . esc_html__( 'Fecha', 'atora-lms' ) . '</th>';
+				echo '<th>' . esc_html__( 'Evento', 'atora-lms' ) . '</th>';
+				echo '<th>' . esc_html__( 'Actor', 'atora-lms' ) . '</th>';
+				echo '<th>' . esc_html__( 'Revisor', 'atora-lms' ) . '</th>';
+				echo '<th>' . esc_html__( 'Reviewee', 'atora-lms' ) . '</th>';
+				echo '<th>' . esc_html__( 'Assignment', 'atora-lms' ) . '</th>';
+				echo '<th>' . esc_html__( 'Submission', 'atora-lms' ) . '</th>';
+				echo '</tr></thead><tbody>';
+
+				foreach ( $logs as $log ) {
+					$actor = absint( $log['actor_id'] ?? 0 );
+					$ar = $actor ? get_userdata( $actor ) : null;
+					$actor_name = $ar ? ( $ar->display_name ? $ar->display_name : $ar->user_login ) : (string) $actor;
+
+					echo '<tr>';
+					echo '<td><span class="description">' . esc_html( (string) ( $log['created_at'] ?? '' ) ) . '</span></td>';
+					echo '<td><strong>' . esc_html( sanitize_key( (string) ( $log['event_type'] ?? '' ) ) ) . '</strong></td>';
+					echo '<td>' . esc_html( $actor_name ) . '</td>';
+					echo '<td>' . esc_html( (string) absint( $log['reviewer_id'] ?? 0 ) ) . '</td>';
+					echo '<td>' . esc_html( (string) absint( $log['reviewee_id'] ?? 0 ) ) . '</td>';
+					echo '<td>' . esc_html( (string) absint( $log['assignment_id'] ?? 0 ) ) . '</td>';
+					echo '<td>' . esc_html( (string) absint( $log['submission_id'] ?? 0 ) ) . '</td>';
+					echo '</tr>';
+				}
+
+				echo '</tbody></table>';
+			}
+		}
+
 		echo '</div>';
+	}
+
+	public function handle_export_csv(): void {
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			wp_die( esc_html__( 'No tienes permisos.', 'atora-lms' ) );
+		}
+
+		$lesson_id = isset( $_GET['lesson_id'] ) ? absint( wp_unslash( $_GET['lesson_id'] ) ) : 0;
+		check_admin_referer( 'clms_peer_review_export_' . $lesson_id );
+
+		if ( ! $lesson_id ) {
+			wp_die( esc_html__( 'Lección inválida.', 'atora-lms' ) );
+		}
+
+		$assignments = get_posts(
+			array(
+				'post_type'      => 'clms_peer_review',
+				'post_status'    => array( 'publish', 'draft' ),
+				'posts_per_page' => -1,
+				'fields'         => 'ids',
+				'no_found_rows'  => true,
+				'meta_query'     => array(
+					array( 'key' => '_clms_pr_lesson_id', 'value' => $lesson_id, 'type' => 'NUMERIC' ),
+				),
+			)
+		);
+
+		$stream = fopen( 'php://temp', 'w+' ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		if ( ! $stream ) {
+			wp_die( esc_html__( 'No se pudo generar el CSV.', 'atora-lms' ) );
+		}
+
+		fputcsv( // phpcs:ignore WordPress.WP.AlternativeFunctions
+			$stream,
+			array(
+				'lesson_id',
+				'assignment_id',
+				'is_calibration',
+				'excluded',
+				'reviewer_id',
+				'reviewee_id',
+				'status',
+				'submitted_at',
+				'consistency_delta',
+				'consistency_flag',
+				'calibration_delta',
+				'calibration_score',
+				'calibration_status',
+				'quality_score',
+				'quality_status',
+			)
+		);
+
+		foreach ( (array) $assignments as $assignment_id ) {
+			$assignment_id = absint( $assignment_id );
+			$is_cal = '1' === (string) get_post_meta( $assignment_id, '_clms_pr_is_calibration', true );
+			$excluded = '1' === (string) get_post_meta( $assignment_id, '_clms_pr_excluded', true );
+			fputcsv( // phpcs:ignore WordPress.WP.AlternativeFunctions
+				$stream,
+				array(
+					$lesson_id,
+					$assignment_id,
+					$is_cal ? 1 : 0,
+					$excluded ? 1 : 0,
+					absint( get_post_meta( $assignment_id, '_clms_pr_reviewer_id', true ) ),
+					absint( get_post_meta( $assignment_id, '_clms_pr_reviewee_id', true ) ),
+					sanitize_key( (string) get_post_meta( $assignment_id, '_clms_pr_status', true ) ),
+					(string) get_post_meta( $assignment_id, '_clms_pr_submitted_at', true ),
+					$is_cal ? '' : (string) get_post_meta( $assignment_id, '_clms_pr_consistency_delta', true ),
+					$is_cal ? '' : sanitize_key( (string) get_post_meta( $assignment_id, '_clms_pr_consistency_flag', true ) ),
+					$is_cal ? (string) get_post_meta( $assignment_id, '_clms_pr_calibration_delta', true ) : '',
+					$is_cal ? (string) get_post_meta( $assignment_id, '_clms_pr_calibration_score', true ) : '',
+					$is_cal ? sanitize_key( (string) get_post_meta( $assignment_id, '_clms_pr_calibration_status', true ) ) : '',
+					absint( get_post_meta( $assignment_id, '_clms_pr_quality_score', true ) ),
+					sanitize_key( (string) get_post_meta( $assignment_id, '_clms_pr_quality_status', true ) ),
+				)
+			);
+		}
+
+		rewind( $stream );
+		$content = stream_get_contents( $stream ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		fclose( $stream ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+
+		nocache_headers();
+		header( 'Content-Type: text/csv; charset=utf-8' );
+		header( 'Content-Disposition: attachment; filename=' . sanitize_file_name( sprintf( 'atora-peer-review-lesson-%d-%s.csv', $lesson_id, gmdate( 'Ymd-His' ) ) ) );
+		echo (string) $content; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		exit;
+	}
+
+	public function handle_toggle_exclude_assignment(): void {
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			wp_die( esc_html__( 'No tienes permisos.', 'atora-lms' ) );
+		}
+
+		$lesson_id     = isset( $_GET['lesson_id'] ) ? absint( wp_unslash( $_GET['lesson_id'] ) ) : 0;
+		$assignment_id = isset( $_GET['assignment_id'] ) ? absint( wp_unslash( $_GET['assignment_id'] ) ) : 0;
+		$exclude       = isset( $_GET['exclude'] ) ? absint( wp_unslash( $_GET['exclude'] ) ) : 0;
+
+		check_admin_referer( 'clms_peer_review_toggle_exclude_' . $assignment_id );
+
+		if ( ! $lesson_id || ! $assignment_id ) {
+			wp_die( esc_html__( 'Solicitud inválida.', 'atora-lms' ) );
+		}
+
+		$assignment = get_post( $assignment_id );
+		if ( ! $assignment || 'clms_peer_review' !== $assignment->post_type ) {
+			wp_die( esc_html__( 'Asignación no encontrada.', 'atora-lms' ) );
+		}
+
+		$assignment_lesson_id = absint( get_post_meta( $assignment_id, '_clms_pr_lesson_id', true ) );
+		if ( $assignment_lesson_id !== $lesson_id ) {
+			wp_die( esc_html__( 'Asignación no pertenece a esta lección.', 'atora-lms' ) );
+		}
+
+		$is_cal = '1' === (string) get_post_meta( $assignment_id, '_clms_pr_is_calibration', true );
+		if ( $is_cal ) {
+			wp_safe_redirect( admin_url( 'admin.php?page=clms-peer-review-reports&lesson_id=' . $lesson_id ) );
+			exit;
+		}
+
+		update_post_meta( $assignment_id, '_clms_pr_excluded', $exclude ? '1' : '0' );
+
+		$submission_id = absint( get_post_meta( $assignment_id, '_clms_pr_submission_id', true ) );
+		$reviewer_id   = absint( get_post_meta( $assignment_id, '_clms_pr_reviewer_id', true ) );
+		$reviewee_id   = absint( get_post_meta( $assignment_id, '_clms_pr_reviewee_id', true ) );
+
+		self::audit(
+			$exclude ? 'assignment_excluded' : 'assignment_included',
+			array(
+				'assignment_id' => $assignment_id,
+				'lesson_id'     => $lesson_id,
+				'submission_id' => $submission_id,
+				'reviewer_id'   => $reviewer_id,
+				'reviewee_id'   => $reviewee_id,
+				'actor_id'      => get_current_user_id(),
+				'meta'          => array(
+					'excluded' => $exclude ? 1 : 0,
+				),
+			)
+		);
+
+		if ( $submission_id ) {
+			self::recalculate_submission_grade( $submission_id, $lesson_id );
+		}
+
+		wp_safe_redirect( admin_url( 'admin.php?page=clms-peer-review-reports&lesson_id=' . $lesson_id ) );
+		exit;
 	}
 
 	/* ----------------------------------------------------------------
 	 * AUDIT LOG
 	 * -------------------------------------------------------------- */
+
+	protected static function is_submission_calibration_exemplar( int $submission_id, int $lesson_id ): bool {
+		$submission_id = absint( $submission_id );
+		$lesson_id     = absint( $lesson_id );
+		if ( ! $submission_id || ! $lesson_id ) {
+			return false;
+		}
+
+		$settings = self::get_calibration_settings_for_lesson( $lesson_id );
+		if ( empty( $settings['enabled'] ) ) {
+			return false;
+		}
+
+		return absint( $settings['submission_id'] ?? 0 ) === $submission_id;
+	}
+
+	protected static function compute_peer_grade_for_submission( int $submission_id, int $lesson_id ): array {
+		$submission_id = absint( $submission_id );
+		$lesson_id     = absint( $lesson_id );
+
+		$all = get_posts(
+			array(
+				'post_type'      => 'clms_peer_review',
+				'post_status'    => array( 'publish', 'draft' ),
+				'posts_per_page' => -1,
+				'fields'         => 'ids',
+				'meta_query'     => array(
+					array( 'key' => '_clms_pr_submission_id', 'value' => $submission_id, 'type' => 'NUMERIC' ),
+				),
+			)
+		);
+
+		$expected = 0;
+		$completed = 0;
+		$included_completed = 0;
+		$total_scores = array();
+
+		foreach ( (array) $all as $pr_id ) {
+			$pr_id = absint( $pr_id );
+			if ( ! $pr_id ) {
+				continue;
+			}
+
+			$is_cal = '1' === (string) get_post_meta( $pr_id, '_clms_pr_is_calibration', true );
+			if ( $is_cal ) {
+				continue;
+			}
+
+			++$expected;
+
+			if ( 'completed' !== get_post_meta( $pr_id, '_clms_pr_status', true ) ) {
+				continue;
+			}
+
+			++$completed;
+
+			$excluded = '1' === (string) get_post_meta( $pr_id, '_clms_pr_excluded', true );
+			if ( $excluded ) {
+				continue;
+			}
+
+			++$included_completed;
+			$scores = (array) get_post_meta( $pr_id, '_clms_pr_scores', true );
+			foreach ( $scores as $criterion => $points ) {
+				if ( ! isset( $total_scores[ $criterion ] ) ) {
+					$total_scores[ $criterion ] = array();
+				}
+				$total_scores[ $criterion ][] = absint( $points );
+			}
+		}
+
+		$avg_scores  = array();
+		$peer_grade  = 0;
+
+		if ( $included_completed > 0 && ! empty( $total_scores ) ) {
+			$grand_total = 0;
+			foreach ( $total_scores as $criterion => $values ) {
+				$avg                      = array_sum( $values ) / count( $values );
+				$avg_scores[ $criterion ] = round( $avg, 1 );
+				$grand_total             += $avg;
+			}
+
+			$rubric_id = absint( get_post_meta( $lesson_id, '_clms_rubric_id', true ) );
+			$max_score = 100;
+
+			if ( $rubric_id && class_exists( 'CLMS_Rubric' ) ) {
+				$derived = CLMS_Rubric::get_total_points( $rubric_id );
+				if ( $derived > 0 ) {
+					$max_score = $derived;
+				}
+			}
+
+			$peer_grade = $max_score > 0 ? min( 100, round( ( $grand_total / $max_score ) * 100 ) ) : 0;
+		}
+
+		return array(
+			'expected'          => $expected,
+			'completed'         => $completed,
+			'included_completed'=> $included_completed,
+			'peer_grade'        => $peer_grade,
+			'avg_scores'        => $avg_scores,
+		);
+	}
+
+	protected static function recalculate_submission_grade( int $submission_id, int $lesson_id ): void {
+		$submission_id = absint( $submission_id );
+		$lesson_id     = absint( $lesson_id );
+		if ( ! $submission_id || ! $lesson_id ) {
+			return;
+		}
+
+		if ( self::is_submission_calibration_exemplar( $submission_id, $lesson_id ) ) {
+			return;
+		}
+
+		$calc = self::compute_peer_grade_for_submission( $submission_id, $lesson_id );
+		if ( empty( $calc['expected'] ) ) {
+			return;
+		}
+		if ( absint( $calc['completed'] ?? 0 ) < absint( $calc['expected'] ?? 0 ) ) {
+			return;
+		}
+
+		$peer_grade = absint( $calc['peer_grade'] ?? 0 );
+		$avg_scores = isset( $calc['avg_scores'] ) && is_array( $calc['avg_scores'] ) ? $calc['avg_scores'] : array();
+
+		$teacher_grade = absint( get_post_meta( $submission_id, '_clms_submission_grade', true ) );
+
+		$final_grade = $peer_grade;
+		if ( $teacher_grade > 0 && $peer_grade > 0 ) {
+			$final_grade = round( ( $teacher_grade * 0.6 ) + ( $peer_grade * 0.4 ) );
+		} elseif ( $teacher_grade > 0 && 0 === $peer_grade ) {
+			$final_grade = $teacher_grade;
+		}
+
+		update_post_meta( $submission_id, '_clms_peer_grade',     $peer_grade );
+		update_post_meta( $submission_id, '_clms_peer_scores',    $avg_scores );
+		update_post_meta( $submission_id, '_clms_peer_grade_at',  gmdate( 'Y-m-d H:i:s' ) );
+		update_post_meta( $submission_id, '_clms_final_grade',    $final_grade );
+
+		self::score_consistency_for_submission( $submission_id, $peer_grade, $lesson_id );
+	}
 
 	public static function audit( string $event_type, array $payload ): void {
 		global $wpdb;
@@ -1130,6 +1523,9 @@ class CLMS_Peer_Review {
 		$reviewee_id   = absint( $payload['reviewee_id'] ?? 0 );
 		$actor_id      = absint( $payload['actor_id'] ?? 0 );
 		$meta          = isset( $payload['meta'] ) && is_array( $payload['meta'] ) ? $payload['meta'] : array();
+		if ( $lesson_id && ! array_key_exists( 'is_blind', $meta ) ) {
+			$meta['is_blind'] = (bool) get_post_meta( $lesson_id, '_clms_peer_review_blind', true );
+		}
 
 		$wpdb->insert(
 			$table,
@@ -1592,9 +1988,41 @@ class CLMS_Peer_Review {
 				$saved_scores  = (array) get_post_meta( $assignment->ID, '_clms_pr_scores',  true );
 				$saved_comment = get_post_meta( $assignment->ID, '_clms_pr_comment', true );
 				$submitted_at  = get_post_meta( $assignment->ID, '_clms_pr_submitted_at', true );
+				$cal_status    = sanitize_key( (string) get_post_meta( $assignment->ID, '_clms_pr_calibration_status', true ) );
+				$cal_delta     = get_post_meta( $assignment->ID, '_clms_pr_calibration_delta', true );
+				$cal_score     = get_post_meta( $assignment->ID, '_clms_pr_calibration_score', true );
+				$con_delta     = get_post_meta( $assignment->ID, '_clms_pr_consistency_delta', true );
+				$con_flag      = sanitize_key( (string) get_post_meta( $assignment->ID, '_clms_pr_consistency_flag', true ) );
 			?>
 			<div class="clms-pr-result">
 				<p class="clms-pr-result__date"><?php echo esc_html( sprintf( __( 'Enviada el %s', 'atora-lms' ), date_i18n( 'd/m/Y H:i', strtotime( $submitted_at ) ) ) ); ?></p>
+				<?php if ( $is_calibration ) : ?>
+					<p class="description">
+						<?php
+						$delta_i = ( '' !== (string) $cal_delta && is_numeric( $cal_delta ) ) ? (int) $cal_delta : null;
+						$score_i = ( '' !== (string) $cal_score && is_numeric( $cal_score ) ) ? absint( $cal_score ) : null;
+						$label = $cal_status ? $cal_status : '—';
+						if ( null !== $delta_i ) {
+							$label .= ' (Δ ' . ( $delta_i > 0 ? '+' : '' ) . (string) $delta_i . ')';
+						}
+						if ( null !== $score_i ) {
+							$label .= ' — ' . (string) $score_i . '/100';
+						}
+						echo esc_html__( 'Calibración:', 'atora-lms' ) . ' <strong>' . esc_html( $label ) . '</strong>';
+						?>
+					</p>
+				<?php else : ?>
+					<?php if ( '' !== (string) $con_delta && is_numeric( $con_delta ) ) : ?>
+						<p class="description">
+							<?php
+							$delta_i = (int) $con_delta;
+							$flag    = $con_flag ? $con_flag : '—';
+							echo esc_html__( 'Consistencia:', 'atora-lms' ) . ' <strong>' . esc_html( $flag ) . '</strong> ';
+							echo '<span class="description">Δ ' . esc_html( ( $delta_i > 0 ? '+' : '' ) . (string) $delta_i ) . '</span>';
+							?>
+						</p>
+					<?php endif; ?>
+				<?php endif; ?>
 				<?php if ( ! empty( $saved_scores ) ) : ?>
 				<ul class="clms-pr-result__scores">
 					<?php foreach ( $saved_scores as $crit => $pts ) : ?>
