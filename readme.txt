@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 6.24.0
+Stable tag: 6.25.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,11 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+
+= 6.25.0 =
+* Added the institutional credential engine with immutable snapshots and public verification.
+* Added local QR generation without third-party data disclosure.
+* Added two-person revocation, irreversible revocation, replacement credentials, and tamper-evident audit events.
 = 6.24.0 =
 * Biblioteca académica MVP: recursos con identidad estable, versiones inmutables y checksum SHA-256, flujo borrador/revisión/publicación/archivo y bitácora completa.
 * Los recursos pueden vincularse con competencias y actividades de evidencia validadas contra su curso; API administrativa aislada bajo `/clms/v1/library`.
