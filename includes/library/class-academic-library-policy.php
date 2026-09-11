@@ -33,12 +33,16 @@ class CLMS_Academic_Library_Policy {
 		return in_array( $type, self::RESOURCE_TYPES, true ) ? $type : 'document';
 	}
 
+	public static function normalize_mime_type( $mime_type ) {
+		return strtolower( (string) preg_replace( '/[^a-z0-9.+\\-\\/]/i', '', (string) $mime_type ) );
+	}
+
 	public static function canonical_hash( $payload ) {
 		$payload = is_array( $payload ) ? $payload : array();
 		$canonical = array(
 			'attachment_id' => absint( $payload['attachment_id'] ?? 0 ),
 			'content_url'   => esc_url_raw( (string) ( $payload['content_url'] ?? '' ) ),
-			'mime_type'     => sanitize_mime_type( (string) ( $payload['mime_type'] ?? '' ) ),
+			'mime_type'     => self::normalize_mime_type( $payload['mime_type'] ?? '' ),
 			'metadata'      => self::sort_recursive( is_array( $payload['metadata'] ?? null ) ? $payload['metadata'] : array() ),
 		);
 		return hash( 'sha256', (string) wp_json_encode( $canonical ) );
