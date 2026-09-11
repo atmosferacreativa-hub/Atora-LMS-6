@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class V5_Installer {
 
 	/** Versión del esquema. Incrementar para forzar re-instalación. */
-	const SCHEMA_VERSION = '6.22.0-institutional-gradebook';
+	const SCHEMA_VERSION = '6.23.0-speedgrader-moderation';
 
 	/** Option key que almacena la versión instalada. */
 	const OPTION_KEY = 'atora_v5_schema_version';
@@ -1517,6 +1517,35 @@ class V5_Installer {
 			KEY scale_id (scale_id)
 		) $charset_collate;" );
 
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_grade_moderations (
+			id                      BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			submission_id           BIGINT UNSIGNED NOT NULL,
+			cycle_id                BIGINT UNSIGNED NOT NULL,
+			student_id              BIGINT UNSIGNED NOT NULL,
+			course_id               BIGINT UNSIGNED NOT NULL,
+			primary_grader_id       BIGINT UNSIGNED NOT NULL,
+			moderator_id            BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			primary_grade           DECIMAL(9,4) NOT NULL,
+			moderator_grade         DECIMAL(9,4) NULL DEFAULT NULL,
+			resolved_grade          DECIMAL(9,4) NULL DEFAULT NULL,
+			primary_rubric_json     LONGTEXT NULL DEFAULT NULL,
+			moderator_rubric_json   LONGTEXT NULL DEFAULT NULL,
+			teacher_comment         TEXT NULL DEFAULT NULL,
+			moderator_comment       TEXT NULL DEFAULT NULL,
+			status                  VARCHAR(30) NOT NULL DEFAULT 'pending',
+			lock_version            INT UNSIGNED NOT NULL DEFAULT 1,
+			submitted_at            DATETIME NOT NULL,
+			decided_at              DATETIME NULL DEFAULT NULL,
+			created_at              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			UNIQUE KEY submission_cycle (submission_id, cycle_id),
+			KEY cycle_status (cycle_id, status),
+			KEY moderator_status (moderator_id, status),
+			KEY course_id (course_id),
+			KEY student_id (student_id)
+		) $charset_collate;" );
+
 		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_institutional_grades (
 			id             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 			cycle_id       BIGINT UNSIGNED NOT NULL,
@@ -2027,6 +2056,7 @@ class V5_Installer {
 			"{$wpdb->prefix}atora_academic_periods",
 			"{$wpdb->prefix}atora_grading_scales",
 			"{$wpdb->prefix}atora_gradebook_cycles",
+			"{$wpdb->prefix}atora_grade_moderations",
 			"{$wpdb->prefix}atora_institutional_grades",
 			"{$wpdb->prefix}atora_grade_rectifications",
 			"{$wpdb->prefix}atora_gradebook_events",
