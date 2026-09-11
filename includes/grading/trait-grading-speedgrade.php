@@ -362,6 +362,12 @@ trait CLMS_Grading_SpeedGrade_Trait {
 										?>
 									</div>
 									<input type="hidden" name="moderation_lock_version" value="<?php echo esc_attr( absint( $moderation_context['lock_version'] ?? 0 ) ); ?>">
+									<?php if ( ! empty( $moderation_context['can_moderate'] ) ) : ?>
+										<div class="clms-sg-field">
+											<label for="clms_sg_moderation_comment"><?php esc_html_e( 'Comentario interno de moderación', 'atora-lms' ); ?></label>
+											<textarea id="clms_sg_moderation_comment" name="moderation_comment" rows="4"><?php echo esc_textarea( (string) ( $moderation_context['moderator_comment'] ?? '' ) ); ?></textarea>
+										</div>
+									<?php endif; ?>
 								<?php endif; ?>
 
 								<div class="clms-sg-actions">
@@ -772,7 +778,7 @@ trait CLMS_Grading_SpeedGrade_Trait {
 		} elseif ( 'submit_moderation' === $submit_action ) {
 			$status = 'in_review';
 		} elseif ( 'request_moderation_changes' === $submit_action ) {
-			$status = 'needs_revision';
+			$status = 'in_review';
 		}
 
 		if ( 'accept_ai_draft' === $submit_action ) {
@@ -892,7 +898,8 @@ trait CLMS_Grading_SpeedGrade_Trait {
 				$moderation_result = $moderation_service->submit( $submission_id, $course_id, $student_id, $grade, $rubric_scores, $feedback, $user_id, $expected_lock );
 			} else {
 				$decision = 'approve_moderation' === $submit_action ? 'approved' : 'changes_requested';
-				$moderation_result = $moderation_service->decide( $submission_id, $course_id, $decision, $grade, $rubric_scores, $feedback, $user_id, $expected_lock );
+				$moderation_comment = isset( $_POST['moderation_comment'] ) ? sanitize_textarea_field( wp_unslash( $_POST['moderation_comment'] ) ) : '';
+				$moderation_result = $moderation_service->decide( $submission_id, $course_id, $decision, $grade, $rubric_scores, $moderation_comment, $user_id, $expected_lock );
 				if ( ! is_wp_error( $moderation_result ) && 'approved' === $decision ) {
 					$grade = $moderation_result['grade'];
 				}
