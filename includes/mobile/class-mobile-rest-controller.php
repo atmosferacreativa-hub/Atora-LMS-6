@@ -63,6 +63,19 @@ final class ATORA_Mobile_REST_Controller {
 			'permission_callback' => array( __CLASS__, 'authorize' ),
 			'args'                => array( 'lesson_id' => array( 'sanitize_callback' => 'absint' ) ),
 		) );
+		register_rest_route( self::REST_NAMESPACE, '/lessons/(?P<lesson_id>\d+)/quiz', array(
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => array( __CLASS__, 'quiz' ),
+				'permission_callback' => array( __CLASS__, 'authorize' ),
+			),
+			array(
+				'methods'             => WP_REST_Server::CREATABLE,
+				'callback'            => array( __CLASS__, 'submit_quiz' ),
+				'permission_callback' => array( __CLASS__, 'authorize' ),
+			),
+			'args' => array( 'lesson_id' => array( 'sanitize_callback' => 'absint' ) ),
+		) );
 		register_rest_route( self::REST_NAMESPACE, '/lessons/(?P<lesson_id>\d+)/complete', array(
 			'methods'             => WP_REST_Server::CREATABLE,
 			'callback'            => array( __CLASS__, 'complete_lesson' ),
@@ -104,7 +117,7 @@ final class ATORA_Mobile_REST_Controller {
 			'authentication'   => 'opaque_bearer',
 			'access_ttl'       => ATORA_Mobile_Token_Service::ACCESS_TTL,
 			'refresh_ttl'      => ATORA_Mobile_Token_Service::REFRESH_TTL,
-			'features'         => array( 'profile', 'dashboard', 'courses', 'progress', 'lesson_completion' ),
+			'features'         => array( 'profile', 'dashboard', 'courses', 'progress', 'lesson_completion', 'quizzes' ),
 		), 200 );
 	}
 
@@ -238,8 +251,54 @@ final class ATORA_Mobile_REST_Controller {
 				'content_html' => $content_html,
 				'content_text' => sanitize_textarea_field( wp_strip_all_tags( $content_html ) ),
 				'completed'    => in_array( $lesson_id, self::completed_lesson_ids( $user_id, $course_id ), true ),
+				'quiz_available'=> $wp_post_id && '1' === (string) get_post_meta( $wp_post_id, '_clms_quiz_enabled', true ),
 			),
 		), 200 );
+	}
+
+	public static function quiz( WP_REST_Request $request ) {
+		$context = self::quiz_context( absint( $request['lesson_id'] ) );
+		if ( is_wp_error( $context ) ) {
+			return $context;
+		}
+		if ( ! class_exists( 'CLMS_Quiz' ) ) {
+			return new WP_Error( 'atora_mobile_quiz_unavailable', __( 'El motor de evaluaciones no está disponible.', 'atora-lms' ), array( 'status' => 503 ) );
+		}
+		$engine = new CLMS_Quiz();
+		$result = $engine->get_quiz_rest( get_current_user_id(), $context['wp_post_id'] );
+		return is_wp_error( $result ) ? $result : new WP_REST_Response( array( 'quiz' => $result ), 200 );
+	}
+
+	public static function submit_quiz( WP_REST_Request $request ) {
+		$context = self::quiz_context( absint( $request['lesson_id'] ) );
+		if ( is_wp_error( $context ) ) {
+			return $context;
+		}
+		if ( ! class_exists( 'CLMS_Quiz' ) ) {
+			return new WP_Error( 'atora_mobile_quiz_unavailable', __( 'El motor de evaluaciones no está disponible.', 'atora-lms' ), array( 'status' => 503 ) );
+		}
+		$params  = (array) $request->get_json_params();
+		$answers = isset( $params['answers'] ) && is_array( $params['answers'] ) ? array_slice( $params['answers'], 0, CLMS_Quiz::MAX_ANSWER_ITEMS, true ) : array();
+		$token   = sanitize_text_field( (string) ( $params['token'] ?? '' ) );
+		$engine  = new CLMS_Quiz();
+		$result  = $engine->grade_mobile_quiz_rest( get_current_user_id(), $context['wp_post_id'], $answers, $token );
+		return is_wp_error( $result ) ? $result : new WP_REST_Response( array( 'result' => $result ), 200 );
+	}
+
+	private static function quiz_context( int $lesson_id ) {
+		$lesson = \\ATORA\\LMS\\LMS_Course_Service::get_lesson( $lesson_id );
+		if ( ! $lesson || 'published' !== (string) ( $lesson['status'] ?? '' ) ) {
+			return new WP_Error( 'atora_mobile_lesson_not_found', __( 'Lección no encontrada.', 'atora-lms' ), array( 'status' => 404 ) );
+		}
+		$course_id = absint( $lesson['course_id'] ?? 0 );
+		if ( ! \\ATORA\\LMS\\LMS_Enrollment_Service::get_enrollment( get_current_user_id(), $course_id ) ) {
+			return new WP_Error( 'atora_mobile_lesson_forbidden', __( 'No tienes acceso a esta lección.', 'atora-lms' ), array( 'status' => 403 ) );
+		}
+		$wp_post_id = absint( $lesson['wp_post_id'] ?? 0 );
+		if ( ! $wp_post_id || 'lm_lesson' !== get_post_type( $wp_post_id ) ) {
+			return new WP_Error( 'atora_mobile_quiz_not_found', __( 'Esta lección no contiene una evaluación móvil.', 'atora-lms' ), array( 'status' => 404 ) );
+		}
+		return array( 'lesson_id' => $lesson_id, 'course_id' => $course_id, 'wp_post_id' => $wp_post_id );
 	}
 
 	public static function complete_lesson( WP_REST_Request $request ) {
