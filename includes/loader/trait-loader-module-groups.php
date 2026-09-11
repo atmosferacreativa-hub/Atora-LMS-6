@@ -122,6 +122,21 @@ trait CLMS_Loader_Module_Groups_Trait {
 					'dependencies' => array( 'CLMS_Helper' ),
 				),
 				array(
+					'file'         => 'includes/library/class-academic-library-policy.php',
+					'class'        => 'CLMS_Academic_Library_Policy',
+					'dependencies' => array(),
+				),
+				array(
+					'file'         => 'includes/library/class-academic-library-service.php',
+					'class'        => 'CLMS_Academic_Library_Service',
+					'dependencies' => array( 'CLMS_Academic_Library_Policy', 'CLMS_Competency_Service', 'CLMS_Evidence_Service' ),
+				),
+				array(
+					'file'         => 'includes/library/class-academic-library-rest-controller.php',
+					'class'        => 'CLMS_Academic_Library_REST_Controller',
+					'dependencies' => array( 'CLMS_Academic_Library_Service' ),
+				),
+				array(
 					'file'         => 'includes/gradebook/class-gradebook-normalizer.php',
 					'class'        => 'CLMS_Gradebook_Normalizer',
 					'dependencies' => array(),
