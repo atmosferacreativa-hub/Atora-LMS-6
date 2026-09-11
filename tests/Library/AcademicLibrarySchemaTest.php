@@ -18,6 +18,6 @@ final class AcademicLibrarySchemaTest extends TestCase {
 		$rest = file_get_contents( dirname( __DIR__, 2 ) . '/includes/library/class-academic-library-rest-controller.php' );
 		$this->assertStringContainsString( "const BASE      = '/library';", $rest );
 		$this->assertStringContainsString( "'manage_options'", $rest );
-		$this->assertStringContainsString( "'permission_callback' => array( $this, 'can_manage' )", $rest );
+		$this->assertStringContainsString( "'permission_callback' => array( \$this, 'can_manage' )", $rest );
 	}
 }
