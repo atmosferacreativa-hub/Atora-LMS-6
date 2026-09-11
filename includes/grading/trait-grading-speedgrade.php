@@ -345,13 +345,45 @@ trait CLMS_Grading_SpeedGrade_Trait {
 									<textarea id="clms_sg_feedback" name="feedback" rows="8"><?php echo esc_textarea( $context['feedback'] ); ?></textarea>
 								</div>
 
+								<?php
+								$moderation_context = isset( $context['moderation'] ) && is_array( $context['moderation'] ) ? $context['moderation'] : array();
+								$institutional_flow = ! empty( $moderation_context['institutional'] );
+								$moderation_status  = sanitize_key( (string) ( $moderation_context['status'] ?? 'none' ) );
+								?>
+								<?php if ( $institutional_flow ) : ?>
+									<div class="clms-sg-flash">
+										<?php
+										printf(
+											/* translators: 1: cycle id, 2: moderation status */
+											esc_html__( 'Ciclo institucional #%1$d · Moderación: %2$s', 'atora-lms' ),
+											absint( $moderation_context['cycle_id'] ?? 0 ),
+											esc_html( $moderation_status )
+										);
+										?>
+									</div>
+									<input type="hidden" name="moderation_lock_version" value="<?php echo esc_attr( absint( $moderation_context['lock_version'] ?? 0 ) ); ?>">
+								<?php endif; ?>
+
 								<div class="clms-sg-actions">
 									<button type="submit" name="clms_sg_submit" value="save_draft" class="clms-sg-btn clms-sg-btn--secondary">
 										<?php esc_html_e( 'Guardar en revisión', 'atora-lms' ); ?>
 									</button>
-									<button type="submit" name="clms_sg_submit" value="publish" class="clms-sg-btn clms-sg-btn--primary">
-										<?php esc_html_e( 'Publicar calificación', 'atora-lms' ); ?>
-									</button>
+									<?php if ( ! $institutional_flow ) : ?>
+										<button type="submit" name="clms_sg_submit" value="publish" class="clms-sg-btn clms-sg-btn--primary">
+											<?php esc_html_e( 'Publicar calificación', 'atora-lms' ); ?>
+										</button>
+									<?php elseif ( ! empty( $moderation_context['can_moderate'] ) ) : ?>
+										<button type="submit" name="clms_sg_submit" value="approve_moderation" class="clms-sg-btn clms-sg-btn--primary">
+											<?php esc_html_e( 'Aprobar moderación', 'atora-lms' ); ?>
+										</button>
+										<button type="submit" name="clms_sg_submit" value="request_moderation_changes" class="clms-sg-btn clms-sg-btn--secondary">
+											<?php esc_html_e( 'Solicitar cambios al docente', 'atora-lms' ); ?>
+										</button>
+									<?php elseif ( ! empty( $moderation_context['can_submit'] ) ) : ?>
+										<button type="submit" name="clms_sg_submit" value="submit_moderation" class="clms-sg-btn clms-sg-btn--primary">
+											<?php echo esc_html( 'changes_requested' === $moderation_status ? __( 'Reenviar a moderación', 'atora-lms' ) : __( 'Enviar a moderación', 'atora-lms' ) ); ?>
+										</button>
+									<?php endif; ?>
 									<button type="submit" name="clms_sg_submit" value="return_revision" class="clms-sg-btn clms-sg-btn--secondary">
 										<?php esc_html_e( 'Devolver para mejorar', 'atora-lms' ); ?>
 									</button>
@@ -703,6 +735,28 @@ trait CLMS_Grading_SpeedGrade_Trait {
 			$grade = '';
 		}
 
+		$student_id = absint( get_post_meta( $submission_id, '_clms_submission_user_id', true ) );
+		if ( ! $student_id ) {
+			$student_id = absint( get_post_meta( $submission_id, '_clms_submission_student_id', true ) );
+		}
+		if ( ! $student_id ) {
+			$student_id = absint( get_post_field( 'post_author', $submission_id ) );
+		}
+		$course_id = absint( get_post_meta( $submission_id, '_clms_submission_course_id', true ) );
+		if ( ! $course_id && $lesson_id && class_exists( 'CLMS_Helper' ) ) {
+			$course_id = absint( CLMS_Helper::get_lesson_course_id( $lesson_id ) );
+		}
+		$moderation_service = class_exists( 'CLMS_Helper' ) ? clms_core('CLMS_SpeedGrade_Moderation_Service') : null;
+		$moderation_context = ( $moderation_service && method_exists( $moderation_service, 'get_context' ) )
+			? (array) $moderation_service->get_context( $submission_id, $course_id, $user_id )
+			: array( 'institutional' => false, 'status' => 'none' );
+		if (
+			! CLMS_SpeedGrade_Moderation_Policy::direct_publish_allowed( ! empty( $moderation_context['institutional'] ), $moderation_context['status'] ?? 'none' )
+			&& in_array( $submit_action, array( 'publish', 'approve_evidence' ), true )
+		) {
+			return new WP_Error( 'clms_moderation_required', __( 'Esta calificación pertenece a un ciclo institucional y debe aprobarse mediante moderación.', 'atora-lms' ) );
+		}
+
 		if ( ! in_array( $status, array( 'submitted', 'in_review', 'graded', 'needs_revision', 'returned' ), true ) ) {
 			$status = 'in_review';
 		}
@@ -713,8 +767,12 @@ trait CLMS_Grading_SpeedGrade_Trait {
 			$status = 'graded';
 		} elseif ( 'return_revision' === $submit_action ) {
 			$status = 'needs_revision';
-		} elseif ( 'approve_evidence' === $submit_action ) {
+		} elseif ( 'approve_evidence' === $submit_action || 'approve_moderation' === $submit_action ) {
 			$status = 'graded';
+		} elseif ( 'submit_moderation' === $submit_action ) {
+			$status = 'in_review';
+		} elseif ( 'request_moderation_changes' === $submit_action ) {
+			$status = 'needs_revision';
 		}
 
 		if ( 'accept_ai_draft' === $submit_action ) {
@@ -823,6 +881,25 @@ trait CLMS_Grading_SpeedGrade_Trait {
 
 		if ( '' !== $grade && 'submitted' === $status ) {
 			$status = 'graded';
+		}
+
+		if ( in_array( $submit_action, array( 'submit_moderation', 'approve_moderation', 'request_moderation_changes' ), true ) ) {
+			if ( ! $moderation_service ) {
+				return new WP_Error( 'clms_moderation_unavailable', __( 'El servicio de moderación no está disponible.', 'atora-lms' ) );
+			}
+			$expected_lock = isset( $_POST['moderation_lock_version'] ) ? absint( wp_unslash( $_POST['moderation_lock_version'] ) ) : 0;
+			if ( 'submit_moderation' === $submit_action ) {
+				$moderation_result = $moderation_service->submit( $submission_id, $course_id, $student_id, $grade, $rubric_scores, $feedback, $user_id, $expected_lock );
+			} else {
+				$decision = 'approve_moderation' === $submit_action ? 'approved' : 'changes_requested';
+				$moderation_result = $moderation_service->decide( $submission_id, $course_id, $decision, $grade, $rubric_scores, $feedback, $user_id, $expected_lock );
+				if ( ! is_wp_error( $moderation_result ) && 'approved' === $decision ) {
+					$grade = $moderation_result['grade'];
+				}
+			}
+			if ( is_wp_error( $moderation_result ) ) {
+				return $moderation_result;
+			}
 		}
 
 		$assessment_engine = clms_core('CLMS_Assessment_Engine');
