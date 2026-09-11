@@ -142,6 +142,16 @@ trait CLMS_Loader_Module_Groups_Trait {
 					'dependencies' => array( 'CLMS_Institutional_Gradebook_Policy' ),
 				),
 				array(
+					'file'         => 'includes/speedgrade/class-speedgrade-moderation-policy.php',
+					'class'        => 'CLMS_SpeedGrade_Moderation_Policy',
+					'dependencies' => array(),
+				),
+				array(
+					'file'         => 'includes/speedgrade/class-speedgrade-moderation-service.php',
+					'class'        => 'CLMS_SpeedGrade_Moderation_Service',
+					'dependencies' => array( 'CLMS_SpeedGrade_Moderation_Policy', 'CLMS_Institutional_Gradebook_Service' ),
+				),
+				array(
 					'file'         => 'includes/gradebook/class-institutional-gradebook-rest-controller.php',
 					'class'        => 'CLMS_Institutional_Gradebook_REST_Controller',
 					'dependencies' => array( 'CLMS_Institutional_Gradebook_Service' ),
