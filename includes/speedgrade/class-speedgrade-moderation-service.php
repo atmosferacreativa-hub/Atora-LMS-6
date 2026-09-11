@@ -49,7 +49,7 @@ class CLMS_SpeedGrade_Moderation_Service {
 				'cycle_id'      => absint( $cycle['id'] ),
 				'cycle_status'  => sanitize_key( (string) $cycle['status'] ),
 				'status'        => sanitize_key( (string) ( $row['status'] ?? 'none' ) ),
-				'can_submit'    => 'open' === $cycle['status'] && 'approved' !== ( $row['status'] ?? '' ),
+				'can_submit'    => 'open' === $cycle['status'] && in_array( $row['status'] ?? 'none', array( 'none', 'changes_requested' ), true ),
 				'can_moderate'  => current_user_can( 'manage_options' )
 					&& CLMS_SpeedGrade_Moderation_Policy::can_moderate( $row['primary_grader_id'] ?? 0, $actor_id ?: get_current_user_id() )
 					&& 'pending' === ( $row['status'] ?? '' ),
@@ -134,6 +134,9 @@ class CLMS_SpeedGrade_Moderation_Service {
 		}
 		if ( ! in_array( $decision, array( 'approved', 'changes_requested' ), true ) ) {
 			return new WP_Error( 'clms_moderation_invalid_decision', __( 'Decisión de moderación no válida.', 'atora-lms' ) );
+		}
+		if ( 'changes_requested' === $decision && strlen( trim( wp_strip_all_tags( (string) $comment ) ) ) < 5 ) {
+			return new WP_Error( 'clms_moderation_comment_required', __( 'La devolución requiere una justificación para el docente.', 'atora-lms' ) );
 		}
 
 		$cycle = $this->get_active_cycle( $course_id );
