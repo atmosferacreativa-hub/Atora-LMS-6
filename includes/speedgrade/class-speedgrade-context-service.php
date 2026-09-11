@@ -70,6 +70,11 @@ class CLMS_Speedgrade_Context_Service {
 			&& in_array( sanitize_key( (string) ( $context['grade_source'] ?? '' ) ), array( 'ai_assisted', 'ai_auto_grade', 'hybrid' ), true );
 		$context['configuration_warnings'] = $this->get_configuration_warnings( $context );
 
+		$moderation = class_exists( 'CLMS_Helper' ) ? clms_core('CLMS_SpeedGrade_Moderation_Service') : null;
+		$context['moderation'] = ( $moderation && method_exists( $moderation, 'get_context' ) )
+			? (array) $moderation->get_context( $submission_id, $course_id, get_current_user_id() )
+			: array( 'institutional' => false, 'status' => 'none' );
+
 		return $context;
 	}
 
