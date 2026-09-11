@@ -79,7 +79,7 @@ class CLMS_Academic_Library_Service {
 		$payload      = array(
 			'attachment_id' => $attachment_id,
 			'content_url'   => $content_url,
-			'mime_type'     => sanitize_mime_type( (string) ( $data['mime_type'] ?? '' ) ),
+			'mime_type'     => CLMS_Academic_Library_Policy::normalize_mime_type( $data['mime_type'] ?? '' ),
 			'metadata'      => $metadata,
 		);
 		$actor_id = absint( $actor_id ?: get_current_user_id() );
