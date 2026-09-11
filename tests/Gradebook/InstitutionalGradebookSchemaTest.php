@@ -25,7 +25,7 @@ final class InstitutionalGradebookSchemaTest extends TestCase {
 		foreach ( $tables as $table ) {
 			$this->assertStringContainsString( $table, $installer );
 		}
-		$this->assertStringContainsString( "const SCHEMA_VERSION = '6.22.0-institutional-gradebook';", $installer );
+		$this->assertStringContainsString( "const SCHEMA_VERSION = '6.23.0-speedgrader-moderation';", $installer );
 	}
 
 	public function test_rest_controller_is_admin_scoped_and_isolated(): void {
