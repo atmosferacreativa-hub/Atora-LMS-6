@@ -57,6 +57,12 @@ final class ATORA_Mobile_REST_Controller {
 			'permission_callback' => array( __CLASS__, 'authorize' ),
 			'args'                => array( 'course_id' => array( 'sanitize_callback' => 'absint' ) ),
 		) );
+		register_rest_route( self::REST_NAMESPACE, '/lessons/(?P<lesson_id>\d+)', array(
+			'methods'             => WP_REST_Server::READABLE,
+			'callback'            => array( __CLASS__, 'lesson' ),
+			'permission_callback' => array( __CLASS__, 'authorize' ),
+			'args'                => array( 'lesson_id' => array( 'sanitize_callback' => 'absint' ) ),
+		) );
 		register_rest_route( self::REST_NAMESPACE, '/lessons/(?P<lesson_id>\d+)/complete', array(
 			'methods'             => WP_REST_Server::CREATABLE,
 			'callback'            => array( __CLASS__, 'complete_lesson' ),
@@ -202,6 +208,37 @@ final class ATORA_Mobile_REST_Controller {
 			'course'     => self::safe_course( $course ),
 			'progress'   => \ATORA\LMS\LMS_Enrollment_Service::get_progress( $user_id, $course_id ),
 			'curriculum' => $lessons,
+		), 200 );
+	}
+
+	public static function lesson( WP_REST_Request $request ) {
+		$user_id   = get_current_user_id();
+		$lesson_id = absint( $request['lesson_id'] );
+		$lesson    = \ATORA\LMS\LMS_Course_Service::get_lesson( $lesson_id );
+		if ( ! $lesson || 'published' !== (string) ( $lesson['status'] ?? '' ) ) {
+			return new WP_Error( 'atora_mobile_lesson_not_found', __( 'Lección no encontrada.', 'atora-lms' ), array( 'status' => 404 ) );
+		}
+		$course_id = absint( $lesson['course_id'] );
+		if ( ! \ATORA\LMS\LMS_Enrollment_Service::get_enrollment( $user_id, $course_id ) ) {
+			return new WP_Error( 'atora_mobile_lesson_forbidden', __( 'No tienes acceso a esta lección.', 'atora-lms' ), array( 'status' => 403 ) );
+		}
+
+		$wp_post_id  = absint( $lesson['wp_post_id'] ?? 0 );
+		$raw_content = $wp_post_id ? (string) get_post_field( 'post_content', $wp_post_id ) : '';
+		$content_html = wp_kses_post( apply_filters( 'the_content', $raw_content ) );
+
+		return new WP_REST_Response( array(
+			'lesson' => array(
+				'id'           => $lesson_id,
+				'course_id'    => $course_id,
+				'title'        => sanitize_text_field( (string) ( $lesson['title'] ?? '' ) ),
+				'type'         => sanitize_key( (string) ( $lesson['type'] ?? 'text' ) ),
+				'duration_min' => absint( $lesson['duration_min'] ?? 0 ),
+				'video_url'    => esc_url_raw( (string) ( $lesson['video_url'] ?? '' ) ),
+				'content_html' => $content_html,
+				'content_text' => sanitize_textarea_field( wp_strip_all_tags( $content_html ) ),
+				'completed'    => in_array( $lesson_id, self::completed_lesson_ids( $user_id, $course_id ), true ),
+			),
 		), 200 );
 	}
 
