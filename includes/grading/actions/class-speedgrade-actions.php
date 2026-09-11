@@ -15,6 +15,9 @@ class CLMS_SpeedGrade_Actions {
 		return array(
 			'save_draft',
 			'publish',
+			'submit_moderation',
+			'approve_moderation',
+			'request_moderation_changes',
 			'return_revision',
 			'approve_evidence',
 			'insert_plan',
