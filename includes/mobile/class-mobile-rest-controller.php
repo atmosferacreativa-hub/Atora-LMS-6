@@ -286,12 +286,12 @@ final class ATORA_Mobile_REST_Controller {
 	}
 
 	private static function quiz_context( int $lesson_id ) {
-		$lesson = \\ATORA\\LMS\\LMS_Course_Service::get_lesson( $lesson_id );
+		$lesson = \ATORA\LMS\LMS_Course_Service::get_lesson( $lesson_id );
 		if ( ! $lesson || 'published' !== (string) ( $lesson['status'] ?? '' ) ) {
 			return new WP_Error( 'atora_mobile_lesson_not_found', __( 'Lección no encontrada.', 'atora-lms' ), array( 'status' => 404 ) );
 		}
 		$course_id = absint( $lesson['course_id'] ?? 0 );
-		if ( ! \\ATORA\\LMS\\LMS_Enrollment_Service::get_enrollment( get_current_user_id(), $course_id ) ) {
+		if ( ! \ATORA\LMS\LMS_Enrollment_Service::get_enrollment( get_current_user_id(), $course_id ) ) {
 			return new WP_Error( 'atora_mobile_lesson_forbidden', __( 'No tienes acceso a esta lección.', 'atora-lms' ), array( 'status' => 403 ) );
 		}
 		$wp_post_id = absint( $lesson['wp_post_id'] ?? 0 );
