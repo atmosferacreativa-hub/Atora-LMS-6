@@ -274,6 +274,13 @@ class CLMS_Institutional_Gradebook_Service {
 			return new WP_Error( 'clms_cycle_revision_conflict', __( 'El ciclo cambió durante la operación. Actualiza antes de continuar.', 'atora-lms' ) );
 		}
 
+		if ( in_array( $target_status, array( 'review', 'published', 'closed' ), true ) && class_exists( 'CLMS_SpeedGrade_Moderation_Service' ) ) {
+			$moderation = new CLMS_SpeedGrade_Moderation_Service();
+			if ( $moderation->count_unresolved( $cycle_id ) > 0 ) {
+				return new WP_Error( 'clms_cycle_moderation_pending', __( 'No se puede avanzar el ciclo mientras existan calificaciones pendientes de moderación o devueltas.', 'atora-lms' ) );
+			}
+		}
+
 		$records = $wpdb->get_results(
 			$wpdb->prepare( "SELECT student_id, grade, scale_code, status, revision FROM {$wpdb->prefix}atora_institutional_grades WHERE cycle_id = %d ORDER BY student_id ASC", absint( $cycle_id ) ),
 			ARRAY_A
