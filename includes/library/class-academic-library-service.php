@@ -45,12 +45,14 @@ class CLMS_Academic_Library_Service {
 		if ( ! empty( $data['version'] ) && is_array( $data['version'] ) ) {
 			$version = $this->add_version( $item_id, $data['version'], $actor_id );
 			if ( is_wp_error( $version ) ) {
+				$this->cleanup_failed_item( $item_id );
 				return $version;
 			}
 		}
 		if ( ! empty( $data['links'] ) && is_array( $data['links'] ) ) {
 			$links = $this->replace_links( $item_id, $data['links'], $actor_id );
 			if ( is_wp_error( $links ) ) {
+				$this->cleanup_failed_item( $item_id );
 				return $links;
 			}
 		}
@@ -167,8 +169,14 @@ class CLMS_Academic_Library_Service {
 				if ( '' === $object_key || ! $competencies || empty( $competencies->get_competency( $course_id, $object_key ) ) ) {
 					return new WP_Error( 'clms_library_competency_not_found', __( 'La competencia vinculada no existe en el curso.', 'atora-lms' ) );
 				}
-			} elseif ( ! $object_id ) {
-				return new WP_Error( 'clms_library_evidence_not_found', __( 'El vínculo de evidencia requiere una actividad.', 'atora-lms' ) );
+			} else {
+				$evidence = class_exists( 'CLMS_Helper' ) ? clms_core('CLMS_Evidence_Service') : null;
+				$config   = ( $object_id && $evidence && method_exists( $evidence, 'get_activity_evidence_config' ) )
+					? (array) $evidence->get_activity_evidence_config( $object_id )
+					: array();
+				if ( ! $object_id || absint( $config['course_id'] ?? 0 ) !== $course_id ) {
+					return new WP_Error( 'clms_library_evidence_not_found', __( 'La actividad de evidencia no pertenece al curso indicado.', 'atora-lms' ) );
+				}
 			}
 			$normalized[] = compact( 'type', 'course_id', 'object_key', 'object_id' );
 		}
@@ -215,6 +223,15 @@ class CLMS_Academic_Library_Service {
 			);
 		}
 		return $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}atora_library_items WHERE status = %s ORDER BY title", $status ), ARRAY_A );
+	}
+
+	protected function cleanup_failed_item( $item_id ) {
+		global $wpdb;
+		$item_id = absint( $item_id );
+		$wpdb->delete( $wpdb->prefix . 'atora_library_links', array( 'item_id' => $item_id ), array( '%d' ) );
+		$wpdb->delete( $wpdb->prefix . 'atora_library_versions', array( 'item_id' => $item_id ), array( '%d' ) );
+		$wpdb->delete( $wpdb->prefix . 'atora_library_events', array( 'item_id' => $item_id ), array( '%d' ) );
+		$wpdb->delete( $wpdb->prefix . 'atora_library_items', array( 'id' => $item_id, 'status' => 'draft' ), array( '%d', '%s' ) );
 	}
 
 	protected function get_item_row( $item_id ) {
