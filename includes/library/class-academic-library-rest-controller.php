@@ -15,7 +15,7 @@ class CLMS_Academic_Library_REST_Controller {
 	const NAMESPACE = 'clms/v1';
 	const BASE      = '/library';
 
-	public function register_hooks() {
+	public function __construct() {
 		add_action( 'rest_api_init', array( $this, 'register_routes' ) );
 	}
 
