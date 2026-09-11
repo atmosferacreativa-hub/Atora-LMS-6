@@ -28,7 +28,7 @@ class CLMS_Academic_Library_Policy {
 		return isset( self::TRANSITIONS[ $from ] ) && in_array( $to, self::TRANSITIONS[ $from ], true );
 	}
 
-	public static function normalize_resource_type( $type ) ) {
+	public static function normalize_resource_type( $type ) {
 		$type = sanitize_key( (string) $type );
 		return in_array( $type, self::RESOURCE_TYPES, true ) ? $type : 'document';
 	}
