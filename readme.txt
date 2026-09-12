@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 6.25.0
+Stable tag: 6.26.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,10 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+
+= 6.26.0 =
+* Integración institucional: Gradebook institucional + SpeedGrader 2 (moderación) + Biblioteca académica + Credenciales verificables con QR local.
+* Mobile API v1: autenticación con tokens opacos, endpoints estudiantiles, y compatibilidad canónica de matrículas legacy/tablas (incluye `active` y `completed`, deduplicación y autorización centralizada).
 
 = 6.25.0 =
 * Added the institutional credential engine with immutable snapshots and public verification.
