@@ -15,6 +15,13 @@ final class ATORA_Mobile_REST_Controller {
 	const LOGIN_LIMIT     = 8;
 	const LOGIN_WINDOW    = 15 * MINUTE_IN_SECONDS;
 
+	/**
+	 * Cache por-request (proceso) de matrículas móviles normalizadas.
+	 *
+	 * @var array<int, array<int, array{course_id:int,status:string,source:string}>>
+	 */
+	private static array $enrollment_index_cache = array();
+
 	public static function register_routes(): void {
 		register_rest_route( self::REST_NAMESPACE, '/discovery', array(
 			'methods'             => WP_REST_Server::READABLE,
@@ -202,10 +209,8 @@ final class ATORA_Mobile_REST_Controller {
 	public static function course( WP_REST_Request $request ) {
 		$user_id   = get_current_user_id();
 		$course_id = absint( $request['course_id'] );
-		$enrollment = \ATORA\LMS\LMS_Enrollment_Service::get_enrollment( $user_id, $course_id );
-		if ( ! $enrollment ) {
-			return new WP_Error( 'atora_mobile_course_forbidden', __( 'No tienes acceso a este curso.', 'atora-lms' ), array( 'status' => 403 ) );
-		}
+		$auth = self::authorize_course_id( $user_id, $course_id );
+		if ( is_wp_error( $auth ) ) { return $auth; }
 		$course = \ATORA\LMS\LMS_Course_Service::get( $course_id );
 		if ( ! $course || 'published' !== (string) $course['status'] ) {
 			return new WP_Error( 'atora_mobile_course_not_found', __( 'Curso no encontrado.', 'atora-lms' ), array( 'status' => 404 ) );
@@ -232,9 +237,8 @@ final class ATORA_Mobile_REST_Controller {
 			return new WP_Error( 'atora_mobile_lesson_not_found', __( 'Lección no encontrada.', 'atora-lms' ), array( 'status' => 404 ) );
 		}
 		$course_id = absint( $lesson['course_id'] );
-		if ( ! \ATORA\LMS\LMS_Enrollment_Service::get_enrollment( $user_id, $course_id ) ) {
-			return new WP_Error( 'atora_mobile_lesson_forbidden', __( 'No tienes acceso a esta lección.', 'atora-lms' ), array( 'status' => 403 ) );
-		}
+		$auth = self::authorize_course_id( $user_id, $course_id );
+		if ( is_wp_error( $auth ) ) { return $auth; }
 
 		$wp_post_id  = absint( $lesson['wp_post_id'] ?? 0 );
 		$raw_content = $wp_post_id ? (string) get_post_field( 'post_content', $wp_post_id ) : '';
@@ -291,9 +295,8 @@ final class ATORA_Mobile_REST_Controller {
 			return new WP_Error( 'atora_mobile_lesson_not_found', __( 'Lección no encontrada.', 'atora-lms' ), array( 'status' => 404 ) );
 		}
 		$course_id = absint( $lesson['course_id'] ?? 0 );
-		if ( ! \ATORA\LMS\LMS_Enrollment_Service::get_enrollment( get_current_user_id(), $course_id ) ) {
-			return new WP_Error( 'atora_mobile_lesson_forbidden', __( 'No tienes acceso a esta lección.', 'atora-lms' ), array( 'status' => 403 ) );
-		}
+		$auth = self::authorize_course_id( get_current_user_id(), $course_id );
+		if ( is_wp_error( $auth ) ) { return $auth; }
 		$wp_post_id = absint( $lesson['wp_post_id'] ?? 0 );
 		if ( ! $wp_post_id || 'lm_lesson' !== get_post_type( $wp_post_id ) ) {
 			return new WP_Error( 'atora_mobile_quiz_not_found', __( 'Esta lección no contiene una evaluación móvil.', 'atora-lms' ), array( 'status' => 404 ) );
@@ -309,9 +312,8 @@ final class ATORA_Mobile_REST_Controller {
 			return new WP_Error( 'atora_mobile_lesson_not_found', __( 'Lección no encontrada.', 'atora-lms' ), array( 'status' => 404 ) );
 		}
 		$course_id = absint( $lesson['course_id'] );
-		if ( ! \ATORA\LMS\LMS_Enrollment_Service::get_enrollment( $user_id, $course_id ) ) {
-			return new WP_Error( 'atora_mobile_lesson_forbidden', __( 'No tienes acceso a esta lección.', 'atora-lms' ), array( 'status' => 403 ) );
-		}
+		$auth = self::authorize_course_id( $user_id, $course_id );
+		if ( is_wp_error( $auth ) ) { return $auth; }
 		$ok = \ATORA\LMS\LMS_Enrollment_Service::complete_lesson( $user_id, $lesson_id );
 		return new WP_REST_Response( array(
 			'completed' => $ok,
@@ -320,7 +322,7 @@ final class ATORA_Mobile_REST_Controller {
 	}
 
 	private static function prepare_enrollments( int $user_id ): array {
-		$rows = \ATORA\LMS\LMS_Enrollment_Service::get_user_enrollments( $user_id );
+		$rows = self::enrollment_index( $user_id );
 		$items = array();
 		foreach ( $rows as $row ) {
 			$course_id = absint( $row['course_id'] ?? 0 );
@@ -343,6 +345,128 @@ final class ATORA_Mobile_REST_Controller {
 			);
 		}
 		return $items;
+	}
+
+	/**
+	 * Índice canónico de matrículas móviles.
+	 *
+	 * - Incluye `active` y `completed` de tablas.
+	 * - Incluye matrículas legacy a través del helper canónico/router (y mapea wp_post_id -> course_id).
+	 * - Deduplica por `course_id`.
+	 *
+	 * @return array<int, array{course_id:int,status:string,source:string}>
+	 */
+	private static function enrollment_index( int $user_id ): array {
+		$user_id = absint( $user_id );
+		if ( $user_id <= 0 ) { return array(); }
+
+		if ( isset( self::$enrollment_index_cache[ $user_id ] ) ) {
+			return self::$enrollment_index_cache[ $user_id ];
+		}
+
+		$by_course = array();
+		$ordered   = array();
+
+		// 1) Tablas: active + completed.
+		if ( class_exists( '\\ATORA\\LMS\\LMS_Enrollment_Service' ) ) {
+			foreach ( array( 'active', 'completed' ) as $status ) {
+				$rows = (array) \ATORA\LMS\LMS_Enrollment_Service::get_user_enrollments( $user_id, $status );
+				foreach ( $rows as $row ) {
+					if ( ! is_array( $row ) ) { continue; }
+					$course_id = absint( $row['course_id'] ?? 0 );
+					if ( $course_id <= 0 ) { continue; }
+
+					$row_status = sanitize_key( (string) ( $row['status'] ?? $status ) );
+					if ( '' === $row_status ) { $row_status = $status; }
+
+					// Preferir active si hay doble estado para el mismo curso.
+					if ( isset( $by_course[ $course_id ] ) && 'active' === ( $by_course[ $course_id ]['status'] ?? '' ) ) {
+						continue;
+					}
+
+					$by_course[ $course_id ] = array_merge(
+						$row,
+						array( 'course_id' => $course_id, 'status' => $row_status, 'source' => 'tables' )
+					);
+					$ordered[] = $course_id;
+				}
+			}
+		}
+
+		// 2) Legacy/router: wp_post_id (lm_course) -> course_id de tablas.
+		if ( class_exists( 'CLMS_Helper' )
+			&& method_exists( 'CLMS_Helper', 'get_user_enrolled_courses' )
+			&& class_exists( '\\ATORA\\LMS\\LMS_Course_Service' )
+			&& method_exists( '\\ATORA\\LMS\\LMS_Course_Service', 'get_by_wp_post' ) ) {
+			$wp_course_ids = (array) \CLMS_Helper::get_user_enrolled_courses( $user_id );
+			foreach ( $wp_course_ids as $wp_course_id ) {
+				$wp_course_id = absint( $wp_course_id );
+				if ( $wp_course_id <= 0 ) { continue; }
+
+				$course = \ATORA\LMS\LMS_Course_Service::get_by_wp_post( $wp_course_id );
+				$course_id = absint( is_array( $course ) ? ( $course['id'] ?? 0 ) : 0 );
+				if ( $course_id <= 0 ) { continue; }
+
+				if ( isset( $by_course[ $course_id ] ) ) {
+					continue;
+				}
+
+				$is_completed = false;
+				if ( method_exists( 'CLMS_Helper', 'is_course_completed' ) ) {
+					$is_completed = (bool) \CLMS_Helper::is_course_completed( $user_id, $wp_course_id );
+				}
+
+				$by_course[ $course_id ] = array(
+					'course_id' => $course_id,
+					'status'    => $is_completed ? 'completed' : 'active',
+					'source'    => 'legacy',
+				);
+				$ordered[] = $course_id;
+			}
+		}
+
+		// 3) Salida ordenada y deduplicada.
+		$out = array();
+		foreach ( array_values( array_unique( array_filter( array_map( 'absint', $ordered ) ) ) ) as $course_id ) {
+			if ( isset( $by_course[ $course_id ] ) ) {
+				$out[] = $by_course[ $course_id ];
+			}
+		}
+
+		self::$enrollment_index_cache[ $user_id ] = $out;
+		return $out;
+	}
+
+	private static function authorize_course_id( int $user_id, int $course_id ) {
+		$user_id   = absint( $user_id );
+		$course_id = absint( $course_id );
+		if ( $user_id <= 0 ) {
+			return new WP_Error( 'atora_mobile_auth_required', __( 'Se requiere autenticación móvil.', 'atora-lms' ), array( 'status' => 401 ) );
+		}
+		if ( $course_id <= 0 ) {
+			return new WP_Error( 'atora_mobile_course_not_found', __( 'Curso no encontrado.', 'atora-lms' ), array( 'status' => 404 ) );
+		}
+
+		$index = self::enrollment_index( $user_id );
+		foreach ( $index as $row ) {
+			if ( absint( $row['course_id'] ?? 0 ) === $course_id ) {
+				return true;
+			}
+		}
+
+		// Fallback defensivo: si el curso tiene wp_post_id válido, confirmar matrícula legacy del mismo usuario.
+		if ( class_exists( '\\ATORA\\LMS\\LMS_Course_Service' )
+			&& method_exists( '\\ATORA\\LMS\\LMS_Course_Service', 'get' )
+			&& class_exists( 'CLMS_Helper' )
+			&& method_exists( 'CLMS_Helper', 'user_is_enrolled_in_course' ) ) {
+			$course = \ATORA\LMS\LMS_Course_Service::get( $course_id );
+			$wp_course_id = absint( is_array( $course ) ? ( $course['wp_post_id'] ?? 0 ) : 0 );
+			if ( $wp_course_id > 0 && \CLMS_Helper::user_is_enrolled_in_course( $user_id, $wp_course_id ) ) {
+				return true;
+			}
+		}
+
+		return new WP_Error( 'atora_mobile_course_forbidden', __( 'No tienes acceso a este curso.', 'atora-lms' ), array( 'status' => 403 ) );
 	}
 
 	private static function safe_course( array $course ): array {
