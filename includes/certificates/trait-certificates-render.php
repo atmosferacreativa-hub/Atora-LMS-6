@@ -337,7 +337,9 @@ trait CLMS_Certificates_Render_Trait {
 		$user         = get_userdata( $user_id );
 		$course       = 'program' === $target_type ? get_the_title( $program_id ) : get_the_title( $course_id );
 		$issue_date   = ! empty( $record['issued_at'] ) ? (string) $record['issued_at'] : '';
-		$verify_url   = ! empty( $record['verification_code'] ) ? $this->get_public_verification_url( (string) $record['verification_code'] ) : '';
+		$verify_url   = ! empty( $record['credential_uuid'] ) && class_exists( 'CLMS_Credential_QR' )
+			? CLMS_Credential_QR::verification_url( (string) $record['credential_uuid'] )
+			: ( ! empty( $record['verification_code'] ) ? $this->get_public_verification_url( (string) $record['verification_code'] ) : '' );
 		$view_url     = 'program' === $target_type ? $this->get_view_program_certificate_url( $user_id, $program_id ) : $this->get_view_certificate_url( $user_id, $course_id );
 		$status       = isset( $record['status'] ) ? sanitize_key( (string) $record['status'] ) : 'valid';
 		$status_labels = array(
@@ -650,6 +652,9 @@ trait CLMS_Certificates_Render_Trait {
 						<button type="button" onclick="window.print();"><?php esc_html_e( 'Imprimir certificado', 'atora-lms' ); ?></button>
 						<?php if ( $verify_url ) : ?>
 							<a href="<?php echo esc_url( $verify_url ); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Verificar certificado', 'atora-lms' ); ?></a>
+							<?php if ( ! empty( $record['credential_uuid'] ) ) : ?>
+								<?php echo do_shortcode( '[atora_credential_qr id="' . esc_attr( (string) $record['credential_uuid'] ) . '" size="148"]' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- shortcode propio con salida escapada. ?>
+							<?php endif; ?>
 						<?php endif; ?>
 						<?php if ( $linkedin_url ) : ?>
 							<a class="is-soft" href="<?php echo esc_url( $linkedin_url ); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Agregar a LinkedIn', 'atora-lms' ); ?></a>

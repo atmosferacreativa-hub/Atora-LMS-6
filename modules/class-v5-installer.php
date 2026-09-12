@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class V5_Installer {
 
 	/** Versión del esquema. Incrementar para forzar re-instalación. */
-	const SCHEMA_VERSION = '6.24.0-academic-library';
+	const SCHEMA_VERSION = '6.25.0-credential-engine';
 
 	/** Option key que almacena la versión instalada. */
 	const OPTION_KEY = 'atora_v5_schema_version';
@@ -1711,6 +1711,63 @@ class V5_Installer {
 			KEY program_id                   (program_id),
 			KEY status                       (status),
 			KEY verification_code            (verification_code(20))
+		) $charset_collate;" );
+
+		// Credenciales verificables: snapshot inmutable, doble control y auditoría encadenada.
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_credentials (
+			id                      BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			credential_uuid         CHAR(36)        NOT NULL,
+			user_id                 BIGINT UNSIGNED NOT NULL,
+			target_type             VARCHAR(20)     NOT NULL,
+			target_id               BIGINT UNSIGNED NOT NULL,
+			cycle_id                BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			cert_code               VARCHAR(100)    NOT NULL DEFAULT '',
+			verification_token_hash CHAR(64)        NOT NULL,
+			status                  VARCHAR(30)     NOT NULL DEFAULT 'valid',
+			snapshot_json           LONGTEXT        NOT NULL,
+			snapshot_hash           CHAR(64)        NOT NULL,
+			template_version        VARCHAR(40)     NOT NULL DEFAULT '1',
+			issued_by               BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			issued_at               DATETIME        NOT NULL,
+			expires_at              DATETIME                 DEFAULT NULL,
+			revoked_at              DATETIME                 DEFAULT NULL,
+			superseded_by_uuid      CHAR(36)        NOT NULL DEFAULT '',
+			created_at              DATETIME        NOT NULL,
+			updated_at              DATETIME        NOT NULL,
+			PRIMARY KEY (id),
+			UNIQUE KEY credential_uuid (credential_uuid),
+			UNIQUE KEY verification_token_hash (verification_token_hash),
+			KEY holder_target (user_id, target_type, target_id),
+			KEY status (status)
+		) $charset_collate;" );
+
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_credential_revocations (
+			id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			credential_id BIGINT UNSIGNED NOT NULL,
+			category      VARCHAR(40)     NOT NULL,
+			reason        TEXT            NOT NULL,
+			status        VARCHAR(20)     NOT NULL DEFAULT 'requested',
+			requested_by  BIGINT UNSIGNED NOT NULL,
+			decided_by    BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			requested_at  DATETIME        NOT NULL,
+			decided_at    DATETIME                 DEFAULT NULL,
+			PRIMARY KEY (id),
+			KEY credential_status (credential_id, status),
+			KEY requested_by (requested_by)
+		) $charset_collate;" );
+
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_credential_events (
+			id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			credential_id BIGINT UNSIGNED NOT NULL,
+			action        VARCHAR(60)     NOT NULL,
+			actor_id      BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			details_json  LONGTEXT                 DEFAULT NULL,
+			previous_hash CHAR(64)        NOT NULL DEFAULT '',
+			event_hash    CHAR(64)        NOT NULL,
+			created_at    DATETIME        NOT NULL,
+			PRIMARY KEY (id),
+			UNIQUE KEY event_hash (event_hash),
+			KEY credential_id (credential_id)
 		) $charset_collate;" );
 
 		// ── /Fase 11b ─────────────────────────────────────────────────────────

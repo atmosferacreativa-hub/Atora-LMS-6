@@ -388,6 +388,30 @@ trait CLMS_Loader_Module_Groups_Trait {
 					'dependencies' => array( 'CLMS_Helper', 'CLMS_Submission' ),
 				),
 				array(
+					'file'         => 'includes/credentials/class-credential-policy.php',
+					'class'        => 'CLMS_Credential_Policy',
+					'dependencies' => array(),
+					'condition'    => 'module:certificates',
+				),
+				array(
+					'file'         => 'includes/credentials/class-credential-service.php',
+					'class'        => 'CLMS_Credential_Service',
+					'dependencies' => array( 'CLMS_Credential_Policy' ),
+					'condition'    => 'module:certificates',
+				),
+				array(
+					'file'         => 'includes/credentials/class-credential-rest-controller.php',
+					'class'        => 'CLMS_Credential_REST_Controller',
+					'dependencies' => array( 'CLMS_Credential_Service' ),
+					'condition'    => 'module:certificates',
+				),
+				array(
+					'file'         => 'includes/credentials/class-credential-qr.php',
+					'class'        => 'CLMS_Credential_QR',
+					'dependencies' => array( 'CLMS_Credential_Service' ),
+					'condition'    => 'module:certificates',
+				),
+				array(
 					'file'         => 'includes/certificates/class-certificate-rules.php',
 					'class'        => 'CLMS_Certificate_Rules',
 					'dependencies' => array( 'CLMS_Helper' ),
