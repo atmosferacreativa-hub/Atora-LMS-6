@@ -109,6 +109,7 @@ $atora_tables = array(
 	'atora_gradebook',
 	'atora_gradebook_cycles',
 	'atora_gradebook_events',
+	'atora_grade_moderations',
 	'atora_grading_scales',
 	'atora_institutional_grades',
 	'atora_lesson_progress',

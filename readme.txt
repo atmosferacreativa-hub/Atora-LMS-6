@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 6.22.0
+Stable tag: 6.23.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,9 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.23.0 =
+* SpeedGrader 2: flujo institucional de doble revisión con propuesta docente, aprobación o devolución por autoridad distinta, rúbricas y notas moderadas, bloqueo de cierre con moderaciones pendientes y auditoría en el Gradebook.
+* Los cursos sin ciclo institucional activo conservan el flujo de publicación existente.
 = 6.22.0 =
 * Gradebook institucional: períodos académicos, escalas versionadas, ciclos de revisión/publicación/cierre, notas oficiales con control de concurrencia, snapshots verificables y rectificaciones con separación de funciones.
 * Nueva API administrativa aislada bajo `/clms/v1/gradebook/institutional`; el Gradebook existente por curso conserva su comportamiento.
