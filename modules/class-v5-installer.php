@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class V5_Installer {
 
 	/** Versión del esquema. Incrementar para forzar re-instalación. */
-	const SCHEMA_VERSION = '6.23.0-speedgrader-moderation';
+	const SCHEMA_VERSION = '6.24.0-academic-library';
 
 	/** Option key que almacena la versión instalada. */
 	const OPTION_KEY = 'atora_v5_schema_version';
@@ -1601,6 +1601,72 @@ class V5_Installer {
 			KEY created_at (created_at)
 		) $charset_collate;" );
 
+		// Biblioteca académica versionada.
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_library_items (
+			id                 BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			academy_id         BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			slug               VARCHAR(190) NOT NULL,
+			title              VARCHAR(255) NOT NULL,
+			description        TEXT NULL DEFAULT NULL,
+			resource_type      VARCHAR(30) NOT NULL DEFAULT 'document',
+			status             VARCHAR(20) NOT NULL DEFAULT 'draft',
+			current_version_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			published_at       DATETIME NULL DEFAULT NULL,
+			published_by       BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			created_by         BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			created_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			UNIQUE KEY academy_slug (academy_id, slug),
+			KEY status_type (status, resource_type),
+			KEY current_version_id (current_version_id)
+		) $charset_collate;" );
+
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_library_versions (
+			id                 BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			item_id            BIGINT UNSIGNED NOT NULL,
+			version_number     INT UNSIGNED NOT NULL,
+			attachment_id      BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			content_url        TEXT NULL DEFAULT NULL,
+			mime_type          VARCHAR(120) NOT NULL DEFAULT '',
+			metadata_json      LONGTEXT NULL DEFAULT NULL,
+			checksum_sha256    CHAR(64) NOT NULL,
+			change_note        TEXT NULL DEFAULT NULL,
+			created_by         BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			created_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			UNIQUE KEY item_version (item_id, version_number),
+			KEY checksum_sha256 (checksum_sha256),
+			KEY attachment_id (attachment_id)
+		) $charset_collate;" );
+
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_library_links (
+			id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			item_id     BIGINT UNSIGNED NOT NULL,
+			link_type   VARCHAR(20) NOT NULL,
+			course_id   BIGINT UNSIGNED NOT NULL,
+			object_key  VARCHAR(190) NOT NULL DEFAULT '',
+			object_id   BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			UNIQUE KEY item_academic_link (item_id, link_type, course_id, object_key, object_id),
+			KEY course_type (course_id, link_type),
+			KEY object_id (object_id)
+		) $charset_collate;" );
+
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_library_events (
+			id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			actor_id     BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			action       VARCHAR(60) NOT NULL,
+			item_id      BIGINT UNSIGNED NOT NULL,
+			details_json LONGTEXT NULL DEFAULT NULL,
+			created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			KEY actor_id (actor_id),
+			KEY item_action (item_id, action),
+			KEY created_at (created_at)
+		) $charset_collate;" );
+
 		// Calificaciones finales por alumno/curso (D-002; migra _clms_gradebook_course_{id}).
 		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_gradebook (
 			id              BIGINT UNSIGNED  NOT NULL AUTO_INCREMENT,
@@ -2060,6 +2126,11 @@ class V5_Installer {
 			"{$wpdb->prefix}atora_institutional_grades",
 			"{$wpdb->prefix}atora_grade_rectifications",
 			"{$wpdb->prefix}atora_gradebook_events",
+			// Biblioteca académica.
+			"{$wpdb->prefix}atora_library_items",
+			"{$wpdb->prefix}atora_library_versions",
+			"{$wpdb->prefix}atora_library_links",
+			"{$wpdb->prefix}atora_library_events",
 			// Affiliates.
 			"{$wpdb->prefix}atora_affiliates",
 			"{$wpdb->prefix}atora_affiliate_clicks",
