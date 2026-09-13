@@ -47,10 +47,11 @@ final class H5P_Module {
 		global $menu, $submenu;
 
 		$target_slug = 'edit.php?post_type=h5p_content';
+		$target_label = __( '🟦 Interactivo H5P', 'atora-lms' );
 
 		foreach ( (array) $menu as $i => $item ) {
 			if ( isset( $item[2] ) && $target_slug === (string) $item[2] ) {
-				$menu[ $i ][0] = __( 'Interactivo H5P', 'atora-lms' );
+				$menu[ $i ][0] = $target_label;
 				break;
 			}
 		}
@@ -58,7 +59,18 @@ final class H5P_Module {
 		if ( isset( $submenu[ $target_slug ] ) && is_array( $submenu[ $target_slug ] ) ) {
 			foreach ( $submenu[ $target_slug ] as $j => $item ) {
 				if ( isset( $item[0] ) && is_string( $item[0] ) && '' !== $item[0] ) {
-					$submenu[ $target_slug ][ $j ][0] = __( 'Interactivo H5P', 'atora-lms' );
+					$submenu[ $target_slug ][ $j ][0] = $target_label;
+					break;
+				}
+			}
+		}
+
+		// Si el CPT está anidado bajo el menú ATORA (show_in_menu=clms-dashboard),
+		// el label vive en el submenu de `clms-dashboard`.
+		if ( isset( $submenu['clms-dashboard'] ) && is_array( $submenu['clms-dashboard'] ) ) {
+			foreach ( $submenu['clms-dashboard'] as $k => $item ) {
+				if ( isset( $item[2] ) && $target_slug === (string) $item[2] ) {
+					$submenu['clms-dashboard'][ $k ][0] = $target_label;
 					break;
 				}
 			}
