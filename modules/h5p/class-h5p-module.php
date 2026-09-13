@@ -47,7 +47,7 @@ final class H5P_Module {
 		global $menu, $submenu;
 
 		$target_slug = 'edit.php?post_type=h5p_content';
-		$target_label = __( '🟦 Interactivo H5P', 'atora-lms' );
+		$target_label = __( '🎮 Interactivo H5P', 'atora-lms' );
 
 		foreach ( (array) $menu as $i => $item ) {
 			if ( isset( $item[2] ) && $target_slug === (string) $item[2] ) {

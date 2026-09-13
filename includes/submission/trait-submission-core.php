@@ -12,7 +12,7 @@ trait CLMS_Submission_Core_Trait {
 				'labels' => array(
 					'name'          => 'Entregas',
 					'singular_name' => 'Entrega',
-					'menu_name'     => '🟦 Entregas',
+					'menu_name'     => '📥 Entregas',
 				),
 				'public'             => false,
 				'show_ui'            => true,
