@@ -244,7 +244,27 @@ final class ATORA_Mobile_REST_Controller {
 		$raw_content  = $wp_post_id ? (string) get_post_field( 'post_content', $wp_post_id ) : '';
 		$content_html = wp_kses_post( apply_filters( 'the_content', $raw_content ) );
 		$video_url    = esc_url_raw( (string) ( $lesson['video_url'] ?? '' ) );
-		$video_embed  = self::google_drive_embed_url( $video_url, $raw_content );
+
+		// La UI histórica guarda el video principal en extra_videos y mantiene
+		// _clms_lesson_video_url como compatibilidad. La tabla migrada puede
+		// estar vacía si la lección fue migrada antes de guardar esas claves.
+		if ( $wp_post_id > 0 && '' === $video_url ) {
+			$extra_videos = get_post_meta( $wp_post_id, '_clms_lesson_extra_videos', true );
+			if ( is_array( $extra_videos ) ) {
+				foreach ( $extra_videos as $extra_video ) {
+					$candidate = is_array( $extra_video ) ? esc_url_raw( (string) ( $extra_video['url'] ?? '' ) ) : '';
+					if ( '' !== $candidate ) {
+						$video_url = $candidate;
+						break;
+					}
+				}
+			}
+			if ( '' === $video_url ) {
+				$video_url = esc_url_raw( (string) get_post_meta( $wp_post_id, '_clms_lesson_video_url', true ) );
+			}
+		}
+
+		$video_embed = self::google_drive_embed_url( $video_url, $raw_content );
 
 		return new WP_REST_Response( array(
 			'lesson' => array(
