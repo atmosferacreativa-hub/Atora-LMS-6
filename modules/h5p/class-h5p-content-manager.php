@@ -39,7 +39,7 @@ final class H5P_Content_Manager {
 				'labels'          => array(
 					'name'          => __( 'Interactivo H5P', 'atora-lms' ),
 					'singular_name' => __( 'Contenido interactivo H5P', 'atora-lms' ),
-					'menu_name'     => __( '🟦 Interactivo H5P', 'atora-lms' ),
+					'menu_name'     => __( '🎮 Interactivo H5P', 'atora-lms' ),
 				),
 				'public'          => false,
 				'show_ui'         => true,

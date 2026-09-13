@@ -39,14 +39,14 @@ final class Early_Warning_Module {
 			'clms-dashboard',
 			__( 'Alertas tempranas', 'atora-lms' ),
 			__( 'Alertas tempranas', 'atora-lms' ),
-			'edit_posts',
+			'read',
 			'atora-early-warning',
 			array( __CLASS__, 'render_admin_page' )
 		);
 	}
 
 	public static function render_admin_page(): void {
-		if ( ! current_user_can( 'edit_posts' ) ) {
+		if ( ! current_user_can( 'edit_posts' ) && ! current_user_can( 'manage_options' ) ) {
 			wp_die( esc_html__( 'No tienes permisos.', 'atora-lms' ) );
 		}
 
@@ -55,15 +55,39 @@ final class Early_Warning_Module {
 		echo '<div class="wrap"><h1>' . esc_html__( 'Alertas tempranas', 'atora-lms' ) . '</h1>';
 		echo '<p class="description">' . esc_html__( 'MVP: entregas perdidas por estudiante en un curso.', 'atora-lms' ) . '</p>';
 
+		$courses = array();
+		if ( class_exists( '\\ATORA\\LMS\\LMS_Course_Service' ) ) {
+			$args = array(
+				'status' => 'published',
+				'limit'  => 200,
+				'offset' => 0,
+			);
+			if ( ! current_user_can( 'manage_options' ) ) {
+				$args['instructor_id'] = get_current_user_id();
+			}
+			$list = \ATORA\LMS\LMS_Course_Service::get_all( $args );
+			$courses = is_array( $list ) ? (array) ( $list['items'] ?? array() ) : array();
+		}
+
 		echo '<form method="get" style="margin:12px 0">';
 		echo '<input type="hidden" name="page" value="atora-early-warning">';
 		echo '<label><strong>' . esc_html__( 'Curso', 'atora-lms' ) . '</strong></label><br>';
-		echo '<input type="number" name="course_id" value="' . esc_attr( (string) $course_id ) . '" min="1" style="width:180px">';
+		echo '<select name="course_id" style="min-width:360px;max-width:100%">';
+		echo '<option value="0">' . esc_html__( 'Selecciona un curso…', 'atora-lms' ) . '</option>';
+		foreach ( (array) $courses as $c ) {
+			if ( ! is_array( $c ) ) { continue; }
+			$cid   = absint( $c['id'] ?? 0 );
+			$title = sanitize_text_field( (string) ( $c['title'] ?? '' ) );
+			if ( $cid <= 0 ) { continue; }
+			$label = $title ? ( $title . ' (#' . $cid . ')' ) : ( '#' . $cid );
+			echo '<option value="' . esc_attr( (string) $cid ) . '"' . selected( $course_id, $cid, false ) . '>' . esc_html( $label ) . '</option>';
+		}
+		echo '</select>';
 		echo '<button class="button button-primary" type="submit" style="margin-left:8px">' . esc_html__( 'Cargar', 'atora-lms' ) . '</button>';
 		echo '</form>';
 
 		if ( ! $course_id ) {
-			echo '<p class="description">' . esc_html__( 'Indica un course_id para ver las alertas.', 'atora-lms' ) . '</p>';
+			echo '<p class="description">' . esc_html__( 'Selecciona un curso para ver las alertas.', 'atora-lms' ) . '</p>';
 			echo '</div>';
 			return;
 		}
