@@ -313,7 +313,23 @@ class LMS_Migrator {
 
 			$section = sanitize_text_field( (string) get_post_meta( $lesson_id, '_clms_section', true ) );
 			$type    = sanitize_key( (string) ( get_post_meta( $lesson_id, '_clms_lesson_type', true ) ?: 'text' ) );
-			$video   = esc_url_raw( (string) get_post_meta( $lesson_id, '_clms_video_url', true ) );
+			$video        = '';
+			$extra_videos = get_post_meta( $lesson_id, '_clms_lesson_extra_videos', true );
+			if ( is_array( $extra_videos ) ) {
+				foreach ( $extra_videos as $extra_video ) {
+					$candidate = is_array( $extra_video ) ? esc_url_raw( (string) ( $extra_video['url'] ?? '' ) ) : '';
+					if ( '' !== $candidate ) {
+						$video = $candidate;
+						break;
+					}
+				}
+			}
+			if ( '' === $video ) {
+				$video = esc_url_raw( (string) get_post_meta( $lesson_id, '_clms_lesson_video_url', true ) );
+			}
+			if ( '' === $video ) {
+				$video = esc_url_raw( (string) get_post_meta( $lesson_id, '_clms_video_url', true ) );
+			}
 
 			$data = array(
 				'wp_post_id'      => $lesson_id,
