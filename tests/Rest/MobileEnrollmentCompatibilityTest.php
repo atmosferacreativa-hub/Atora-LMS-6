@@ -2,10 +2,6 @@
 
 declare( strict_types = 1 );
 
-namespace ATORA\Tests\Rest;
-
-use PHPUnit\Framework\TestCase;
-
 /**
  * Pruebas de compatibilidad: matrículas en tablas + legacy (router/helper canónico).
  *
@@ -13,7 +9,7 @@ use PHPUnit\Framework\TestCase;
  * del controller móvil sin depender de una instalación completa de WordPress.
  */
 
-namespace ATORA\LMS;
+namespace ATORA\LMS {
 
 if ( ! class_exists( LMS_Enrollment_Service::class ) ) {
 	class LMS_Enrollment_Service {
@@ -51,6 +47,7 @@ if ( ! class_exists( LMS_Course_Service::class ) ) {
 		}
 	}
 }
+}
 
 namespace {
 	if ( ! class_exists( 'CLMS_Helper' ) ) {
@@ -78,7 +75,9 @@ namespace {
 	}
 }
 
-namespace ATORA\Tests\Rest;
+namespace ATORA\Tests\Rest {
+
+use PHPUnit\Framework\TestCase;
 
 require_once __DIR__ . '/../../includes/mobile/class-mobile-rest-controller.php';
 
@@ -217,4 +216,4 @@ final class MobileEnrollmentCompatibilityTest extends TestCase {
 		$this->assertSame( 'atora_mobile_course_forbidden', $result->get_error_code() );
 	}
 }
-
+}
