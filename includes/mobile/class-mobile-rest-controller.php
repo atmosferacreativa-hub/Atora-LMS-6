@@ -240,9 +240,11 @@ final class ATORA_Mobile_REST_Controller {
 		$auth = self::authorize_course_id( $user_id, $course_id );
 		if ( is_wp_error( $auth ) ) { return $auth; }
 
-		$wp_post_id  = absint( $lesson['wp_post_id'] ?? 0 );
-		$raw_content = $wp_post_id ? (string) get_post_field( 'post_content', $wp_post_id ) : '';
+		$wp_post_id   = absint( $lesson['wp_post_id'] ?? 0 );
+		$raw_content  = $wp_post_id ? (string) get_post_field( 'post_content', $wp_post_id ) : '';
 		$content_html = wp_kses_post( apply_filters( 'the_content', $raw_content ) );
+		$video_url    = esc_url_raw( (string) ( $lesson['video_url'] ?? '' ) );
+		$video_embed  = self::google_drive_embed_url( $video_url, $raw_content );
 
 		return new WP_REST_Response( array(
 			'lesson' => array(
@@ -251,8 +253,10 @@ final class ATORA_Mobile_REST_Controller {
 				'title'        => sanitize_text_field( (string) ( $lesson['title'] ?? '' ) ),
 				'type'         => sanitize_key( (string) ( $lesson['type'] ?? 'text' ) ),
 				'duration_min' => absint( $lesson['duration_min'] ?? 0 ),
-				'video_url'    => esc_url_raw( (string) ( $lesson['video_url'] ?? '' ) ),
-				'content_html' => $content_html,
+				'video_url'       => $video_url,
+				'video_embed_url' => $video_embed,
+				'video_provider'  => '' !== $video_embed ? 'google_drive' : ( '' !== $video_url ? 'direct' : '' ),
+				'content_html'    => $content_html,
 				'content_text' => sanitize_textarea_field( wp_strip_all_tags( $content_html ) ),
 				'completed'    => in_array( $lesson_id, self::completed_lesson_ids( $user_id, $course_id ), true ),
 				'quiz_available'=> $wp_post_id && '1' === (string) get_post_meta( $wp_post_id, '_clms_quiz_enabled', true ),
@@ -319,6 +323,46 @@ final class ATORA_Mobile_REST_Controller {
 			'completed' => $ok,
 			'progress'  => \ATORA\LMS\LMS_Enrollment_Service::get_progress( $user_id, $course_id ),
 		), $ok ? 200 : 400 );
+	}
+
+	/**
+	 * Extrae y normaliza únicamente videos de Google Drive autorizados.
+	 * Nunca devuelve el iframe original ni acepta hosts arbitrarios.
+	 */
+	private static function google_drive_embed_url( string $video_url, string $raw_content ): string {
+		$candidates = array();
+
+		if ( '' !== $video_url ) {
+			$candidates[] = $video_url;
+		}
+
+		if ( preg_match_all( '#https?://(?:drive|docs)\\.google\\.com/[^"\\'<>\\s]+#i', html_entity_decode( $raw_content, ENT_QUOTES | ENT_HTML5, 'UTF-8' ), $matches ) ) {
+			$candidates = array_merge( $candidates, (array) $matches[0] );
+		}
+
+		foreach ( $candidates as $candidate ) {
+			$url   = esc_url_raw( trim( (string) $candidate ) );
+			$parts = wp_parse_url( $url );
+			$host  = strtolower( (string) ( $parts['host'] ?? '' ) );
+			if ( ! in_array( $host, array( 'drive.google.com', 'docs.google.com' ), true ) ) {
+				continue;
+		}
+
+			$file_id = '';
+			$path    = (string) ( $parts['path'] ?? '' );
+			if ( preg_match( '#/file/d/([a-zA-Z0-9_-]+)#', $path, $id_match ) ) {
+				$file_id = (string) $id_match[1];
+			} elseif ( ! empty( $parts['query'] ) ) {
+				parse_str( (string) $parts['query'], $query );
+				$file_id = sanitize_text_field( (string) ( $query['id'] ?? '' ) );
+			}
+
+			if ( preg_match( '/^[a-zA-Z0-9_-]{10,}$/', $file_id ) ) {
+				return 'https://drive.google.com/file/d/' . rawurlencode( $file_id ) . '/preview';
+			}
+		}
+
+		return '';
 	}
 
 	private static function prepare_enrollments( int $user_id ): array {
