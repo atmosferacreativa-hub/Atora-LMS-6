@@ -41,14 +41,14 @@ final class Learning_Analytics_Module {
 			'clms-dashboard',
 			__( 'Analítica de riesgo', 'atora-lms' ),
 			__( 'Analítica de riesgo', 'atora-lms' ),
-			'edit_posts',
+			'read',
 			'atora-learning-analytics',
 			array( __CLASS__, 'render_admin_page' )
 		);
 	}
 
 	public static function render_admin_page(): void {
-		if ( ! current_user_can( 'edit_posts' ) ) {
+		if ( ! current_user_can( 'edit_posts' ) && ! current_user_can( 'manage_options' ) ) {
 			wp_die( esc_html__( 'No tienes permisos.', 'atora-lms' ) );
 		}
 
@@ -56,6 +56,20 @@ final class Learning_Analytics_Module {
 		$teacher_id = isset( $_GET['teacher_id'] ) ? absint( wp_unslash( $_GET['teacher_id'] ) ) : 0;
 		$cohort_id  = isset( $_GET['cohort_id'] ) ? absint( wp_unslash( $_GET['cohort_id'] ) ) : 0;
 		$student_id = isset( $_GET['student_id'] ) ? absint( wp_unslash( $_GET['student_id'] ) ) : 0;
+
+		$courses = array();
+		if ( class_exists( '\\ATORA\\LMS\\LMS_Course_Service' ) ) {
+			$args = array(
+				'status' => 'published',
+				'limit'  => 200,
+				'offset' => 0,
+			);
+			if ( ! current_user_can( 'manage_options' ) ) {
+				$args['instructor_id'] = get_current_user_id();
+			}
+			$list = \ATORA\LMS\LMS_Course_Service::get_all( $args );
+			$courses = is_array( $list ) ? (array) ( $list['items'] ?? array() ) : array();
+		}
 
 		echo '<div class="wrap"><h1>' . esc_html__( 'Analítica de riesgo', 'atora-lms' ) . '</h1>';
 		echo '<p class="description">' . esc_html__( 'Scoring por estudiante/curso basado en progreso, pendientes, notas, inactividad y engagement (lecturas/mensajes).', 'atora-lms' ) . '</p>';
@@ -65,7 +79,17 @@ final class Learning_Analytics_Module {
 		echo '<p style="margin:0 0 8px 0"><strong>' . esc_html__( 'Filtros', 'atora-lms' ) . '</strong></p>';
 		echo '<label class="description">' . esc_html__( 'Usa al menos uno: curso, cohorte o docente. Si defines curso, los demás filtros se ignoran.', 'atora-lms' ) . '</label><br><br>';
 		echo '<label><strong>' . esc_html__( 'Curso (course_id)', 'atora-lms' ) . '</strong></label><br>';
-		echo '<input type="number" name="course_id" value="' . esc_attr( (string) $course_id ) . '" min="1" style="width:180px"> ';
+		echo '<select name="course_id" style="min-width:360px;max-width:100%">';
+		echo '<option value="0">' . esc_html__( 'Selecciona un curso…', 'atora-lms' ) . '</option>';
+		foreach ( (array) $courses as $c ) {
+			if ( ! is_array( $c ) ) { continue; }
+			$cid   = absint( $c['id'] ?? 0 );
+			$title = sanitize_text_field( (string) ( $c['title'] ?? '' ) );
+			if ( $cid <= 0 ) { continue; }
+			$label = $title ? ( $title . ' (#' . $cid . ')' ) : ( '#' . $cid );
+			echo '<option value="' . esc_attr( (string) $cid ) . '"' . selected( $course_id, $cid, false ) . '>' . esc_html( $label ) . '</option>';
+		}
+		echo '</select> ';
 		echo '<span class="description">' . esc_html__( 'Recomendado para ver detalle por curso.', 'atora-lms' ) . '</span><br><br>';
 
 		echo '<label><strong>' . esc_html__( 'Cohorte (cohort_id)', 'atora-lms' ) . '</strong></label><br>';

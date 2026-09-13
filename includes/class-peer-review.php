@@ -1134,7 +1134,7 @@ class CLMS_Peer_Review {
 			'clms-dashboard',
 			__( 'Coevaluación', 'atora-lms' ),
 			__( 'Coevaluación', 'atora-lms' ),
-			'edit_posts',
+			'read',
 			'clms-peer-review-reports',
 			array( $this, 'render_admin_reports_page' )
 		);
@@ -1144,7 +1144,7 @@ class CLMS_Peer_Review {
 	}
 
 	public function render_admin_reports_page(): void {
-		if ( ! current_user_can( 'edit_posts' ) ) {
+		if ( ! current_user_can( 'edit_posts' ) && ! current_user_can( 'manage_options' ) ) {
 			wp_die( esc_html__( 'No tienes permisos.', 'atora-lms' ) );
 		}
 
