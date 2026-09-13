@@ -122,6 +122,21 @@ trait CLMS_Loader_Module_Groups_Trait {
 					'dependencies' => array( 'CLMS_Helper' ),
 				),
 				array(
+					'file'         => 'includes/library/class-academic-library-policy.php',
+					'class'        => 'CLMS_Academic_Library_Policy',
+					'dependencies' => array(),
+				),
+				array(
+					'file'         => 'includes/library/class-academic-library-service.php',
+					'class'        => 'CLMS_Academic_Library_Service',
+					'dependencies' => array( 'CLMS_Academic_Library_Policy', 'CLMS_Competency_Service', 'CLMS_Evidence_Service' ),
+				),
+				array(
+					'file'         => 'includes/library/class-academic-library-rest-controller.php',
+					'class'        => 'CLMS_Academic_Library_REST_Controller',
+					'dependencies' => array( 'CLMS_Academic_Library_Service' ),
+				),
+				array(
 					'file'         => 'includes/gradebook/class-gradebook-normalizer.php',
 					'class'        => 'CLMS_Gradebook_Normalizer',
 					'dependencies' => array(),
@@ -140,6 +155,16 @@ trait CLMS_Loader_Module_Groups_Trait {
 					'file'         => 'includes/gradebook/class-institutional-gradebook-service.php',
 					'class'        => 'CLMS_Institutional_Gradebook_Service',
 					'dependencies' => array( 'CLMS_Institutional_Gradebook_Policy' ),
+				),
+				array(
+					'file'         => 'includes/speedgrade/class-speedgrade-moderation-policy.php',
+					'class'        => 'CLMS_SpeedGrade_Moderation_Policy',
+					'dependencies' => array(),
+				),
+				array(
+					'file'         => 'includes/speedgrade/class-speedgrade-moderation-service.php',
+					'class'        => 'CLMS_SpeedGrade_Moderation_Service',
+					'dependencies' => array( 'CLMS_SpeedGrade_Moderation_Policy', 'CLMS_Institutional_Gradebook_Service' ),
 				),
 				array(
 					'file'         => 'includes/gradebook/class-institutional-gradebook-rest-controller.php',
@@ -361,6 +386,30 @@ trait CLMS_Loader_Module_Groups_Trait {
 					'file'         => 'includes/class-peer-review.php',
 					'class'        => 'CLMS_Peer_Review',
 					'dependencies' => array( 'CLMS_Helper', 'CLMS_Submission' ),
+				),
+				array(
+					'file'         => 'includes/credentials/class-credential-policy.php',
+					'class'        => 'CLMS_Credential_Policy',
+					'dependencies' => array(),
+					'condition'    => 'module:certificates',
+				),
+				array(
+					'file'         => 'includes/credentials/class-credential-service.php',
+					'class'        => 'CLMS_Credential_Service',
+					'dependencies' => array( 'CLMS_Credential_Policy' ),
+					'condition'    => 'module:certificates',
+				),
+				array(
+					'file'         => 'includes/credentials/class-credential-rest-controller.php',
+					'class'        => 'CLMS_Credential_REST_Controller',
+					'dependencies' => array( 'CLMS_Credential_Service' ),
+					'condition'    => 'module:certificates',
+				),
+				array(
+					'file'         => 'includes/credentials/class-credential-qr.php',
+					'class'        => 'CLMS_Credential_QR',
+					'dependencies' => array( 'CLMS_Credential_Service' ),
+					'condition'    => 'module:certificates',
 				),
 				array(
 					'file'         => 'includes/certificates/class-certificate-rules.php',

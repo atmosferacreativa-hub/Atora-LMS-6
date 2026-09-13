@@ -35,14 +35,15 @@ final class H5P_Content_Manager {
 		register_post_type(
 			'h5p_content',
 			array(
-				'label'           => __( 'H5P', 'atora-lms' ),
+				'label'           => __( 'Interactivo H5P', 'atora-lms' ),
 				'labels'          => array(
-					'name'          => __( 'H5P', 'atora-lms' ),
-					'singular_name' => __( 'Contenido H5P', 'atora-lms' ),
+					'name'          => __( 'Interactivo H5P', 'atora-lms' ),
+					'singular_name' => __( 'Contenido interactivo H5P', 'atora-lms' ),
+					'menu_name'     => __( '🟦 Interactivo H5P', 'atora-lms' ),
 				),
 				'public'          => false,
 				'show_ui'         => true,
-				'show_in_menu'    => true,
+				'show_in_menu'    => 'clms-dashboard',
 				'show_in_rest'    => false,
 				'supports'        => array( 'title', 'editor' ),
 				'capability_type' => 'post',
@@ -170,4 +171,3 @@ final class H5P_Content_Manager {
 		return $ok ? true : new WP_Error( 'atora_h5p_db_error', __( 'No se pudo crear el contenido.', 'atora-lms' ), array( 'status' => 500 ) );
 	}
 }
-

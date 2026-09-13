@@ -385,17 +385,20 @@ trait CLMS_Certificates_Issuance_Verification_Trait {
 		$course_id = isset( $_POST['course_id'] ) ? absint( wp_unslash( $_POST['course_id'] ) ) : 0;
 		check_admin_referer( 'clms_revoke_certificate_' . $user_id . '_' . $course_id );
 		$record = $this->get_certificate_record( $user_id, $course_id );
-		if ( empty( $record ) ) {
-			wp_die( esc_html__( 'Certificado no encontrado.', 'atora-lms' ) );
+		if ( empty( $record ) || ! class_exists( 'CLMS_Credential_Service' ) ) {
+			wp_die( esc_html__( 'Credencial institucional no encontrada.', 'atora-lms' ) );
 		}
-		$reason = isset( $_POST['reason'] ) ? sanitize_text_field( wp_unslash( $_POST['reason'] ) ) : '';
-		$record['status'] = 'revoked';
-		$record['revoked_at'] = current_time( 'mysql' );
+		$reason = isset( $_POST['reason'] ) ? sanitize_textarea_field( wp_unslash( $_POST['reason'] ) ) : '';
+		$category = isset( $_POST['category'] ) ? sanitize_key( wp_unslash( $_POST['category'] ) ) : 'administrative';
+		$service = new CLMS_Credential_Service();
+		$credential = $service->find_for_target( $user_id, 'course', $course_id );
+		$result = $credential ? $service->request_revocation( $credential['id'], $category, $reason, get_current_user_id() ) : new WP_Error( 'atora_credential_not_found' );
+		if ( is_wp_error( $result ) ) {
+			wp_die( esc_html( $result->get_error_message() ?: __( 'No fue posible solicitar la revocación.', 'atora-lms' ) ) );
+		}
+		$record['status'] = 'revocation_pending';
 		$record['revocation_reason'] = $reason;
 		$this->save_certificate_record( $user_id, $course_id, $record );
-		if ( ! empty( $record['verification_code'] ) ) {
-			$this->index_certificate_verification_code( (string) $record['verification_code'], $user_id, $course_id, 'course' );
-		}
 		wp_safe_redirect( wp_get_referer() ? wp_get_referer() : admin_url() );
 		exit;
 	}
@@ -404,27 +407,10 @@ trait CLMS_Certificates_Issuance_Verification_Trait {
 		if ( ! CLMS_Access::can_access_admin() ) {
 			wp_die( esc_html__( 'Sin permisos.', 'atora-lms' ) );
 		}
-		if ( ! $this->is_reissue_allowed() ) {
-			wp_die( esc_html__( 'La reemisión de certificados está desactivada.', 'atora-lms' ) );
-		}
 		$user_id   = isset( $_POST['user_id'] ) ? absint( wp_unslash( $_POST['user_id'] ) ) : 0;
 		$course_id = isset( $_POST['course_id'] ) ? absint( wp_unslash( $_POST['course_id'] ) ) : 0;
 		check_admin_referer( 'clms_reissue_certificate_' . $user_id . '_' . $course_id );
-		$record = $this->get_certificate_record( $user_id, $course_id );
-		if ( empty( $record ) ) {
-			$this->maybe_issue_certificate( $user_id, $course_id );
-		} else {
-			$record['status'] = 'valid';
-			$record['revoked_at'] = '';
-			$record['revocation_reason'] = '';
-			if ( empty( $record['verification_code'] ) ) {
-				$record['verification_code'] = wp_generate_password( 20, false, false );
-			}
-			$this->save_certificate_record( $user_id, $course_id, $record );
-			$this->index_certificate_verification_code( (string) $record['verification_code'], $user_id, $course_id, 'course' );
-		}
-		wp_safe_redirect( wp_get_referer() ? wp_get_referer() : admin_url() );
-		exit;
+		wp_die( esc_html__( 'La reemisión directa fue retirada por seguridad. Emite una credencial de sustitución mediante el flujo institucional.', 'atora-lms' ) );
 	}
 
 }

@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class V5_Installer {
 
 	/** Versión del esquema. Incrementar para forzar re-instalación. */
-	const SCHEMA_VERSION = '6.22.0-institutional-gradebook';
+	const SCHEMA_VERSION = '6.26.0-integrated-schema';
 
 	/** Option key que almacena la versión instalada. */
 	const OPTION_KEY = 'atora_v5_schema_version';
@@ -1517,6 +1517,35 @@ class V5_Installer {
 			KEY scale_id (scale_id)
 		) $charset_collate;" );
 
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_grade_moderations (
+			id                      BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			submission_id           BIGINT UNSIGNED NOT NULL,
+			cycle_id                BIGINT UNSIGNED NOT NULL,
+			student_id              BIGINT UNSIGNED NOT NULL,
+			course_id               BIGINT UNSIGNED NOT NULL,
+			primary_grader_id       BIGINT UNSIGNED NOT NULL,
+			moderator_id            BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			primary_grade           DECIMAL(9,4) NOT NULL,
+			moderator_grade         DECIMAL(9,4) NULL DEFAULT NULL,
+			resolved_grade          DECIMAL(9,4) NULL DEFAULT NULL,
+			primary_rubric_json     LONGTEXT NULL DEFAULT NULL,
+			moderator_rubric_json   LONGTEXT NULL DEFAULT NULL,
+			teacher_comment         TEXT NULL DEFAULT NULL,
+			moderator_comment       TEXT NULL DEFAULT NULL,
+			status                  VARCHAR(30) NOT NULL DEFAULT 'pending',
+			lock_version            INT UNSIGNED NOT NULL DEFAULT 1,
+			submitted_at            DATETIME NOT NULL,
+			decided_at              DATETIME NULL DEFAULT NULL,
+			created_at              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			UNIQUE KEY submission_cycle (submission_id, cycle_id),
+			KEY cycle_status (cycle_id, status),
+			KEY moderator_status (moderator_id, status),
+			KEY course_id (course_id),
+			KEY student_id (student_id)
+		) $charset_collate;" );
+
 		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_institutional_grades (
 			id             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 			cycle_id       BIGINT UNSIGNED NOT NULL,
@@ -1572,6 +1601,72 @@ class V5_Installer {
 			KEY created_at (created_at)
 		) $charset_collate;" );
 
+		// Biblioteca académica versionada.
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_library_items (
+			id                 BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			academy_id         BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			slug               VARCHAR(190) NOT NULL,
+			title              VARCHAR(255) NOT NULL,
+			description        TEXT NULL DEFAULT NULL,
+			resource_type      VARCHAR(30) NOT NULL DEFAULT 'document',
+			status             VARCHAR(20) NOT NULL DEFAULT 'draft',
+			current_version_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			published_at       DATETIME NULL DEFAULT NULL,
+			published_by       BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			created_by         BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			created_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			UNIQUE KEY academy_slug (academy_id, slug),
+			KEY status_type (status, resource_type),
+			KEY current_version_id (current_version_id)
+		) $charset_collate;" );
+
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_library_versions (
+			id                 BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			item_id            BIGINT UNSIGNED NOT NULL,
+			version_number     INT UNSIGNED NOT NULL,
+			attachment_id      BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			content_url        TEXT NULL DEFAULT NULL,
+			mime_type          VARCHAR(120) NOT NULL DEFAULT '',
+			metadata_json      LONGTEXT NULL DEFAULT NULL,
+			checksum_sha256    CHAR(64) NOT NULL,
+			change_note        TEXT NULL DEFAULT NULL,
+			created_by         BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			created_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			UNIQUE KEY item_version (item_id, version_number),
+			KEY checksum_sha256 (checksum_sha256),
+			KEY attachment_id (attachment_id)
+		) $charset_collate;" );
+
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_library_links (
+			id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			item_id     BIGINT UNSIGNED NOT NULL,
+			link_type   VARCHAR(20) NOT NULL,
+			course_id   BIGINT UNSIGNED NOT NULL,
+			object_key  VARCHAR(190) NOT NULL DEFAULT '',
+			object_id   BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			UNIQUE KEY item_academic_link (item_id, link_type, course_id, object_key, object_id),
+			KEY course_type (course_id, link_type),
+			KEY object_id (object_id)
+		) $charset_collate;" );
+
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_library_events (
+			id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			actor_id     BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			action       VARCHAR(60) NOT NULL,
+			item_id      BIGINT UNSIGNED NOT NULL,
+			details_json LONGTEXT NULL DEFAULT NULL,
+			created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			KEY actor_id (actor_id),
+			KEY item_action (item_id, action),
+			KEY created_at (created_at)
+		) $charset_collate;" );
+
 		// Calificaciones finales por alumno/curso (D-002; migra _clms_gradebook_course_{id}).
 		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_gradebook (
 			id              BIGINT UNSIGNED  NOT NULL AUTO_INCREMENT,
@@ -1616,6 +1711,63 @@ class V5_Installer {
 			KEY program_id                   (program_id),
 			KEY status                       (status),
 			KEY verification_code            (verification_code(20))
+		) $charset_collate;" );
+
+		// Credenciales verificables: snapshot inmutable, doble control y auditoría encadenada.
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_credentials (
+			id                      BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			credential_uuid         CHAR(36)        NOT NULL,
+			user_id                 BIGINT UNSIGNED NOT NULL,
+			target_type             VARCHAR(20)     NOT NULL,
+			target_id               BIGINT UNSIGNED NOT NULL,
+			cycle_id                BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			cert_code               VARCHAR(100)    NOT NULL DEFAULT '',
+			verification_token_hash CHAR(64)        NOT NULL,
+			status                  VARCHAR(30)     NOT NULL DEFAULT 'valid',
+			snapshot_json           LONGTEXT        NOT NULL,
+			snapshot_hash           CHAR(64)        NOT NULL,
+			template_version        VARCHAR(40)     NOT NULL DEFAULT '1',
+			issued_by               BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			issued_at               DATETIME        NOT NULL,
+			expires_at              DATETIME                 DEFAULT NULL,
+			revoked_at              DATETIME                 DEFAULT NULL,
+			superseded_by_uuid      CHAR(36)        NOT NULL DEFAULT '',
+			created_at              DATETIME        NOT NULL,
+			updated_at              DATETIME        NOT NULL,
+			PRIMARY KEY (id),
+			UNIQUE KEY credential_uuid (credential_uuid),
+			UNIQUE KEY verification_token_hash (verification_token_hash),
+			KEY holder_target (user_id, target_type, target_id),
+			KEY status (status)
+		) $charset_collate;" );
+
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_credential_revocations (
+			id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			credential_id BIGINT UNSIGNED NOT NULL,
+			category      VARCHAR(40)     NOT NULL,
+			reason        TEXT            NOT NULL,
+			status        VARCHAR(20)     NOT NULL DEFAULT 'requested',
+			requested_by  BIGINT UNSIGNED NOT NULL,
+			decided_by    BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			requested_at  DATETIME        NOT NULL,
+			decided_at    DATETIME                 DEFAULT NULL,
+			PRIMARY KEY (id),
+			KEY credential_status (credential_id, status),
+			KEY requested_by (requested_by)
+		) $charset_collate;" );
+
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_credential_events (
+			id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			credential_id BIGINT UNSIGNED NOT NULL,
+			action        VARCHAR(60)     NOT NULL,
+			actor_id      BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			details_json  LONGTEXT                 DEFAULT NULL,
+			previous_hash CHAR(64)        NOT NULL DEFAULT '',
+			event_hash    CHAR(64)        NOT NULL,
+			created_at    DATETIME        NOT NULL,
+			PRIMARY KEY (id),
+			UNIQUE KEY event_hash (event_hash),
+			KEY credential_id (credential_id)
 		) $charset_collate;" );
 
 		// ── /Fase 11b ─────────────────────────────────────────────────────────
@@ -2027,9 +2179,15 @@ class V5_Installer {
 			"{$wpdb->prefix}atora_academic_periods",
 			"{$wpdb->prefix}atora_grading_scales",
 			"{$wpdb->prefix}atora_gradebook_cycles",
+			"{$wpdb->prefix}atora_grade_moderations",
 			"{$wpdb->prefix}atora_institutional_grades",
 			"{$wpdb->prefix}atora_grade_rectifications",
 			"{$wpdb->prefix}atora_gradebook_events",
+			// Biblioteca académica.
+			"{$wpdb->prefix}atora_library_items",
+			"{$wpdb->prefix}atora_library_versions",
+			"{$wpdb->prefix}atora_library_links",
+			"{$wpdb->prefix}atora_library_events",
 			// Affiliates.
 			"{$wpdb->prefix}atora_affiliates",
 			"{$wpdb->prefix}atora_affiliate_clicks",

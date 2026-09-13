@@ -495,6 +495,115 @@ class CLMS_Quiz {
 	   REST
 	--------------------------------------------------------------- */
 
+	/**
+	 * Prepara una evaluación para clientes móviles sin exponer claves ni feedback.
+	 */
+	public function get_quiz_rest( $user_id, $lesson_id ) {
+		$user_id   = absint( $user_id );
+		$lesson_id = absint( $lesson_id );
+
+		if ( ! $user_id || ! $lesson_id || ! CLMS_Helper::user_can_access_lesson( $user_id, $lesson_id ) ) {
+			return new WP_Error( 'clms_quiz_forbidden', __( 'No tienes acceso a esta evaluación.', 'atora-lms' ), array( 'status' => 403 ) );
+		}
+		if ( ! $this->is_quiz_enabled( $lesson_id ) ) {
+			return new WP_Error( 'clms_quiz_disabled', __( 'Esta evaluación no está habilitada.', 'atora-lms' ), array( 'status' => 404 ) );
+		}
+		$date_check = $this->validate_availability_window( $lesson_id );
+		if ( true !== $date_check ) {
+			return new WP_Error( 'clms_quiz_unavailable', $date_check, array( 'status' => 409 ) );
+		}
+		$all_questions = $this->get_questions( $lesson_id );
+		if ( empty( $all_questions ) ) {
+			return new WP_Error( 'clms_quiz_empty', __( 'No hay preguntas válidas.', 'atora-lms' ), array( 'status' => 404 ) );
+		}
+		$attempt       = $this->get_quiz_attempt( $user_id, $lesson_id );
+		$retry_context = $this->get_quiz_retry_context( $lesson_id, $attempt );
+		$can_retry     = $this->can_retry_quiz( $lesson_id, $attempt );
+		$selection     = $can_retry ? $this->select_questions_for_render( $user_id, $lesson_id, $all_questions ) : array( 'questions' => array(), 'token' => '' );
+		$time_limit    = absint( get_post_meta( $lesson_id, '_lm_quiz_time_limit', true ) );
+		$remaining     = 0;
+		if ( $time_limit > 0 && $can_retry ) {
+			$start     = $this->get_or_create_quiz_start( $user_id, $lesson_id, $time_limit * 60 );
+			$remaining = max( 0, ( $time_limit * 60 ) - max( 0, time() - $start ) );
+		}
+
+		$questions = array();
+		foreach ( $selection['questions'] as $index => $question ) {
+			$questions[] = array(
+				'id'       => $index,
+				'type'     => sanitize_key( (string) ( $question['type'] ?? 'single' ) ),
+				'question' => sanitize_text_field( $this->get_question_text( $question ) ),
+				'options'  => array_values( array_map( 'sanitize_text_field', (array) ( $question['options'] ?? array() ) ) ),
+				'weight'   => max( 1, absint( $question['weight'] ?? 1 ) ),
+			);
+		}
+
+		return array(
+			'lesson_id'        => $lesson_id,
+			'token'            => (string) $selection['token'],
+			'questions'        => $questions,
+			'can_submit'       => $can_retry,
+			'remaining_seconds'=> $remaining,
+			'attempts'         => absint( $attempt['attempts'] ?? 0 ),
+			'best_score'       => isset( $attempt['best_score'] ) ? absint( $attempt['best_score'] ) : null,
+			'retry_context'    => $retry_context,
+		);
+	}
+
+	/**
+	 * Califica exactamente la selección firmada entregada al cliente móvil.
+	 */
+	public function grade_mobile_quiz_rest( $user_id, $lesson_id, $answers, $token ) {
+		$user_id   = absint( $user_id );
+		$lesson_id = absint( $lesson_id );
+		$token     = sanitize_text_field( (string) $token );
+		if ( ! $user_id || ! $lesson_id || ! CLMS_Helper::user_can_access_lesson( $user_id, $lesson_id ) ) {
+			return new WP_Error( 'clms_quiz_forbidden', __( 'No tienes acceso a esta evaluación.', 'atora-lms' ), array( 'status' => 403 ) );
+		}
+		$date_check = $this->validate_availability_window( $lesson_id );
+		if ( true !== $date_check ) {
+			return new WP_Error( 'clms_quiz_unavailable', $date_check, array( 'status' => 409 ) );
+		}
+		$time_check = $this->validate_time_limit( $user_id, $lesson_id );
+		if ( is_wp_error( $time_check ) ) {
+			return $time_check;
+		}
+		$questions = $this->get_questions_by_token( $user_id, $lesson_id, $token );
+		if ( empty( $questions ) ) {
+			return new WP_Error( 'clms_quiz_token_expired', __( 'La evaluación venció. Vuelve a abrirla para continuar.', 'atora-lms' ), array( 'status' => 409 ) );
+		}
+		$attempt = $this->get_quiz_attempt( $user_id, $lesson_id );
+		if ( ! $this->can_retry_quiz( $lesson_id, $attempt ) ) {
+			return new WP_Error( 'clms_quiz_attempts_exceeded', __( 'Ya no tienes más intentos disponibles.', 'atora-lms' ), array( 'status' => 409 ) );
+		}
+		if ( $this->is_submission_locked( $user_id, $lesson_id ) ) {
+			return new WP_Error( 'clms_quiz_submission_locked', __( 'Tu evaluación ya se está procesando.', 'atora-lms' ), array( 'status' => 429 ) );
+		}
+		$this->lock_submission( $user_id, $lesson_id );
+		$clean_answers = $this->sanitize_quiz_answers( $questions, is_array( $answers ) ? $answers : array() );
+		if ( is_wp_error( $clean_answers ) ) {
+			$this->unlock_submission( $user_id, $lesson_id );
+			return $clean_answers;
+		}
+		$result = $this->grade_quiz( $lesson_id, $questions, $clean_answers );
+		$stored = $this->store_result( $user_id, $lesson_id, $result );
+		$this->unlock_submission( $user_id, $lesson_id );
+		delete_transient( $this->get_timer_start_key( $user_id, $lesson_id ) );
+		do_action( 'clms_quiz_submitted', $user_id, $lesson_id, array(
+			'score' => $stored['score'] ?? 0, 'best_score' => $stored['best_score'] ?? 0,
+			'latest_score' => $stored['last_score'] ?? 0, 'attempts' => $stored['attempts'] ?? 1,
+			'answers' => $stored['answers'] ?? array(),
+		) );
+		$this->mark_lesson_completed_for_user( $user_id, $lesson_id );
+		return array(
+			'score'           => absint( $stored['last_score'] ?? 0 ),
+			'best_score'      => absint( $stored['best_score'] ?? 0 ),
+			'attempt'         => absint( $stored['attempts'] ?? 1 ),
+			'student_message' => sanitize_textarea_field( (string) ( $stored['performance_message'] ?? '' ) ),
+			'can_retry'       => $this->can_retry_quiz( $lesson_id, $stored ),
+		);
+	}
+
 	public function grade_quiz_rest( $user_id, $lesson_id, $answers ) {
 		$user_id   = absint( $user_id );
 		$lesson_id = absint( $lesson_id );

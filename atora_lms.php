@@ -3,7 +3,7 @@
  * Plugin Name:       ATORA LMS
  * Plugin URI:        https://atora.studio
  * Description:       LMS modular para WordPress con IA, evaluaciones, certificados, CRM, mensajería multi-canal, afiliados, live streaming y más. Autor: Atora Studio. Creado por Atmósfera Creativa.
- * Version:           6.22.0
+ * Version:           6.26.0
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Atora Studio
@@ -52,7 +52,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * - Limpieza automática de notificaciones >90 días
  */
 if ( ! defined( 'ATORA_LMS_VERSION' ) ) {
-	define( 'ATORA_LMS_VERSION', '6.22.0' );
+	define( 'ATORA_LMS_VERSION', '6.26.0' );
 }
 
 if ( ! defined( 'ATORA_LMS_FILE' ) ) {
@@ -1129,6 +1129,13 @@ add_action( 'init', static function () {
 		atora_lms_require_module( 'modules/lms/' . $lms_file );
 	}
 	add_action( 'rest_api_init', array( 'ATORA\\LMS\\LMS_REST_Controller', 'register_routes' ) );
+
+	// ── Mobile API v1: tokens opacos y experiencia estudiantil ───────────────
+	atora_lms_require_module( 'includes/mobile/class-mobile-token-service.php' );
+	atora_lms_require_module( 'includes/mobile/class-mobile-rest-controller.php' );
+	if ( class_exists( 'ATORA_Mobile_REST_Controller' ) ) {
+		add_action( 'rest_api_init', array( 'ATORA_Mobile_REST_Controller', 'register_routes' ) );
+	}
 	// Sincronizar CPT con tablas propias al publicar/actualizar
 	add_action( 'save_post_lm_course', function( int $post_id ) {
 		if ( wp_is_post_autosave( $post_id ) || wp_is_post_revision( $post_id ) ) { return; }

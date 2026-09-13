@@ -1014,6 +1014,20 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 			}
 		}
 
+		// ── Integraciones — solo admin ────────────────────────────────────────
+		// Consolida accesos a integraciones del sistema (Google, Classroom,
+		// Microsoft, etc.) en un hub único.
+		if ( current_user_can( $settings_cap ) ) {
+			add_submenu_page(
+				'clms-dashboard',
+				__( 'Integraciones', 'atora-lms' ),
+				__( '🔌 Integraciones', 'atora-lms' ),
+				$settings_cap,
+				'atora-integrations-hub',
+				array( $this, 'render_integrations_hub_page' )
+			);
+		}
+
 		// ── Analytics (oculta, PT-4.4.3) — reubicada bajo el hub "Informes",
 		// si 'analytics' está activo. Fuera del if ($settings_cap) porque
 		// Informes es legible por cualquiera con 'read', no solo admins ────
@@ -1122,13 +1136,90 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 			'edit.php?post_type=clms_rubric',
 			'atora-analytics',
 			'atora-live-streaming',
+			// Entradas reubicadas al Panel ATORA (tarjetas + acceso rápido).
+			'atora-early-warning',
+			'atora-learning-analytics',
+			'atora-groups',
+			'clms-peer-review-reports',
+			'atora-portfolios',
+			// Templates se operan desde tarjetas/hubs, no como item fijo del sidebar.
+			'clms-template-parts',
+			// Integraciones se consolidan bajo el hub "Integraciones".
+			'atora-google',
+			'atora-classroom',
 			);
 
 		foreach ( $hidden_submenus as $submenu_slug ) {
 			remove_submenu_page( 'clms-dashboard', $submenu_slug );
 		}
 
+		// Icono para "Presets de rúbrica" (CPT) — WordPress no muestra iconos
+		// en submenús por defecto, así que se antepone un emoji al label.
+		global $submenu;
+		$dashboard_items = isset( $submenu['clms-dashboard'] ) && is_array( $submenu['clms-dashboard'] )
+			? (array) $submenu['clms-dashboard']
+			: array();
+		if ( $dashboard_items ) {
+			foreach ( $dashboard_items as $i => $item ) {
+				$slug = isset( $item[2] ) ? (string) $item[2] : '';
+				if ( 'edit.php?post_type=clms_rubric_preset' === $slug ) {
+					$submenu['clms-dashboard'][ $i ][0] = __( '🧩 Presets de rúbrica', 'atora-lms' );
+					break;
+				}
+			}
+		}
+
 		$this->prioritize_dashboard_root_submenu();
+	}
+
+	/**
+	 * Hub de Integraciones: catálogo central de integraciones del sistema.
+	 */
+	public function render_integrations_hub_page(): void {
+		if ( ! current_user_can( 'clms_access_admin' ) && ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'No tienes permisos.', 'atora-lms' ) );
+		}
+
+		$links = array();
+		if ( class_exists( '\ATORA\Google\Google_Module' ) ) {
+			$links[] = $this->build_nav_item(
+				__( '🔗 Google', 'atora-lms' ),
+				__( 'OAuth, Calendar/Meet/Drive y scopes de la instalación.', 'atora-lms' ),
+				admin_url( 'admin.php?page=atora-google' )
+			);
+		}
+
+		if ( class_exists( '\ATORA\Classroom\Classroom_Module' ) ) {
+			$links[] = $this->build_nav_item(
+				__( '🏫 Google Classroom', 'atora-lms' ),
+				__( 'Mapeo de cursos, roster sync e importación de coursework.', 'atora-lms' ),
+				admin_url( 'admin.php?page=atora-classroom' )
+			);
+		}
+
+		if ( class_exists( '\ATORA\Microsoft\Microsoft_Module' ) ) {
+			$links[] = $this->build_nav_item(
+				__( '🪟 Microsoft', 'atora-lms' ),
+				__( 'SSO (Entra), Teams (webhook) y utilidades de Outlook.', 'atora-lms' ),
+				admin_url( 'admin.php?page=clms-settings' )
+			);
+		}
+
+		// Live streaming (Zoom/Meet/Teams) se opera por lección; se enlaza al hub de comunicación.
+		if ( class_exists( '\ATORA\LiveStreaming\Live_Streaming' ) ) {
+			$links[] = $this->build_nav_item(
+				__( '🎥 Zoom / Meet / Teams', 'atora-lms' ),
+				__( 'Clases en vivo y sesiones: configuración por lección + asistencia y recordatorios.', 'atora-lms' ),
+				admin_url( 'admin.php?page=atora-communication-hub' )
+			);
+		}
+
+		$this->render_simple_hub_page(
+			__( 'Integraciones', 'atora-lms' ),
+			__( 'Integraciones', 'atora-lms' ),
+			__( 'Centraliza integraciones externas como Google, Classroom y Microsoft.', 'atora-lms' ),
+			$links
+		);
 	}
 
 	/**

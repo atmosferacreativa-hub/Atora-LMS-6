@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 6.22.0
+Stable tag: 6.26.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,21 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+
+= 6.26.0 =
+* Integración institucional: Gradebook institucional + SpeedGrader 2 (moderación) + Biblioteca académica + Credenciales verificables con QR local.
+* Mobile API v1: autenticación con tokens opacos, endpoints estudiantiles, y compatibilidad canónica de matrículas legacy/tablas (incluye `active` y `completed`, deduplicación y autorización centralizada).
+
+= 6.25.0 =
+* Added the institutional credential engine with immutable snapshots and public verification.
+* Added local QR generation without third-party data disclosure.
+* Added two-person revocation, irreversible revocation, replacement credentials, and tamper-evident audit events.
+= 6.24.0 =
+* Biblioteca académica MVP: recursos con identidad estable, versiones inmutables y checksum SHA-256, flujo borrador/revisión/publicación/archivo y bitácora completa.
+* Los recursos pueden vincularse con competencias y actividades de evidencia validadas contra su curso; API administrativa aislada bajo `/clms/v1/library`.
+= 6.23.0 =
+* SpeedGrader 2: flujo institucional de doble revisión con propuesta docente, aprobación o devolución por autoridad distinta, rúbricas y notas moderadas, bloqueo de cierre con moderaciones pendientes y auditoría en el Gradebook.
+* Los cursos sin ciclo institucional activo conservan el flujo de publicación existente.
 = 6.22.0 =
 * Gradebook institucional: períodos académicos, escalas versionadas, ciclos de revisión/publicación/cierre, notas oficiales con control de concurrencia, snapshots verificables y rectificaciones con separación de funciones.
 * Nueva API administrativa aislada bajo `/clms/v1/gradebook/institutional`; el Gradebook existente por curso conserva su comportamiento.

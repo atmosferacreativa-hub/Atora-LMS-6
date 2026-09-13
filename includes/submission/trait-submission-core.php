@@ -12,10 +12,11 @@ trait CLMS_Submission_Core_Trait {
 				'labels' => array(
 					'name'          => 'Entregas',
 					'singular_name' => 'Entrega',
+					'menu_name'     => '🟦 Entregas',
 				),
 				'public'             => false,
 				'show_ui'            => true,
-				'show_in_menu'       => true,
+				'show_in_menu'       => 'clms-dashboard',
 				'show_in_rest'       => false,
 				'supports'           => array( 'title', 'author' ),
 				'capability_type'    => array( 'clms_submission', 'clms_submissions' ),

@@ -930,7 +930,147 @@ trait CLMS_Admin_Menu_Widgets_And_Hubs_Trait {
 				'button'      => __( 'Ir a Mensajes', 'atora-lms' ),
 			),
 		);
-		$quick_links = $this->get_hub_quick_links( $role_context, 12 );
+
+		$can_edit_posts   = current_user_can( 'edit_posts' ) || current_user_can( 'manage_options' );
+		$can_manage_courses = method_exists( $this, 'can_manage_courses' ) ? (bool) $this->can_manage_courses() : current_user_can( 'manage_options' );
+
+		$extra_panel_cards = array();
+		if ( $can_edit_posts && class_exists( '\ATORA\EarlyWarning\Early_Warning_Module' ) ) {
+			$extra_panel_cards[] = array(
+				'variant'     => 'amber',
+				'icon'        => '🚨',
+				'title'       => __( 'Alertas tempranas', 'atora-lms' ),
+				'description' => __( 'Detecta entregas perdidas y señales de riesgo por estudiante/curso.', 'atora-lms' ),
+				'features'    => array(
+					__( 'Escaneo manual y export CSV.', 'atora-lms' ),
+					__( 'Flujo MVP por curso.', 'atora-lms' ),
+				),
+				'url'         => admin_url( 'admin.php?page=atora-early-warning' ),
+				'button'      => __( 'Abrir alertas', 'atora-lms' ),
+			);
+		}
+		if ( $can_edit_posts && class_exists( '\ATORA\LearningAnalytics\Learning_Analytics_Module' ) ) {
+			$extra_panel_cards[] = array(
+				'variant'     => 'slate',
+				'icon'        => '📊',
+				'title'       => __( 'Analíticas de riesgo', 'atora-lms' ),
+				'description' => __( 'Scoring por progreso, pendientes, notas, inactividad y engagement.', 'atora-lms' ),
+				'features'    => array(
+					__( 'Filtros por curso, cohorte o docente.', 'atora-lms' ),
+					__( 'Export CSV/JSON.', 'atora-lms' ),
+				),
+				'url'         => admin_url( 'admin.php?page=atora-learning-analytics' ),
+				'button'      => __( 'Ver analítica', 'atora-lms' ),
+			);
+		}
+		if ( $can_manage_courses ) {
+			$extra_panel_cards[] = array(
+				'variant'     => 'blue',
+				'icon'        => '📚',
+				'title'       => __( 'Cursos', 'atora-lms' ),
+				'description' => __( 'Gestiona la oferta formativa: creación, edición y publicación.', 'atora-lms' ),
+				'features'    => array(
+					__( 'Listado de cursos (CPT).', 'atora-lms' ),
+					__( 'Acceso directo a edición.', 'atora-lms' ),
+				),
+				'url'         => admin_url( 'edit.php?post_type=lm_course' ),
+				'button'      => __( 'Abrir cursos', 'atora-lms' ),
+			);
+		}
+		if ( $can_edit_posts && class_exists( '\ATORA\Groups\Groups_Module' ) ) {
+			$extra_panel_cards[] = array(
+				'variant'     => 'indigo',
+				'icon'        => '👥',
+				'title'       => __( 'Grupos', 'atora-lms' ),
+				'description' => __( 'Organiza estudiantes por curso para actividades grupales y evaluación.', 'atora-lms' ),
+				'features'    => array(
+					__( 'Gestión por course_id.', 'atora-lms' ),
+					__( 'Export CSV (grupal + individual).', 'atora-lms' ),
+				),
+				'url'         => admin_url( 'admin.php?page=atora-groups' ),
+				'button'      => __( 'Administrar grupos', 'atora-lms' ),
+			);
+		}
+		if ( $can_edit_posts && class_exists( 'CLMS_Peer_Review' ) ) {
+			$extra_panel_cards[] = array(
+				'variant'     => 'teal',
+				'icon'        => '🤝',
+				'title'       => __( 'Coevaluación', 'atora-lms' ),
+				'description' => __( 'Reporte operativo de peer review: calibración, consistencia y auditoría.', 'atora-lms' ),
+				'features'    => array(
+					__( 'Enfoque por lesson_id.', 'atora-lms' ),
+					__( 'Export CSV.', 'atora-lms' ),
+				),
+				'url'         => admin_url( 'admin.php?page=clms-peer-review-reports' ),
+				'button'      => __( 'Abrir reportes', 'atora-lms' ),
+			);
+		}
+		if ( $can_edit_posts && class_exists( '\ATORA\Portfolios\Portfolios_Module' ) ) {
+			$extra_panel_cards[] = array(
+				'variant'     => 'slate',
+				'icon'        => '🗂️',
+				'title'       => __( 'Portafolios', 'atora-lms' ),
+				'description' => __( 'Evidencias, reflexión y feedback por estudiante/curso.', 'atora-lms' ),
+				'features'    => array(
+					__( 'Detalle por course_id.', 'atora-lms' ),
+					__( 'Export ZIP (MVP).', 'atora-lms' ),
+				),
+				'url'         => admin_url( 'admin.php?page=atora-portfolios' ),
+				'button'      => __( 'Ver portafolios', 'atora-lms' ),
+			);
+		}
+
+		$panel_cards = array_merge( $panel_cards, $extra_panel_cards );
+
+		$priority_quick_links = array();
+		if ( $can_edit_posts && class_exists( '\ATORA\EarlyWarning\Early_Warning_Module' ) ) {
+			$priority_quick_links[] = array(
+				'title'       => __( 'Alertas tempranas', 'atora-lms' ),
+				'description' => __( 'Entregas perdidas y señales de riesgo por curso.', 'atora-lms' ),
+				'url'         => admin_url( 'admin.php?page=atora-early-warning' ),
+			);
+		}
+		if ( $can_edit_posts && class_exists( '\ATORA\LearningAnalytics\Learning_Analytics_Module' ) ) {
+			$priority_quick_links[] = array(
+				'title'       => __( 'Analíticas de riesgo', 'atora-lms' ),
+				'description' => __( 'Scoring académico y exportes por filtros.', 'atora-lms' ),
+				'url'         => admin_url( 'admin.php?page=atora-learning-analytics' ),
+			);
+		}
+		if ( $can_manage_courses ) {
+			$priority_quick_links[] = array(
+				'title'       => __( 'Cursos', 'atora-lms' ),
+				'description' => __( 'Abrir listado y edición de cursos.', 'atora-lms' ),
+				'url'         => admin_url( 'edit.php?post_type=lm_course' ),
+			);
+		}
+		if ( $can_edit_posts && class_exists( '\ATORA\Groups\Groups_Module' ) ) {
+			$priority_quick_links[] = array(
+				'title'       => __( 'Grupos', 'atora-lms' ),
+				'description' => __( 'Gestiona grupos por curso.', 'atora-lms' ),
+				'url'         => admin_url( 'admin.php?page=atora-groups' ),
+			);
+		}
+		if ( $can_edit_posts && class_exists( 'CLMS_Peer_Review' ) ) {
+			$priority_quick_links[] = array(
+				'title'       => __( 'Coevaluación', 'atora-lms' ),
+				'description' => __( 'Reportes de peer review por lección.', 'atora-lms' ),
+				'url'         => admin_url( 'admin.php?page=clms-peer-review-reports' ),
+			);
+		}
+		if ( $can_edit_posts && class_exists( '\ATORA\Portfolios\Portfolios_Module' ) ) {
+			$priority_quick_links[] = array(
+				'title'       => __( 'Portafolios', 'atora-lms' ),
+				'description' => __( 'Evidencias y feedback por curso.', 'atora-lms' ),
+				'url'         => admin_url( 'admin.php?page=atora-portfolios' ),
+			);
+		}
+
+		$quick_links = $this->unique_hub_items_by_url(
+			array_merge( $priority_quick_links, $this->get_hub_quick_links( $role_context, 36 ) ),
+			18,
+			true
+		);
 		?>
 		<div class="wrap atora-hub">
 			<div class="atora-hub__header">
