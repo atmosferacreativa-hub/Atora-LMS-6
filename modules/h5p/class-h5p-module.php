@@ -24,11 +24,45 @@ final class H5P_Module {
 		$content_manager = new H5P_Content_Manager();
 		add_action( 'init', array( $content_manager, 'maybe_register_cpt' ), 5 );
 
+		if ( is_admin() ) {
+			add_action( 'admin_menu', array( __CLASS__, 'rename_admin_menu_label' ), 999 );
+		}
+
 		add_shortcode( 'atora_h5p', array( __CLASS__, 'shortcode' ) );
 		add_filter( 'the_content', array( __CLASS__, 'inject_into_lesson_content' ), 12 );
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'maybe_enqueue_front_assets' ) );
 
 		add_action( 'rest_api_init', array( __CLASS__, 'register_rest' ) );
+	}
+
+	/**
+	 * Renombra el item del menú lateral del CPT `h5p_content` a "Interactivo H5P".
+	 *
+	 * Esto cubre el caso donde el CPT ya existe (p.ej. plugin H5P externo),
+	 * y por tanto ATORA no lo registra y no puede inyectar labels.
+	 *
+	 * @return void
+	 */
+	public static function rename_admin_menu_label(): void {
+		global $menu, $submenu;
+
+		$target_slug = 'edit.php?post_type=h5p_content';
+
+		foreach ( (array) $menu as $i => $item ) {
+			if ( isset( $item[2] ) && $target_slug === (string) $item[2] ) {
+				$menu[ $i ][0] = __( 'Interactivo H5P', 'atora-lms' );
+				break;
+			}
+		}
+
+		if ( isset( $submenu[ $target_slug ] ) && is_array( $submenu[ $target_slug ] ) ) {
+			foreach ( $submenu[ $target_slug ] as $j => $item ) {
+				if ( isset( $item[0] ) && is_string( $item[0] ) && '' !== $item[0] ) {
+					$submenu[ $target_slug ][ $j ][0] = __( 'Interactivo H5P', 'atora-lms' );
+					break;
+				}
+			}
+		}
 	}
 
 	private static function get_lesson_h5p_config( int $lesson_id ): array {

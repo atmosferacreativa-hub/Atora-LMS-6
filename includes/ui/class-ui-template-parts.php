@@ -40,6 +40,7 @@ class CLMS_UI_Template_Parts {
 		add_action( 'add_meta_boxes', array( $this, 'add_meta_boxes' ) );
 		add_action( 'save_post_' . self::POST_TYPE, array( $this, 'save_template_part' ), 10, 3 );
 		add_action( 'admin_menu', array( $this, 'register_admin_page' ), 30 );
+		add_action( 'admin_menu', array( $this, 'reorder_admin_menu_under_settings' ), 999 );
 		add_action( 'admin_post_clms_create_template_part', array( $this, 'handle_create_template_part' ) );
 		add_action( 'admin_post_clms_activate_template_part', array( $this, 'handle_activate_template_part' ) );
 		add_action( 'admin_notices', array( $this, 'render_admin_notice' ) );
@@ -363,6 +364,63 @@ class CLMS_UI_Template_Parts {
 			'clms-template-parts',
 			array( $this, 'render_admin_page' )
 		);
+	}
+
+	/**
+	 * Reubica "Templates H/F" cerca de "Ajustes" en el menú lateral de ATORA.
+	 *
+	 * Mantiene el mismo slug (`clms-template-parts`) y parent (`clms-dashboard`),
+	 * pero reordena el item para que quede inmediatamente después de
+	 * `clms-settings-hub`.
+	 *
+	 * @return void
+	 */
+	public function reorder_admin_menu_under_settings(): void {
+		if ( ! is_admin() ) {
+			return;
+		}
+
+		global $submenu;
+
+		if ( empty( $submenu['clms-dashboard'] ) || ! is_array( $submenu['clms-dashboard'] ) ) {
+			return;
+		}
+
+		$items = (array) $submenu['clms-dashboard'];
+
+		$template_index = null;
+		$settings_index = null;
+		foreach ( $items as $i => $item ) {
+			$slug = isset( $item[2] ) ? (string) $item[2] : '';
+			if ( 'clms-template-parts' === $slug ) {
+				$template_index = $i;
+			} elseif ( 'clms-settings-hub' === $slug ) {
+				$settings_index = $i;
+			}
+		}
+
+		if ( null === $template_index || null === $settings_index ) {
+			return;
+		}
+
+		$template_item = $items[ $template_index ];
+		unset( $items[ $template_index ] );
+
+		$items = array_values( $items );
+
+		$settings_index = null;
+		foreach ( $items as $i => $item ) {
+			if ( isset( $item[2] ) && 'clms-settings-hub' === (string) $item[2] ) {
+				$settings_index = $i;
+				break;
+			}
+		}
+		if ( null === $settings_index ) {
+			return;
+		}
+
+		array_splice( $items, $settings_index + 1, 0, array( $template_item ) );
+		$submenu['clms-dashboard'] = $items;
 	}
 
 	public function render_admin_page(): void {
