@@ -354,10 +354,10 @@ final class ATORA_Mobile_REST_Controller {
 			$candidates[] = $video_url;
 		}
 
-		$decoded_content = html_entity_decode( $raw_content, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
-		if ( preg_match_all( '~https?://(?:drive|docs)\\.google\\.com/[^"<>\\s]+~i', $decoded_content, $matches ) ) {
-			$candidates = array_merge( $candidates, (array) $matches[0] );
-		}
+			$decoded_content = html_entity_decode( $raw_content, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+			if ( preg_match_all( '#https?://(?:drive|docs)\\.google\\.com/[^"\'<>\\s]+#i', $decoded_content, $matches ) ) {
+				$candidates = array_merge( $candidates, (array) $matches[0] );
+			}
 
 		foreach ( $candidates as $candidate ) {
 			$url   = esc_url_raw( trim( (string) $candidate ) );
