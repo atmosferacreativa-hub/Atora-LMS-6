@@ -336,9 +336,9 @@ final class ATORA_Mobile_REST_Controller {
 			$candidates[] = $video_url;
 		}
 
-		if ( preg_match_all( '#https?://(?:drive|docs)\\.google\\.com/[^"\\'<>\\s]+#i', html_entity_decode( $raw_content, ENT_QUOTES | ENT_HTML5, 'UTF-8' ), $matches ) ) {
-			$candidates = array_merge( $candidates, (array) $matches[0] );
-		}
+			if ( preg_match_all( '#https?://(?:drive|docs)\\.google\\.com/[^"\'<>\\s]+#i', html_entity_decode( $raw_content, ENT_QUOTES | ENT_HTML5, 'UTF-8' ), $matches ) ) {
+				$candidates = array_merge( $candidates, (array) $matches[0] );
+			}
 
 		foreach ( $candidates as $candidate ) {
 			$url   = esc_url_raw( trim( (string) $candidate ) );
