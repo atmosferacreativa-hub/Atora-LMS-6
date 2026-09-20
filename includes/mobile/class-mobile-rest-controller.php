@@ -245,18 +245,32 @@ final class ATORA_Mobile_REST_Controller {
 		$content_html = wp_kses_post( apply_filters( 'the_content', $raw_content ) );
 		$video_url    = esc_url_raw( (string) ( $lesson['video_url'] ?? '' ) );
 
-		// Compatibilidad con las claves usadas por el editor de lecciones.
-		if ( $wp_post_id > 0 && '' === $video_url ) {
-			$extra_videos = get_post_meta( $wp_post_id, '_clms_lesson_extra_videos', true );
-			if ( is_array( $extra_videos ) ) {
-				foreach ( $extra_videos as $extra_video ) {
-					$candidate = is_array( $extra_video ) ? esc_url_raw( (string) ( $extra_video['url'] ?? '' ) ) : '';
-					if ( '' !== $candidate ) {
-						$video_url = $candidate;
-						break;
+			// Compatibilidad con las claves usadas por el editor de lecciones.
+			if ( $wp_post_id > 0 && '' === $video_url ) {
+				$extra_videos = get_post_meta( $wp_post_id, '_clms_lesson_extra_videos', true );
+				if ( is_string( $extra_videos ) && '' !== trim( $extra_videos ) ) {
+					$decoded = json_decode( $extra_videos, true );
+					if ( is_array( $decoded ) ) {
+						$extra_videos = $decoded;
+					} elseif ( function_exists( 'maybe_unserialize' ) ) {
+						$extra_videos = maybe_unserialize( $extra_videos );
 					}
 				}
-			}
+				if ( is_array( $extra_videos ) ) {
+					foreach ( $extra_videos as $extra_video ) {
+						$candidate = '';
+						if ( is_array( $extra_video ) ) {
+							$candidate = (string) ( $extra_video['url'] ?? $extra_video['src'] ?? '' );
+						} elseif ( is_string( $extra_video ) ) {
+							$candidate = $extra_video;
+						}
+						$candidate = esc_url_raw( trim( $candidate ) );
+						if ( '' !== $candidate ) {
+							$video_url = $candidate;
+							break;
+						}
+					}
+				}
 			if ( '' === $video_url ) {
 				$video_url = esc_url_raw( (string) get_post_meta( $wp_post_id, '_clms_lesson_video_url', true ) );
 			}
@@ -347,25 +361,29 @@ final class ATORA_Mobile_REST_Controller {
 	 * Extrae y normaliza únicamente videos de Google Drive autorizados.
 	 * Nunca devuelve el iframe original ni acepta hosts arbitrarios.
 	 */
-	private static function google_drive_embed_url( string $video_url, string $raw_content ): string {
-		$candidates = array();
+		private static function google_drive_embed_url( string $video_url, string $raw_content ): string {
+			$candidates = array();
 
-		if ( '' !== $video_url ) {
-			$candidates[] = $video_url;
-		}
+			if ( '' !== $video_url ) {
+				$candidates[] = $video_url;
+			}
 
 			$decoded_content = html_entity_decode( $raw_content, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
-			if ( preg_match_all( '#https?://(?:drive|docs)\\.google\\.com/[^"\'<>\\s]+#i', $decoded_content, $matches ) ) {
+			if ( preg_match_all( '#(?:https?:)?//(?:drive|docs)\\.google\\.com/[^"\'<>\\s]+#i', $decoded_content, $matches ) ) {
 				$candidates = array_merge( $candidates, (array) $matches[0] );
 			}
 
-		foreach ( $candidates as $candidate ) {
-			$url   = esc_url_raw( trim( (string) $candidate ) );
-			$parts = wp_parse_url( $url );
-			$host  = strtolower( (string) ( $parts['host'] ?? '' ) );
-			if ( ! in_array( $host, array( 'drive.google.com', 'docs.google.com' ), true ) ) {
-				continue;
-		}
+			foreach ( $candidates as $candidate ) {
+				$url = esc_url_raw( trim( (string) $candidate ) );
+				if ( str_starts_with( $url, '//' ) ) {
+					$url = 'https:' . $url;
+				}
+				$parts = wp_parse_url( $url );
+				$host  = strtolower( (string) ( $parts['host'] ?? '' ) );
+				$host  = preg_replace( '/^www\\./', '', $host );
+				if ( ! in_array( $host, array( 'drive.google.com', 'docs.google.com' ), true ) ) {
+					continue;
+			}
 
 			$file_id = '';
 			$path    = (string) ( $parts['path'] ?? '' );
