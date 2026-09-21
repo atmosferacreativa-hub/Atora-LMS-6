@@ -398,6 +398,11 @@ jobs:
             || svn export --force "https://develop.svn.wordpress.org/tags/${WP_VERSION}.0/tests/phpunit/" "${WP_TESTS_DIR}" \
             || svn export --force "https://develop.svn.wordpress.org/trunk/tests/phpunit/" "${WP_TESTS_DIR}"
 
+          # wp-tests-config-sample.php vive en la raíz del repo de desarrollo, no dentro de tests/phpunit/.
+          svn export --force "https://develop.svn.wordpress.org/tags/${WP_VERSION}/wp-tests-config-sample.php" "${WP_TESTS_DIR}/wp-tests-config-sample.php" \
+            || svn export --force "https://develop.svn.wordpress.org/tags/${WP_VERSION}.0/wp-tests-config-sample.php" "${WP_TESTS_DIR}/wp-tests-config-sample.php" \
+            || svn export --force "https://develop.svn.wordpress.org/trunk/wp-tests-config-sample.php" "${WP_TESTS_DIR}/wp-tests-config-sample.php"
+
           cp "${WP_TESTS_DIR}/wp-tests-config-sample.php" "${WP_TESTS_DIR}/wp-tests-config.php"
 
           sed -i \
