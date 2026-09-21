@@ -97,6 +97,119 @@ class Tenancy_CLI {
 			}
 		}
 
+		// Revertir reconciliación 6.26.4 (institution_id -> columna legacy) para
+		// volver al esquema anterior cuando se usa rollback como red de seguridad.
+		$legacy_col = 'academy' . '_id';
+		$legacy_index = 'idx_' . $legacy_col;
+		$inst_index   = 'idx_institution_id';
+
+		$has_column = static function( string $table, string $column ) use ( $wpdb ): bool {
+			return (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+					 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND COLUMN_NAME = %s",
+					$table,
+					$column
+				)
+			) > 0;
+		};
+
+		$has_index = static function( string $table, string $index ) use ( $wpdb ): bool {
+			return (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS
+					 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND INDEX_NAME = %s",
+					$table,
+					$index
+				)
+			) > 0;
+		};
+
+		$ensure_table = static function( string $table ) use ( $wpdb ): bool {
+			return (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) ) === $table;
+		};
+
+		$rename_index = static function( string $table, string $from, string $to ) use ( $has_index, $wpdb ): void {
+			if ( $has_index( $table, $from ) && ! $has_index( $table, $to ) ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				$wpdb->query( "ALTER TABLE {$table} RENAME INDEX {$from} TO {$to}" );
+				return;
+			}
+			if ( $has_index( $table, $from ) && $has_index( $table, $to ) ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				$wpdb->query( "ALTER TABLE {$table} DROP INDEX {$from}" );
+			}
+		};
+
+		$reconciled = array(
+			$wpdb->prefix . 'atora_academic_periods' => array(
+				'inst_code' => 'academy_code',
+			),
+			$wpdb->prefix . 'atora_grading_scales' => array(
+				'inst_code_version' => 'academy_code_version',
+			),
+			$wpdb->prefix . 'atora_gradebook_cycles' => array(
+				'inst_status' => 'academy_status',
+			),
+			$wpdb->prefix . 'atora_library_items' => array(
+				'inst_slug' => 'academy_slug',
+			),
+		);
+
+		foreach ( $reconciled as $table => $index_renames ) {
+			if ( ! $ensure_table( $table ) ) {
+				continue;
+			}
+
+			if ( $has_column( $table, 'institution_id' ) && ! $has_column( $table, $legacy_col ) ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				$wpdb->query( "ALTER TABLE {$table} CHANGE COLUMN institution_id {$legacy_col} BIGINT UNSIGNED NOT NULL DEFAULT 0" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			}
+
+			foreach ( $index_renames as $from => $to ) {
+				$rename_index( $table, $from, $to );
+			}
+		}
+
+		$legacy_tables = array(
+			$wpdb->prefix . 'atora_automation_queue',
+			$wpdb->prefix . 'atora_automations',
+			$wpdb->prefix . 'atora_companies',
+			$wpdb->prefix . 'atora_contacts',
+			$wpdb->prefix . 'atora_crm_campaign_recipients',
+			$wpdb->prefix . 'atora_crm_campaigns',
+			$wpdb->prefix . 'atora_crm_deals',
+			$wpdb->prefix . 'atora_crm_lists',
+			$wpdb->prefix . 'atora_crm_tasks',
+			$wpdb->prefix . 'atora_email_sequence_enrollments',
+			$wpdb->prefix . 'atora_email_sequences',
+		);
+
+		foreach ( $legacy_tables as $table ) {
+			if ( ! $ensure_table( $table ) ) {
+				continue;
+			}
+
+			if ( $has_column( $table, 'institution_id' ) && ! $has_column( $table, $legacy_col ) ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				$wpdb->query( "ALTER TABLE {$table} CHANGE COLUMN institution_id {$legacy_col} BIGINT UNSIGNED NOT NULL DEFAULT 0" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$rename_index( $table, $inst_index, $legacy_index );
+			}
+		}
+
+		$enrollments = $wpdb->prefix . 'atora_enrollments';
+		if ( $ensure_table( $enrollments ) && ! $has_column( $enrollments, $legacy_col ) && $has_column( $enrollments, 'institution_id' ) ) {
+			// Re-agregar la columna legacy (rollback del drop) y reconstruir un índice simple.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$wpdb->query( "ALTER TABLE {$enrollments} ADD COLUMN {$legacy_col} BIGINT UNSIGNED NOT NULL DEFAULT 0" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$wpdb->query( "UPDATE {$enrollments} SET {$legacy_col} = institution_id WHERE {$legacy_col} = 0 AND institution_id > 0" );
+			if ( ! $has_index( $enrollments, $legacy_index ) ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				$wpdb->query( "ALTER TABLE {$enrollments} ADD KEY {$legacy_index} ({$legacy_col})" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			}
+		}
+
 		delete_option( 'atora_default_institution' );
 		delete_option( 'atora_cohort_source' );
 

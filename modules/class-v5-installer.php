@@ -289,6 +289,55 @@ class V5_Installer {
 			}
 		}
 
+		// Tablas legacy que todavía cargan la columna legacy del inquilino
+		// (dbDelta nunca elimina columnas). 6.26.4 exige que no quede esa
+		// columna en el esquema.
+		$legacy_tables = array(
+			$wpdb->prefix . 'atora_automation_queue',
+			$wpdb->prefix . 'atora_automations',
+			$wpdb->prefix . 'atora_companies',
+			$wpdb->prefix . 'atora_contacts',
+			$wpdb->prefix . 'atora_crm_campaign_recipients',
+			$wpdb->prefix . 'atora_crm_campaigns',
+			$wpdb->prefix . 'atora_crm_deals',
+			$wpdb->prefix . 'atora_crm_lists',
+			$wpdb->prefix . 'atora_crm_tasks',
+			$wpdb->prefix . 'atora_email_sequence_enrollments',
+			$wpdb->prefix . 'atora_email_sequences',
+		);
+
+		$legacy_index = 'idx_' . $legacy_column;
+		$inst_index   = 'idx_institution_id';
+
+		foreach ( $legacy_tables as $table ) {
+			if ( ! $ensure_table( $table ) ) {
+				continue;
+			}
+
+			if ( $has_column( $table, $legacy_column ) && ! $has_column( $table, 'institution_id' ) ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				$wpdb->query( "ALTER TABLE {$table} CHANGE COLUMN {$legacy_column} institution_id BIGINT UNSIGNED NOT NULL DEFAULT 0" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$rename_index( $table, $legacy_index, $inst_index );
+			}
+		}
+
+		// Tabla de matrículas: ya tiene institution_id canónico (X-01). Si queda
+		// la columna legacy, eliminarla.
+		$enrollments = $wpdb->prefix . 'atora_enrollments';
+		if ( $ensure_table( $enrollments ) && $has_column( $enrollments, $legacy_column ) && $has_column( $enrollments, 'institution_id' ) ) {
+			// Backfill conservador por si quedaron filas legacy en 0.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$wpdb->query( "UPDATE {$enrollments} SET institution_id = {$legacy_column} WHERE institution_id = 0 AND {$legacy_column} > 0" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+			if ( $has_index( $enrollments, $legacy_index ) ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				$wpdb->query( "ALTER TABLE {$enrollments} DROP INDEX {$legacy_index}" );
+			}
+
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$wpdb->query( "ALTER TABLE {$enrollments} DROP COLUMN {$legacy_column}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		}
+
 		return true;
 	}
 
