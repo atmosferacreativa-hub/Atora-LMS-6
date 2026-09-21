@@ -708,6 +708,21 @@ class CLMS_Rubric {
 		$criteria = $this->sanitize_criteria( $raw );
 
 		update_post_meta( $post_id, self::META_CRITERIA, $criteria );
+
+		// 6.26.5: espejo en tablas con versionado inmutable (sin borrar postmeta).
+		if ( class_exists( '\ATORA\LMS\Rubric_Service' ) ) {
+			$rubric_data = array(
+				'title'       => (string) get_the_title( $post_id ),
+				'slug'        => sanitize_title( (string) get_post_field( 'post_name', $post_id ) ),
+				'scale_type'  => $scale_type,
+				'scale_code'  => '',
+				'is_holistic' => '1' === (string) $is_holistic ? 1 : 0,
+				'scope'       => 'institution',
+				'owner_id'    => absint( (int) get_post_field( 'post_author', $post_id ) ),
+				'status'      => 'active',
+			);
+			\ATORA\LMS\Rubric_Service::create_revision( $post_id, $rubric_data, $criteria );
+		}
 	}
 
 	protected function sanitize_criteria( $raw ) {
@@ -834,6 +849,14 @@ class CLMS_Rubric {
 			return array();
 		}
 
+		// Ruta preferida: tablas (6.26.5). Si aún no existe fila, caer a postmeta.
+		if ( class_exists( '\ATORA\LMS\Rubric_Service' ) ) {
+			$rubric = \ATORA\LMS\Rubric_Service::get( $rubric_id );
+			if ( is_array( $rubric ) && absint( $rubric['id'] ?? 0 ) > 0 ) {
+				return \ATORA\LMS\Rubric_Service::get_criteria( $rubric_id, absint( $rubric['revision'] ?? 1 ) );
+			}
+		}
+
 		$criteria = get_post_meta( $rubric_id, self::META_CRITERIA, true );
 		$criteria = is_array( $criteria ) ? $criteria : array();
 		$normalized = array();
@@ -857,6 +880,13 @@ class CLMS_Rubric {
 	 * @return int
 	 */
 	public static function get_total_points( $rubric_id ) {
+		if ( class_exists( '\ATORA\LMS\Rubric_Service' ) ) {
+			$r = \ATORA\LMS\Rubric_Service::get( absint( $rubric_id ) );
+			if ( is_array( $r ) && absint( $r['id'] ?? 0 ) > 0 ) {
+				return absint( $r['total_points'] ?? 0 );
+			}
+		}
+
 		$total = 0;
 		foreach ( self::get_criteria( $rubric_id ) as $c ) {
 			$total += isset( $c['max_points'] ) ? absint( $c['max_points'] ) : 0;

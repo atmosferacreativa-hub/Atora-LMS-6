@@ -373,6 +373,7 @@ final class ATORA_Mobile_REST_Controller {
 			'lesson' => array(
 				'id'           => $lesson_id,
 				'course_id'    => $course_id,
+				'revision'     => absint( $lesson['revision'] ?? 1 ),
 				'title'        => sanitize_text_field( (string) ( $lesson['title'] ?? '' ) ),
 				'type'         => sanitize_key( (string) ( $lesson['type'] ?? 'text' ) ),
 				'duration_min' => absint( $lesson['duration_min'] ?? 0 ),
@@ -910,6 +911,7 @@ final class ATORA_Mobile_REST_Controller {
 	private static function safe_course( array $course ): array {
 		return array(
 			'id'             => absint( $course['id'] ?? 0 ),
+			'revision'       => absint( $course['revision'] ?? 1 ),
 			'title'          => sanitize_text_field( (string) ( $course['title'] ?? '' ) ),
 			'excerpt'        => sanitize_textarea_field( (string) ( $course['excerpt'] ?? '' ) ),
 			'thumbnail_url'  => esc_url_raw( (string) ( $course['thumbnail_url'] ?? '' ) ),

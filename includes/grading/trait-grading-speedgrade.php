@@ -634,8 +634,7 @@ trait CLMS_Grading_SpeedGrade_Trait {
 		// Rubric: read per-criterion scores if available
 		$lesson_id      = absint( get_post_meta( $submission_id, '_clms_submission_lesson_id', true ) );
 		$rubric_id      = $lesson_id ? absint( get_post_meta( $lesson_id, '_clms_rubric_id', true ) ) : 0;
-		$rubric_snapshot = $rubric_id ? get_post_meta( $submission_id, '_clms_submission_rubric_snapshot', true ) : array();
-		$rubric_snapshot = is_array( $rubric_snapshot ) ? $rubric_snapshot : array();
+		$rubric_snapshot = array();
 		$rubric_scores  = array();
 		$grade_from_rubric = '';
 
@@ -644,6 +643,20 @@ trait CLMS_Grading_SpeedGrade_Trait {
 			$total_points = 0;
 			$scale_type = '';
 			$is_holistic = false;
+
+			$rubric_row = class_exists( '\ATORA\LMS\Rubric_Service' ) ? \ATORA\LMS\Rubric_Service::get( $rubric_id ) : null;
+			$rubric_revision = absint( is_array( $rubric_row ) ? ( $rubric_row['revision'] ?? 1 ) : 1 );
+
+			// Preferir snapshot inmutable desde tabla de evaluaciones.
+			if ( class_exists( '\ATORA\LMS\Rubric_Service' ) ) {
+				$existing_eval = \ATORA\LMS\Rubric_Service::get_evaluation( $submission_id );
+				if ( is_array( $existing_eval ) && absint( $existing_eval['rubric_id'] ?? 0 ) === $rubric_id ) {
+					$decoded = json_decode( (string) ( $existing_eval['snapshot_json'] ?? '' ), true );
+					if ( is_array( $decoded ) && isset( $decoded['rubric'] ) && is_array( $decoded['rubric'] ) ) {
+						$rubric_snapshot = (array) $decoded['rubric'];
+					}
+				}
+			}
 
 			$has_snapshot = ! empty( $rubric_snapshot['rubric_id'] )
 				&& $rubric_id === absint( $rubric_snapshot['rubric_id'] )
@@ -656,10 +669,12 @@ trait CLMS_Grading_SpeedGrade_Trait {
 				$scale_type   = sanitize_key( (string) ( $rubric_snapshot['scale_type'] ?? '' ) );
 				$is_holistic  = ! empty( $rubric_snapshot['is_holistic'] );
 			} else {
-				$criteria     = CLMS_Rubric::get_criteria( $rubric_id );
-				$total_points = absint( CLMS_Rubric::get_total_points( $rubric_id ) );
-				$scale_type   = sanitize_key( (string) get_post_meta( $rubric_id, CLMS_Rubric::META_SCALE, true ) );
-				$is_holistic  = '1' === (string) get_post_meta( $rubric_id, CLMS_Rubric::META_HOLISTIC, true );
+				$criteria     = class_exists( '\ATORA\LMS\Rubric_Service' ) && is_array( $rubric_row )
+					? \ATORA\LMS\Rubric_Service::get_criteria( $rubric_id, $rubric_revision )
+					: CLMS_Rubric::get_criteria( $rubric_id );
+				$total_points = is_array( $rubric_row ) ? absint( $rubric_row['total_points'] ?? 0 ) : absint( CLMS_Rubric::get_total_points( $rubric_id ) );
+				$scale_type   = is_array( $rubric_row ) ? sanitize_key( (string) ( $rubric_row['scale_type'] ?? '' ) ) : '';
+				$is_holistic  = is_array( $rubric_row ) ? ! empty( $rubric_row['is_holistic'] ) : false;
 
 				// Snapshot por entrega: evita que cambios futuros en la rúbrica rompan la trazabilidad.
 				if ( ! empty( $criteria ) ) {
@@ -669,11 +684,10 @@ trait CLMS_Grading_SpeedGrade_Trait {
 						'scale_type'    => $scale_type,
 						'is_holistic'   => $is_holistic ? 1 : 0,
 						'total_points'  => $total_points,
+						'rubric_revision' => $rubric_revision,
 						'criteria'      => $criteria,
 						'captured_at'   => current_time( 'mysql' ),
 					);
-					update_post_meta( $submission_id, '_clms_submission_rubric_snapshot', $rubric_snapshot );
-					update_post_meta( $submission_id, '_clms_submission_rubric_snapshot_hash', md5( wp_json_encode( $rubric_snapshot ) ) );
 				}
 			}
 
@@ -971,6 +985,65 @@ trait CLMS_Grading_SpeedGrade_Trait {
 			do_action( 'clms_submission_graded', $submission_id, $student_id > 0 ? $student_id : $user_id, $status, $grade, $feedback );
 		}
 
+		// 6.26.5: registrar evaluación inmutable en tabla (atora_rubric_evaluations).
+		if ( $rubric_id > 0 && ! empty( $rubric_snapshot ) && class_exists( '\ATORA\LMS\Rubric_Service' ) ) {
+			$student_id_eval = absint( get_post_meta( $submission_id, '_clms_submission_user_id', true ) );
+			if ( ! $student_id_eval ) {
+				$student_id_eval = absint( get_post_meta( $submission_id, '_clms_submission_student_id', true ) );
+			}
+			if ( ! $student_id_eval ) {
+				$student_id_eval = absint( get_post_field( 'post_author', $submission_id ) );
+			}
+
+			$institution_id = absint( (int) get_option( 'atora_default_institution', 0 ) );
+			if ( class_exists( '\ATORA\LMS\Tenant_Context' ) ) {
+				$inst = \ATORA\LMS\Tenant_Context::require_current_institution_id();
+				if ( ! is_wp_error( $inst ) ) {
+					$institution_id = absint( $inst );
+				}
+			}
+
+			$grader_id = absint( get_current_user_id() );
+			$on_behalf_of = 0;
+			if ( class_exists( 'ATORA_Delegation_Service' ) && $lesson_id > 0 && ATORA_Delegation_Service::covers( $grader_id, $lesson_id, 'grade' ) ) {
+				$on_behalf_of = absint( (int) get_post_field( 'post_author', $lesson_id ) );
+			}
+
+			$earned_points = 0;
+			foreach ( (array) $rubric_scores as $row ) {
+				$row = is_array( $row ) ? $row : array();
+				if ( '' !== (string) ( $row['score'] ?? '' ) ) {
+					$earned_points += absint( $row['score'] ?? 0 );
+				}
+			}
+
+			$payload = array(
+				'rubric'   => $rubric_snapshot,
+				'scores'   => $rubric_scores,
+				'grade'    => $grade,
+				'status'   => $status,
+				'feedback' => $feedback,
+			);
+
+			\ATORA\LMS\Rubric_Service::record_evaluation( array(
+				'institution_id'   => $institution_id,
+				'submission_id'    => 0,
+				'wp_submission_id' => $submission_id,
+				'student_id'       => $student_id_eval,
+				'rubric_id'        => $rubric_id,
+				'rubric_revision'  => absint( $rubric_snapshot['rubric_revision'] ?? 1 ),
+				'total_points'     => absint( $rubric_snapshot['total_points'] ?? 0 ),
+				'earned_points'    => absint( $earned_points ),
+				'scale_type'       => sanitize_key( (string) ( $rubric_snapshot['scale_type'] ?? '' ) ),
+				'scale_code'       => sanitize_key( (string) ( $rubric_snapshot['scale_code'] ?? '' ) ),
+				'source'           => 'speedgrader',
+				'grader_id'        => $grader_id,
+				'on_behalf_of'     => $on_behalf_of,
+				'ai_assisted'      => 'accept_ai_draft' === $submit_action,
+				'snapshot_json'    => wp_json_encode( $payload ),
+			) );
+		}
+
 		return array(
 			'submission_id' => $submission_id,
 			'status'        => $status,
@@ -1085,8 +1158,16 @@ trait CLMS_Grading_SpeedGrade_Trait {
 		$recent_history   = $this->get_student_recent_submission_history( $student_id, $course_id, $lesson_id, $submission_id, 5 );
 		$ai_pending       = $this->is_submission_ai_pending_validation( $submission_id, $status, $assessment_record );
 		$rubric_id        = $lesson_id ? absint( get_post_meta( $lesson_id, '_clms_rubric_id', true ) ) : 0;
-		$rubric_snapshot  = $rubric_id ? get_post_meta( $submission_id, '_clms_submission_rubric_snapshot', true ) : array();
-		$rubric_snapshot  = is_array( $rubric_snapshot ) ? $rubric_snapshot : array();
+		$rubric_snapshot  = array();
+		if ( $rubric_id && class_exists( '\ATORA\LMS\Rubric_Service' ) ) {
+			$eval = \ATORA\LMS\Rubric_Service::get_evaluation( $submission_id );
+			if ( is_array( $eval ) && absint( $eval['rubric_id'] ?? 0 ) === $rubric_id ) {
+				$decoded = json_decode( (string) ( $eval['snapshot_json'] ?? '' ), true );
+				if ( is_array( $decoded ) && isset( $decoded['rubric'] ) && is_array( $decoded['rubric'] ) ) {
+					$rubric_snapshot = (array) $decoded['rubric'];
+				}
+			}
+		}
 		$context = array(
 			'submission_id' => $submission_id,
 			'student_id'    => $student_id,

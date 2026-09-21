@@ -323,6 +323,7 @@ class LMS_Course_Service {
 		return array(
 			'id'             => absint( $row['id'] ),
 			'wp_post_id'     => absint( $row['wp_post_id'] ),
+			'revision'       => absint( $row['revision'] ?? 1 ),
 			'title'          => sanitize_text_field( (string) ( $row['title']          ?? '' ) ),
 			'slug'           => sanitize_title(      (string) ( $row['slug']           ?? '' ) ),
 			'excerpt'        => sanitize_textarea_field( (string) ( $row['excerpt']    ?? '' ) ),
@@ -350,6 +351,7 @@ class LMS_Course_Service {
 			'course_id'       => absint( $row['course_id'] ),
 			'title'           => sanitize_text_field( (string) ( $row['title']        ?? '' ) ),
 			'slug'            => sanitize_title(      (string) ( $row['slug']         ?? '' ) ),
+			'revision'        => absint( $row['revision'] ?? 1 ),
 			'lesson_order'    => absint(                        $row['lesson_order']  ?? 0 ),
 			'section'         => sanitize_text_field( (string) ( $row['section']      ?? '' ) ),
 			'section_order'   => absint(                        $row['section_order'] ?? 0 ),
