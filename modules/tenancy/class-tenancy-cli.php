@@ -156,6 +156,9 @@ class Tenancy_CLI {
 		\WP_CLI::log( 'Miembros migrados: ' . absint( $cohorts['members'] ?? 0 ) );
 		\WP_CLI::log( 'Cursos vinculados: ' . absint( $cohorts['courses'] ?? 0 ) );
 
+		$finalized = Institution_Service::finalize_institution_columns();
+		\WP_CLI::log( 'Finalize institution_id (no default): ' . wp_json_encode( $finalized ) );
+
 		update_option( 'atora_cohort_source', 'tables', false );
 
 		\WP_CLI::success( 'Migración completada.' );
