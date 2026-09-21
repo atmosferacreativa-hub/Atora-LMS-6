@@ -2,8 +2,6 @@
 <ruleset name="ATORA LMS">
 	<description>PHPCS rules for ATORA LMS.</description>
 
-	<config name="installed_paths" value="vendor/wp-coding-standards/wpcs"/>
-
 	<arg name="basepath" value="."/>
 	<arg name="colors"/>
 	<arg name="extensions" value="php"/>
@@ -20,4 +18,3 @@
 	<rule ref="WordPress"/>
 	<rule ref="WordPress-Extra"/>
 </ruleset>
-
