@@ -1,22 +1,389 @@
-name: CI
+name: ATORA LMS CI
 
 on:
   push:
+    branches:
+      - main
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atora-lms-ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  test:
+  quality:
+    name: PHP ${{ matrix.php }} quality
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php:
+          - "8.1"
+          - "8.2"
+          - "8.3"
+          - "8.4"
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: shivammathur/setup-php@v2
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.1'
+          php-version: ${{ matrix.php }}
+          coverage: none
           tools: composer:v2
+
+      - name: Validate Composer metadata
+        run: composer validate --strict
+
+      - name: Install reproducible test dependencies
+        shell: bash
+        run: |
+          if [[ -f composer.lock ]]; then
+            composer install --no-interaction --prefer-dist --no-progress
+          else
+            composer update --no-interaction --prefer-dist --no-progress
+          fi
+
+      - name: Lint PHP files
+        shell: bash
+        run: |
+          find . -path ./vendor -prune -o -name '*.php' -print0 |
+            xargs -0 -n1 php -l
+
+      - name: Export generated Composer lock
+        if: matrix.php == '8.1' && hashFiles('composer.lock') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: composer-lock
+          path: composer.lock
+          if-no-files-found: error
+          retention-days: 7
+
+
+  security-gate:
+    name: Security gate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.1"
+          coverage: none
+          tools: composer:v2
+
+      - name: Install locked dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Audit Composer dependencies
+        run: composer audit --locked --no-interaction
+
+      - name: Run repository security gate
+        run: bash scripts/security-gate.sh
+
+      - name: Run security and authorization regression suite
+        run: |
+          vendor/bin/phpunit \
+            tests/Security \
+            tests/CRM/CRMRestPermissionsTest.php \
+            tests/Groups/AdminPostAuthorizationTest.php \
+            tests/H5P/ContentControllerOwnershipTest.php \
+            tests/LMS/EnrollmentAjaxOwnershipTest.php \
+            tests/LMS/GradeAppealOwnershipTest.php \
+            tests/LMS/LMSCourseOwnershipTest.php \
+            tests/LMS/LMSCourseVisibilityTest.php \
+            tests/Rest/WebhookPermissionsTest.php
+
+  unit-tests:
+    name: PHPUnit full suite (file-isolated)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.1"
+          coverage: none
+          tools: composer:v2
+
       - name: Install dependencies
-        run: composer install --no-interaction --prefer-dist
-      - name: PHPCS
-        run: composer phpcs
-      - name: PHPUnit
-        run: composer test
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Run PHPUnit suite with file isolation
+        run: bash scripts/run-phpunit-files.sh
+
+
+  lms-migrator-tests:
+    name: LMS migrator and F4 gate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.1"
+          coverage: none
+          tools: composer:v2
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Run blocking migrator tests
+        run: |
+          vendor/bin/phpunit \
+            tests/LMS/ReadRouterTest.php \
+            tests/LMS/EnrollmentServiceReadersTest.php \
+            tests/LMS/CutoverReadyGateTest.php \
+            tests/LMS/MigrationWindowDiscrepancyTest.php \
+            tests/LMS/TelegramLinksMigrationTest.php
+
+
+  wordpress-smoke:
+    name: WordPress ${{ matrix.wordpress }} / PHP 8.1
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        wordpress:
+          - "6.4"
+          - "6.8"
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_DATABASE: wordpress
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Check out plugin
+        uses: actions/checkout@v4
+
+      - name: Resolve plugin version
+        id: plugin_version
+        shell: bash
+        run: |
+          VERSION=$(grep -m1 '^ \* Version:' atora_lms.php | sed -E 's/.*Version:\s*//' | tr -d '[:space:]')
+          if [ -z "$VERSION" ]; then
+            echo "No se pudo determinar la version desde atora_lms.php" >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Set up PHP and WP-CLI
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.1"
+          coverage: none
+          tools: wp-cli
+
+      - name: Install WordPress
+        shell: bash
+        run: |
+          wp core download --version="${{ matrix.wordpress }}" --skip-content --path=/tmp/wordpress
+          wp config create \
+            --path=/tmp/wordpress \
+            --dbname=wordpress \
+            --dbuser=root \
+            --dbpass=root \
+            --dbhost=127.0.0.1:3306 \
+            --skip-check
+          wp config set WP_DEBUG true --raw --path=/tmp/wordpress
+          wp config set WP_DEBUG_LOG true --raw --path=/tmp/wordpress
+          wp core install \
+            --path=/tmp/wordpress \
+            --url=http://atora.test \
+            --title="ATORA CI" \
+            --admin_user=admin \
+            --admin_password=atora-ci-password \
+            --admin_email=ci@example.test \
+            --skip-email
+
+      - name: Install and activate ATORA LMS
+        shell: bash
+        run: |
+          mkdir -p /tmp/wordpress/wp-content/plugins/atora-lms
+          rsync -a \
+            --exclude=.git \
+            --exclude=vendor \
+            --exclude=dist \
+            ./ /tmp/wordpress/wp-content/plugins/atora-lms/
+          wp plugin activate atora-lms --path=/tmp/wordpress
+
+      - name: Verify runtime bootstrap
+        shell: bash
+        env:
+          EXPECTED_VERSION: ${{ steps.plugin_version.outputs.version }}
+        run: |
+          wp eval '
+            $expected = getenv( "EXPECTED_VERSION" );
+            if ( ! defined( "ATORA_LMS_VERSION" ) || $expected !== ATORA_LMS_VERSION ) {
+              fwrite( STDERR, "Unexpected ATORA LMS version\n" );
+              exit( 1 );
+            }
+            if ( ! post_type_exists( "lm_course" ) ) {
+              fwrite( STDERR, "lm_course was not registered\n" );
+              exit( 1 );
+            }
+          ' --path=/tmp/wordpress
+          wp --path=/tmp/wordpress --context=admin eval '
+            $priority = has_action( "admin_menu", array( "ATORA_Onboarding_Wizard", "register_page" ) );
+            if ( 20 !== $priority ) {
+              fwrite( STDERR, "ATORA onboarding must register after its parent menu\n" );
+              exit( 1 );
+            }
+
+            global $menu, $submenu, $admin_page_hooks, $_registered_pages;
+            $menu = $submenu = $admin_page_hooks = $_registered_pages = array();
+
+            $admin_menu = new CLMS_Admin_Menu();
+            $admin_menu->register_admin_pages();
+            ATORA_Onboarding_Wizard::register_page();
+
+            $hook = get_plugin_page_hookname( "atora-onboarding", "clms-dashboard" );
+            if ( empty( $_registered_pages[ $hook ] ) ) {
+              fwrite( STDERR, "ATORA onboarding admin page was not registered with its parent hook\n" );
+              exit( 1 );
+            }
+          '
+          wp --path=/tmp/wordpress --context=admin eval '
+            CLMS_Install_Profiles::apply( "academia" );
+            \ATORA\V5_Installer::ensure_active_module_tables();
+          '
+          wp --path=/tmp/wordpress --context=admin eval '
+            $_POST = array(
+              "contact_name"    => "Estudiante CI",
+              "contact_email"   => "estudiante-ci@atora.test",
+              "contact_company" => "ATORA CI",
+            );
+
+            $method = new ReflectionMethod( "ATORA_Onboarding_Wizard", "save_step3" );
+            $method->setAccessible( true );
+            $method->invoke( null );
+
+            global $wpdb;
+            $contact = $wpdb->get_row(
+              $wpdb->prepare(
+                "SELECT id, company_id, source FROM {$wpdb->prefix}atora_contacts WHERE email = %s LIMIT 1",
+                "estudiante-ci@atora.test"
+              ),
+              ARRAY_A
+            );
+            if ( empty( $contact["id"] ) || "onboarding" !== $contact["source"] ) {
+              fwrite( STDERR, "ATORA onboarding did not persist the CRM contact correctly\n" );
+              exit( 1 );
+            }
+
+            $company_name = $wpdb->get_var(
+              $wpdb->prepare(
+                "SELECT name FROM {$wpdb->prefix}atora_companies WHERE id = %d LIMIT 1",
+                absint( $contact["company_id"] ?? 0 )
+              )
+            );
+            if ( "ATORA CI" !== $company_name ) {
+              fwrite( STDERR, "ATORA onboarding did not associate the CRM company\n" );
+              exit( 1 );
+            }
+          '
+          wp rewrite structure '/%postname%/' --path=/tmp/wordpress
+          wp rewrite flush --hard --path=/tmp/wordpress
+          course_id="$(wp post create \
+            --post_type=lm_course \
+            --post_status=publish \
+            --post_title='Curso de humo CI' \
+            --porcelain \
+            --path=/tmp/wordpress)"
+          test -n "$course_id"
+          wp post get "$course_id" --field=post_status --path=/tmp/wordpress | grep -qx publish
+
+      - name: Tenancy CLI rollback smoke (schema returns to baseline)
+        if: matrix.wordpress == '6.8'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # 1) Rollback to baseline state (drop tenancy additions).
+          wp atora tenancy rollback --yes --path=/tmp/wordpress
+
+          # Snapshot schema post-rollback.
+          for t in wp_atora_programs wp_atora_courses wp_atora_enrollments wp_atora_program_enrollments wp_clms_invitations; do
+            wp db query "SHOW CREATE TABLE ${t}\\G" --path=/tmp/wordpress > "/tmp/${t}.before.txt"
+          done
+
+          # 2) Re-apply schema and then rollback again; schemas must match.
+          wp --path=/tmp/wordpress --context=admin eval '\ATORA\V5_Installer::force_install();'
+          wp atora tenancy rollback --yes --path=/tmp/wordpress
+
+          for t in wp_atora_programs wp_atora_courses wp_atora_enrollments wp_atora_program_enrollments wp_clms_invitations; do
+            wp db query "SHOW CREATE TABLE ${t}\\G" --path=/tmp/wordpress > "/tmp/${t}.after.txt"
+            diff -u "/tmp/${t}.before.txt" "/tmp/${t}.after.txt"
+          done
+
+      - name: Surface WordPress debug log
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f /tmp/wordpress/wp-content/debug.log ]]; then
+            sed -n '1,400p' /tmp/wordpress/wp-content/debug.log
+          fi
+
+  distribution:
+    name: Distribution package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Resolve plugin version
+        id: plugin_version
+        shell: bash
+        run: |
+          VERSION=$(grep -m1 '^ \* Version:' atora_lms.php | sed -E 's/.*Version:\s*//' | tr -d '[:space:]')
+          if [ -z "$VERSION" ]; then
+            echo "No se pudo determinar la version desde atora_lms.php" >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Build ZIP
+        run: ./scripts/build-dist.sh "${{ steps.plugin_version.outputs.version }}"
+
+      - name: Inspect ZIP
+        shell: bash
+        env:
+          VERSION: ${{ steps.plugin_version.outputs.version }}
+        run: |
+          unzip -t "dist/atora-lms-${VERSION}.zip"
+          ! unzip -Z1 "dist/atora-lms-${VERSION}.zip" | grep -E '(^|/)(\.git|\.claude|tests|docs|vendor|composer\.(json|lock)|phpunit\.xml)(/|$)'
+
+      - name: Upload distribution
+        uses: actions/upload-artifact@v4
+        with:
+          name: atora-lms-${{ steps.plugin_version.outputs.version }}
+          path: dist/atora-lms-${{ steps.plugin_version.outputs.version }}.zip
+          if-no-files-found: error
+          retention-days: 7
 
