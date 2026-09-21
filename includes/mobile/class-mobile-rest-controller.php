@@ -277,6 +277,7 @@ final class ATORA_Mobile_REST_Controller {
 		}
 
 		$video_embed = self::google_drive_embed_url( $video_url, $raw_content );
+		$resources   = $wp_post_id ? self::normalize_lesson_resources( $wp_post_id ) : array();
 
 		return new WP_REST_Response( array(
 			'lesson' => array(
@@ -292,6 +293,7 @@ final class ATORA_Mobile_REST_Controller {
 				'content_text' => sanitize_textarea_field( wp_strip_all_tags( $content_html ) ),
 				'completed'    => in_array( $lesson_id, self::completed_lesson_ids( $user_id, $course_id ), true ),
 				'quiz_available'=> $wp_post_id && '1' === (string) get_post_meta( $wp_post_id, '_clms_quiz_enabled', true ),
+				'resources'      => $resources,
 			),
 		), 200 );
 	}
@@ -426,6 +428,91 @@ final class ATORA_Mobile_REST_Controller {
 			);
 		}
 		return $items;
+	}
+
+	/**
+	 * Normaliza recursos de lección (guías/archivos/enlaces) para consumo móvil.
+	 *
+	 * @return array<int, array{
+	 *   type:string,
+	 *   title:string,
+	 *   description:string,
+	 *   url:string,
+	 *   download_url:string,
+	 *   file_id:int,
+	 *   mime:string,
+	 *   thumb_url:string
+	 * }>
+	 */
+	private static function normalize_lesson_resources( int $wp_lesson_id ): array {
+		$raw = get_post_meta( $wp_lesson_id, '_clms_lesson_resources', true );
+
+		if ( is_string( $raw ) && '' !== trim( $raw ) ) {
+			$decoded = json_decode( $raw, true );
+			if ( is_array( $decoded ) ) {
+				$raw = $decoded;
+			} elseif ( function_exists( 'maybe_unserialize' ) ) {
+				$raw = maybe_unserialize( $raw );
+			}
+		}
+
+		if ( ! is_array( $raw ) ) {
+			return array();
+		}
+
+		$items = array();
+
+		foreach ( $raw as $resource ) {
+			if ( ! is_array( $resource ) ) { continue; }
+
+			$file_id   = absint( $resource['file_id'] ?? 0 );
+			$thumb_id  = absint( $resource['thumb_id'] ?? 0 );
+			$title     = sanitize_text_field( (string) ( $resource['title'] ?? '' ) );
+			$desc      = sanitize_textarea_field( (string) ( $resource['description'] ?? '' ) );
+			$url       = esc_url_raw( (string) ( $resource['url'] ?? '' ) );
+			$type      = sanitize_key( (string) ( $resource['type'] ?? '' ) );
+			$mime      = '';
+			$thumb_url = '';
+
+			$resolved_url = '';
+
+			if ( $file_id > 0 ) {
+				$resolved_url = (string) wp_get_attachment_url( $file_id );
+				$mime         = sanitize_text_field( (string) get_post_mime_type( $file_id ) );
+				if ( '' === $title ) {
+					$title = sanitize_text_field( (string) get_the_title( $file_id ) );
+				}
+			} elseif ( '' !== $url ) {
+				$resolved_url = $url;
+			}
+
+			if ( $thumb_id > 0 ) {
+				$thumb_url = (string) wp_get_attachment_url( $thumb_id );
+			}
+
+			$resolved_url = esc_url_raw( trim( $resolved_url ) );
+			$thumb_url    = esc_url_raw( trim( $thumb_url ) );
+
+			if ( '' === $resolved_url ) { continue; }
+
+			$final_type = $type;
+			if ( '' === $final_type ) {
+				$final_type = $file_id > 0 ? 'file' : 'link';
+			}
+
+			$items[] = array(
+				'type'         => $final_type,
+				'title'        => $title ?: ( $file_id > 0 ? __( 'Archivo', 'atora-lms' ) : __( 'Enlace', 'atora-lms' ) ),
+				'description'  => $desc,
+				'url'          => $resolved_url,
+				'download_url' => $resolved_url,
+				'file_id'      => $file_id,
+				'mime'         => $mime,
+				'thumb_url'    => $thumb_url,
+			);
+		}
+
+		return array_values( $items );
 	}
 
 	/**

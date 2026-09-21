@@ -18,23 +18,36 @@
 
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
-class ATORA_Onboarding_Wizard {
+	class ATORA_Onboarding_Wizard {
 
 	const OPTION_COMPLETE = 'atora_onboarding_complete';
 	const OPTION_STEP     = 'atora_onboarding_step';
 	const OPTION_ACADEMY  = 'atora_academy_settings';
-	const PAGE_SLUG       = 'atora-onboarding';
+		const PAGE_SLUG       = 'atora-onboarding';
 
-	public static function init(): void {
-		if ( get_option( self::OPTION_COMPLETE ) === '1' ) { return; }
+		public static function init(): void {
+			$force = isset( $_GET['atora_onboarding_force'] ) && '1' === (string) wp_unslash( $_GET['atora_onboarding_force'] ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			if ( get_option( self::OPTION_COMPLETE ) === '1' && ! $force ) { return; }
 
-		// El menú padre clms-dashboard se registra en prioridad 10. Registrar después
-		// mantiene estable el hook interno que WordPress usa para autorizar la página.
-		add_action( 'admin_menu',            array( __CLASS__, 'register_page' ), 20 );
-		add_action( 'admin_init',            array( __CLASS__, 'handle_form' ) );
-		add_action( 'admin_notices',         array( __CLASS__, 'show_notice' ) );
-		add_action( 'wp_ajax_atora_onboarding_skip', array( __CLASS__, 'ajax_skip' ) );
-	}
+			// El menú padre clms-dashboard se registra en prioridad 10. Registrar después
+			// mantiene estable el hook interno que WordPress usa para autorizar la página.
+			add_action( 'admin_menu',            array( __CLASS__, 'register_page' ), 20 );
+			add_action( 'admin_init',            array( __CLASS__, 'handle_form' ) );
+			add_action( 'admin_notices',         array( __CLASS__, 'show_notice' ) );
+			add_action( 'wp_ajax_atora_onboarding_skip', array( __CLASS__, 'ajax_skip' ) );
+			add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue_assets' ) );
+		}
+
+		public static function enqueue_assets( string $hook_suffix ): void {
+			// Hook típico: clms-dashboard_page_atora-onboarding.
+			if ( false === strpos( $hook_suffix, self::PAGE_SLUG ) ) { return; }
+			if ( ! current_user_can( 'manage_options' ) ) { return; }
+
+			// Necesario para el selector de medios (logo).
+			if ( function_exists( 'wp_enqueue_media' ) ) {
+				wp_enqueue_media();
+			}
+		}
 
 	/** Registra la página admin del wizard. */
 	public static function register_page(): void {
@@ -337,24 +350,34 @@ class ATORA_Onboarding_Wizard {
 					<?php endforeach; ?>
 				</div>
 
-				<?php elseif ( 2 === $current_step ) : ?>
-				<!-- PASO 2: Tu academia -->
-				<h2 style="font-size:18px;font-weight:700;margin:0 0 20px">🏫 <?php esc_html_e( 'Tu academia', 'atora-lms' ); ?></h2>
-				<div style="display:grid;gap:16px">
+					<?php elseif ( 2 === $current_step ) : ?>
+					<!-- PASO 2: Tu academia -->
+					<h2 style="font-size:18px;font-weight:700;margin:0 0 20px">🏫 <?php esc_html_e( 'Tu academia', 'atora-lms' ); ?></h2>
+					<div style="display:grid;gap:16px">
 					<label style="font-size:13px;font-weight:600;color:#0f172a;display:block">
 						<?php esc_html_e( 'Nombre de la academia *', 'atora-lms' ); ?>
 						<input type="text" name="academy_name" required
 							value="<?php echo esc_attr( (string) ( $academy['name'] ?? '' ) ); ?>"
 							placeholder="<?php esc_attr_e( 'Ej: Academia Digital Pro', 'atora-lms' ); ?>"
 							style="display:block;width:100%;margin-top:6px;padding:9px 12px;border-radius:8px;border:.5px solid #e2e8f0;font-size:14px">
-					</label>
-					<label style="font-size:13px;font-weight:600;color:#0f172a;display:block">
-						<?php esc_html_e( 'URL del logo (opcional)', 'atora-lms' ); ?>
-						<input type="url" name="academy_logo"
-							value="<?php echo esc_attr( (string) ( $academy['logo_url'] ?? '' ) ); ?>"
-							placeholder="https://..."
-							style="display:block;width:100%;margin-top:6px;padding:9px 12px;border-radius:8px;border:.5px solid #e2e8f0;font-size:14px">
-					</label>
+						</label>
+						<label style="font-size:13px;font-weight:600;color:#0f172a;display:block">
+							<?php esc_html_e( 'URL del logo (opcional)', 'atora-lms' ); ?>
+							<div style="display:flex;gap:10px;align-items:center;margin-top:6px;flex-wrap:wrap">
+								<input type="url" name="academy_logo" id="atora-academy-logo"
+									value="<?php echo esc_attr( (string) ( $academy['logo_url'] ?? '' ) ); ?>"
+									placeholder="https://..."
+									style="flex:1;min-width:260px;padding:9px 12px;border-radius:8px;border:.5px solid #e2e8f0;font-size:14px">
+								<button type="button" class="button" id="atora-pick-logo">
+									<?php esc_html_e( 'Seleccionar desde Medios', 'atora-lms' ); ?>
+								</button>
+							</div>
+							<div id="atora-logo-preview-wrap" style="margin-top:10px;display:<?php echo empty( $academy['logo_url'] ) ? 'none' : 'block'; ?>">
+								<img id="atora-logo-preview" src="<?php echo esc_url( (string) ( $academy['logo_url'] ?? '' ) ); ?>"
+									alt="<?php esc_attr_e( 'Vista previa del logo', 'atora-lms' ); ?>"
+									style="max-height:56px;width:auto;border-radius:8px;border:.5px solid #e2e8f0;background:#fff;padding:6px">
+							</div>
+						</label>
 					<label style="font-size:13px;font-weight:600;color:#0f172a;display:block">
 						<?php esc_html_e( 'Zona horaria', 'atora-lms' ); ?>
 						<select name="academy_timezone" style="display:block;width:100%;margin-top:6px;padding:9px 12px;border-radius:8px;border:.5px solid #e2e8f0;font-size:14px">
@@ -375,9 +398,47 @@ class ATORA_Onboarding_Wizard {
 							?>
 						</select>
 					</label>
-				</div>
+					</div>
+					<script>
+					(function(){
+						var pickBtn = document.getElementById('atora-pick-logo');
+						var input = document.getElementById('atora-academy-logo');
+						var previewWrap = document.getElementById('atora-logo-preview-wrap');
+						var previewImg = document.getElementById('atora-logo-preview');
+						if(!pickBtn || !input || typeof wp === 'undefined' || !wp.media){ return; }
 
-				<?php elseif ( 3 === $current_step ) : ?>
+						var frame;
+						pickBtn.addEventListener('click', function(){
+							if(frame){ frame.open(); return; }
+							frame = wp.media({
+								title: '<?php echo esc_js( __( 'Selecciona un logo', 'atora-lms' ) ); ?>',
+								library: { type: 'image' },
+								button: { text: '<?php echo esc_js( __( 'Usar este logo', 'atora-lms' ) ); ?>' },
+								multiple: false
+							});
+							frame.on('select', function(){
+								var attachment = frame.state().get('selection').first().toJSON();
+								if(!attachment || !attachment.url){ return; }
+								input.value = attachment.url;
+								if(previewImg){ previewImg.src = attachment.url; }
+								if(previewWrap){ previewWrap.style.display = 'block'; }
+							});
+							frame.open();
+						});
+
+						input.addEventListener('input', function(){
+							if(!previewImg || !previewWrap){ return; }
+							if(input.value){
+								previewImg.src = input.value;
+								previewWrap.style.display = 'block';
+							}else{
+								previewWrap.style.display = 'none';
+							}
+						});
+					})();
+					</script>
+
+					<?php elseif ( 3 === $current_step ) : ?>
 				<!-- PASO 3: Email provider -->
 				<h2 style="font-size:18px;font-weight:700;margin:0 0 20px">📧 <?php esc_html_e( 'Configuración de Email', 'atora-lms' ); ?></h2>
 				<div style="display:grid;gap:16px">
