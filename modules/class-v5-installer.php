@@ -38,6 +38,11 @@ class V5_Installer {
 			return;
 		}
 
+		$prev = (string) get_option( self::OPTION_KEY, '' );
+		if ( '' !== $prev && ! get_option( 'atora_tenancy_prev_v5_schema_version', false ) ) {
+			update_option( 'atora_tenancy_prev_v5_schema_version', $prev, false );
+		}
+
 		if ( self::create_tables()
 			&& self::migrate_tenancy_columns()
 			&& self::migrate_wp_post_id_nullable_columns()
@@ -57,6 +62,11 @@ class V5_Installer {
 	 * @return void
 	 */
 	public static function force_install(): void {
+		$prev = (string) get_option( self::OPTION_KEY, '' );
+		if ( '' !== $prev && ! get_option( 'atora_tenancy_prev_v5_schema_version', false ) ) {
+			update_option( 'atora_tenancy_prev_v5_schema_version', $prev, false );
+		}
+
 		if ( self::create_tables()
 			&& self::migrate_tenancy_columns()
 			&& self::migrate_wp_post_id_nullable_columns()

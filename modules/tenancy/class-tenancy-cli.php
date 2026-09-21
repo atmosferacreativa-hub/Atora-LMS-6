@@ -3,6 +3,8 @@
  * Tenancy CLI — X-01
  *
  * `wp atora tenancy rollback [--yes]`
+ * `wp atora tenancy migrate [--dry-run] [--yes]`
+ * `wp atora tenancy verify`
  *
  * Rollback limpio (aditivo): elimina solo el esquema agregado por X-01/E-10
  * sin tocar posts/postmeta/usermeta.
@@ -22,6 +24,8 @@ class Tenancy_CLI {
 
 	public static function init(): void {
 		\WP_CLI::add_command( 'atora tenancy rollback', array( __CLASS__, 'rollback' ) );
+		\WP_CLI::add_command( 'atora tenancy migrate', array( __CLASS__, 'migrate' ) );
+		\WP_CLI::add_command( 'atora tenancy verify', array( __CLASS__, 'verify' ) );
 	}
 
 	/**
@@ -99,5 +103,90 @@ class Tenancy_CLI {
 
 		\WP_CLI::success( 'Rollback de tenencia/delegación completado.' );
 	}
-}
 
+	/**
+	 * Migra datos legacy a tablas de tenencia (cohortes + backfill institution_id).
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--dry-run]
+	 * : No escribe; solo reporta el plan.
+	 *
+	 * [--yes]
+	 * : No pedir confirmación (cuando no es dry-run).
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp atora tenancy migrate --dry-run
+	 *     wp atora tenancy migrate --yes
+	 *
+	 * @param array $args       Argumentos posicionales (sin uso).
+	 * @param array $assoc_args Argumentos con nombre.
+	 */
+	public static function migrate( array $args, array $assoc_args ): void {
+		$dry_run = isset( $assoc_args['dry-run'] );
+
+		$plan = self::build_migration_plan();
+		\WP_CLI::log( 'Plan:' );
+		foreach ( $plan as $line ) {
+			\WP_CLI::log( ' - ' . $line );
+		}
+
+		if ( $dry_run ) {
+			\WP_CLI::success( 'Dry-run: no se escribió nada.' );
+			return;
+		}
+
+		if ( ! isset( $assoc_args['yes'] ) ) {
+			\WP_CLI::confirm( 'Esto escribirá en tablas de tenencia. ¿Continuar?', $assoc_args );
+		}
+
+		$default_inst = Institution_Service::ensure_default_institution();
+		if ( $default_inst <= 0 ) {
+			\WP_CLI::error( 'No se pudo asegurar la institución por defecto.' );
+			return;
+		}
+		update_option( 'atora_default_institution', $default_inst, false );
+
+		$backfilled = Institution_Service::backfill_institution_ids( $default_inst );
+		\WP_CLI::log( 'Backfill institution_id: ' . wp_json_encode( $backfilled ) );
+
+		$cohorts = Cohort_Migrator::migrate_from_postmeta( $default_inst );
+		\WP_CLI::log( 'Cohortes migradas: ' . absint( $cohorts['cohorts'] ?? 0 ) );
+		\WP_CLI::log( 'Miembros migrados: ' . absint( $cohorts['members'] ?? 0 ) );
+		\WP_CLI::log( 'Cursos vinculados: ' . absint( $cohorts['courses'] ?? 0 ) );
+
+		update_option( 'atora_cohort_source', 'tables', false );
+
+		\WP_CLI::success( 'Migración completada.' );
+	}
+
+	/**
+	 * Verifica paridad básica entre legacy (postmeta) y tablas para cohortes.
+	 *
+	 * @param array $args       Argumentos posicionales (sin uso).
+	 * @param array $assoc_args Argumentos con nombre.
+	 */
+	public static function verify( array $args, array $assoc_args ): void {
+		$report = Cohort_Migrator::verify_parity();
+		if ( ! empty( $report['errors'] ) ) {
+			foreach ( (array) $report['errors'] as $err ) {
+				\WP_CLI::log( 'ERROR: ' . $err );
+			}
+			\WP_CLI::error( 'Verify falló.' );
+			return;
+		}
+
+		\WP_CLI::success( 'Verify OK: cero divergencias detectadas (chequeo básico).' );
+	}
+
+	private static function build_migration_plan(): array {
+		$default = (int) get_option( 'atora_default_institution', 0 );
+		$lines   = array();
+		$lines[] = $default > 0 ? "Institución por defecto ya existe: {$default}" : 'Crear/asegurar institución por defecto.';
+		$lines[] = 'Backfill institution_id en atora_programs/courses/enrollments/program_enrollments/clms_invitations (si está en 0).';
+		$lines[] = 'Migrar cohortes desde lm_cohort postmeta a atora_cohorts/atora_cohort_members/atora_cohort_courses.';
+		$lines[] = 'Set option atora_cohort_source=tables.';
+		return $lines;
+	}
+}

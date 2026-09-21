@@ -1038,6 +1038,8 @@ add_action( 'init', static function () {
 
 		// ── X-01: comando WP-CLI `wp atora tenancy rollback` ─────────────────
 		atora_lms_require_module( 'modules/tenancy/class-tenancy-cli.php', static function() {
+			atora_lms_require_module( 'modules/tenancy/class-institution-service.php' );
+			atora_lms_require_module( 'modules/tenancy/class-cohort-migrator.php' );
 			if ( class_exists( '\ATORA\LMS\Tenancy_CLI' ) ) {
 				\ATORA\LMS\Tenancy_CLI::init();
 			}
@@ -1051,6 +1053,10 @@ add_action( 'init', static function () {
 
 	// ── Fase IV S15: Academy Context (multi-tenant base) ─────────────────────
 	atora_lms_require_module_if_active( 'crm', 'modules/crm-v2/class-academy-context.php' );
+
+	// ── X-01: Tenant Context (institución) ──────────────────────────────────
+	atora_lms_require_module( 'modules/tenancy/class-tenant-context.php' );
+	atora_lms_require_module( 'modules/tenancy/class-institution-service.php' );
 
 	// ── Fase IV S13: Webhook Dispatcher ──────────────────────────────────────
 	atora_lms_require_module_if_active( 'webhooks', 'modules/webhooks/class-webhook-dispatcher.php', static function() {
