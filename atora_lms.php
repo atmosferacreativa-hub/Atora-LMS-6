@@ -1075,6 +1075,13 @@ add_action( 'init', static function () {
 	// ── X-01: Tenant Context (institución) ──────────────────────────────────
 	atora_lms_require_module( 'modules/tenancy/class-tenant-context.php' );
 	atora_lms_require_module( 'modules/tenancy/class-institution-service.php' );
+	atora_lms_require_module( 'modules/tenancy/class-cohort-table-service.php' );
+	atora_lms_require_module( 'modules/tenancy/class-tenancy-audit.php' );
+	atora_lms_require_module( 'modules/tenancy/class-tenancy-query-detector.php', static function() {
+		if ( class_exists( '\ATORA\LMS\Tenancy_Query_Detector' ) ) {
+			\ATORA\LMS\Tenancy_Query_Detector::init();
+		}
+	} );
 
 	// ── Fase IV S13: Webhook Dispatcher ──────────────────────────────────────
 	atora_lms_require_module_if_active( 'webhooks', 'modules/webhooks/class-webhook-dispatcher.php', static function() {
