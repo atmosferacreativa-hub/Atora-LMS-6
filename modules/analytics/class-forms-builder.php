@@ -241,8 +241,17 @@ class Forms_Builder {
 				        <?php echo $req_attr; // phpcs:ignore ?>
 				        style="width:100%;padding:8px 12px;border:1px solid var(--atora-border);border-radius:var(--ac-radius-xs);">
 					<option value=""><?php esc_html_e( '— Selecciona —', 'atora-lms' ); ?></option>
-					<?php foreach ( (array) $field['options'] as $opt ) : ?>
-						<option value="<?php echo esc_attr( $opt ); ?>"><?php echo esc_html( $opt ); ?></option>
+					<?php foreach ( (array) $field['options'] as $opt ) :
+						$pair = self::normalize_select_option( $opt );
+						$val  = (string) ( $pair['value'] ?? '' );
+						$lab  = (string) ( $pair['label'] ?? '' );
+						if ( '' === $val && '' === $lab ) {
+							continue;
+						}
+						if ( '' === $val ) { $val = $lab; }
+						if ( '' === $lab ) { $lab = $val; }
+					?>
+						<option value="<?php echo esc_attr( $val ); ?>"><?php echo esc_html( $lab ); ?></option>
 					<?php endforeach; ?>
 				</select>
 			<?php elseif ( 'checkbox' === $type ) : ?>
@@ -265,6 +274,28 @@ class Forms_Builder {
 		</div>
 		<?php
 		return ob_get_clean();
+	}
+
+	/**
+	 * Normaliza una opción de <select> para soportar:
+	 * - string: "Opción"
+	 * - array:  { value, label } o variantes históricas (text/val, name/id, etc.)
+	 *
+	 * @param mixed $opt
+	 * @return array{value:string,label:string}
+	 */
+	private static function normalize_select_option( $opt ): array {
+		if ( is_array( $opt ) ) {
+			$value = (string) ( $opt['value'] ?? $opt['val'] ?? $opt['id'] ?? $opt['key'] ?? $opt['label'] ?? $opt['text'] ?? $opt['name'] ?? '' );
+			$label = (string) ( $opt['label'] ?? $opt['text'] ?? $opt['name'] ?? $opt['value'] ?? $opt['val'] ?? $opt['id'] ?? '' );
+			return array(
+				'value' => sanitize_text_field( $value ),
+				'label' => sanitize_text_field( $label ),
+			);
+		}
+
+		$s = sanitize_text_field( (string) $opt );
+		return array( 'value' => $s, 'label' => $s );
 	}
 
 	// ── Submit ────────────────────────────────────────────────────────────────
@@ -353,6 +384,42 @@ class Forms_Builder {
 						),
 					) );
 				}
+			}
+		}
+
+		// Validar selects: el valor enviado debe existir en las opciones definidas.
+		foreach ( $schema['fields'] ?? array() as $field ) {
+			$type  = sanitize_key( $field['type'] ?? '' );
+			if ( 'select' !== $type || empty( $field['options'] ) ) {
+				continue;
+			}
+			$fname = sanitize_key( $field['name'] ?? '' );
+			if ( '' === $fname ) {
+				continue;
+			}
+			$val = (string) ( $submitted[ $fname ] ?? '' );
+			if ( '' === $val ) {
+				continue; // requerido ya fue validado arriba.
+			}
+
+			$allowed = array();
+			foreach ( (array) $field['options'] as $opt ) {
+				$pair = self::normalize_select_option( $opt );
+				$opt_val = (string) ( $pair['value'] ?? '' );
+				$opt_lab = (string) ( $pair['label'] ?? '' );
+				if ( '' === $opt_val ) { $opt_val = $opt_lab; }
+				if ( '' !== $opt_val ) {
+					$allowed[] = $opt_val;
+				}
+			}
+
+			if ( ! in_array( $val, $allowed, true ) ) {
+				wp_send_json_error( array(
+					'message' => sprintf(
+						__( 'El valor del campo "%s" no es válido.', 'atora-lms' ),
+						$field['label'] ?? $fname
+					),
+				) );
 			}
 		}
 
