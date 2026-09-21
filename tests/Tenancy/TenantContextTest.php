@@ -19,6 +19,7 @@ final class TenantContextTest extends TestCase {
 		atora_test_reset_user_meta();
 
 		require_once __DIR__ . '/../../modules/tenancy/class-tenant-context.php';
+		\ATORA\LMS\Tenant_Context::reset_cache();
 
 		// Fresh stub per test.
 		$GLOBALS['wpdb'] = new class {
@@ -43,7 +44,7 @@ final class TenantContextTest extends TestCase {
 				$sql = (string) $sql;
 
 				if ( preg_match( '/SHOW TABLES LIKE\\s+([^\\s]+)/i', $sql, $m ) ) {
-					return $m[1];
+					return str_replace( '\\', '', (string) $m[1] );
 				}
 
 				// Institution exists.
@@ -169,4 +170,3 @@ final class TenantContextTest extends TestCase {
 		$this->assertSame( 3, $out );
 	}
 }
-
