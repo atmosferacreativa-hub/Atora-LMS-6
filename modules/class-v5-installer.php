@@ -1610,6 +1610,29 @@ class V5_Installer {
 			KEY target_user (target_user_id)
 		) $charset_collate;" );
 
+		// ── E-10: Delegación de instructor asistente ────────────────────────
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_instructor_delegations (
+			id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			institution_id  BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			instructor_id   BIGINT UNSIGNED NOT NULL,
+			assistant_id    BIGINT UNSIGNED NOT NULL,
+			scope           VARCHAR(20)     NOT NULL DEFAULT 'instructor',
+			course_id       BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			status          VARCHAR(20)     NOT NULL DEFAULT 'active',
+			perms_json      LONGTEXT                 DEFAULT NULL,
+			created_by      BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			expires_at      DATETIME                 DEFAULT NULL,
+			revoked_by      BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			revoked_at      DATETIME                 DEFAULT NULL,
+			PRIMARY KEY (id),
+			UNIQUE KEY delegation (instructor_id, assistant_id, scope, course_id),
+			KEY assistant_status (assistant_id, status),
+			KEY instructor_id (instructor_id),
+			KEY course_id (course_id),
+			KEY institution_id (institution_id)
+		) $charset_collate;" );
+
 		// Definición de quiz por lección (D-002; una fila por lección con quiz activo).
 		// Las preguntas en JSON provienen de _clms_quiz_questions (postmeta de lm_lesson).
 		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_quizzes (
