@@ -10,14 +10,20 @@ WP=${WP:-"wp --allow-root"}
 
 echo "== Seed ATORA Lab 6.26.5 =="
 
-ADMIN_LOGIN=${ADMIN_LOGIN:-admin}
+ADMIN_ID=${ADMIN_ID:-}
 INSTRUCTOR_LOGIN=${INSTRUCTOR_LOGIN:-docente_prueba}
 ASSISTANT_LOGIN=${ASSISTANT_LOGIN:-asistente_prueba}
 STUDENT_LOGIN=${STUDENT_LOGIN:-est_prueba}
 STUDENT_PASS=${STUDENT_PASS:-"atora_lab_6265"}
 
 echo "Asegurando usuarios…"
-$WP user get "$ADMIN_LOGIN" --field=ID >/dev/null
+if [ -z "${ADMIN_ID}" ]; then
+  ADMIN_ID=$($WP user list --role=administrator --field=ID --format=ids | awk '{print $1}')
+fi
+if [ -z "${ADMIN_ID}" ]; then
+  echo "No se pudo resolver un administrador (ADMIN_ID)." >&2
+  exit 1
+fi
 
 INSTRUCTOR_ID=$($WP user create "$INSTRUCTOR_LOGIN" "${INSTRUCTOR_LOGIN}@example.com" --role=author --user_pass="atora_lab_6265" --display_name="Docente Prueba" --porcelain || $WP user get "$INSTRUCTOR_LOGIN" --field=ID)
 ASSISTANT_ID=$($WP user create "$ASSISTANT_LOGIN" "${ASSISTANT_LOGIN}@example.com" --role=subscriber --user_pass="atora_lab_6265" --display_name="Asistente Prueba" --porcelain || $WP user get "$ASSISTANT_LOGIN" --field=ID)
@@ -158,7 +164,7 @@ global \$wpdb;
     'wp_course_id'   => 0,
     'status'         => 'active',
     'perms_json'     => wp_json_encode( array( 'grade' => true ) ),
-    'created_by'     => 1,
+    'created_by'     => {$ADMIN_ID},
     'created_at'     => current_time( 'mysql', true ),
     'expires_at'     => null,
   ),
@@ -175,4 +181,3 @@ echo "Rúbrica holística: $RUBRIC_HOL_ID"
 echo "Rúbrica NL: $RUBRIC_NL_ID"
 echo "Entrega (WP clms_submission): $SUBMISSION_ID"
 echo "Estudiante: $STUDENT_LOGIN / $STUDENT_PASS"
-
