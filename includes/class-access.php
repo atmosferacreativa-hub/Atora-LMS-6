@@ -369,6 +369,8 @@ class CLMS_Access {
 			'clms_view_teacher_dashboard' => true,
 			'clms_manage_enrollments'     => true,
 			'clms_manage_course_access'   => true,
+			'clms_access_admin'           => true,
+			'clms_grade_submissions'      => true,
 			'clms_access_crm_view'        => true,
 			'crm_view_reports'            => true,
 			'clms_manage_courses'         => false,
@@ -678,6 +680,12 @@ class CLMS_Access {
 			return true;
 		}
 
+		// E-07: coordinador/admin por membresía institucional del recurso.
+		$resource_institution_id = self::resource_institution_id( $resource_id, $resource_type );
+		if ( $resource_institution_id > 0 && self::user_is_institution_staff( $user_id, $resource_institution_id ) ) {
+			return true;
+		}
+
 		// E-10: delegación como tercera vía (solo cursos/lecciones).
 		if ( class_exists( 'ATORA_Delegation_Service' ) && in_array( $resource_type, array( 'course', 'program' ), true ) ) {
 			$perm = ( 'access' === $scope ) ? 'access' : 'enroll';
@@ -726,6 +734,76 @@ class CLMS_Access {
 		}
 
 		return '';
+	}
+
+	/**
+	 * Resuelve institution_id para un recurso WordPress (curso/programa) vía tablas v5.
+	 *
+	 * @param int    $resource_id   WP post ID.
+	 * @param string $resource_type course|program|teacher.
+	 * @return int institution_id o 0 si no se pudo resolver.
+	 */
+	private static function resource_institution_id( int $resource_id, string $resource_type ): int {
+		global $wpdb;
+
+		$resource_id   = absint( $resource_id );
+		$resource_type = sanitize_key( $resource_type );
+		if ( $resource_id <= 0 ) {
+			return 0;
+		}
+
+		if ( 'course' === $resource_type ) {
+			$table = $wpdb->prefix . 'atora_courses';
+			if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) ) !== $table ) {
+				return 0;
+			}
+			return absint( $wpdb->get_var( $wpdb->prepare( "SELECT institution_id FROM {$table} WHERE wp_post_id = %d LIMIT 1", $resource_id ) ) );
+		}
+
+		if ( 'program' === $resource_type ) {
+			$table = $wpdb->prefix . 'atora_programs';
+			if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) ) !== $table ) {
+				return 0;
+			}
+			return absint( $wpdb->get_var( $wpdb->prepare( "SELECT institution_id FROM {$table} WHERE wp_post_id = %d LIMIT 1", $resource_id ) ) );
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Determina si un usuario es staff institucional (coordinator/admin) en una institución.
+	 *
+	 * @param int $user_id        Usuario.
+	 * @param int $institution_id Institución.
+	 * @return bool
+	 */
+	private static function user_is_institution_staff( int $user_id, int $institution_id ): bool {
+		global $wpdb;
+
+		$user_id        = absint( $user_id );
+		$institution_id = absint( $institution_id );
+		if ( $user_id <= 0 || $institution_id <= 0 ) {
+			return false;
+		}
+
+		$table = $wpdb->prefix . 'atora_institution_members';
+		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) ) !== $table ) {
+			return false;
+		}
+
+		$role = (string) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT role FROM {$table}
+				 WHERE institution_id = %d AND user_id = %d AND status = 'active'
+				 ORDER BY FIELD(role, 'admin', 'coordinator') DESC
+				 LIMIT 1",
+				$institution_id,
+				$user_id
+			)
+		);
+		$role = sanitize_key( $role );
+		return in_array( $role, array( 'admin', 'coordinator' ), true );
 	}
 
 	/**

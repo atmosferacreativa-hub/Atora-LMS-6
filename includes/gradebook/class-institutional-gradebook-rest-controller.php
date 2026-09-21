@@ -107,7 +107,7 @@ class CLMS_Institutional_Gradebook_REST_Controller {
 	}
 
 	public function can_manage() {
-		return current_user_can( 'manage_options' )
+		return ( current_user_can( 'manage_options' ) || current_user_can( 'clms_grade_submissions' ) )
 			? true
 			: new WP_Error( 'rest_forbidden', __( 'Solo la autoridad académica puede administrar el gradebook institucional.', 'atora-lms' ), array( 'status' => 403 ) );
 	}

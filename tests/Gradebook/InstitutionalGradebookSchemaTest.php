@@ -32,6 +32,7 @@ final class InstitutionalGradebookSchemaTest extends TestCase {
 		$controller = (string) file_get_contents( __DIR__ . '/../../includes/gradebook/class-institutional-gradebook-rest-controller.php' );
 
 		$this->assertStringContainsString( "current_user_can( 'manage_options' )", $controller );
+		$this->assertStringContainsString( "current_user_can( 'clms_grade_submissions' )", $controller );
 		$this->assertStringContainsString( "'/gradebook/institutional", $controller );
 		$this->assertStringContainsString( "'permission_callback' => array( \$this, 'can_manage' )", $controller );
 	}
