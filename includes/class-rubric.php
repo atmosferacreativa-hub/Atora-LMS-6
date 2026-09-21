@@ -849,8 +849,10 @@ class CLMS_Rubric {
 			return array();
 		}
 
-		// Ruta preferida: tablas (6.26.5). Si aún no existe fila, caer a postmeta.
-		if ( class_exists( '\ATORA\LMS\Rubric_Service' ) ) {
+		// 6.26.5: enrutador de fuente (atora_rubric_source).
+		if ( class_exists( '\ATORA\LMS\Rubric_Read_Router' )
+			&& \ATORA\LMS\Rubric_Read_Router::is_tables()
+			&& class_exists( '\ATORA\LMS\Rubric_Service' ) ) {
 			$rubric = \ATORA\LMS\Rubric_Service::get( $rubric_id );
 			if ( is_array( $rubric ) && absint( $rubric['id'] ?? 0 ) > 0 ) {
 				return \ATORA\LMS\Rubric_Service::get_criteria( $rubric_id, absint( $rubric['revision'] ?? 1 ) );
@@ -880,7 +882,9 @@ class CLMS_Rubric {
 	 * @return int
 	 */
 	public static function get_total_points( $rubric_id ) {
-		if ( class_exists( '\ATORA\LMS\Rubric_Service' ) ) {
+		if ( class_exists( '\ATORA\LMS\Rubric_Read_Router' )
+			&& \ATORA\LMS\Rubric_Read_Router::is_tables()
+			&& class_exists( '\ATORA\LMS\Rubric_Service' ) ) {
 			$r = \ATORA\LMS\Rubric_Service::get( absint( $rubric_id ) );
 			if ( is_array( $r ) && absint( $r['id'] ?? 0 ) > 0 ) {
 				return absint( $r['total_points'] ?? 0 );

@@ -633,7 +633,9 @@ trait CLMS_Grading_SpeedGrade_Trait {
 
 		// Rubric: read per-criterion scores if available
 		$lesson_id      = absint( get_post_meta( $submission_id, '_clms_submission_lesson_id', true ) );
-		$rubric_id      = $lesson_id ? absint( get_post_meta( $lesson_id, '_clms_rubric_id', true ) ) : 0;
+		$rubric_id      = ( $lesson_id && class_exists( '\ATORA\LMS\Rubric_Service' ) )
+			? \ATORA\LMS\Rubric_Service::get_rubric_id_for_lesson( $lesson_id )
+			: 0;
 		$rubric_snapshot = array();
 		$rubric_scores  = array();
 		$grade_from_rubric = '';
@@ -1157,7 +1159,9 @@ trait CLMS_Grading_SpeedGrade_Trait {
 		$student_snapshot = $this->build_student_course_snapshot( $student_id, $course_id );
 		$recent_history   = $this->get_student_recent_submission_history( $student_id, $course_id, $lesson_id, $submission_id, 5 );
 		$ai_pending       = $this->is_submission_ai_pending_validation( $submission_id, $status, $assessment_record );
-		$rubric_id        = $lesson_id ? absint( get_post_meta( $lesson_id, '_clms_rubric_id', true ) ) : 0;
+		$rubric_id        = ( $lesson_id && class_exists( '\ATORA\LMS\Rubric_Service' ) )
+			? \ATORA\LMS\Rubric_Service::get_rubric_id_for_lesson( $lesson_id )
+			: 0;
 		$rubric_snapshot  = array();
 		if ( $rubric_id && class_exists( '\ATORA\LMS\Rubric_Service' ) ) {
 			$eval = \ATORA\LMS\Rubric_Service::get_evaluation( $submission_id );

@@ -69,6 +69,18 @@ final class Rubric_Service {
 	}
 
 	/**
+	 * Puntero de asignación de rúbrica en una lección.
+	 *
+	 * @param int $lesson_id
+	 * @return int wp_post_id del CPT clms_rubric
+	 */
+	public static function get_rubric_id_for_lesson( int $lesson_id ): int {
+		$lesson_id = absint( $lesson_id );
+		if ( $lesson_id <= 0 ) { return 0; }
+		return absint( get_post_meta( $lesson_id, '_clms_rubric_id', true ) );
+	}
+
+	/**
 	 * @param int      $wp_post_id
 	 * @param int|null $revision
 	 * @return array<int,array<string,mixed>>
