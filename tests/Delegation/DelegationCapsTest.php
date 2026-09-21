@@ -8,7 +8,7 @@
 declare( strict_types = 1 );
 
 namespace {
-	require_once __DIR__ . '/../includes/delegation/class-delegation-caps.php';
+	require_once __DIR__ . '/../../includes/delegation/class-delegation-caps.php';
 
 	if ( ! class_exists( 'ATORA_Delegation_Service' ) ) {
 		final class ATORA_Delegation_Service {
@@ -22,7 +22,6 @@ namespace {
 
 namespace ATORA\Tests\Delegation {
 
-use Brain\Monkey\Functions;
 use PHPUnit\Framework\TestCase;
 
 final class DelegationCapsTest extends TestCase {
@@ -41,11 +40,7 @@ final class DelegationCapsTest extends TestCase {
 
 	/** @test */
 	public function it_rewrites_others_caps_when_delegated(): void {
-		$post = (object) array( 'ID' => 123, 'post_type' => 'lm_course' );
-
-		Functions\when( 'get_post' )->alias( static function( $id ) use ( $post ) {
-			return ( absint( $id ) === 123 ) ? $post : null;
-		} );
+		atora_test_set_post( 123, array( 'post_type' => 'lm_course' ) );
 
 		$out = \ATORA_Delegation_Caps::map_delegated_caps(
 			array( 'edit_others_lm_courses', 'edit_published_lm_courses' ),
@@ -58,3 +53,4 @@ final class DelegationCapsTest extends TestCase {
 	}
 }
 
+}
