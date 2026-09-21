@@ -1000,12 +1000,14 @@ add_action( 'init', static function () {
 				return $text;
 			}
 			$info = ATORA_Build_Info::get();
+			$dirty = $info['dirty'] ?? null;
+			$dirty_label = null === $dirty ? 'dirty: ?' : ( $dirty ? 'dirty' : 'clean' );
 			$stamp = trim( sprintf(
-				'ATORA LMS %s · %s (%s%s)',
+				'ATORA LMS %s · %s (%s, %s)',
 				(string) ( $info['version'] ?? '' ),
 				(string) ( $info['commit_short'] ?? '' ),
 				(string) ( $info['origin'] ?? '' ),
-				! empty( $info['dirty'] ) ? ', dirty' : ''
+				(string) $dirty_label
 			) );
 			return '' !== $text ? $text . ' · ' . esc_html( $stamp ) : esc_html( $stamp );
 		} );

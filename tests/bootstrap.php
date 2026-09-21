@@ -415,6 +415,9 @@ if ( ! class_exists( 'WP_User' ) ) {
 if ( ! function_exists( 'wpautop' ) ) {
 	function wpautop( string $s ): string { return '<p>' . $s . '</p>'; }
 }
+if ( ! function_exists( 'trailingslashit' ) ) {
+	function trailingslashit( string $s ): string { return rtrim( $s, '/' ) . '/'; }
+}
 if ( ! function_exists( 'sanitize_textarea_field' ) ) {
 	function sanitize_textarea_field( $s ): string { return trim( strip_tags( (string) $s ) ); }
 }

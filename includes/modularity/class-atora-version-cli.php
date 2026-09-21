@@ -32,16 +32,18 @@ final class ATORA_Version_CLI {
 		}
 
 		$info = ATORA_Build_Info::get();
+		$dirty = $info['dirty'] ?? null;
+		$dirty_label = null === $dirty ? 'unknown' : ( $dirty ? 'dirty' : 'clean' );
+		$dirty_suffix = 'unknown' === $dirty_label ? '' : ( ', ' . $dirty_label );
 		$line = sprintf(
 			'%s %s (%s%s)',
 			$info['version'] ?? '',
 			$info['commit_short'] ?? '',
 			$info['origin'] ?? '',
-			! empty( $info['dirty'] ) ? ', dirty' : ''
+			$dirty_suffix
 		);
 
 		\WP_CLI::log( $line );
 		\WP_CLI::log( wp_json_encode( $info ) );
 	}
 }
-
