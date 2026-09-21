@@ -902,6 +902,9 @@ add_action( 'init', static function () {
 		ATORA_Security_Maintenance::init();
 	}
 
+	// 6.26.5: sello de versión (build-info.json / git).
+	require_once ATORA_LMS_DIR . 'includes/class-build-info.php';
+
 	// P10.1 (6.13.0): cifrado de tokens OAuth — bloqueante, debe cargar
 	// antes que Calendar_Sync y cualquier proveedor Google (Meet/Drive).
 	require_once ATORA_LMS_DIR . 'includes/security/class-token-crypto.php';
@@ -938,6 +941,11 @@ add_action( 'init', static function () {
 		atora_lms_require_module( 'includes/modularity/class-rest-audit-cli.php', static function() {
 			if ( class_exists( 'CLMS_Rest_Audit_CLI' ) ) {
 				CLMS_Rest_Audit_CLI::init();
+			}
+		} );
+		atora_lms_require_module( 'includes/modularity/class-atora-version-cli.php', static function() {
+			if ( class_exists( 'ATORA_Version_CLI' ) ) {
+				ATORA_Version_CLI::init();
 			}
 		} );
 	}
@@ -984,6 +992,24 @@ add_action( 'init', static function () {
 			ATORA\V5_Installer::install();
 		}
 	} );
+
+	// Mostrar sello de versión en admin (para depuración / QA).
+	if ( is_admin() ) {
+		add_filter( 'admin_footer_text', static function( string $text ): string {
+			if ( ! current_user_can( 'manage_options' ) || ! class_exists( 'ATORA_Build_Info' ) ) {
+				return $text;
+			}
+			$info = ATORA_Build_Info::get();
+			$stamp = trim( sprintf(
+				'ATORA LMS %s · %s (%s%s)',
+				(string) ( $info['version'] ?? '' ),
+				(string) ( $info['commit_short'] ?? '' ),
+				(string) ( $info['origin'] ?? '' ),
+				! empty( $info['dirty'] ) ? ', dirty' : ''
+			) );
+			return '' !== $text ? $text . ' · ' . esc_html( $stamp ) : esc_html( $stamp );
+		} );
+	}
 
 	// Bootstrap v5 modules (Security, Affiliates, …).
 	atora_lms_require_module( 'modules/class-v5-modules.php', static function() {
