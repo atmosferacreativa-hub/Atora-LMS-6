@@ -253,6 +253,11 @@ trait CLMS_Helper_Core_Trait {
 			return true;
 		}
 
+		// Post ajeno: permitir por delegación (E-10) antes del rechazo por autoría.
+		if ( class_exists( 'ATORA_Delegation_Service' ) && ATORA_Delegation_Service::covers( $current_user_id, $post, 'content' ) ) {
+			return true;
+		}
+
 		// Post ajeno: necesita capacidad de edición de otros.
 		return current_user_can( $edit_others_cap );
 	}

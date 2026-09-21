@@ -318,6 +318,29 @@ jobs:
           test -n "$course_id"
           wp post get "$course_id" --field=post_status --path=/tmp/wordpress | grep -qx publish
 
+      - name: Tenancy CLI rollback smoke (schema returns to baseline)
+        if: matrix.wordpress == '6.8'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # 1) Rollback to baseline state (drop tenancy additions).
+          wp atora tenancy rollback --yes --path=/tmp/wordpress
+
+          # Snapshot schema post-rollback.
+          for t in wp_atora_programs wp_atora_courses wp_atora_enrollments wp_atora_program_enrollments wp_clms_invitations; do
+            wp db query "SHOW CREATE TABLE ${t}\\G" --path=/tmp/wordpress > "/tmp/${t}.before.txt"
+          done
+
+          # 2) Re-apply schema and then rollback again; schemas must match.
+          wp --path=/tmp/wordpress --context=admin eval '\ATORA\V5_Installer::force_install();'
+          wp atora tenancy rollback --yes --path=/tmp/wordpress
+
+          for t in wp_atora_programs wp_atora_courses wp_atora_enrollments wp_atora_program_enrollments wp_clms_invitations; do
+            wp db query "SHOW CREATE TABLE ${t}\\G" --path=/tmp/wordpress > "/tmp/${t}.after.txt"
+            diff -u "/tmp/${t}.before.txt" "/tmp/${t}.after.txt"
+          done
+
       - name: Surface WordPress debug log
         if: always()
         shell: bash
@@ -363,3 +386,4 @@ jobs:
           path: dist/atora-lms-${{ steps.plugin_version.outputs.version }}.zip
           if-no-files-found: error
           retention-days: 7
+

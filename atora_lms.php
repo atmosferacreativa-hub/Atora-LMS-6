@@ -3,7 +3,7 @@
  * Plugin Name:       ATORA LMS
  * Plugin URI:        https://atora.studio
  * Description:       LMS modular para WordPress con IA, evaluaciones, certificados, CRM, mensajería multi-canal, afiliados, live streaming y más. Autor: Atora Studio. Creado por Atmósfera Creativa.
- * Version:           6.26.2
+ * Version:           6.26.3
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Atora Studio
@@ -52,7 +52,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * - Limpieza automática de notificaciones >90 días
  */
 if ( ! defined( 'ATORA_LMS_VERSION' ) ) {
-	define( 'ATORA_LMS_VERSION', '6.26.2' );
+	define( 'ATORA_LMS_VERSION', '6.26.3' );
 }
 
 if ( ! defined( 'ATORA_LMS_FILE' ) ) {
@@ -1014,6 +1014,24 @@ add_action( 'init', static function () {
 		ATORA_Onboarding_Wizard::init();
 	} );
 
+	// ── E-10: Delegación (instructor asistente) ─────────────────────────────
+	atora_lms_require_module( 'includes/delegation/class-delegation-service.php' );
+	atora_lms_require_module( 'includes/delegation/class-delegation-caps.php', static function() {
+		if ( class_exists( 'ATORA_Delegation_Caps' ) ) {
+			ATORA_Delegation_Caps::init();
+		}
+	} );
+	atora_lms_require_module( 'includes/delegation/class-delegation-attribution.php', static function() {
+		if ( class_exists( 'ATORA_Delegation_Attribution' ) ) {
+			ATORA_Delegation_Attribution::init();
+		}
+	} );
+	atora_lms_require_module( 'includes/delegation/class-delegation-ui.php', static function() {
+		if ( is_admin() && class_exists( 'ATORA_Delegation_UI' ) ) {
+			ATORA_Delegation_UI::init();
+		}
+	} );
+
 	// ── Fase V S16: Migración LMS — página admin + handler AJAX ─────────────
 	atora_lms_require_module( 'modules/lms/class-lms-migration-admin.php', static function() {
 		ATORA_LMS_Migration_Admin::init();
@@ -1035,6 +1053,15 @@ add_action( 'init', static function () {
 				\ATORA\LMS\LMS_CLI::init();
 			}
 		} );
+
+		// ── X-01: comando WP-CLI `wp atora tenancy rollback` ─────────────────
+		atora_lms_require_module( 'modules/tenancy/class-tenancy-cli.php', static function() {
+			atora_lms_require_module( 'modules/tenancy/class-institution-service.php' );
+			atora_lms_require_module( 'modules/tenancy/class-cohort-migrator.php' );
+			if ( class_exists( '\ATORA\LMS\Tenancy_CLI' ) ) {
+				\ATORA\LMS\Tenancy_CLI::init();
+			}
+		} );
 	}
 
 	// ── Fase V S16: LMS Compatibility Layer ──────────────────────────────────
@@ -1044,6 +1071,17 @@ add_action( 'init', static function () {
 
 	// ── Fase IV S15: Academy Context (multi-tenant base) ─────────────────────
 	atora_lms_require_module_if_active( 'crm', 'modules/crm-v2/class-academy-context.php' );
+
+	// ── X-01: Tenant Context (institución) ──────────────────────────────────
+	atora_lms_require_module( 'modules/tenancy/class-tenant-context.php' );
+	atora_lms_require_module( 'modules/tenancy/class-institution-service.php' );
+	atora_lms_require_module( 'modules/tenancy/class-cohort-table-service.php' );
+	atora_lms_require_module( 'modules/tenancy/class-tenancy-audit.php' );
+	atora_lms_require_module( 'modules/tenancy/class-tenancy-query-detector.php', static function() {
+		if ( class_exists( '\ATORA\LMS\Tenancy_Query_Detector' ) ) {
+			\ATORA\LMS\Tenancy_Query_Detector::init();
+		}
+	} );
 
 	// ── Fase IV S13: Webhook Dispatcher ──────────────────────────────────────
 	atora_lms_require_module_if_active( 'webhooks', 'modules/webhooks/class-webhook-dispatcher.php', static function() {

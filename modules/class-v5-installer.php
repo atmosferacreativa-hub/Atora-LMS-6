@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class V5_Installer {
 
 	/** Versión del esquema. Incrementar para forzar re-instalación. */
-	const SCHEMA_VERSION = '6.26.0-integrated-schema';
+	const SCHEMA_VERSION = '6.26.3-tenancy-schema';
 
 	/** Option key que almacena la versión instalada. */
 	const OPTION_KEY = 'atora_v5_schema_version';
@@ -38,7 +38,20 @@ class V5_Installer {
 			return;
 		}
 
-		if ( self::create_tables() && self::migrate_wp_post_id_nullable_columns() && self::migrate_rate_limit_indexes() && self::migrate_telegram_links_from_usermeta() && self::ensure_parity_tables() && self::migrate_followup_plan_column() && self::migrate_followup_plan_domain_columns() && self::migrate_6131_schema_fixes() ) {
+		$prev = (string) get_option( self::OPTION_KEY, '' );
+		if ( '' !== $prev && ! get_option( 'atora_tenancy_prev_v5_schema_version', false ) ) {
+			update_option( 'atora_tenancy_prev_v5_schema_version', $prev, false );
+		}
+
+		if ( self::create_tables()
+			&& self::migrate_tenancy_columns()
+			&& self::migrate_wp_post_id_nullable_columns()
+			&& self::migrate_rate_limit_indexes()
+			&& self::migrate_telegram_links_from_usermeta()
+			&& self::ensure_parity_tables()
+			&& self::migrate_followup_plan_column()
+			&& self::migrate_followup_plan_domain_columns()
+			&& self::migrate_6131_schema_fixes() ) {
 			update_option( self::OPTION_KEY, self::SCHEMA_VERSION );
 		}
 	}
@@ -49,9 +62,147 @@ class V5_Installer {
 	 * @return void
 	 */
 	public static function force_install(): void {
-		if ( self::create_tables() && self::migrate_wp_post_id_nullable_columns() && self::migrate_rate_limit_indexes() && self::migrate_telegram_links_from_usermeta() && self::ensure_parity_tables() && self::migrate_followup_plan_column() && self::migrate_followup_plan_domain_columns() && self::migrate_6131_schema_fixes() ) {
+		$prev = (string) get_option( self::OPTION_KEY, '' );
+		if ( '' !== $prev && ! get_option( 'atora_tenancy_prev_v5_schema_version', false ) ) {
+			update_option( 'atora_tenancy_prev_v5_schema_version', $prev, false );
+		}
+
+		if ( self::create_tables()
+			&& self::migrate_tenancy_columns()
+			&& self::migrate_wp_post_id_nullable_columns()
+			&& self::migrate_rate_limit_indexes()
+			&& self::migrate_telegram_links_from_usermeta()
+			&& self::ensure_parity_tables()
+			&& self::migrate_followup_plan_column()
+			&& self::migrate_followup_plan_domain_columns()
+			&& self::migrate_6131_schema_fixes() ) {
 			update_option( self::OPTION_KEY, self::SCHEMA_VERSION );
 		}
+	}
+
+	/**
+	 * X-01 (6.26.3): columnas de tenencia que dbDelta() no aplica de forma confiable
+	 * en tablas ya existentes (adds de columna / índices en updates).
+	 *
+	 * @return bool
+	 */
+	private static function migrate_tenancy_columns(): bool {
+		global $wpdb;
+
+		$has_column = static function( string $table, string $column ) use ( $wpdb ): bool {
+			return (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+					 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND COLUMN_NAME = %s",
+					$table,
+					$column
+				)
+			) > 0;
+		};
+
+		$has_index = static function( string $table, string $index ) use ( $wpdb ): bool {
+			return (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS
+					 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND INDEX_NAME = %s",
+					$table,
+					$index
+				)
+			) > 0;
+		};
+
+		$ensure_column = static function( string $table, string $column, string $ddl ) use ( $has_column, $wpdb ): void {
+			if ( ! $has_column( $table, $column ) ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				$wpdb->query( $ddl );
+			}
+		};
+
+		$ensure_index = static function( string $table, string $index, string $ddl ) use ( $has_index, $wpdb ): void {
+			if ( ! $has_index( $table, $index ) ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				$wpdb->query( $ddl );
+			}
+		};
+
+		// ── Columnas de tenencia en tablas existentes ───────────────────────
+
+		$programs = $wpdb->prefix . 'atora_programs';
+		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $programs ) ) ) === $programs ) {
+			$ensure_column( $programs, 'institution_id', "ALTER TABLE {$programs} ADD COLUMN institution_id BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER id" );
+			$ensure_index( $programs, 'institution_id', "ALTER TABLE {$programs} ADD KEY institution_id (institution_id)" );
+			$ensure_index( $programs, 'inst_status', "ALTER TABLE {$programs} ADD KEY inst_status (institution_id, status)" );
+		}
+
+		$courses = $wpdb->prefix . 'atora_courses';
+		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $courses ) ) ) === $courses ) {
+			$ensure_column( $courses, 'institution_id', "ALTER TABLE {$courses} ADD COLUMN institution_id BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER id" );
+			$ensure_column( $courses, 'scope', "ALTER TABLE {$courses} ADD COLUMN scope VARCHAR(20) NOT NULL DEFAULT 'institution' AFTER visibility" );
+			$ensure_index( $courses, 'institution_id', "ALTER TABLE {$courses} ADD KEY institution_id (institution_id)" );
+			$ensure_index( $courses, 'inst_status', "ALTER TABLE {$courses} ADD KEY inst_status (institution_id, status)" );
+		}
+
+		$enrollments = $wpdb->prefix . 'atora_enrollments';
+		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $enrollments ) ) ) === $enrollments ) {
+			$ensure_column( $enrollments, 'institution_id', "ALTER TABLE {$enrollments} ADD COLUMN institution_id BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER id" );
+			$ensure_column( $enrollments, 'cohort_id', "ALTER TABLE {$enrollments} ADD COLUMN cohort_id BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER course_id" );
+			$ensure_index( $enrollments, 'institution_id', "ALTER TABLE {$enrollments} ADD KEY institution_id (institution_id)" );
+			$ensure_index( $enrollments, 'cohort_id', "ALTER TABLE {$enrollments} ADD KEY cohort_id (cohort_id)" );
+			$ensure_index( $enrollments, 'inst_status_activity', "ALTER TABLE {$enrollments} ADD KEY inst_status_activity (institution_id, status, last_activity)" );
+		}
+
+		$program_enrollments = $wpdb->prefix . 'atora_program_enrollments';
+		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $program_enrollments ) ) ) === $program_enrollments ) {
+			$ensure_column( $program_enrollments, 'institution_id', "ALTER TABLE {$program_enrollments} ADD COLUMN institution_id BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER id" );
+			$ensure_column( $program_enrollments, 'cohort_id', "ALTER TABLE {$program_enrollments} ADD COLUMN cohort_id BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER program_id" );
+			$ensure_index( $program_enrollments, 'institution_id', "ALTER TABLE {$program_enrollments} ADD KEY institution_id (institution_id)" );
+			$ensure_index( $program_enrollments, 'cohort_id', "ALTER TABLE {$program_enrollments} ADD KEY cohort_id (cohort_id)" );
+		}
+
+		$invitations = $wpdb->prefix . 'clms_invitations';
+		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $invitations ) ) ) === $invitations ) {
+			$ensure_column( $invitations, 'institution_id', "ALTER TABLE {$invitations} ADD COLUMN institution_id BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER id" );
+			$ensure_column( $invitations, 'cohort_id', "ALTER TABLE {$invitations} ADD COLUMN cohort_id BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER program_id" );
+			$ensure_column( $invitations, 'batch_id', "ALTER TABLE {$invitations} ADD COLUMN batch_id VARCHAR(64) NOT NULL DEFAULT '' AFTER cohort_id" );
+			$ensure_index( $invitations, 'institution_id', "ALTER TABLE {$invitations} ADD KEY institution_id (institution_id)" );
+			$ensure_index( $invitations, 'cohort_id', "ALTER TABLE {$invitations} ADD KEY cohort_id (cohort_id)" );
+			$ensure_index( $invitations, 'batch_id', "ALTER TABLE {$invitations} ADD KEY batch_id (batch_id)" );
+		}
+
+		// ── E-10: normalización del nombre de columna wp_course_id ──────────
+		$delegations = $wpdb->prefix . 'atora_instructor_delegations';
+		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $delegations ) ) ) === $delegations ) {
+			if ( ! $has_column( $delegations, 'wp_course_id' ) && $has_column( $delegations, 'course_id' ) ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				$wpdb->query( "ALTER TABLE {$delegations} CHANGE COLUMN course_id wp_course_id BIGINT UNSIGNED NOT NULL DEFAULT 0" );
+			}
+
+			// Re-crear unique key solo si no coincide con la definición esperada.
+			$delegation_cols = (array) $wpdb->get_col(
+				$wpdb->prepare(
+					"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.STATISTICS
+					 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND INDEX_NAME = %s
+					 ORDER BY SEQ_IN_INDEX ASC",
+					$delegations,
+					'delegation'
+				)
+			);
+			$delegation_cols = array_values( array_filter( array_map( 'sanitize_key', $delegation_cols ) ) );
+			$expected_cols   = array( 'instructor_id', 'assistant_id', 'scope', 'wp_course_id' );
+			if ( $has_index( $delegations, 'delegation' ) && $delegation_cols !== $expected_cols ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				$wpdb->query( "ALTER TABLE {$delegations} DROP INDEX delegation" );
+			}
+			$ensure_index( $delegations, 'delegation', "ALTER TABLE {$delegations} ADD UNIQUE KEY delegation (instructor_id, assistant_id, scope, wp_course_id)" );
+
+			if ( $has_index( $delegations, 'course_id' ) ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				$wpdb->query( "ALTER TABLE {$delegations} DROP INDEX course_id" );
+			}
+			$ensure_index( $delegations, 'wp_course_id', "ALTER TABLE {$delegations} ADD KEY wp_course_id (wp_course_id)" );
+		}
+
+		return true;
 	}
 
 	/**
@@ -1242,6 +1393,7 @@ class V5_Installer {
 		// ── Fase 11: LMS — tablas propias (desacopla wp_posts) ───────────────
 		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_courses (
 			id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			institution_id  BIGINT UNSIGNED NOT NULL DEFAULT 0,
 			wp_post_id      BIGINT UNSIGNED NULL DEFAULT NULL,
 			title           VARCHAR(500)    NOT NULL DEFAULT '',
 			slug            VARCHAR(500)    NOT NULL DEFAULT '',
@@ -1249,6 +1401,7 @@ class V5_Installer {
 			excerpt         TEXT            NOT NULL,
 			status          VARCHAR(20)     NOT NULL DEFAULT 'draft',
 			visibility      VARCHAR(20)     NOT NULL DEFAULT 'public',
+			scope           VARCHAR(20)     NOT NULL DEFAULT 'institution',
 			type            VARCHAR(20)     NOT NULL DEFAULT 'self_paced',
 			instructor_id   BIGINT UNSIGNED NOT NULL DEFAULT 0,
 			price           DECIMAL(10,2)   NOT NULL DEFAULT 0.00,
@@ -1267,6 +1420,8 @@ class V5_Installer {
 			PRIMARY KEY (id),
 			UNIQUE KEY wp_post_id  (wp_post_id),
 			KEY status         (status),
+			KEY institution_id (institution_id),
+			KEY inst_status    (institution_id, status),
 			KEY instructor_id  (instructor_id),
 			KEY slug           (slug(200))
 		) $charset_collate;" );
@@ -1300,8 +1455,10 @@ class V5_Installer {
 
 		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_enrollments (
 			id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			institution_id  BIGINT UNSIGNED NOT NULL DEFAULT 0,
 			user_id         BIGINT UNSIGNED NOT NULL,
 			course_id       BIGINT UNSIGNED NOT NULL,
+			cohort_id       BIGINT UNSIGNED NOT NULL DEFAULT 0,
 			wp_course_id    BIGINT UNSIGNED NOT NULL DEFAULT 0,
 			status          VARCHAR(20)     NOT NULL DEFAULT 'active',
 			progress_pct    TINYINT UNSIGNED NOT NULL DEFAULT 0,
@@ -1315,7 +1472,10 @@ class V5_Installer {
 			PRIMARY KEY (id),
 			UNIQUE KEY user_course  (user_id, course_id),
 			KEY status      (status),
+			KEY institution_id (institution_id),
+			KEY inst_status_activity (institution_id, status, last_activity),
 			KEY course_id   (course_id),
+			KEY cohort_id   (cohort_id),
 			KEY enrolled_at (enrolled_at),
 			KEY last_activity (last_activity)
 		) $charset_collate;" );
@@ -1372,6 +1532,7 @@ class V5_Installer {
 		// Programas/diplomados (D-001 = A).
 		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_programs (
 			id              BIGINT UNSIGNED  NOT NULL AUTO_INCREMENT,
+			institution_id  BIGINT UNSIGNED  NOT NULL DEFAULT 0,
 			wp_post_id      BIGINT UNSIGNED  NULL DEFAULT NULL,
 			title           VARCHAR(500)     NOT NULL DEFAULT '',
 			slug            VARCHAR(500)     NOT NULL DEFAULT '',
@@ -1392,6 +1553,8 @@ class V5_Installer {
 			PRIMARY KEY (id),
 			UNIQUE KEY wp_post_id    (wp_post_id),
 			KEY status               (status),
+			KEY institution_id       (institution_id),
+			KEY inst_status          (institution_id, status),
 			KEY instructor_id        (instructor_id),
 			KEY slug                 (slug(200))
 		) $charset_collate;" );
@@ -1399,8 +1562,10 @@ class V5_Installer {
 		// Matrículas a programa (D-001 = A).
 		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_program_enrollments (
 			id              BIGINT UNSIGNED  NOT NULL AUTO_INCREMENT,
+			institution_id  BIGINT UNSIGNED  NOT NULL DEFAULT 0,
 			user_id         BIGINT UNSIGNED  NOT NULL,
 			program_id      BIGINT UNSIGNED  NOT NULL,
+			cohort_id       BIGINT UNSIGNED  NOT NULL DEFAULT 0,
 			wp_program_id   BIGINT UNSIGNED  NOT NULL DEFAULT 0,
 			status          VARCHAR(20)      NOT NULL DEFAULT 'active',
 			enrolled_at     DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1411,8 +1576,142 @@ class V5_Installer {
 			PRIMARY KEY (id),
 			UNIQUE KEY user_program  (user_id, program_id),
 			KEY status               (status),
+			KEY institution_id       (institution_id),
 			KEY program_id           (program_id),
+			KEY cohort_id            (cohort_id),
 			KEY enrolled_at          (enrolled_at)
+		) $charset_collate;" );
+
+		// ── X-01: Instituciones + Cohortes (tenencia) ───────────────────────
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_institutions (
+			id                   BIGINT UNSIGNED  NOT NULL AUTO_INCREMENT,
+			slug                 VARCHAR(190)     NOT NULL DEFAULT '',
+			name                 VARCHAR(255)     NOT NULL DEFAULT '',
+			legal_name           VARCHAR(255)     NOT NULL DEFAULT '',
+			status               VARCHAR(20)      NOT NULL DEFAULT 'active',
+			locale               VARCHAR(10)      NOT NULL DEFAULT 'es',
+			timezone             VARCHAR(64)      NOT NULL DEFAULT '',
+			logo_url             VARCHAR(500)     NOT NULL DEFAULT '',
+			contact_email        VARCHAR(190)     NOT NULL DEFAULT '',
+			grading_policy_json  LONGTEXT                  DEFAULT NULL,
+			ai_policy_json       LONGTEXT                  DEFAULT NULL,
+			settings_json        LONGTEXT                  DEFAULT NULL,
+			seats_licensed       INT UNSIGNED     NOT NULL DEFAULT 0,
+			created_at           DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at           DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			UNIQUE KEY slug (slug),
+			KEY status (status)
+		) $charset_collate;" );
+
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_institution_members (
+			id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			institution_id  BIGINT UNSIGNED NOT NULL,
+			user_id         BIGINT UNSIGNED NOT NULL,
+			role            VARCHAR(40)     NOT NULL DEFAULT 'student',
+			status          VARCHAR(20)     NOT NULL DEFAULT 'active',
+			scope_json      LONGTEXT                 DEFAULT NULL,
+			student_code    VARCHAR(60)     NOT NULL DEFAULT '',
+			joined_at       DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			UNIQUE KEY inst_user_role (institution_id, user_id, role),
+			KEY inst_role_status (institution_id, role, status),
+			KEY user_id (user_id),
+			KEY inst_code (institution_id, student_code)
+		) $charset_collate;" );
+
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_cohorts (
+			id              BIGINT UNSIGNED  NOT NULL AUTO_INCREMENT,
+			institution_id  BIGINT UNSIGNED  NOT NULL DEFAULT 0,
+			program_id      BIGINT UNSIGNED  NOT NULL DEFAULT 0,
+			wp_post_id      BIGINT UNSIGNED  NULL DEFAULT NULL,
+			code            VARCHAR(60)      NOT NULL DEFAULT '',
+			name            VARCHAR(255)     NOT NULL DEFAULT '',
+			status          VARCHAR(20)      NOT NULL DEFAULT 'planned',
+			start_date      DATE                      DEFAULT NULL,
+			end_date        DATE                      DEFAULT NULL,
+			capacity        INT UNSIGNED     NOT NULL DEFAULT 0,
+			settings_json   LONGTEXT                  DEFAULT NULL,
+			created_at      DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at      DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			UNIQUE KEY wp_post_id (wp_post_id),
+			KEY inst_status (institution_id, status),
+			KEY program_id (program_id),
+			KEY dates (start_date, end_date)
+		) $charset_collate;" );
+
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_cohort_members (
+			id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			cohort_id       BIGINT UNSIGNED NOT NULL,
+			institution_id  BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			user_id         BIGINT UNSIGNED NOT NULL,
+			role            VARCHAR(20)     NOT NULL DEFAULT 'student',
+			status          VARCHAR(20)     NOT NULL DEFAULT 'active',
+			joined_at       DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			left_at         DATETIME                 DEFAULT NULL,
+			meta_json       LONGTEXT                 DEFAULT NULL,
+			PRIMARY KEY (id),
+			UNIQUE KEY cohort_user_role (cohort_id, user_id, role),
+			KEY cohort_status (cohort_id, status),
+			KEY inst_user (institution_id, user_id),
+			KEY user_id (user_id)
+		) $charset_collate;" );
+
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_cohort_courses (
+			id            BIGINT UNSIGNED   NOT NULL AUTO_INCREMENT,
+			cohort_id     BIGINT UNSIGNED   NOT NULL,
+			course_id     BIGINT UNSIGNED   NOT NULL,
+			course_order  SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+			is_required   TINYINT(1)        NOT NULL DEFAULT 1,
+			opens_at      DATETIME                   DEFAULT NULL,
+			closes_at     DATETIME                   DEFAULT NULL,
+			PRIMARY KEY (id),
+			UNIQUE KEY cohort_course (cohort_id, course_id),
+			KEY course_id (course_id)
+		) $charset_collate;" );
+
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_tenancy_audit (
+			id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			institution_id  BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			cohort_id       BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			actor_id        BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			on_behalf_of    BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			target_user_id  BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			object_type     VARCHAR(40)     NOT NULL DEFAULT '',
+			object_id       BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			action          VARCHAR(40)     NOT NULL DEFAULT '',
+			payload_json    LONGTEXT                 DEFAULT NULL,
+			created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			KEY inst_created (institution_id, created_at),
+			KEY cohort_id (cohort_id),
+			KEY actor_id (actor_id),
+			KEY target_user (target_user_id)
+		) $charset_collate;" );
+
+		// ── E-10: Delegación de instructor asistente ────────────────────────
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_instructor_delegations (
+			id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			institution_id  BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			instructor_id   BIGINT UNSIGNED NOT NULL,
+			assistant_id    BIGINT UNSIGNED NOT NULL,
+			scope           VARCHAR(20)     NOT NULL DEFAULT 'instructor',
+			wp_course_id    BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			status          VARCHAR(20)     NOT NULL DEFAULT 'active',
+			perms_json      LONGTEXT                 DEFAULT NULL,
+			created_by      BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			expires_at      DATETIME                 DEFAULT NULL,
+			revoked_by      BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			revoked_at      DATETIME                 DEFAULT NULL,
+			PRIMARY KEY (id),
+			UNIQUE KEY delegation (instructor_id, assistant_id, scope, wp_course_id),
+			KEY assistant_status (assistant_id, status),
+			KEY instructor_id (instructor_id),
+			KEY wp_course_id (wp_course_id),
+			KEY institution_id (institution_id)
 		) $charset_collate;" );
 
 		// Definición de quiz por lección (D-002; una fila por lección con quiz activo).

@@ -1,0 +1,140 @@
+
+-- SHOW CREATE TABLE wp_atora_programs
+
+*************************** 1. row ***************************
+wp_atora_programs
+CREATE TABLE `wp_atora_programs` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `wp_post_id` bigint unsigned DEFAULT NULL,
+  `title` varchar(500) COLLATE utf8mb4_unicode_520_ci NOT NULL DEFAULT '',
+  `slug` varchar(500) COLLATE utf8mb4_unicode_520_ci NOT NULL DEFAULT '',
+  `description` longtext COLLATE utf8mb4_unicode_520_ci NOT NULL,
+  `excerpt` text COLLATE utf8mb4_unicode_520_ci NOT NULL,
+  `status` varchar(20) COLLATE utf8mb4_unicode_520_ci NOT NULL DEFAULT 'draft',
+  `instructor_id` bigint unsigned NOT NULL DEFAULT '0',
+  `price` decimal(10,2) NOT NULL DEFAULT '0.00',
+  `currency` varchar(3) COLLATE utf8mb4_unicode_520_ci NOT NULL DEFAULT 'USD',
+  `duration_hours` decimal(5,1) NOT NULL DEFAULT '0.0',
+  `thumbnail_url` varchar(500) COLLATE utf8mb4_unicode_520_ci NOT NULL DEFAULT '',
+  `passing_grade` tinyint unsigned NOT NULL DEFAULT '70',
+  `settings_json` longtext COLLATE utf8mb4_unicode_520_ci,
+  `meta_json` longtext COLLATE utf8mb4_unicode_520_ci,
+  `published_at` datetime DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `wp_post_id` (`wp_post_id`),
+  KEY `status` (`status`),
+  KEY `instructor_id` (`instructor_id`),
+  KEY `slug` (`slug`(200))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci
+
+-- SHOW CREATE TABLE wp_atora_courses
+
+*************************** 1. row ***************************
+wp_atora_courses
+CREATE TABLE `wp_atora_courses` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `wp_post_id` bigint unsigned DEFAULT NULL,
+  `title` varchar(500) COLLATE utf8mb4_unicode_520_ci NOT NULL DEFAULT '',
+  `slug` varchar(500) COLLATE utf8mb4_unicode_520_ci NOT NULL DEFAULT '',
+  `description` longtext COLLATE utf8mb4_unicode_520_ci NOT NULL,
+  `excerpt` text COLLATE utf8mb4_unicode_520_ci NOT NULL,
+  `status` varchar(20) COLLATE utf8mb4_unicode_520_ci NOT NULL DEFAULT 'draft',
+  `visibility` varchar(20) COLLATE utf8mb4_unicode_520_ci NOT NULL DEFAULT 'public',
+  `type` varchar(20) COLLATE utf8mb4_unicode_520_ci NOT NULL DEFAULT 'self_paced',
+  `instructor_id` bigint unsigned NOT NULL DEFAULT '0',
+  `price` decimal(10,2) NOT NULL DEFAULT '0.00',
+  `currency` varchar(3) COLLATE utf8mb4_unicode_520_ci NOT NULL DEFAULT 'USD',
+  `duration_hours` decimal(5,1) NOT NULL DEFAULT '0.0',
+  `level` varchar(20) COLLATE utf8mb4_unicode_520_ci NOT NULL DEFAULT 'beginner',
+  `language` varchar(5) COLLATE utf8mb4_unicode_520_ci NOT NULL DEFAULT 'es',
+  `thumbnail_url` varchar(500) COLLATE utf8mb4_unicode_520_ci NOT NULL DEFAULT '',
+  `certificate_tpl` varchar(200) COLLATE utf8mb4_unicode_520_ci NOT NULL DEFAULT '',
+  `passing_grade` tinyint unsigned NOT NULL DEFAULT '70',
+  `settings_json` longtext COLLATE utf8mb4_unicode_520_ci,
+  `meta_json` longtext COLLATE utf8mb4_unicode_520_ci,
+  `published_at` datetime DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `wp_post_id` (`wp_post_id`),
+  KEY `status` (`status`),
+  KEY `instructor_id` (`instructor_id`),
+  KEY `slug` (`slug`(200))
+) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci
+
+-- SHOW CREATE TABLE wp_atora_enrollments
+
+*************************** 1. row ***************************
+wp_atora_enrollments
+CREATE TABLE `wp_atora_enrollments` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` bigint unsigned NOT NULL,
+  `course_id` bigint unsigned NOT NULL,
+  `wp_course_id` bigint unsigned NOT NULL DEFAULT '0',
+  `status` varchar(20) COLLATE utf8mb4_unicode_520_ci NOT NULL DEFAULT 'active',
+  `progress_pct` tinyint unsigned NOT NULL DEFAULT '0',
+  `grade` decimal(5,2) DEFAULT NULL,
+  `order_id` bigint unsigned NOT NULL DEFAULT '0',
+  `enrolled_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `completed_at` datetime DEFAULT NULL,
+  `expires_at` datetime DEFAULT NULL,
+  `last_activity` datetime DEFAULT NULL,
+  `meta_json` longtext COLLATE utf8mb4_unicode_520_ci,
+  `academy_id` bigint unsigned NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `user_course` (`user_id`,`course_id`),
+  KEY `status` (`status`),
+  KEY `course_id` (`course_id`),
+  KEY `enrolled_at` (`enrolled_at`),
+  KEY `last_activity` (`last_activity`),
+  KEY `idx_academy_id` (`academy_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci
+
+-- SHOW CREATE TABLE wp_atora_program_enrollments
+
+*************************** 1. row ***************************
+wp_atora_program_enrollments
+CREATE TABLE `wp_atora_program_enrollments` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` bigint unsigned NOT NULL,
+  `program_id` bigint unsigned NOT NULL,
+  `wp_program_id` bigint unsigned NOT NULL DEFAULT '0',
+  `status` varchar(20) COLLATE utf8mb4_unicode_520_ci NOT NULL DEFAULT 'active',
+  `enrolled_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `completed_at` datetime DEFAULT NULL,
+  `expires_at` datetime DEFAULT NULL,
+  `last_activity` datetime DEFAULT NULL,
+  `meta_json` longtext COLLATE utf8mb4_unicode_520_ci,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `user_program` (`user_id`,`program_id`),
+  KEY `status` (`status`),
+  KEY `program_id` (`program_id`),
+  KEY `enrolled_at` (`enrolled_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci
+
+-- SHOW CREATE TABLE wp_clms_invitations
+
+*************************** 1. row ***************************
+wp_clms_invitations
+CREATE TABLE `wp_clms_invitations` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `token` varchar(64) COLLATE utf8mb4_unicode_520_ci NOT NULL,
+  `course_id` bigint NOT NULL DEFAULT '0',
+  `program_id` bigint NOT NULL DEFAULT '0',
+  `access_mode` varchar(20) COLLATE utf8mb4_unicode_520_ci NOT NULL DEFAULT 'invite',
+  `invited_email` varchar(200) COLLATE utf8mb4_unicode_520_ci NOT NULL DEFAULT '',
+  `access_password` varchar(200) COLLATE utf8mb4_unicode_520_ci NOT NULL DEFAULT '',
+  `created_by` bigint NOT NULL DEFAULT '0',
+  `max_uses` int NOT NULL DEFAULT '1',
+  `used_count` int NOT NULL DEFAULT '0',
+  `expires_at` datetime DEFAULT NULL,
+  `status` varchar(20) COLLATE utf8mb4_unicode_520_ci NOT NULL DEFAULT 'active',
+  `created_at` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `token` (`token`),
+  KEY `course_id` (`course_id`),
+  KEY `program_id` (`program_id`),
+  KEY `status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci

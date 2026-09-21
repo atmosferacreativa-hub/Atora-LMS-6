@@ -255,6 +255,51 @@ class CLMS_Access {
 			}
 		}
 
+		// ── Instructor asistente: gestiona contenidos delegados (sin edit_others estático) ──
+		$assistant_caps = array(
+			'read'                        => true,
+			'upload_files'                => true,
+			'clms_access_admin'           => true,
+			'clms_manage_courses'         => true,
+			'clms_manage_lessons'         => true,
+			'clms_manage_submissions'     => true,
+			'clms_view_teacher_dashboard' => true,
+			'create_lm_courses'           => true,
+			'edit_lm_courses'             => true,
+			'edit_published_lm_courses'   => true,
+			'publish_lm_courses'          => true,
+			'create_lm_lessons'           => true,
+			'edit_lm_lessons'             => true,
+			'edit_published_lm_lessons'   => true,
+			'publish_lm_lessons'          => true,
+			// PROHIBIDO conceder estáticamente:
+			'edit_others_lm_courses'      => false,
+			'edit_others_lm_lessons'      => false,
+			'delete_others_lm_courses'    => false,
+			'delete_others_lm_lessons'    => false,
+			// Solo por delegación, en runtime:
+			'clms_grade_submissions'      => false,
+			'clms_manage_enrollments'     => false,
+			'clms_manage_course_access'   => false,
+			'clms_manage_enrollment_access' => false,
+			// Destructivo:
+			'delete_lm_courses'           => false,
+			'delete_published_lm_courses' => false,
+			'delete_lm_lessons'           => false,
+			'delete_published_lm_lessons' => false,
+		);
+
+		if ( ! get_role( 'lms_instructor_assistant' ) ) {
+			add_role( 'lms_instructor_assistant', 'Instructor asistente', array_filter( $assistant_caps ) );
+		} else {
+			$role = get_role( 'lms_instructor_assistant' );
+			if ( $role ) {
+				foreach ( $assistant_caps as $cap => $grant ) {
+					$grant ? $role->add_cap( $cap, true ) : $role->remove_cap( $cap );
+				}
+			}
+		}
+
 		// ── Estudiante: solo lectura, sin edición ────────────────────────────
 		if ( ! get_role( 'lms_student' ) ) {
 			add_role(
@@ -629,7 +674,17 @@ class CLMS_Access {
 		}
 
 		$edit_others_cap = self::resource_edit_others_cap( $resource_type );
-		return '' !== $edit_others_cap && current_user_can( $edit_others_cap );
+		if ( '' !== $edit_others_cap && current_user_can( $edit_others_cap ) ) {
+			return true;
+		}
+
+		// E-10: delegación como tercera vía (solo cursos/lecciones).
+		if ( class_exists( 'ATORA_Delegation_Service' ) && in_array( $resource_type, array( 'course', 'program' ), true ) ) {
+			$perm = ( 'access' === $scope ) ? 'access' : 'enroll';
+			return ATORA_Delegation_Service::covers( $user_id, $post, $perm );
+		}
+
+		return false;
 	}
 
 	/**

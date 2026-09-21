@@ -200,7 +200,10 @@ trait CLMS_Teacher_Dashboard_Data_Trait {
 				'post_status'    => array( 'publish', 'private', 'draft' ),
 				'posts_per_page' => -1,
 				'fields'         => 'ids',
-				'author'         => $user_id,
+				'author__in'     => array_values( array_unique( array_filter( array_map( 'absint', array_merge(
+					array( $user_id ),
+					class_exists( 'ATORA_Delegation_Service' ) ? ATORA_Delegation_Service::delegating_instructors( $user_id ) : array()
+				) ) ) ) ),
 				'orderby'        => 'title',
 				'order'          => 'ASC',
 			)
@@ -419,8 +422,9 @@ trait CLMS_Teacher_Dashboard_Data_Trait {
 		return $items;
 	}
 
-	protected function get_course_cards( $course_ids ) {
+	protected function get_course_cards( $course_ids, $viewer_id = 0 ) {
 		$course_ids = is_array( $course_ids ) ? array_map( 'absint', $course_ids ) : array();
+		$viewer_id  = absint( $viewer_id );
 
 		if ( empty( $course_ids ) ) {
 			return array();
@@ -429,6 +433,16 @@ trait CLMS_Teacher_Dashboard_Data_Trait {
 		$items = array();
 
 		foreach ( $course_ids as $course_id ) {
+			$owner_id = absint( get_post_field( 'post_author', $course_id ) );
+			$delegated_label = '';
+			if ( $viewer_id > 0 && $owner_id > 0 && $owner_id !== $viewer_id ) {
+				$delegated_label = sprintf(
+					/* translators: %s instructor display name */
+					__( 'de %s', 'atora-lms' ),
+					sanitize_text_field( (string) get_the_author_meta( 'display_name', $owner_id ) )
+				);
+			}
+
 			$lesson_ids       = CLMS_Helper::get_course_lessons( $course_id );
 			$first_lesson_id  = ! empty( $lesson_ids ) ? absint( $lesson_ids[0] ) : 0;
 			$student_count    = $this->get_course_student_count( $course_id );
@@ -439,6 +453,9 @@ trait CLMS_Teacher_Dashboard_Data_Trait {
 				_n( '%d lección', '%d lecciones', $lesson_count, 'atora-lms' ),
 				$lesson_count
 			);
+			if ( '' !== $delegated_label ) {
+				$meta_parts[] = $delegated_label;
+			}
 			if ( $student_count > 0 ) {
 				$meta_parts[] = sprintf(
 					_n( '%d estudiante', '%d estudiantes', $student_count, 'atora-lms' ),

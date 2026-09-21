@@ -365,6 +365,40 @@ class Licensing {
 				</p>
 			</div>
 
+			<?php if ( class_exists( '\ATORA\LMS\Institution_Service' ) ) : ?>
+				<?php
+				$seats = \ATORA\LMS\Institution_Service::seats_report();
+				?>
+				<?php if ( ! empty( $seats ) ) : ?>
+					<div class="card" style="max-width:640px;padding:20px;margin-top:16px">
+						<h2 style="margin-top:0"><?php esc_html_e( 'Instituciones — asientos', 'atora-lms' ); ?></h2>
+						<table class="widefat striped">
+							<thead>
+								<tr>
+									<th><?php esc_html_e( 'ID', 'atora-lms' ); ?></th>
+									<th><?php esc_html_e( 'Slug', 'atora-lms' ); ?></th>
+									<th><?php esc_html_e( 'Nombre', 'atora-lms' ); ?></th>
+									<th><?php esc_html_e( 'Licenciados', 'atora-lms' ); ?></th>
+									<th><?php esc_html_e( 'Usados', 'atora-lms' ); ?></th>
+								</tr>
+							</thead>
+							<tbody>
+								<?php foreach ( $seats as $row ) : ?>
+									<tr>
+										<td><?php echo esc_html( (string) absint( $row['id'] ?? 0 ) ); ?></td>
+										<td><?php echo esc_html( (string) ( $row['slug'] ?? '' ) ); ?></td>
+										<td><?php echo esc_html( (string) ( $row['name'] ?? '' ) ); ?></td>
+										<td><?php echo esc_html( (string) absint( $row['seats_licensed'] ?? 0 ) ); ?></td>
+										<td><?php echo esc_html( (string) absint( $row['seats_used'] ?? 0 ) ); ?></td>
+									</tr>
+								<?php endforeach; ?>
+							</tbody>
+						</table>
+						<p class="description"><?php esc_html_e( 'Reporte local: asientos usados = miembros activos con rol estudiante.', 'atora-lms' ); ?></p>
+					</div>
+				<?php endif; ?>
+			<?php endif; ?>
+
 			<div class="card" style="max-width:640px;padding:20px;margin-top:16px;border-left:4px solid #d63638">
 				<h2 style="margin-top:0"><?php esc_html_e( 'Zona de riesgo', 'atora-lms' ); ?></h2>
 				<?php

@@ -26,6 +26,26 @@ class CLMS_Cohort_Service {
 	const META_STUDENT_STATUS = '_clms_cohort_student_status_map';
 
 	/**
+	 * Fuente de lectura de cohortes.
+	 *
+	 * legacy = wp_postmeta (default)
+	 * tables = tablas atora_cohorts/*
+	 */
+	const OPT_SOURCE = 'atora_cohort_source';
+
+	private function source(): string {
+		return (string) get_option( self::OPT_SOURCE, 'legacy' );
+	}
+
+	private function is_tables(): bool {
+		return 'tables' === $this->source();
+	}
+
+	private function table_service_enabled(): bool {
+		return $this->is_tables() && class_exists( '\ATORA\LMS\Cohort_Table_Service' );
+	}
+
+	/**
 	 * Estados válidos de cohorte.
 	 *
 	 * @return array<string,string>
@@ -91,6 +111,9 @@ class CLMS_Cohort_Service {
 	 * @return array<int,int>
 	 */
 	public function get_cohort_course_ids( $cohort_id ) {
+		if ( $this->table_service_enabled() ) {
+			return \ATORA\LMS\Cohort_Table_Service::get_wp_course_ids( absint( $cohort_id ) );
+		}
 		return $this->normalize_ids( get_post_meta( absint( $cohort_id ), self::META_COURSE_IDS, true ) );
 	}
 
@@ -111,6 +134,9 @@ class CLMS_Cohort_Service {
 	 * @return array<int,int>
 	 */
 	public function get_cohort_teacher_ids( $cohort_id ) {
+		if ( $this->table_service_enabled() ) {
+			return \ATORA\LMS\Cohort_Table_Service::get_member_ids( absint( $cohort_id ), 'teacher' );
+		}
 		return $this->normalize_ids( get_post_meta( absint( $cohort_id ), self::META_TEACHER_IDS, true ) );
 	}
 
@@ -121,6 +147,9 @@ class CLMS_Cohort_Service {
 	 * @return array<int,int>
 	 */
 	public function get_cohort_student_ids( $cohort_id ) {
+		if ( $this->table_service_enabled() ) {
+			return \ATORA\LMS\Cohort_Table_Service::get_member_ids( absint( $cohort_id ), 'student' );
+		}
 		return $this->normalize_ids( get_post_meta( absint( $cohort_id ), self::META_STUDENT_IDS, true ) );
 	}
 
@@ -132,6 +161,17 @@ class CLMS_Cohort_Service {
 	 */
 	public function get_cohort_student_status_map( $cohort_id ) {
 		$cohort_id = absint( $cohort_id );
+		if ( $this->table_service_enabled() ) {
+			$raw = \ATORA\LMS\Cohort_Table_Service::get_student_status_map( $cohort_id );
+			$raw = is_array( $raw ) ? $raw : array();
+			$map = array();
+			foreach ( $this->get_cohort_student_ids( $cohort_id ) as $student_id ) {
+				$student_id = absint( $student_id );
+				if ( ! $student_id ) { continue; }
+				$map[ $student_id ] = $this->normalize_student_status( $raw[ $student_id ] ?? 'activo' );
+			}
+			return $map;
+		}
 		$raw       = get_post_meta( $cohort_id, self::META_STUDENT_STATUS, true );
 		$raw       = is_array( $raw ) ? $raw : array();
 		$students  = $this->get_cohort_student_ids( $cohort_id );
@@ -158,6 +198,11 @@ class CLMS_Cohort_Service {
 	 */
 	public function set_cohort_student_ids( $cohort_id, $student_ids ) {
 		$cohort_id   = absint( $cohort_id );
+		if ( $this->table_service_enabled() ) {
+			// En modo tablas, la edición/mutación se gestiona por servicios tabulares.
+			// No escribir en postmeta legacy durante la transición.
+			return;
+		}
 		$student_ids = $this->normalize_ids( $student_ids );
 		update_post_meta( $cohort_id, self::META_STUDENT_IDS, $student_ids );
 
@@ -180,6 +225,9 @@ class CLMS_Cohort_Service {
 		$cohort_id  = absint( $cohort_id );
 		$student_id = absint( $student_id );
 		if ( ! $cohort_id || ! $student_id ) {
+			return false;
+		}
+		if ( $this->table_service_enabled() ) {
 			return false;
 		}
 
@@ -206,6 +254,9 @@ class CLMS_Cohort_Service {
 		if ( ! $cohort_id || ! $student_id ) {
 			return false;
 		}
+		if ( $this->table_service_enabled() ) {
+			return false;
+		}
 
 		$students = $this->get_cohort_student_ids( $cohort_id );
 		$students = array_values( array_diff( $students, array( $student_id ) ) );
@@ -225,6 +276,9 @@ class CLMS_Cohort_Service {
 		$cohort_id  = absint( $cohort_id );
 		$student_id = absint( $student_id );
 		if ( ! $cohort_id || ! $student_id ) {
+			return false;
+		}
+		if ( $this->table_service_enabled() ) {
 			return false;
 		}
 
@@ -250,6 +304,9 @@ class CLMS_Cohort_Service {
 		$cohort_id    = absint( $cohort_id );
 		$cohort_state = $this->normalize_cohort_status( $cohort_state );
 		if ( ! $cohort_id ) {
+			return;
+		}
+		if ( $this->table_service_enabled() ) {
 			return;
 		}
 
@@ -278,18 +335,22 @@ class CLMS_Cohort_Service {
 	 * @param int   $limit         Límite.
 	 * @return array<int,int>
 	 */
-	public function get_visible_cohort_ids( $user_id = 0, $status_filter = array(), $limit = 150 ) {
+	public function get_visible_cohort_ids( $user_id = 0, $status_filter = array(), $limit = 0 ) {
 		$user_id = absint( $user_id );
 		if ( ! $user_id ) {
 			$user_id = get_current_user_id();
 		}
-		$limit = max( 1, absint( $limit ) );
+		$limit = absint( $limit );
+
+		if ( $this->table_service_enabled() ) {
+			return \ATORA\LMS\Cohort_Table_Service::get_visible_wp_post_ids( $user_id, is_array( $status_filter ) ? $status_filter : array(), $limit );
+		}
 
 		$posts = get_posts(
 			array(
 				'post_type'              => self::POST_TYPE,
 				'post_status'            => array( 'publish', 'private', 'draft' ),
-				'posts_per_page'         => $limit,
+				'posts_per_page'         => ( $limit > 0 ? $limit : -1 ),
 				'orderby'                => 'date',
 				'order'                  => 'DESC',
 				'fields'                 => 'ids',
@@ -431,7 +492,7 @@ class CLMS_Cohort_Service {
 	 * @return array<string,mixed>
 	 */
 	public function get_operational_snapshot( $user_id = 0 ) {
-		$cohort_ids = $this->get_visible_cohort_ids( $user_id, array(), 150 );
+		$cohort_ids = $this->get_visible_cohort_ids( $user_id, array(), 0 );
 		$counts = array(
 			'proximo'    => 0,
 			'activo'     => 0,
@@ -561,4 +622,3 @@ class CLMS_Cohort_Service {
 		return $values;
 	}
 }
-

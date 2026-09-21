@@ -66,7 +66,7 @@ trait CLMS_Teacher_Dashboard_Render_Trait {
 		$pending_submissions = $this->get_pending_submissions( $user_id, $course_ids, $lesson_ids, $pending_limit );
 		$reviewed_items      = $this->get_reviewed_submissions( $user_id, $course_ids, $lesson_ids, $reviewed_limit );
 		$recent_lessons      = $this->get_recent_lessons_data( $lesson_ids, $recent_lessons_limit );
-		$course_cards        = $this->get_course_cards( $course_ids );
+		$course_cards        = $this->get_course_cards( $course_ids, $user_id );
 		$metrics             = $this->get_metrics( $course_ids, $lesson_ids, $pending_submissions, $reviewed_items );
 		$speedgrade_focus    = $this->get_speedgrade_focus_item( $pending_submissions );
 		$notifications       = $this->get_teacher_notifications( $user_id, $notifications_limit );
