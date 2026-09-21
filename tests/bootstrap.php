@@ -24,6 +24,7 @@ require_once $autoload;
 
 // Brain\Monkey para stubs de WordPress
 \Brain\Monkey\setUp();
+\Brain\Monkey\Functions\when( 'wp_kses_post' )->returnArg();
 
 // Definir constantes WP mínimas
 if ( ! defined( 'ABSPATH' ) )         { define( 'ABSPATH', '/tmp/wp/' ); }
@@ -79,7 +80,6 @@ if ( ! function_exists( 'sanitize_email' ) )   { function sanitize_email( $s ): 
 	if ( ! function_exists( 'esc_url_raw' ) )      { function esc_url_raw( $s ): string { return filter_var( (string) $s, FILTER_SANITIZE_URL ) ?: ''; } }
 	if ( ! function_exists( 'wp_parse_url' ) )     { function wp_parse_url( string $url ) { return parse_url( $url ); } }
 	if ( ! function_exists( 'wp_json_encode' ) )   { function wp_json_encode( $d ): string { return (string) json_encode( $d ); } }
-	if ( ! function_exists( 'wp_kses_post' ) )     { function wp_kses_post( string $s ): string { return $s; } }
 if ( ! function_exists( 'wp_unslash' ) ) {
 	function wp_unslash( $value ) {
 		return is_array( $value ) ? array_map( 'wp_unslash', $value ) : ( is_string( $value ) ? stripslashes( $value ) : $value );

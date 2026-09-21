@@ -349,6 +349,76 @@ jobs:
             sed -n '1,400p' /tmp/wordpress/wp-content/debug.log
           fi
 
+  wordpress-integration:
+    name: WordPress integration (WP_UnitTestCase) / PHP 8.1
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_DATABASE: wordpress
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up PHP and tools
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.1"
+          coverage: none
+          tools: composer:v2, wp-cli
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Install WordPress test suite
+        shell: bash
+        env:
+          WP_VERSION: "6.8"
+          WP_CORE_DIR: /tmp/wordpress
+          WP_TESTS_DIR: /tmp/wordpress-tests-lib
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y subversion
+
+          wp core download --version="${WP_VERSION}" --skip-content --path="${WP_CORE_DIR}"
+
+          svn export --force "https://develop.svn.wordpress.org/tags/${WP_VERSION}/tests/phpunit/" "${WP_TESTS_DIR}" \
+            || svn export --force "https://develop.svn.wordpress.org/tags/${WP_VERSION}.0/tests/phpunit/" "${WP_TESTS_DIR}" \
+            || svn export --force "https://develop.svn.wordpress.org/trunk/tests/phpunit/" "${WP_TESTS_DIR}"
+
+          cp "${WP_TESTS_DIR}/wp-tests-config-sample.php" "${WP_TESTS_DIR}/wp-tests-config.php"
+
+          sed -i \
+            -e "s/youremptytestdbnamehere/wordpress/" \
+            -e "s/yourusernamehere/root/" \
+            -e "s/yourpasswordhere/root/" \
+            -e "s/localhost/127.0.0.1:3306/" \
+            "${WP_TESTS_DIR}/wp-tests-config.php"
+
+          # Ajustar ABSPATH al core descargado por WP-CLI.
+          sed -i \
+            -E "s|define\\( 'ABSPATH'.*|define( 'ABSPATH', '${WP_CORE_DIR}/' );|g" \
+            "${WP_TESTS_DIR}/wp-tests-config.php"
+
+      - name: Run integration tests (file isolated)
+        shell: bash
+        env:
+          WP_TESTS_DIR: /tmp/wordpress-tests-lib
+          WP_CORE_DIR: /tmp/wordpress
+        run: bash scripts/run-phpunit-integration-files.sh
+
   distribution:
     name: Distribution package
     runs-on: ubuntu-latest
@@ -386,4 +456,3 @@ jobs:
           path: dist/atora-lms-${{ steps.plugin_version.outputs.version }}.zip
           if-no-files-found: error
           retention-days: 7
-
