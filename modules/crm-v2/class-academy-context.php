@@ -62,7 +62,7 @@ class Academy_Context {
 	 */
 	public static function where_clause( string $alias = '' ): string {
 		$id = self::get_current_academy_id();
-		if ( 0 === $id ) { return ''; }
+		if ( 0 === $id ) { return 'AND 1=0'; }
 		global $wpdb;
 		$alias = (string) preg_replace( '/[^a-zA-Z0-9_]/', '', $alias );
 		$col   = $alias ? "{$alias}.institution_id" : 'institution_id';
@@ -123,8 +123,6 @@ class Academy_Context {
 		}
 
 		$id = self::get_current_academy_id();
-		if ( $id > 0 ) {
-			$args[ $field ] = $id;
-		}
+		$args[ $field ] = $id > 0 ? $id : -1;
 	}
 }
