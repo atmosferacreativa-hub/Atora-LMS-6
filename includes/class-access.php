@@ -28,7 +28,6 @@ class CLMS_Access {
 			'clms_access_crm_view',
 			'clms_manage_crm',
 			'crm_manage_campaigns',
-			'crm_manage_pipelines',
 			'crm_export_contacts',
 			'crm_send_email',
 			'crm_view_reports',
@@ -201,7 +200,7 @@ class CLMS_Access {
 			'clms_view_teacher_dashboard' => true,
 			'clms_manage_enrollments'     => true,
 			'clms_manage_course_access'   => true,
-			'clms_manage_enrollment_access' => true,
+			'clms_manage_enrollment_access' => false,
 			// CPT lm_course (propios)
 			'create_lm_courses'           => true,
 			'edit_lm_courses'             => true,
@@ -323,7 +322,7 @@ class CLMS_Access {
 			'clms_access_crm_view'    => true,
 			'clms_manage_crm'         => true,
 			'crm_manage_campaigns'    => true,
-			'crm_manage_pipelines'    => true,
+			'crm_manage_pipelines'    => false,
 			'crm_export_contacts'     => true,
 			'crm_send_email'          => true,
 			'crm_view_reports'        => true,
@@ -344,7 +343,7 @@ class CLMS_Access {
 		$crm_operator_caps = array(
 			'read'                    => true,
 			'clms_access_crm_view'    => true,
-			'crm_manage_pipelines'    => true,
+			'crm_manage_pipelines'    => false,
 			'crm_send_email'          => true,
 			'crm_view_reports'        => true,
 			'crm_manage_campaigns'    => false,
@@ -394,11 +393,14 @@ class CLMS_Access {
 		if ( $admin ) {
 			$crm_caps = array(
 				'clms_access_crm_view', 'clms_manage_crm', 'crm_manage_campaigns',
-				'crm_manage_pipelines', 'crm_export_contacts', 'crm_send_email', 'crm_view_reports',
+				'crm_export_contacts', 'crm_send_email', 'crm_view_reports',
 			);
 			foreach ( $crm_caps as $cap ) {
 				$admin->add_cap( $cap, true );
 			}
+
+			// Cap muerto (E-07 audit): no se usa ni se comprueba.
+			$admin->remove_cap( 'crm_manage_pipelines' );
 		}
 
 		// ── Añadir cap de vista CRM al instructor ─────────────────────────────
@@ -839,12 +841,8 @@ class CLMS_Access {
 		return current_user_can( 'crm_manage_campaigns' ) || current_user_can( 'clms_manage_crm' ) || current_user_can( 'manage_options' );
 	}
 
-	public static function can_manage_crm_pipelines(): bool {
-		return current_user_can( 'crm_manage_pipelines' ) || current_user_can( 'clms_manage_crm' ) || current_user_can( 'manage_options' );
-	}
-
 	public static function can_export_contacts(): bool {
-		return current_user_can( 'crm_export_contacts' ) || current_user_can( 'clms_manage_crm' ) || current_user_can( 'manage_options' );
+		return current_user_can( 'crm_export_contacts' ) || current_user_can( 'manage_options' );
 	}
 
 	public static function can_send_crm_email(): bool {
