@@ -41,6 +41,7 @@ $WP post meta update "$RUBRIC_STRUCT_ID" _clms_rubric_scale_type 0_100 >/dev/nul
 $WP post meta update "$RUBRIC_STRUCT_ID" _clms_rubric_is_holistic 0 >/dev/null
 
 $WP eval "
+\$rubric_id = (int) ${RUBRIC_STRUCT_ID};
 \$criteria = array(
   array(
     'name' => 'Claridad',
@@ -79,7 +80,7 @@ $WP eval "
     ),
   ),
 );
-update_post_meta( {$RUBRIC_STRUCT_ID}, '_clms_rubric_criteria', \$criteria );
+update_post_meta( \$rubric_id, '_clms_rubric_criteria', \$criteria );
 echo \"ok\\n\";
 " >/dev/null
 
@@ -92,6 +93,7 @@ RUBRIC_NL_ID=$($WP post create --post_type=clms_rubric --post_status=publish --p
 $WP post meta update "$RUBRIC_NL_ID" _clms_rubric_scale_type 0_100 >/dev/null
 $WP post meta update "$RUBRIC_NL_ID" _clms_rubric_is_holistic 0 >/dev/null
 $WP eval "
+\$rubric_id = (int) ${RUBRIC_NL_ID};
 \$criteria = array(
   array(
     'name' => 'Criterio NL',
@@ -103,7 +105,7 @@ $WP eval "
     'levels' => array(),
   ),
 );
-update_post_meta( {$RUBRIC_NL_ID}, '_clms_rubric_criteria', \$criteria );
+update_post_meta( \$rubric_id, '_clms_rubric_criteria', \$criteria );
 echo \"ok\\n\";
 " >/dev/null
 
@@ -118,7 +120,7 @@ $WP post meta update "$SUBMISSION_ID" _clms_submission_status submitted >/dev/nu
 
 echo "Asegurando curso/lección en tablas LMS + matrícula…"
 $WP eval "
-\$course_post = get_post( {$COURSE_POST_ID} );
+\$course_post = get_post( (int) ${COURSE_POST_ID} );
 \$course_id = \\ATORA\\LMS\\LMS_Course_Service::create( array(
   'title' => (string) \$course_post->post_title,
   'slug' => (string) \$course_post->post_name,
@@ -126,13 +128,13 @@ $WP eval "
   'excerpt' => 'Curso seed',
   'status' => 'published',
   'type' => 'self_paced',
-  'instructor_id' => {$INSTRUCTOR_ID},
+  'instructor_id' => (int) ${INSTRUCTOR_ID},
   'language' => 'es',
 ) );
-\\ATORA\\LMS\\LMS_Course_Service::link_to_legacy_post( \$course_id, {$COURSE_POST_ID} );
+\\ATORA\\LMS\\LMS_Course_Service::link_to_legacy_post( \$course_id, (int) ${COURSE_POST_ID} );
 
 \\ATORA\\LMS\\LMS_Course_Service::upsert_lesson( array(
-  'wp_post_id' => {$LESSON_POST_ID},
+  'wp_post_id' => (int) ${LESSON_POST_ID},
   'course_id' => \$course_id,
   'title' => 'Lección Seed 6.26.5',
   'slug' => 'leccion-seed-6265',
@@ -145,7 +147,7 @@ $WP eval "
   'status' => 'published',
 ) );
 
-\\ATORA\\LMS\\LMS_Enrollment_Service::enroll( {$STUDENT_ID}, \$course_id, 0 );
+\\ATORA\\LMS\\LMS_Enrollment_Service::enroll( (int) ${STUDENT_ID}, \$course_id, 0 );
 echo \"ok\\n\";
 " >/dev/null
 
@@ -158,13 +160,13 @@ global \$wpdb;
   \$table,
   array(
     'institution_id' => \$inst,
-    'instructor_id'  => {$INSTRUCTOR_ID},
-    'assistant_id'   => {$ASSISTANT_ID},
+    'instructor_id'  => (int) ${INSTRUCTOR_ID},
+    'assistant_id'   => (int) ${ASSISTANT_ID},
     'scope'          => 'instructor',
     'wp_course_id'   => 0,
     'status'         => 'active',
     'perms_json'     => wp_json_encode( array( 'grade' => true ) ),
-    'created_by'     => {$ADMIN_ID},
+    'created_by'     => (int) ${ADMIN_ID},
     'created_at'     => current_time( 'mysql', true ),
     'expires_at'     => null,
   ),
