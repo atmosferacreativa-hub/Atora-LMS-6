@@ -75,3 +75,11 @@ Uso típico: universidades con operación institucional.
 
 - `GET /sync?since=` (consolidadora multi-instalación) se entrega en 6.26.5.
 
+## Mediciones reales (línea base)
+
+Ejecutadas el **2026-09-21** en ATORA Lab local (Docker), con **PHP 8.1.33** y **MySQL 8.0**.
+
+Nota: estos tiempos corresponden a la ejecución de cada archivo de la suite de integración,
+que incluye el bootstrap/instalación de WordPress del test runner.
+
+- **Escala 10.000 (cohorte)**: `tests/integration/CohortScaleTest.php` → **8.284 s**
