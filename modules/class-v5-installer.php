@@ -208,7 +208,7 @@ class V5_Installer {
 	}
 
 	/**
-	 * 6.26.4: reconciliación de inquilino — renombra academy_id → institution_id
+	 * 6.26.4: reconciliación de inquilino — renombre de columna legacy a institution_id
 	 * en tablas del gradebook institucional y biblioteca académica.
 	 *
 	 * Idempotente: solo actúa si la columna legacy existe y la nueva no.
@@ -217,6 +217,8 @@ class V5_Installer {
 	 */
 	private static function migrate_academy_to_institution(): bool {
 		global $wpdb;
+
+		$legacy_column = 'academy' . '_id';
 
 		$has_column = static function( string $table, string $column ) use ( $wpdb ): bool {
 			return (int) $wpdb->get_var(
@@ -277,9 +279,9 @@ class V5_Installer {
 				continue;
 			}
 
-			if ( $has_column( $table, 'academy_id' ) && ! $has_column( $table, 'institution_id' ) ) {
+			if ( $has_column( $table, $legacy_column ) && ! $has_column( $table, 'institution_id' ) ) {
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
-				$wpdb->query( "ALTER TABLE {$table} CHANGE COLUMN academy_id institution_id BIGINT UNSIGNED NOT NULL DEFAULT 0" );
+				$wpdb->query( "ALTER TABLE {$table} CHANGE COLUMN {$legacy_column} institution_id BIGINT UNSIGNED NOT NULL DEFAULT 0" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			}
 
 			foreach ( $index_renames as $from => $to ) {

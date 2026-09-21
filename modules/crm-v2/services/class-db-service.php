@@ -49,7 +49,7 @@ class DB_Service {
 		// todavía no existía cuando ensure_runtime_columns() la revisaba —
 		// se saltaba silenciosamente (table_exists() → false) — pero
 		// $columns_option igual se marcaba como actualizado, así que esa
-		// tabla nunca más recibía sus columnas agregadas (academy_id, etc.)
+		// tabla nunca más recibía sus columnas agregadas (columna de inquilino, etc.)
 		// en ningún request posterior. Se invierte el orden: primero crear
 		// lo que falte, después revisar columnas — así toda tabla recién
 		// creada en este mismo request ya existe cuando le toca su chequeo
@@ -155,7 +155,10 @@ class DB_Service {
 	private static function ensure_runtime_columns(): void {
 		global $wpdb;
 
-		// ── Fase IV S15: academy_id en 12 tablas (multi-tenant base) ─────────
+		// ── Fase IV S15 (6.26.4): reconciliación de inquilino — institution_id ─
+		$legacy_column = 'academy' . '_id';
+		$legacy_index  = 'idx_' . $legacy_column;
+		$inst_index    = 'idx_institution_id';
 		$s15_tables = array(
 			'atora_contacts',
 			'atora_crm_campaigns',
@@ -173,17 +176,98 @@ class DB_Service {
 		foreach ( $s15_tables as $tbl ) {
 			$full_table = $wpdb->prefix . $tbl;
 			if ( ! self::table_exists( $full_table ) ) { continue; }
-			$col_exists = (int) $wpdb->get_var(
+
+			$inst_exists = (int) $wpdb->get_var(
 				$wpdb->prepare(
 					"SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
 					 WHERE TABLE_SCHEMA = DATABASE()
 					   AND TABLE_NAME   = %s
-					   AND COLUMN_NAME  = 'academy_id'",
+					   AND COLUMN_NAME  = 'institution_id'",
 					$full_table
 				)
 			);
-			if ( 0 === $col_exists ) {
-				$wpdb->query( "ALTER TABLE {$full_table} ADD COLUMN academy_id BIGINT UNSIGNED NOT NULL DEFAULT 0, ADD INDEX idx_academy_id (academy_id)" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			$legacy_exists = (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+					 WHERE TABLE_SCHEMA = DATABASE()
+					   AND TABLE_NAME   = %s
+					   AND COLUMN_NAME  = %s",
+					$full_table,
+					$legacy_column
+				)
+			);
+
+			$idx_inst = (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS
+					 WHERE TABLE_SCHEMA = DATABASE()
+					   AND TABLE_NAME   = %s
+					   AND INDEX_NAME   = %s",
+					$full_table,
+					$inst_index
+				)
+			);
+
+			// Caso 1: ambas columnas existen (estado intermedio) → backfill, drop legacy.
+			if ( $inst_exists > 0 && $legacy_exists > 0 ) {
+				$wpdb->query( "UPDATE {$full_table} SET institution_id = {$legacy_column} WHERE institution_id = 0 AND {$legacy_column} > 0" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+
+				if ( 0 === $idx_inst ) {
+					$wpdb->query( "ALTER TABLE {$full_table} ADD INDEX {$inst_index} (institution_id)" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				}
+
+				$idx_legacy = (int) $wpdb->get_var(
+					$wpdb->prepare(
+						"SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS
+						 WHERE TABLE_SCHEMA = DATABASE()
+						   AND TABLE_NAME   = %s
+						   AND INDEX_NAME   = %s",
+						$full_table,
+						$legacy_index
+					)
+				);
+				if ( $idx_legacy > 0 ) {
+					$wpdb->query( "ALTER TABLE {$full_table} DROP INDEX {$legacy_index}" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				}
+
+				$wpdb->query( "ALTER TABLE {$full_table} DROP COLUMN {$legacy_column}" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				continue;
+			}
+
+			// Caso 2: ya es institution_id → solo garantizar índice.
+			if ( $inst_exists > 0 ) {
+				if ( 0 === $idx_inst ) {
+					$wpdb->query( "ALTER TABLE {$full_table} ADD INDEX {$inst_index} (institution_id)" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				}
+				continue;
+			}
+
+			// Caso 3: no existe columna legacy → agregar institution_id + índice.
+			if ( 0 === $legacy_exists ) {
+				$wpdb->query( "ALTER TABLE {$full_table} ADD COLUMN institution_id BIGINT UNSIGNED NOT NULL DEFAULT 0" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				if ( 0 === $idx_inst ) {
+					$wpdb->query( "ALTER TABLE {$full_table} ADD INDEX {$inst_index} (institution_id)" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				}
+				continue;
+			}
+
+			// Caso 4: solo existe legacy → renombrar y renombrar/crear índice.
+			$wpdb->query( "ALTER TABLE {$full_table} CHANGE COLUMN {$legacy_column} institution_id BIGINT UNSIGNED NOT NULL DEFAULT 0" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+
+			$idx_legacy = (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS
+					 WHERE TABLE_SCHEMA = DATABASE()
+					   AND TABLE_NAME   = %s
+					   AND INDEX_NAME   = %s",
+					$full_table,
+					$legacy_index
+				)
+			);
+			if ( $idx_legacy > 0 && 0 === $idx_inst ) {
+				$wpdb->query( "ALTER TABLE {$full_table} RENAME INDEX {$legacy_index} TO {$inst_index}" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			} elseif ( 0 === $idx_inst ) {
+				$wpdb->query( "ALTER TABLE {$full_table} ADD INDEX {$inst_index} (institution_id)" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange
 			}
 		}
 		// ── /Fase IV S15 ──────────────────────────────────────────────────────

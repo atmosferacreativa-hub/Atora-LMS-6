@@ -16,7 +16,10 @@ class CLMS_Institutional_Gradebook_Service {
 		global $wpdb;
 
 		$data       = is_array( $data ) ? $data : array();
-		$academy_id = absint( $data['academy_id'] ?? 0 );
+		$institution_id = $this->resolve_institution_id( $data );
+		if ( is_wp_error( $institution_id ) ) {
+			return $institution_id;
+		}
 		$code       = sanitize_key( (string) ( $data['code'] ?? '' ) );
 		$name       = sanitize_text_field( (string) ( $data['name'] ?? '' ) );
 		$starts_at  = $this->normalize_date( $data['starts_at'] ?? '' );
@@ -28,7 +31,7 @@ class CLMS_Institutional_Gradebook_Service {
 
 		$table = $wpdb->prefix . 'atora_academic_periods';
 		$exists = $wpdb->get_var(
-			$wpdb->prepare( "SELECT id FROM {$table} WHERE academy_id = %d AND code = %s LIMIT 1", $academy_id, $code )
+			$wpdb->prepare( "SELECT id FROM {$table} WHERE institution_id = %d AND code = %s LIMIT 1", $institution_id, $code )
 		);
 		if ( $exists ) {
 			return new WP_Error( 'clms_period_duplicate', __( 'Ya existe un período con ese código.', 'atora-lms' ) );
@@ -37,7 +40,7 @@ class CLMS_Institutional_Gradebook_Service {
 		$inserted = $wpdb->insert(
 			$table,
 			array(
-				'academy_id' => $academy_id,
+				'institution_id' => $institution_id,
 				'code'       => $code,
 				'name'       => $name,
 				'starts_at'  => $starts_at,
@@ -88,7 +91,10 @@ class CLMS_Institutional_Gradebook_Service {
 		global $wpdb;
 
 		$data       = is_array( $data ) ? $data : array();
-		$academy_id = absint( $data['academy_id'] ?? 0 );
+		$institution_id = $this->resolve_institution_id( $data );
+		if ( is_wp_error( $institution_id ) ) {
+			return $institution_id;
+		}
 		$code       = sanitize_key( (string) ( $data['code'] ?? '' ) );
 		$name       = sanitize_text_field( (string) ( $data['name'] ?? '' ) );
 		$minimum    = isset( $data['minimum'] ) && is_numeric( $data['minimum'] ) ? (float) $data['minimum'] : 0.0;
@@ -104,7 +110,7 @@ class CLMS_Institutional_Gradebook_Service {
 
 		$table = $wpdb->prefix . 'atora_grading_scales';
 		$exists = $wpdb->get_var(
-			$wpdb->prepare( "SELECT id FROM {$table} WHERE academy_id = %d AND code = %s AND status != 'retired' LIMIT 1", $academy_id, $code )
+			$wpdb->prepare( "SELECT id FROM {$table} WHERE institution_id = %d AND code = %s AND status != 'retired' LIMIT 1", $institution_id, $code )
 		);
 		if ( $exists ) {
 			return new WP_Error( 'clms_scale_duplicate', __( 'Ya existe una escala activa con ese código.', 'atora-lms' ) );
@@ -113,7 +119,7 @@ class CLMS_Institutional_Gradebook_Service {
 		$inserted = $wpdb->insert(
 			$table,
 			array(
-				'academy_id' => $academy_id,
+				'institution_id' => $institution_id,
 				'code'       => $code,
 				'name'       => $name,
 				'minimum'    => $minimum,
@@ -152,15 +158,15 @@ class CLMS_Institutional_Gradebook_Service {
 		if ( empty( $scale ) || 'active' !== $scale['status'] ) {
 			return new WP_Error( 'clms_cycle_scale_inactive', __( 'La escala debe estar activa.', 'atora-lms' ) );
 		}
-		if ( absint( $period['academy_id'] ?? 0 ) !== absint( $scale['academy_id'] ?? 0 ) ) {
-			return new WP_Error( 'clms_cycle_academy_mismatch', __( 'El período y la escala pertenecen a academias diferentes.', 'atora-lms' ) );
+		if ( absint( $period['institution_id'] ?? 0 ) !== absint( $scale['institution_id'] ?? 0 ) ) {
+			return new WP_Error( 'clms_cycle_academy_mismatch', __( 'El período y la escala pertenecen a instituciones diferentes.', 'atora-lms' ) );
 		}
 
 		$table = $wpdb->prefix . 'atora_gradebook_cycles';
 		$inserted = $wpdb->insert(
 			$table,
 			array(
-				'academy_id' => absint( $period['academy_id'] ?? 0 ),
+				'institution_id' => absint( $period['institution_id'] ?? 0 ),
 				'period_id'  => absint( $period_id ),
 				'course_id'  => absint( $course_id ),
 				'scale_id'   => absint( $scale_id ),
@@ -464,30 +470,40 @@ class CLMS_Institutional_Gradebook_Service {
 		return true;
 	}
 
-	public function get_context( $academy_id = 0, $course_id = 0, $cycle_id = 0 ) {
+	public function get_context( $institution_id = 0, $course_id = 0, $cycle_id = 0 ) {
 		global $wpdb;
 
-		$academy_id = absint( $academy_id );
+		$institution_id = absint( $institution_id );
+		if ( ! $institution_id && class_exists( '\ATORA\LMS\Tenant_Context' ) ) {
+			$resolved = \ATORA\LMS\Tenant_Context::require_current_institution_id();
+			if ( is_wp_error( $resolved ) ) {
+				return $resolved;
+			}
+			$institution_id = absint( $resolved );
+		}
+		if ( $institution_id <= 0 ) {
+			return new WP_Error( 'clms_gradebook_missing_institution', __( 'Institución no resuelta.', 'atora-lms' ) );
+		}
 		$course_id  = absint( $course_id );
 		$cycle_id   = absint( $cycle_id );
 
 		$periods = $wpdb->get_results(
-			$wpdb->prepare( "SELECT * FROM {$wpdb->prefix}atora_academic_periods WHERE academy_id = %d ORDER BY starts_at DESC, id DESC", $academy_id ),
+			$wpdb->prepare( "SELECT * FROM {$wpdb->prefix}atora_academic_periods WHERE institution_id = %d ORDER BY starts_at DESC, id DESC", $institution_id ),
 			ARRAY_A
 		);
 		$scales = $wpdb->get_results(
-			$wpdb->prepare( "SELECT * FROM {$wpdb->prefix}atora_grading_scales WHERE academy_id = %d ORDER BY code ASC, version DESC", $academy_id ),
+			$wpdb->prepare( "SELECT * FROM {$wpdb->prefix}atora_grading_scales WHERE institution_id = %d ORDER BY code ASC, version DESC", $institution_id ),
 			ARRAY_A
 		);
 
 		if ( $course_id ) {
 			$cycles = $wpdb->get_results(
-				$wpdb->prepare( "SELECT * FROM {$wpdb->prefix}atora_gradebook_cycles WHERE academy_id = %d AND course_id = %d ORDER BY id DESC", $academy_id, $course_id ),
+				$wpdb->prepare( "SELECT * FROM {$wpdb->prefix}atora_gradebook_cycles WHERE institution_id = %d AND course_id = %d ORDER BY id DESC", $institution_id, $course_id ),
 				ARRAY_A
 			);
 		} else {
 			$cycles = $wpdb->get_results(
-				$wpdb->prepare( "SELECT * FROM {$wpdb->prefix}atora_gradebook_cycles WHERE academy_id = %d ORDER BY id DESC", $academy_id ),
+				$wpdb->prepare( "SELECT * FROM {$wpdb->prefix}atora_gradebook_cycles WHERE institution_id = %d ORDER BY id DESC", $institution_id ),
 				ARRAY_A
 			);
 		}
@@ -534,6 +550,24 @@ class CLMS_Institutional_Gradebook_Service {
 			ARRAY_A
 		);
 		return is_array( $row ) ? $row : array();
+	}
+
+	protected function resolve_institution_id( array $data ) {
+		$institution_id = absint( $data['institution_id'] ?? 0 );
+
+		if ( ! $institution_id && class_exists( '\ATORA\LMS\Tenant_Context' ) ) {
+			$resolved = \ATORA\LMS\Tenant_Context::require_current_institution_id();
+			if ( is_wp_error( $resolved ) ) {
+				return $resolved;
+			}
+			$institution_id = absint( $resolved );
+		}
+
+		if ( $institution_id <= 0 ) {
+			return new WP_Error( 'clms_gradebook_missing_institution', __( 'Institución no resuelta.', 'atora-lms' ) );
+		}
+
+		return $institution_id;
 	}
 
 	protected function normalize_date( $value ) {
