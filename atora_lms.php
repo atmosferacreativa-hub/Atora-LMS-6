@@ -1021,6 +1021,16 @@ add_action( 'init', static function () {
 			ATORA_Delegation_Caps::init();
 		}
 	} );
+	atora_lms_require_module( 'includes/delegation/class-delegation-attribution.php', static function() {
+		if ( class_exists( 'ATORA_Delegation_Attribution' ) ) {
+			ATORA_Delegation_Attribution::init();
+		}
+	} );
+	atora_lms_require_module( 'includes/delegation/class-delegation-ui.php', static function() {
+		if ( is_admin() && class_exists( 'ATORA_Delegation_UI' ) ) {
+			ATORA_Delegation_UI::init();
+		}
+	} );
 
 	// ── Fase V S16: Migración LMS — página admin + handler AJAX ─────────────
 	atora_lms_require_module( 'modules/lms/class-lms-migration-admin.php', static function() {
