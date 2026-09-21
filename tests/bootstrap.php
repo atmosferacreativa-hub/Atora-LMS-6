@@ -136,6 +136,20 @@ if ( ! function_exists( 'apply_filters' ) ) {
 		return $value;
 	}
 }
+
+// get_posts() se usa en rutas legacy (CRM) para acotar resultados.
+// En el entorno de unit tests, por defecto no hay posts accesibles.
+$GLOBALS['__atora_test_get_posts'] = array();
+\Brain\Monkey\Functions\when( 'get_posts' )->alias(
+	static function( $args = array() ): array {
+		return (array) ( $GLOBALS['__atora_test_get_posts'] ?? array() );
+	}
+);
+if ( ! function_exists( 'atora_test_set_get_posts' ) ) {
+	function atora_test_set_get_posts( array $posts ): void {
+		$GLOBALS['__atora_test_get_posts'] = $posts;
+	}
+}
 if ( ! function_exists( 'atora_test_reset_filters' ) ) {
 	function atora_test_reset_filters( string $hook = '' ): void {
 		if ( '' === $hook ) {

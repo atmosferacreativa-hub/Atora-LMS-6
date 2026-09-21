@@ -14,6 +14,23 @@ final class CohortScaleTest extends WP_UnitTestCase {
 			require_once dirname( __DIR__, 2 ) . '/modules/class-v5-installer.php';
 		}
 		\ATORA\V5_Installer::force_install();
+
+		// Limpieza idempotente: el bootstrap de WP no resetea tablas custom del plugin
+		// entre ejecuciones (solo posts). Evita colisiones por UNIQUE KEY en runs repetidos.
+		global $wpdb;
+		$tables = array(
+			$wpdb->prefix . 'atora_cohort_members',
+			$wpdb->prefix . 'atora_cohort_courses',
+			$wpdb->prefix . 'atora_cohorts',
+			$wpdb->prefix . 'atora_institution_members',
+			$wpdb->prefix . 'atora_institutions',
+		);
+		foreach ( $tables as $table ) {
+			$exists = (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) );
+			if ( $exists === $table ) {
+				$wpdb->query( "TRUNCATE TABLE {$table}" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange,WordPress.DB.DirectDatabaseQuery.NoCaching
+			}
+		}
 	}
 
 	private function create_institution_and_user(): array {
@@ -131,4 +148,3 @@ final class CohortScaleTest extends WP_UnitTestCase {
 		$this->assertSame( 1, $count );
 	}
 }
-

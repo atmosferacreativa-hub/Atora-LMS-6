@@ -7,6 +7,7 @@
     <testsuites>
         <testsuite name="ATORA LMS Unit Tests">
             <directory>tests/</directory>
+            <exclude>tests/integration</exclude>
         </testsuite>
     </testsuites>
     <source>

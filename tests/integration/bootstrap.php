@@ -7,6 +7,25 @@
 
 declare( strict_types = 1 );
 
+// WordPress core test bootstrap (>=6.8) requiere que exista la clase
+// Yoast\PHPUnitPolyfills\Autoload aun si el proyecto usa PHPUnit 10.
+// Para nuestras pruebas de integración (plugin), basta con un stub mínimo.
+namespace Yoast\PHPUnitPolyfills {
+	if ( ! class_exists( Autoload::class ) ) {
+		final class Autoload {
+			public const VERSION = '99.0.0';
+		}
+	}
+}
+
+namespace Yoast\PHPUnitPolyfills\TestCases {
+	if ( ! class_exists( TestCase::class ) ) {
+		abstract class TestCase extends \PHPUnit\Framework\TestCase {}
+	}
+}
+
+namespace {
+
 if ( ! defined( 'WP_CLI' ) ) {
 	define( 'WP_CLI', true );
 }
@@ -59,3 +78,4 @@ tests_add_filter( 'muplugins_loaded', static function () {
 
 require $_tests_dir . '/includes/bootstrap.php';
 
+}

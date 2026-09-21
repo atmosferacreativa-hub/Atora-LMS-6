@@ -20,7 +20,7 @@ while IFS= read -r -d '' test_file; do
   if (( status != 0 )); then
     echo "::error file=$test_file::PHPUnit failed in isolated file (exit $status)"
   fi
-done < <(find tests -type f -name '*Test.php' -print0 | sort -z)
+done < <(find tests -path tests/integration -prune -o -type f -name '*Test.php' -print0 | sort -z)
 
 echo "PHPUnit files executed: $executed; failing files: $failures"
 (( failures == 0 ))

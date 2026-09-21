@@ -17,6 +17,23 @@ final class TenancyIsolationTest extends WP_UnitTestCase {
 
 		require_once dirname( __DIR__, 2 ) . '/includes/gradebook/class-institutional-gradebook-service.php';
 		require_once dirname( __DIR__, 2 ) . '/includes/library/class-academic-library-service.php';
+
+		// Limpieza idempotente para permitir re-ejecución local de la suite.
+		global $wpdb;
+		$tables = array(
+			$wpdb->prefix . 'atora_gradebook_cycles',
+			$wpdb->prefix . 'atora_grading_scales',
+			$wpdb->prefix . 'atora_academic_periods',
+			$wpdb->prefix . 'atora_library_items',
+			$wpdb->prefix . 'atora_institution_members',
+			$wpdb->prefix . 'atora_institutions',
+		);
+		foreach ( $tables as $table ) {
+			$exists = (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) );
+			if ( $exists === $table ) {
+				$wpdb->query( "TRUNCATE TABLE {$table}" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange,WordPress.DB.DirectDatabaseQuery.NoCaching
+			}
+		}
 	}
 
 	private function create_institution( string $slug, string $name ): int {
@@ -232,4 +249,3 @@ final class TenancyIsolationTest extends WP_UnitTestCase {
 		$this->assertSame( 'AND 1=0', $clause );
 	}
 }
-

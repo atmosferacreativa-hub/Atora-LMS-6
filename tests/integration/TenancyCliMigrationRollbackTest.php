@@ -17,6 +17,24 @@ final class TenancyCliMigrationRollbackTest extends WP_UnitTestCase {
 			require_once dirname( __DIR__, 2 ) . '/modules/class-v5-installer.php';
 		}
 		\ATORA\V5_Installer::force_install();
+
+		// Asegurar punto de partida limpio para la detección de IDs legacy:
+		// el instalador de WP no limpia tablas custom del plugin entre ejecuciones.
+		global $wpdb;
+		$tables = array(
+			$wpdb->prefix . 'atora_academic_periods',
+			$wpdb->prefix . 'atora_gradebook_cycles',
+			$wpdb->prefix . 'atora_grading_scales',
+			$wpdb->prefix . 'atora_library_items',
+		);
+		foreach ( $tables as $table ) {
+			$exists = (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) );
+			if ( $exists === $table ) {
+				$wpdb->query( "TRUNCATE TABLE {$table}" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.SchemaChange,WordPress.DB.DirectDatabaseQuery.NoCaching
+			}
+		}
+		delete_option( 'atora_active_academy_id' );
+		$wpdb->delete( $wpdb->usermeta, array( 'meta_key' => '_atora_academy_id' ), array( '%s' ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 	}
 
 	public function test_migrate_dry_run_does_not_write_and_verify_and_rollback_work(): void {
@@ -55,4 +73,3 @@ final class TenancyCliMigrationRollbackTest extends WP_UnitTestCase {
 		}
 	}
 }
-

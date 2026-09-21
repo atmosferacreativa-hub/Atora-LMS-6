@@ -17,7 +17,7 @@
     },
     "scripts": {
         "phpcs": "phpcs",
-        "test": "phpunit --testdox",
+        "test": "bash scripts/run-phpunit-files.sh",
         "test-coverage": "phpunit --coverage-text"
     },
     "config": {
