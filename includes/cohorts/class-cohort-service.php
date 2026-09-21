@@ -26,6 +26,51 @@ class CLMS_Cohort_Service {
 	const META_STUDENT_STATUS = '_clms_cohort_student_status_map';
 
 	/**
+	 * Fuente de lectura de cohortes.
+	 *
+	 * legacy = wp_postmeta (default)
+	 * tables = tablas atora_cohorts/*
+	 */
+	const OPT_SOURCE = 'atora_cohort_source';
+
+	/**
+	 * Cache wp_post_id -> atora_cohorts.id.
+	 *
+	 * @var array<int,int>
+	 */
+	private static array $table_id_cache = array();
+
+	private function source(): string {
+		return (string) get_option( self::OPT_SOURCE, 'legacy' );
+	}
+
+	private function is_tables(): bool {
+		return 'tables' === $this->source();
+	}
+
+	private function table_cohort_id_from_wp_post( int $wp_post_id ): int {
+		global $wpdb;
+		$wp_post_id = absint( $wp_post_id );
+		if ( $wp_post_id <= 0 ) { return 0; }
+
+		if ( isset( self::$table_id_cache[ $wp_post_id ] ) ) {
+			return self::$table_id_cache[ $wp_post_id ];
+		}
+
+		$table = $wpdb->prefix . 'atora_cohorts';
+		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) ) !== $table ) {
+			self::$table_id_cache[ $wp_post_id ] = 0;
+			return 0;
+		}
+
+		$id = (int) $wpdb->get_var(
+			$wpdb->prepare( "SELECT id FROM {$table} WHERE wp_post_id = %d LIMIT 1", $wp_post_id )
+		);
+		self::$table_id_cache[ $wp_post_id ] = absint( $id );
+		return self::$table_id_cache[ $wp_post_id ];
+	}
+
+	/**
 	 * Estados válidos de cohorte.
 	 *
 	 * @return array<string,string>
@@ -91,6 +136,9 @@ class CLMS_Cohort_Service {
 	 * @return array<int,int>
 	 */
 	public function get_cohort_course_ids( $cohort_id ) {
+		if ( $this->is_tables() ) {
+			return $this->get_table_cohort_course_ids( absint( $cohort_id ) );
+		}
 		return $this->normalize_ids( get_post_meta( absint( $cohort_id ), self::META_COURSE_IDS, true ) );
 	}
 
@@ -111,6 +159,9 @@ class CLMS_Cohort_Service {
 	 * @return array<int,int>
 	 */
 	public function get_cohort_teacher_ids( $cohort_id ) {
+		if ( $this->is_tables() ) {
+			return $this->get_table_cohort_member_ids( absint( $cohort_id ), 'teacher' );
+		}
 		return $this->normalize_ids( get_post_meta( absint( $cohort_id ), self::META_TEACHER_IDS, true ) );
 	}
 
@@ -121,6 +172,9 @@ class CLMS_Cohort_Service {
 	 * @return array<int,int>
 	 */
 	public function get_cohort_student_ids( $cohort_id ) {
+		if ( $this->is_tables() ) {
+			return $this->get_table_cohort_member_ids( absint( $cohort_id ), 'student' );
+		}
 		return $this->normalize_ids( get_post_meta( absint( $cohort_id ), self::META_STUDENT_IDS, true ) );
 	}
 
@@ -132,6 +186,9 @@ class CLMS_Cohort_Service {
 	 */
 	public function get_cohort_student_status_map( $cohort_id ) {
 		$cohort_id = absint( $cohort_id );
+		if ( $this->is_tables() ) {
+			return $this->get_table_cohort_student_status_map( $cohort_id );
+		}
 		$raw       = get_post_meta( $cohort_id, self::META_STUDENT_STATUS, true );
 		$raw       = is_array( $raw ) ? $raw : array();
 		$students  = $this->get_cohort_student_ids( $cohort_id );
@@ -158,6 +215,11 @@ class CLMS_Cohort_Service {
 	 */
 	public function set_cohort_student_ids( $cohort_id, $student_ids ) {
 		$cohort_id   = absint( $cohort_id );
+		if ( $this->is_tables() ) {
+			// En modo tablas, la edición/mutación se gestiona por servicios tabulares.
+			// No escribir en postmeta legacy durante la transición.
+			return;
+		}
 		$student_ids = $this->normalize_ids( $student_ids );
 		update_post_meta( $cohort_id, self::META_STUDENT_IDS, $student_ids );
 
@@ -180,6 +242,9 @@ class CLMS_Cohort_Service {
 		$cohort_id  = absint( $cohort_id );
 		$student_id = absint( $student_id );
 		if ( ! $cohort_id || ! $student_id ) {
+			return false;
+		}
+		if ( $this->is_tables() ) {
 			return false;
 		}
 
@@ -206,6 +271,9 @@ class CLMS_Cohort_Service {
 		if ( ! $cohort_id || ! $student_id ) {
 			return false;
 		}
+		if ( $this->is_tables() ) {
+			return false;
+		}
 
 		$students = $this->get_cohort_student_ids( $cohort_id );
 		$students = array_values( array_diff( $students, array( $student_id ) ) );
@@ -225,6 +293,9 @@ class CLMS_Cohort_Service {
 		$cohort_id  = absint( $cohort_id );
 		$student_id = absint( $student_id );
 		if ( ! $cohort_id || ! $student_id ) {
+			return false;
+		}
+		if ( $this->is_tables() ) {
 			return false;
 		}
 
@@ -250,6 +321,9 @@ class CLMS_Cohort_Service {
 		$cohort_id    = absint( $cohort_id );
 		$cohort_state = $this->normalize_cohort_status( $cohort_state );
 		if ( ! $cohort_id ) {
+			return;
+		}
+		if ( $this->is_tables() ) {
 			return;
 		}
 
@@ -284,6 +358,10 @@ class CLMS_Cohort_Service {
 			$user_id = get_current_user_id();
 		}
 		$limit = max( 1, absint( $limit ) );
+
+		if ( $this->is_tables() ) {
+			return $this->get_visible_cohort_ids_from_tables( $user_id, $status_filter, $limit );
+		}
 
 		$posts = get_posts(
 			array(
@@ -339,6 +417,168 @@ class CLMS_Cohort_Service {
 		}
 
 		return $visible;
+	}
+
+	/**
+	 * Lectura desde tablas: cohortes visibles por rol docente o admin.
+	 *
+	 * @param int   $user_id       Usuario.
+	 * @param array $status_filter Estados.
+	 * @param int   $limit         Límite.
+	 * @return array<int,int> wp_post_id
+	 */
+	private function get_visible_cohort_ids_from_tables( int $user_id, array $status_filter, int $limit ): array {
+		global $wpdb;
+
+		$user_id = absint( $user_id );
+		$limit   = max( 1, absint( $limit ) );
+
+		$cohort_table = $wpdb->prefix . 'atora_cohorts';
+		$member_table = $wpdb->prefix . 'atora_cohort_members';
+
+		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $cohort_table ) ) ) !== $cohort_table ) {
+			return array();
+		}
+		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $member_table ) ) ) !== $member_table ) {
+			return array();
+		}
+
+		$status_filter = is_array( $status_filter ) ? array_values( array_filter( array_map( 'sanitize_key', $status_filter ) ) ) : array();
+
+		$where = "WHERE c.wp_post_id IS NOT NULL AND c.wp_post_id > 0";
+		$args  = array();
+
+		if ( ! ( current_user_can( 'manage_options' ) || current_user_can( 'clms_access_admin' ) ) ) {
+			$where .= " AND m.user_id = %d AND m.role = 'teacher' AND m.status = 'active'";
+			$args[] = $user_id;
+		}
+
+		if ( ! empty( $status_filter ) ) {
+			$placeholders = implode( ',', array_fill( 0, count( $status_filter ), '%s' ) );
+			$where .= " AND c.status IN ({$placeholders})";
+			foreach ( $status_filter as $st ) {
+				$args[] = $st;
+			}
+		}
+
+		$sql = "SELECT DISTINCT c.wp_post_id
+				FROM {$cohort_table} c
+				LEFT JOIN {$member_table} m ON m.cohort_id = c.id
+				{$where}
+				ORDER BY c.created_at DESC, c.id DESC
+				LIMIT %d";
+		$args[] = $limit;
+
+		$rows = (array) $wpdb->get_col( $wpdb->prepare( $sql, ...$args ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		return array_values( array_unique( array_filter( array_map( 'absint', $rows ) ) ) );
+	}
+
+	private function get_table_cohort_member_ids( int $wp_post_id, string $role ): array {
+		global $wpdb;
+		$wp_post_id = absint( $wp_post_id );
+		if ( $wp_post_id <= 0 ) { return array(); }
+
+		$cohort_id = $this->table_cohort_id_from_wp_post( $wp_post_id );
+		if ( $cohort_id <= 0 ) { return array(); }
+
+		$table = $wpdb->prefix . 'atora_cohort_members';
+		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) ) !== $table ) {
+			return array();
+		}
+
+		$role = sanitize_key( $role );
+		if ( ! in_array( $role, array( 'teacher', 'student' ), true ) ) {
+			$role = 'student';
+		}
+
+		$ids = (array) $wpdb->get_col(
+			$wpdb->prepare(
+				"SELECT user_id FROM {$table}
+				 WHERE cohort_id = %d AND role = %s AND status = 'active'
+				 ORDER BY user_id ASC",
+				$cohort_id,
+				$role
+			)
+		);
+		return array_values( array_unique( array_filter( array_map( 'absint', $ids ) ) ) );
+	}
+
+	private function get_table_cohort_course_ids( int $wp_post_id ): array {
+		global $wpdb;
+		$wp_post_id = absint( $wp_post_id );
+		if ( $wp_post_id <= 0 ) { return array(); }
+
+		$cohort_id = $this->table_cohort_id_from_wp_post( $wp_post_id );
+		if ( $cohort_id <= 0 ) { return array(); }
+
+		$table = $wpdb->prefix . 'atora_cohort_courses';
+		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) ) !== $table ) {
+			return array();
+		}
+
+		$course_ids = (array) $wpdb->get_col(
+			$wpdb->prepare(
+				"SELECT course_id FROM {$table}
+				 WHERE cohort_id = %d
+				 ORDER BY course_order ASC, id ASC",
+				$cohort_id
+			)
+		);
+
+		$wp_ids = array();
+		if ( class_exists( '\\ATORA\\LMS\\LMS_Course_Service' ) ) {
+			foreach ( array_values( array_unique( array_filter( array_map( 'absint', $course_ids ) ) ) ) as $course_id ) {
+				$course = \ATORA\LMS\LMS_Course_Service::get( $course_id );
+				$wp_course_id = absint( is_array( $course ) ? ( $course['wp_post_id'] ?? 0 ) : 0 );
+				if ( $wp_course_id > 0 ) {
+					$wp_ids[] = $wp_course_id;
+				}
+			}
+		}
+
+		return array_values( array_unique( array_filter( array_map( 'absint', $wp_ids ) ) ) );
+	}
+
+	private function get_table_cohort_student_status_map( int $wp_post_id ): array {
+		global $wpdb;
+		$wp_post_id = absint( $wp_post_id );
+		if ( $wp_post_id <= 0 ) { return array(); }
+
+		$cohort_id = $this->table_cohort_id_from_wp_post( $wp_post_id );
+		if ( $cohort_id <= 0 ) { return array(); }
+
+		$table = $wpdb->prefix . 'atora_cohort_members';
+		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) ) !== $table ) {
+			return array();
+		}
+
+		$rows = (array) $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT user_id, meta_json FROM {$table}
+				 WHERE cohort_id = %d AND role = 'student' AND status = 'active'",
+				$cohort_id
+			),
+			ARRAY_A
+		);
+
+		$map = array();
+		foreach ( $rows as $row ) {
+			if ( ! is_array( $row ) ) { continue; }
+			$uid = absint( $row['user_id'] ?? 0 );
+			if ( $uid <= 0 ) { continue; }
+
+			$status = 'activo';
+			$meta = $row['meta_json'] ?? null;
+			if ( is_string( $meta ) && '' !== trim( $meta ) ) {
+				$decoded = json_decode( $meta, true );
+				if ( is_array( $decoded ) && isset( $decoded['legacy_student_status'] ) ) {
+					$status = $this->normalize_student_status( $decoded['legacy_student_status'] );
+				}
+			}
+			$map[ $uid ] = $status;
+		}
+
+		return $map;
 	}
 
 	/**
@@ -561,4 +801,3 @@ class CLMS_Cohort_Service {
 		return $values;
 	}
 }
-
