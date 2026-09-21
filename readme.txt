@@ -47,7 +47,6 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
-
 = 6.26.2 =
 * Mobile API: endpoints de programas (`/programs`) y fallback de evaluaciones desde tablas `atora_quizzes` con persistencia a `atora_quiz_submissions`.
 

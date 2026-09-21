@@ -1545,7 +1545,6 @@ class V5_Installer {
 			KEY course_id (course_id),
 			KEY student_id (student_id)
 		) $charset_collate;" );
-
 		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_institutional_grades (
 			id             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 			cycle_id       BIGINT UNSIGNED NOT NULL,
@@ -1666,7 +1665,6 @@ class V5_Installer {
 			KEY item_action (item_id, action),
 			KEY created_at (created_at)
 		) $charset_collate;" );
-
 		// Calificaciones finales por alumno/curso (D-002; migra _clms_gradebook_course_{id}).
 		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_gradebook (
 			id              BIGINT UNSIGNED  NOT NULL AUTO_INCREMENT,
