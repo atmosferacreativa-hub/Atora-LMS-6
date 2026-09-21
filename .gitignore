@@ -4,5 +4,7 @@
 *.log
 /dist/
 .phpunit.result.cache
-.atora-baseline/
+.atora-baseline/*
+!.atora-baseline/ROLLBACK.md
+!.atora-baseline/esquema-antes.txt
 .claude/settings.local.json
