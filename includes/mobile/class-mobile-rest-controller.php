@@ -125,6 +125,13 @@ final class ATORA_Mobile_REST_Controller {
 	}
 
 	public static function discovery(): WP_REST_Response {
+		$deployment_profile = class_exists( '\\ATORA\\LMS\\Deployment_Profile_Service' )
+			? \ATORA\LMS\Deployment_Profile_Service::current_profile()
+			: 'small';
+		$seats_used = class_exists( '\\ATORA\\LMS\\Deployment_Profile_Service' )
+			? \ATORA\LMS\Deployment_Profile_Service::seats_used_total()
+			: 0;
+
 		return new WP_REST_Response( array(
 			'product'          => 'ATORA LMS',
 			'api'              => self::REST_NAMESPACE,
@@ -132,6 +139,8 @@ final class ATORA_Mobile_REST_Controller {
 			'lms_version'      => defined( 'ATORA_LMS_VERSION' ) ? ATORA_LMS_VERSION : '',
 			'site_name'        => get_bloginfo( 'name' ),
 			'site_url'         => home_url( '/' ),
+			'deployment_profile' => $deployment_profile,
+			'seats_used'       => absint( $seats_used ),
 			'authentication'   => 'opaque_bearer',
 			'access_ttl'       => ATORA_Mobile_Token_Service::ACCESS_TTL,
 			'refresh_ttl'      => ATORA_Mobile_Token_Service::REFRESH_TTL,

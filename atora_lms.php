@@ -1077,6 +1077,11 @@ add_action( 'init', static function () {
 	atora_lms_require_module( 'modules/tenancy/class-institution-service.php' );
 	atora_lms_require_module( 'modules/tenancy/class-cohort-table-service.php' );
 	atora_lms_require_module( 'modules/tenancy/class-tenancy-audit.php' );
+	atora_lms_require_module( 'modules/tenancy/class-deployment-profile-service.php', static function() {
+		if ( class_exists( '\ATORA\LMS\Deployment_Profile_Service' ) ) {
+			\ATORA\LMS\Deployment_Profile_Service::init();
+		}
+	} );
 	atora_lms_require_module( 'modules/tenancy/class-tenancy-query-detector.php', static function() {
 		if ( class_exists( '\ATORA\LMS\Tenancy_Query_Detector' ) ) {
 			\ATORA\LMS\Tenancy_Query_Detector::init();
