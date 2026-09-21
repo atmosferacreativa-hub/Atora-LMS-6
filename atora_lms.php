@@ -1014,6 +1014,14 @@ add_action( 'init', static function () {
 		ATORA_Onboarding_Wizard::init();
 	} );
 
+	// ── E-10: Delegación (instructor asistente) ─────────────────────────────
+	atora_lms_require_module( 'includes/delegation/class-delegation-service.php' );
+	atora_lms_require_module( 'includes/delegation/class-delegation-caps.php', static function() {
+		if ( class_exists( 'ATORA_Delegation_Caps' ) ) {
+			ATORA_Delegation_Caps::init();
+		}
+	} );
+
 	// ── Fase V S16: Migración LMS — página admin + handler AJAX ─────────────
 	atora_lms_require_module( 'modules/lms/class-lms-migration-admin.php', static function() {
 		ATORA_LMS_Migration_Admin::init();

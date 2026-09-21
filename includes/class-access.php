@@ -674,7 +674,17 @@ class CLMS_Access {
 		}
 
 		$edit_others_cap = self::resource_edit_others_cap( $resource_type );
-		return '' !== $edit_others_cap && current_user_can( $edit_others_cap );
+		if ( '' !== $edit_others_cap && current_user_can( $edit_others_cap ) ) {
+			return true;
+		}
+
+		// E-10: delegación como tercera vía (solo cursos/lecciones).
+		if ( class_exists( 'ATORA_Delegation_Service' ) && in_array( $resource_type, array( 'course', 'program' ), true ) ) {
+			$perm = ( 'access' === $scope ) ? 'access' : 'enroll';
+			return ATORA_Delegation_Service::covers( $user_id, $post, $perm );
+		}
+
+		return false;
 	}
 
 	/**
