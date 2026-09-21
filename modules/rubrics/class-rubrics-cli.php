@@ -18,7 +18,121 @@ final class Rubrics_CLI {
 
 	public static function init(): void {
 		\WP_CLI::add_command( 'atora rubrics migrate', array( __CLASS__, 'migrate' ) );
+		\WP_CLI::add_command( 'atora rubrics rollback', array( __CLASS__, 'rollback' ) );
 		\WP_CLI::add_command( 'atora rubrics verify', array( __CLASS__, 'verify' ) );
+	}
+
+	/**
+	 * Rollback del esquema 6.26.5 (rúbricas + offline + sesiones móviles).
+	 *
+	 * No toca posts/postmeta/usermeta.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--yes]
+	 * : No pedir confirmación.
+	 */
+	public static function rollback( array $args, array $assoc_args ): void {
+		global $wpdb;
+
+		if ( ! isset( $assoc_args['yes'] ) ) {
+			\WP_CLI::confirm( 'Esto eliminará el esquema agregado por 6.26.5. ¿Continuar?', $assoc_args );
+		}
+
+		$ensure_table = static function( string $table ) use ( $wpdb ): bool {
+			return (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) ) === $table;
+		};
+		$has_column = static function( string $table, string $column ) use ( $wpdb ): bool {
+			return (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+					 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND COLUMN_NAME = %s",
+					$table,
+					$column
+				)
+			) > 0;
+		};
+		$has_index = static function( string $table, string $index ) use ( $wpdb ): bool {
+			return (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS
+					 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND INDEX_NAME = %s",
+					$table,
+					$index
+				)
+			) > 0;
+		};
+
+		// 1) Drop de tablas nuevas.
+		$tables = array(
+			$wpdb->prefix . 'atora_rubric_levels',
+			$wpdb->prefix . 'atora_rubric_criteria',
+			$wpdb->prefix . 'atora_rubric_evaluations',
+			$wpdb->prefix . 'atora_rubrics',
+			$wpdb->prefix . 'atora_assignment_submissions',
+			$wpdb->prefix . 'atora_upload_sessions',
+			$wpdb->prefix . 'atora_mobile_sessions',
+		);
+		foreach ( $tables as $table ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$wpdb->query( "DROP TABLE IF EXISTS {$table}" );
+		}
+
+		// 2) Quitar columnas 6.26.5 en tablas existentes.
+		$lesson_progress = $wpdb->prefix . 'atora_lesson_progress';
+		if ( $ensure_table( $lesson_progress ) ) {
+			if ( $has_index( $lesson_progress, 'client_event' ) ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				$wpdb->query( "ALTER TABLE {$lesson_progress} DROP INDEX client_event" );
+			}
+			if ( $has_column( $lesson_progress, 'client_event_id' ) ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				$wpdb->query( "ALTER TABLE {$lesson_progress} DROP COLUMN client_event_id" );
+			}
+			if ( $has_column( $lesson_progress, 'client_completed_at' ) ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				$wpdb->query( "ALTER TABLE {$lesson_progress} DROP COLUMN client_completed_at" );
+			}
+		}
+
+		$quiz_submissions = $wpdb->prefix . 'atora_quiz_submissions';
+		if ( $ensure_table( $quiz_submissions ) ) {
+			if ( $has_index( $quiz_submissions, 'user_event' ) ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				$wpdb->query( "ALTER TABLE {$quiz_submissions} DROP INDEX user_event" );
+			}
+			if ( $has_column( $quiz_submissions, 'client_event_id' ) ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				$wpdb->query( "ALTER TABLE {$quiz_submissions} DROP COLUMN client_event_id" );
+			}
+			if ( $has_column( $quiz_submissions, 'client_submitted_at' ) ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				$wpdb->query( "ALTER TABLE {$quiz_submissions} DROP COLUMN client_submitted_at" );
+			}
+		}
+
+		$courses = $wpdb->prefix . 'atora_courses';
+		if ( $ensure_table( $courses ) && $has_column( $courses, 'revision' ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$wpdb->query( "ALTER TABLE {$courses} DROP COLUMN revision" );
+		}
+
+		$lessons = $wpdb->prefix . 'atora_lessons';
+		if ( $ensure_table( $lessons ) && $has_column( $lessons, 'revision' ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$wpdb->query( "ALTER TABLE {$lessons} DROP COLUMN revision" );
+		}
+
+		// 3) Opciones.
+		delete_option( 'atora_rubric_source' );
+
+		// 4) Restaurar schema version previa si está disponible (se guarda al hacer upgrade).
+		$prev = (string) get_option( 'atora_tenancy_prev_v5_schema_version', '' );
+		if ( '' !== $prev ) {
+			update_option( 'atora_v5_schema_version', $prev, false );
+		}
+
+		\WP_CLI::success( 'Rollback 6.26.5 completado.' );
 	}
 
 	public static function migrate( array $args, array $assoc_args ): void {
@@ -311,4 +425,3 @@ final class Rubrics_CLI {
 		return array_values( $criteria );
 	}
 }
-
