@@ -3,7 +3,7 @@
  * Plugin Name:       ATORA LMS
  * Plugin URI:        https://atora.studio
  * Description:       LMS modular para WordPress con IA, evaluaciones, certificados, CRM, mensajería multi-canal, afiliados, live streaming y más. Autor: Atora Studio. Creado por Atmósfera Creativa.
- * Version:           6.26.3
+ * Version:           6.26.4
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Atora Studio
@@ -52,7 +52,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * - Limpieza automática de notificaciones >90 días
  */
 if ( ! defined( 'ATORA_LMS_VERSION' ) ) {
-	define( 'ATORA_LMS_VERSION', '6.26.3' );
+	define( 'ATORA_LMS_VERSION', '6.26.4' );
 }
 
 if ( ! defined( 'ATORA_LMS_FILE' ) ) {
@@ -1077,6 +1077,11 @@ add_action( 'init', static function () {
 	atora_lms_require_module( 'modules/tenancy/class-institution-service.php' );
 	atora_lms_require_module( 'modules/tenancy/class-cohort-table-service.php' );
 	atora_lms_require_module( 'modules/tenancy/class-tenancy-audit.php' );
+	atora_lms_require_module( 'modules/tenancy/class-deployment-profile-service.php', static function() {
+		if ( class_exists( '\ATORA\LMS\Deployment_Profile_Service' ) ) {
+			\ATORA\LMS\Deployment_Profile_Service::init();
+		}
+	} );
 	atora_lms_require_module( 'modules/tenancy/class-tenancy-query-detector.php', static function() {
 		if ( class_exists( '\ATORA\LMS\Tenancy_Query_Detector' ) ) {
 			\ATORA\LMS\Tenancy_Query_Detector::init();

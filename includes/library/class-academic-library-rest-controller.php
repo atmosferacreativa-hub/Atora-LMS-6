@@ -41,11 +41,20 @@ class CLMS_Academic_Library_REST_Controller {
 	}
 
 	public function list_items( WP_REST_Request $request ) {
-		return rest_ensure_response( $this->service()->list_items( $request->get_param( 'status' ) ?: 'published', absint( $request->get_param( 'course_id' ) ) ) );
+		return $this->respond( $this->service()->list_items( $request->get_param( 'status' ) ?: 'published', absint( $request->get_param( 'course_id' ) ) ) );
 	}
 
 	public function create_item( WP_REST_Request $request ) {
-		return $this->respond( $this->service()->create_item( $request->get_json_params(), get_current_user_id() ) );
+		$data = $request->get_json_params();
+		$data = is_array( $data ) ? $data : array();
+		if ( empty( $data['institution_id'] ) && isset( $data['academy_id'] ) ) {
+			if ( function_exists( '_doing_it_wrong' ) ) {
+				_doing_it_wrong( __METHOD__, 'academy_id está obsoleto; usa institution_id.', '6.26.4' );
+			}
+			$data['institution_id'] = absint( $data['academy_id'] );
+		}
+
+		return $this->respond( $this->service()->create_item( $data, get_current_user_id() ) );
 	}
 
 	public function add_version( WP_REST_Request $request ) {

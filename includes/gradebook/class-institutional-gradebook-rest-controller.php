@@ -107,15 +107,24 @@ class CLMS_Institutional_Gradebook_REST_Controller {
 	}
 
 	public function can_manage() {
-		return current_user_can( 'manage_options' )
+		return ( current_user_can( 'manage_options' ) || current_user_can( 'clms_grade_submissions' ) )
 			? true
 			: new WP_Error( 'rest_forbidden', __( 'Solo la autoridad académica puede administrar el gradebook institucional.', 'atora-lms' ), array( 'status' => 403 ) );
 	}
 
 	public function get_context( WP_REST_Request $request ) {
+		$institution_id = absint( $request->get_param( 'institution_id' ) );
+		if ( ! $institution_id ) {
+			$legacy = absint( $request->get_param( 'academy_id' ) );
+			if ( $legacy && function_exists( '_doing_it_wrong' ) ) {
+				_doing_it_wrong( __METHOD__, 'El parámetro academy_id está obsoleto; usa institution_id.', '6.26.4' );
+			}
+			$institution_id = $legacy;
+		}
+
 		return new WP_REST_Response(
 			$this->service->get_context(
-				absint( $request->get_param( 'academy_id' ) ),
+				$institution_id,
 				absint( $request->get_param( 'course_id' ) ),
 				absint( $request->get_param( 'cycle_id' ) )
 			),
@@ -124,7 +133,16 @@ class CLMS_Institutional_Gradebook_REST_Controller {
 	}
 
 	public function create_period( WP_REST_Request $request ) {
-		return $this->created( $this->service->create_period( $request->get_json_params(), get_current_user_id() ) );
+		$data = $request->get_json_params();
+		$data = is_array( $data ) ? $data : array();
+		if ( empty( $data['institution_id'] ) && isset( $data['academy_id'] ) ) {
+			if ( function_exists( '_doing_it_wrong' ) ) {
+				_doing_it_wrong( __METHOD__, 'academy_id está obsoleto; usa institution_id.', '6.26.4' );
+			}
+			$data['institution_id'] = absint( $data['academy_id'] );
+		}
+
+		return $this->created( $this->service->create_period( $data, get_current_user_id() ) );
 	}
 
 	public function transition_period( WP_REST_Request $request ) {
@@ -132,7 +150,16 @@ class CLMS_Institutional_Gradebook_REST_Controller {
 	}
 
 	public function create_scale( WP_REST_Request $request ) {
-		return $this->created( $this->service->create_scale( $request->get_json_params(), get_current_user_id() ) );
+		$data = $request->get_json_params();
+		$data = is_array( $data ) ? $data : array();
+		if ( empty( $data['institution_id'] ) && isset( $data['academy_id'] ) ) {
+			if ( function_exists( '_doing_it_wrong' ) ) {
+				_doing_it_wrong( __METHOD__, 'academy_id está obsoleto; usa institution_id.', '6.26.4' );
+			}
+			$data['institution_id'] = absint( $data['academy_id'] );
+		}
+
+		return $this->created( $this->service->create_scale( $data, get_current_user_id() ) );
 	}
 
 	public function create_cycle( WP_REST_Request $request ) {

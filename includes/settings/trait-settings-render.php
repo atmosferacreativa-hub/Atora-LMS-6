@@ -898,6 +898,28 @@ trait CLMS_Settings_Render_Trait {
 		</table>
 
 		<?php
+		$profile = sanitize_key( (string) get_option( 'atora_deployment_profile', 'small' ) );
+		if ( ! in_array( $profile, array( 'small', 'medium', 'large' ), true ) ) {
+			$profile = 'small';
+		}
+		?>
+
+		<h3 style="margin-top:24px"><?php esc_html_e( 'Perfil de despliegue', 'atora-lms' ); ?></h3>
+		<table class="form-table" role="presentation">
+			<tr>
+				<th><label for="atora_deployment_profile"><?php esc_html_e( 'Perfil', 'atora-lms' ); ?></label></th>
+				<td>
+					<select id="atora_deployment_profile" name="atora_deployment_profile">
+						<option value="small" <?php selected( $profile, 'small' ); ?>><?php esc_html_e( 'small (hasta 100)', 'atora-lms' ); ?></option>
+						<option value="medium" <?php selected( $profile, 'medium' ); ?>><?php esc_html_e( 'medium (hasta 1.500)', 'atora-lms' ); ?></option>
+						<option value="large" <?php selected( $profile, 'large' ); ?>><?php esc_html_e( 'large (hasta 10.000)', 'atora-lms' ); ?></option>
+					</select>
+					<p class="description"><?php esc_html_e( 'Controla el tope operativo de asientos por instalación (avisos, no bloqueos).', 'atora-lms' ); ?></p>
+				</td>
+			</tr>
+		</table>
+
+		<?php
 		$microsoft = get_option( self::OPTION_MICROSOFT, array() );
 		$microsoft = is_array( $microsoft ) ? $microsoft : array();
 		$ms_enabled = ! empty( $microsoft['enabled'] );

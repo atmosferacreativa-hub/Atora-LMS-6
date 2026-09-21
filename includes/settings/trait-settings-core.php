@@ -591,6 +591,15 @@ trait CLMS_Settings_Core_Trait {
 		update_option( self::OPTION_ADV, array_merge( $existing, $data ) );
 		update_option( self::OPTION_CRM_V2_ENABLED, isset( $_POST['crm_v2_enabled'] ) ? 1 : 0 );
 		update_option( 'clms_inactivity_days_threshold', $inactivity_days );
+
+		$profile = isset( $_POST['atora_deployment_profile'] ) ? sanitize_key( wp_unslash( $_POST['atora_deployment_profile'] ) ) : sanitize_key( (string) get_option( 'atora_deployment_profile', 'small' ) );
+		if ( ! in_array( $profile, array( 'small', 'medium', 'large' ), true ) ) {
+			$profile = 'small';
+		}
+		update_option( 'atora_deployment_profile', $profile, false );
+		if ( class_exists( '\\ATORA\\LMS\\Deployment_Profile_Service' ) ) {
+			\ATORA\LMS\Deployment_Profile_Service::clamp_seats_licensed_to_profile_cap();
+		}
 	}
 
 	// ── Render ───────────────────────────────────────────────────────────────────

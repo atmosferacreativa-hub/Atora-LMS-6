@@ -24,10 +24,11 @@ require_once $autoload;
 
 // Brain\Monkey para stubs de WordPress
 \Brain\Monkey\setUp();
+\Brain\Monkey\Functions\when( 'wp_kses_post' )->returnArg();
 
 // Definir constantes WP mínimas
 if ( ! defined( 'ABSPATH' ) )         { define( 'ABSPATH', '/tmp/wp/' ); }
-if ( ! defined( 'ATORA_LMS_VERSION' ) ) { define( 'ATORA_LMS_VERSION', '6.26.2' ); }
+if ( ! defined( 'ATORA_LMS_VERSION' ) ) { define( 'ATORA_LMS_VERSION', '6.26.4' ); }
 if ( ! defined( 'DAY_IN_SECONDS' ) )  { define( 'DAY_IN_SECONDS', 86400 ); }
 if ( ! defined( 'HOUR_IN_SECONDS' ) ) { define( 'HOUR_IN_SECONDS', 3600 ); }
 if ( ! defined( 'MINUTE_IN_SECONDS' ) ) { define( 'MINUTE_IN_SECONDS', 60 ); }
@@ -79,7 +80,6 @@ if ( ! function_exists( 'sanitize_email' ) )   { function sanitize_email( $s ): 
 	if ( ! function_exists( 'esc_url_raw' ) )      { function esc_url_raw( $s ): string { return filter_var( (string) $s, FILTER_SANITIZE_URL ) ?: ''; } }
 	if ( ! function_exists( 'wp_parse_url' ) )     { function wp_parse_url( string $url ) { return parse_url( $url ); } }
 	if ( ! function_exists( 'wp_json_encode' ) )   { function wp_json_encode( $d ): string { return (string) json_encode( $d ); } }
-	if ( ! function_exists( 'wp_kses_post' ) )     { function wp_kses_post( string $s ): string { return $s; } }
 if ( ! function_exists( 'wp_unslash' ) ) {
 	function wp_unslash( $value ) {
 		return is_array( $value ) ? array_map( 'wp_unslash', $value ) : ( is_string( $value ) ? stripslashes( $value ) : $value );
@@ -134,6 +134,20 @@ if ( ! function_exists( 'apply_filters' ) ) {
 			$value = call_user_func( $entry['cb'], $value, ...$args );
 		}
 		return $value;
+	}
+}
+
+// get_posts() se usa en rutas legacy (CRM) para acotar resultados.
+// En el entorno de unit tests, por defecto no hay posts accesibles.
+$GLOBALS['__atora_test_get_posts'] = array();
+\Brain\Monkey\Functions\when( 'get_posts' )->alias(
+	static function( $args = array() ): array {
+		return (array) ( $GLOBALS['__atora_test_get_posts'] ?? array() );
+	}
+);
+if ( ! function_exists( 'atora_test_set_get_posts' ) ) {
+	function atora_test_set_get_posts( array $posts ): void {
+		$GLOBALS['__atora_test_get_posts'] = $posts;
 	}
 }
 if ( ! function_exists( 'atora_test_reset_filters' ) ) {

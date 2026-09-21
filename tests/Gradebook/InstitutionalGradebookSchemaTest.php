@@ -25,13 +25,14 @@ final class InstitutionalGradebookSchemaTest extends TestCase {
 		foreach ( $tables as $table ) {
 			$this->assertStringContainsString( $table, $installer );
 		}
-		$this->assertStringContainsString( "const SCHEMA_VERSION = '6.26.0-integrated-schema';", $installer );
+		$this->assertStringContainsString( "const SCHEMA_VERSION = '6.26.4-tenant-unified';", $installer );
 	}
 
 	public function test_rest_controller_is_admin_scoped_and_isolated(): void {
 		$controller = (string) file_get_contents( __DIR__ . '/../../includes/gradebook/class-institutional-gradebook-rest-controller.php' );
 
 		$this->assertStringContainsString( "current_user_can( 'manage_options' )", $controller );
+		$this->assertStringContainsString( "current_user_can( 'clms_grade_submissions' )", $controller );
 		$this->assertStringContainsString( "'/gradebook/institutional", $controller );
 		$this->assertStringContainsString( "'permission_callback' => array( \$this, 'can_manage' )", $controller );
 	}

@@ -16,6 +16,10 @@ class CLMS_Academic_Library_Service {
 		global $wpdb;
 
 		$data = is_array( $data ) ? $data : array();
+		$institution_id = $this->require_institution_id_from_data( $data );
+		if ( is_wp_error( $institution_id ) ) {
+			return $institution_id;
+		}
 		$title = sanitize_text_field( (string) ( $data['title'] ?? '' ) );
 		$slug  = sanitize_title( (string) ( $data['slug'] ?? $title ) );
 		if ( '' === $title || '' === $slug ) {
@@ -26,7 +30,7 @@ class CLMS_Academic_Library_Service {
 		$inserted = $wpdb->insert(
 			$wpdb->prefix . 'atora_library_items',
 			array(
-				'academy_id'    => absint( $data['academy_id'] ?? 0 ),
+				'institution_id'=> absint( $institution_id ),
 				'slug'          => $slug,
 				'title'         => $title,
 				'description'   => sanitize_textarea_field( (string) ( $data['description'] ?? '' ) ),
@@ -203,6 +207,11 @@ class CLMS_Academic_Library_Service {
 	public function get_item( $item_id ) {
 		global $wpdb;
 
+		$institution_id = $this->require_institution_id_from_data( array() );
+		if ( is_wp_error( $institution_id ) ) {
+			return $institution_id;
+		}
+
 		$item = $this->get_item_row( $item_id );
 		if ( empty( $item ) ) {
 			return array();
@@ -215,14 +224,19 @@ class CLMS_Academic_Library_Service {
 	public function list_items( $status = 'published', $course_id = 0 ) {
 		global $wpdb;
 
+		$institution_id = $this->require_institution_id_from_data( array() );
+		if ( is_wp_error( $institution_id ) ) {
+			return $institution_id;
+		}
+
 		$status = sanitize_key( (string) $status );
 		if ( $course_id ) {
 			return $wpdb->get_results(
-				$wpdb->prepare( "SELECT DISTINCT i.* FROM {$wpdb->prefix}atora_library_items i INNER JOIN {$wpdb->prefix}atora_library_links l ON l.item_id = i.id WHERE i.status = %s AND l.course_id = %d ORDER BY i.title", $status, absint( $course_id ) ),
+				$wpdb->prepare( "SELECT DISTINCT i.* FROM {$wpdb->prefix}atora_library_items i INNER JOIN {$wpdb->prefix}atora_library_links l ON l.item_id = i.id WHERE i.institution_id = %d AND i.status = %s AND l.course_id = %d ORDER BY i.title", absint( $institution_id ), $status, absint( $course_id ) ),
 				ARRAY_A
 			);
 		}
-		return $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}atora_library_items WHERE status = %s ORDER BY title", $status ), ARRAY_A );
+		return $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}atora_library_items WHERE institution_id = %d AND status = %s ORDER BY title", absint( $institution_id ), $status ), ARRAY_A );
 	}
 
 	protected function cleanup_failed_item( $item_id ) {
@@ -236,7 +250,31 @@ class CLMS_Academic_Library_Service {
 
 	protected function get_item_row( $item_id ) {
 		global $wpdb;
-		return $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}atora_library_items WHERE id = %d LIMIT 1", absint( $item_id ) ), ARRAY_A );
+
+		$institution_id = $this->require_institution_id_from_data( array() );
+		if ( is_wp_error( $institution_id ) ) {
+			return array();
+		}
+
+		return $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}atora_library_items WHERE institution_id = %d AND id = %d LIMIT 1", absint( $institution_id ), absint( $item_id ) ), ARRAY_A );
+	}
+
+	protected function require_institution_id_from_data( array $data ) {
+		$institution_id = absint( $data['institution_id'] ?? 0 );
+
+		if ( ! $institution_id && class_exists( '\ATORA\LMS\Tenant_Context' ) ) {
+			$resolved = \ATORA\LMS\Tenant_Context::require_current_institution_id();
+			if ( is_wp_error( $resolved ) ) {
+				return $resolved;
+			}
+			$institution_id = absint( $resolved );
+		}
+
+		if ( $institution_id <= 0 ) {
+			return new WP_Error( 'clms_library_missing_institution', __( 'Institución no resuelta.', 'atora-lms' ) );
+		}
+
+		return $institution_id;
 	}
 
 	protected function log_event( $action, $item_id, $details, $actor_id ) {

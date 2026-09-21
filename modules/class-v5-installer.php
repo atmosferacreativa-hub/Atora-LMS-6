@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class V5_Installer {
 
 	/** Versión del esquema. Incrementar para forzar re-instalación. */
-	const SCHEMA_VERSION = '6.26.3-tenancy-schema';
+	const SCHEMA_VERSION = '6.26.4-tenant-unified';
 
 	/** Option key que almacena la versión instalada. */
 	const OPTION_KEY = 'atora_v5_schema_version';
@@ -45,6 +45,7 @@ class V5_Installer {
 
 		if ( self::create_tables()
 			&& self::migrate_tenancy_columns()
+			&& self::migrate_academy_to_institution()
 			&& self::migrate_wp_post_id_nullable_columns()
 			&& self::migrate_rate_limit_indexes()
 			&& self::migrate_telegram_links_from_usermeta()
@@ -69,6 +70,7 @@ class V5_Installer {
 
 		if ( self::create_tables()
 			&& self::migrate_tenancy_columns()
+			&& self::migrate_academy_to_institution()
 			&& self::migrate_wp_post_id_nullable_columns()
 			&& self::migrate_rate_limit_indexes()
 			&& self::migrate_telegram_links_from_usermeta()
@@ -200,6 +202,140 @@ class V5_Installer {
 				$wpdb->query( "ALTER TABLE {$delegations} DROP INDEX course_id" );
 			}
 			$ensure_index( $delegations, 'wp_course_id', "ALTER TABLE {$delegations} ADD KEY wp_course_id (wp_course_id)" );
+		}
+
+		return true;
+	}
+
+	/**
+	 * 6.26.4: reconciliación de inquilino — renombre de columna legacy a institution_id
+	 * en tablas del gradebook institucional y biblioteca académica.
+	 *
+	 * Idempotente: solo actúa si la columna legacy existe y la nueva no.
+	 *
+	 * @return bool
+	 */
+	private static function migrate_academy_to_institution(): bool {
+		global $wpdb;
+
+		$legacy_column = 'academy' . '_id';
+
+		$has_column = static function( string $table, string $column ) use ( $wpdb ): bool {
+			return (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+					 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND COLUMN_NAME = %s",
+					$table,
+					$column
+				)
+			) > 0;
+		};
+
+		$has_index = static function( string $table, string $index ) use ( $wpdb ): bool {
+			return (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS
+					 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND INDEX_NAME = %s",
+					$table,
+					$index
+				)
+			) > 0;
+		};
+
+		$ensure_table = static function( string $table ) use ( $wpdb ): bool {
+			return (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) ) === $table;
+		};
+
+		$rename_index = static function( string $table, string $from, string $to ) use ( $has_index, $wpdb ): void {
+			if ( $has_index( $table, $from ) && ! $has_index( $table, $to ) ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				$wpdb->query( "ALTER TABLE {$table} RENAME INDEX {$from} TO {$to}" );
+				return;
+			}
+
+			if ( $has_index( $table, $from ) && $has_index( $table, $to ) ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				$wpdb->query( "ALTER TABLE {$table} DROP INDEX {$from}" );
+			}
+		};
+
+		$tables = array(
+			$wpdb->prefix . 'atora_academic_periods' => array(
+				'academy_code' => 'inst_code',
+			),
+			$wpdb->prefix . 'atora_grading_scales' => array(
+				'academy_code_version' => 'inst_code_version',
+			),
+			$wpdb->prefix . 'atora_gradebook_cycles' => array(
+				'academy_status' => 'inst_status',
+			),
+			$wpdb->prefix . 'atora_library_items' => array(
+				'academy_slug' => 'inst_slug',
+			),
+		);
+
+		foreach ( $tables as $table => $index_renames ) {
+			if ( ! $ensure_table( $table ) ) {
+				continue;
+			}
+
+			if ( $has_column( $table, $legacy_column ) && ! $has_column( $table, 'institution_id' ) ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				$wpdb->query( "ALTER TABLE {$table} CHANGE COLUMN {$legacy_column} institution_id BIGINT UNSIGNED NOT NULL DEFAULT 0" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			}
+
+			foreach ( $index_renames as $from => $to ) {
+				$rename_index( $table, $from, $to );
+			}
+		}
+
+		// Tablas legacy que todavía cargan la columna legacy del inquilino
+		// (dbDelta nunca elimina columnas). 6.26.4 exige que no quede esa
+		// columna en el esquema.
+		$legacy_tables = array(
+			$wpdb->prefix . 'atora_automation_queue',
+			$wpdb->prefix . 'atora_automations',
+			$wpdb->prefix . 'atora_companies',
+			$wpdb->prefix . 'atora_contacts',
+			$wpdb->prefix . 'atora_crm_campaign_recipients',
+			$wpdb->prefix . 'atora_crm_campaigns',
+			$wpdb->prefix . 'atora_crm_deals',
+			$wpdb->prefix . 'atora_crm_lists',
+			$wpdb->prefix . 'atora_crm_tasks',
+			$wpdb->prefix . 'atora_email_sequence_enrollments',
+			$wpdb->prefix . 'atora_email_sequences',
+		);
+
+		$legacy_index = 'idx_' . $legacy_column;
+		$inst_index   = 'idx_institution_id';
+
+		foreach ( $legacy_tables as $table ) {
+			if ( ! $ensure_table( $table ) ) {
+				continue;
+			}
+
+			if ( $has_column( $table, $legacy_column ) && ! $has_column( $table, 'institution_id' ) ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				$wpdb->query( "ALTER TABLE {$table} CHANGE COLUMN {$legacy_column} institution_id BIGINT UNSIGNED NOT NULL DEFAULT 0" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$rename_index( $table, $legacy_index, $inst_index );
+			}
+		}
+
+		// Tabla de matrículas: ya tiene institution_id canónico (X-01). Si queda
+		// la columna legacy, eliminarla.
+		$enrollments = $wpdb->prefix . 'atora_enrollments';
+		if ( $ensure_table( $enrollments ) && $has_column( $enrollments, $legacy_column ) && $has_column( $enrollments, 'institution_id' ) ) {
+			// Backfill conservador por si quedaron filas legacy en 0.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$wpdb->query( "UPDATE {$enrollments} SET institution_id = {$legacy_column} WHERE institution_id = 0 AND {$legacy_column} > 0" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+			if ( $has_index( $enrollments, $legacy_index ) ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				$wpdb->query( "ALTER TABLE {$enrollments} DROP INDEX {$legacy_index}" );
+			}
+
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$wpdb->query( "ALTER TABLE {$enrollments} DROP COLUMN {$legacy_column}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		}
 
 		return true;
@@ -1759,7 +1895,7 @@ class V5_Installer {
 		// ── Gradebook institucional (6.22.0) ────────────────────────────────
 		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_academic_periods (
 			id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-			academy_id  BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			institution_id  BIGINT UNSIGNED NOT NULL DEFAULT 0,
 			code        VARCHAR(60) NOT NULL,
 			name        VARCHAR(190) NOT NULL,
 			starts_at   DATE NOT NULL,
@@ -1769,14 +1905,14 @@ class V5_Installer {
 			created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 			PRIMARY KEY (id),
-			UNIQUE KEY academy_code (academy_id, code),
+			UNIQUE KEY inst_code (institution_id, code),
 			KEY status (status),
 			KEY dates (starts_at, ends_at)
 		) $charset_collate;" );
 
 		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_grading_scales (
 			id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-			academy_id  BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			institution_id  BIGINT UNSIGNED NOT NULL DEFAULT 0,
 			code        VARCHAR(60) NOT NULL,
 			name        VARCHAR(190) NOT NULL,
 			minimum     DECIMAL(9,4) NOT NULL DEFAULT 0,
@@ -1788,13 +1924,13 @@ class V5_Installer {
 			created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 			PRIMARY KEY (id),
-			UNIQUE KEY academy_code_version (academy_id, code, version),
+			UNIQUE KEY inst_code_version (institution_id, code, version),
 			KEY status (status)
 		) $charset_collate;" );
 
 		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_gradebook_cycles (
 			id             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-			academy_id     BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			institution_id     BIGINT UNSIGNED NOT NULL DEFAULT 0,
 			period_id      BIGINT UNSIGNED NOT NULL,
 			course_id      BIGINT UNSIGNED NOT NULL,
 			scale_id       BIGINT UNSIGNED NOT NULL,
@@ -1811,7 +1947,7 @@ class V5_Installer {
 			updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 			PRIMARY KEY (id),
 			UNIQUE KEY period_course (period_id, course_id),
-			KEY academy_status (academy_id, status),
+			KEY inst_status (institution_id, status),
 			KEY course_id (course_id),
 			KEY scale_id (scale_id)
 		) $charset_collate;" );
@@ -1902,7 +2038,7 @@ class V5_Installer {
 		// Biblioteca académica versionada.
 		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_library_items (
 			id                 BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-			academy_id         BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			institution_id     BIGINT UNSIGNED NOT NULL DEFAULT 0,
 			slug               VARCHAR(190) NOT NULL,
 			title              VARCHAR(255) NOT NULL,
 			description        TEXT NULL DEFAULT NULL,
@@ -1915,7 +2051,7 @@ class V5_Installer {
 			created_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			updated_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 			PRIMARY KEY (id),
-			UNIQUE KEY academy_slug (academy_id, slug),
+			UNIQUE KEY inst_slug (institution_id, slug),
 			KEY status_type (status, resource_type),
 			KEY current_version_id (current_version_id)
 		) $charset_collate;" );

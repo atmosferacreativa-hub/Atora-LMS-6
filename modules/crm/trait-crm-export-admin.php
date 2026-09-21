@@ -247,6 +247,9 @@ trait CRM_Export_Admin_Trait {
 	public static function ajax_export_csv(): void {
 		check_ajax_referer( 'atora_crm_export' );
 		if ( ! self::can_manage_crm( get_current_user_id() ) ) { wp_die(); }
+		if ( class_exists( 'CLMS_Access' ) && method_exists( 'CLMS_Access', 'can_export_contacts' ) ) {
+			if ( ! \CLMS_Access::can_export_contacts() ) { wp_die(); }
+		}
 		$dataset = isset( $_REQUEST['dataset'] ) ? self::normalize_export_dataset( (string) wp_unslash( $_REQUEST['dataset'] ) ) : 'contacts';
 		$headers = self::get_export_csv_response_headers( $dataset );
 		foreach ( $headers as $header_name => $header_value ) {
