@@ -1035,6 +1035,13 @@ add_action( 'init', static function () {
 				\ATORA\LMS\LMS_CLI::init();
 			}
 		} );
+
+		// ── X-01: comando WP-CLI `wp atora tenancy rollback` ─────────────────
+		atora_lms_require_module( 'modules/tenancy/class-tenancy-cli.php', static function() {
+			if ( class_exists( '\ATORA\LMS\Tenancy_CLI' ) ) {
+				\ATORA\LMS\Tenancy_CLI::init();
+			}
+		} );
 	}
 
 	// ── Fase V S16: LMS Compatibility Layer ──────────────────────────────────
