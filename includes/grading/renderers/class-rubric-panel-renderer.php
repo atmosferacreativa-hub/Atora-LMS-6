@@ -62,6 +62,7 @@ class CLMS_Rubric_Panel_Renderer {
 				.clms-sg-rubric-criterion-info p{margin:3px 0 0;font-size:11px;opacity:.7;line-height:1.4}
 				.clms-sg-rubric-score-box{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:72px}
 				.clms-sg-rubric-score-box input[type="number"]{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:inherit;border-radius:6px;padding:4px 6px;width:60px;text-align:center;font-size:14px;font-weight:700}
+				.clms-sg-rubric-score-error{font-size:10px;line-height:1.2;opacity:.9;color:#ffb4b4;text-align:center;min-height:12px}
 				.clms-sg-rubric-score-label{font-size:10px;opacity:.6;white-space:nowrap}
 				.clms-sg-rubric-levels{display:flex;flex-wrap:wrap;gap:6px;padding:10px 12px;background:rgba(255,255,255,.03)}
 				.clms-sg-rubric-level-btn{border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.07);color:inherit;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:12px;text-align:left;transition:all .15s;max-width:180px;word-break:break-word}
@@ -116,13 +117,14 @@ class CLMS_Rubric_Panel_Renderer {
 							</div>
 							<div class="clms-sg-rubric-score-box">
 								<input
-									type="number" min="0" max="<?php echo esc_attr( $c_max ); ?>" step="1"
+									type="number" min="0" max="<?php echo esc_attr( $c_max ); ?>" step="0.01"
 									name="rubric_scores[<?php echo esc_attr( $ri ); ?>]"
 									value="<?php echo esc_attr( '' !== $c_score ? $c_score : '' ); ?>"
 									class="clms-sg-rubric-score"
 									data-max="<?php echo esc_attr( $c_max ); ?>"
 									data-criterion="<?php echo esc_attr( $ri ); ?>"
 								>
+								<div class="clms-sg-rubric-score-error" aria-live="polite" data-criterion="<?php echo esc_attr( $ri ); ?>"></div>
 								<span class="clms-sg-rubric-score-label"><?php echo esc_html( "/ $c_max pts" ); ?></span>
 							</div>
 						</div>
@@ -179,50 +181,135 @@ class CLMS_Rubric_Panel_Renderer {
 				var rubMax   = <?php echo esc_js( (string) absint( $rub_max ) ); ?>;
 				var emptyLabel = <?php echo wp_json_encode( __( '—', 'atora-lms' ) ); ?>;
 				var userOverride = gradeF && gradeF.value.trim() !== '';
+				var precision = 2;
+
+				function roundTo(val, d){
+					var p = Math.pow(10, d);
+					return Math.round(val * p) / p;
+				}
+
+				function getErrorEl(ci){
+					return document.querySelector('.clms-sg-rubric-score-error[data-criterion="'+ci+'"]');
+				}
+
+				function validateInput(inp){
+					var raw = (inp.value || '').trim();
+					var max = parseFloat(inp.getAttribute('data-max')) || 0;
+					var ci  = inp.getAttribute('data-criterion');
+					var errEl = getErrorEl(ci);
+					inp.setCustomValidity('');
+					if (errEl) errEl.textContent = '';
+					if (raw === '') return { ok:true, value:null, max:max };
+
+					var normalized = raw.replace(',', '.');
+					var v = parseFloat(normalized);
+					if (!isFinite(v)) {
+						var msg = <?php echo wp_json_encode( __( 'Debe ser un número.', 'atora-lms' ) ); ?>;
+						inp.setCustomValidity(msg);
+						if (errEl) errEl.textContent = msg;
+						return { ok:false, value:null, max:max };
+					}
+
+					var parts = normalized.split('.');
+					if (parts.length > 1 && parts[1].length > precision) {
+						var msg2 = <?php echo wp_json_encode( __( 'Máximo 2 decimales.', 'atora-lms' ) ); ?>;
+						inp.setCustomValidity(msg2);
+						if (errEl) errEl.textContent = msg2;
+						return { ok:false, value:null, max:max };
+					}
+
+					if (v < 0 || v > max) {
+						var msg3 = <?php echo wp_json_encode( __( 'Fuera de rango.', 'atora-lms' ) ); ?>;
+						inp.setCustomValidity(msg3);
+						if (errEl) errEl.textContent = msg3 + ' (0–' + max + ')';
+						return { ok:false, value:null, max:max };
+					}
+
+					v = roundTo(v, precision);
+					return { ok:true, value:v, max:max };
+				}
+
+				function setDerivedGrade(pct){
+					if (!gradeF) return;
+					if (userOverride) return;
+					if (gradeF.value.trim() !== '' && gradeF.dataset && gradeF.dataset.clmsDerived !== '1') return;
+					gradeF.value = String(pct);
+					if (gradeF.dataset) gradeF.dataset.clmsDerived = '1';
+				}
 
 				function recalc(){
-					var earned = 0, allFilled = true;
+					var earned = 0;
+					var filled = 0;
+					var invalid = false;
+
 					inputs.forEach(function(inp){
-						if(inp.value.trim()===''){allFilled=false;return;}
-						var max = parseInt(inp.getAttribute('data-max'),10)||0;
-						earned += Math.min(max, Math.max(0,parseInt(inp.value,10)||0));
+						var r = validateInput(inp);
+						if (!r.ok) { invalid = true; return; }
+						if (r.value === null) return;
+						filled++;
+						earned += r.value;
 					});
-					if(allFilled && rubMax > 0){
+
+					var missing = inputs.length - filled;
+					if (filled > 0 && rubMax > 0 && !invalid) {
 						var pct = Math.round((earned/rubMax)*100);
-						totalEl.textContent = earned+'/'+rubMax+' ('+pct+'%)';
-						if(fillEl) fillEl.style.width = pct+'%';
-						if(!userOverride && gradeF) gradeF.value = pct;
+						var tail = missing > 0 ? (' · ' + (<?php echo wp_json_encode( __( 'faltan', 'atora-lms' ) ); ?>) + ' ' + missing) : '';
+						totalEl.textContent = roundTo(earned, precision) + '/' + rubMax + ' (' + pct + '%)' + tail;
+						if (fillEl) fillEl.style.width = Math.max(0, Math.min(100, pct)) + '%';
+						if (missing === 0) setDerivedGrade(pct);
+					} else if (invalid) {
+						totalEl.textContent = <?php echo wp_json_encode( __( 'Revisa los valores fuera de rango.', 'atora-lms' ) ); ?>;
+						if (fillEl) fillEl.style.width = '0%';
 					} else {
 						totalEl.textContent = emptyLabel || '—';
-						if(fillEl) fillEl.style.width = '0%';
+						if (fillEl) fillEl.style.width = '0%';
 					}
 				}
 
 				document.querySelectorAll('.clms-sg-rubric-level-btn').forEach(function(btn){
 					btn.addEventListener('click', function(){
 						var ci     = btn.getAttribute('data-criterion');
-						var pts    = parseInt(btn.getAttribute('data-points'),10)||0;
+						var pts    = parseFloat(btn.getAttribute('data-points'))||0;
 						var inp    = document.querySelector('.clms-sg-rubric-score[data-criterion="'+ci+'"]');
 						if(!inp) return;
-						inp.value = pts;
+						inp.value = String(pts);
 						document.querySelectorAll('.clms-sg-rubric-levels[data-criterion="'+ci+'"] .clms-sg-rubric-level-btn').forEach(function(b){ b.classList.remove('is-active'); });
 						btn.classList.add('is-active');
 						recalc();
 					});
 				});
 
+				function syncActiveLevelFromValue(ci, v){
+					var buttons = Array.prototype.slice.call(document.querySelectorAll('.clms-sg-rubric-levels[data-criterion="'+ci+'"] .clms-sg-rubric-level-btn'));
+					if (!buttons.length) return;
+					buttons.forEach(function(b){ b.classList.remove('is-active'); });
+					if (!isFinite(v)) return;
+
+					var levels = buttons.map(function(b){
+						return { btn:b, pts: parseFloat(b.getAttribute('data-points'))||0 };
+					}).sort(function(a,b){ return a.pts - b.pts; });
+
+					var chosen = levels[levels.length - 1];
+					for (var i=0;i<levels.length;i++){
+						if (v <= levels[i].pts) { chosen = levels[i]; break; }
+					}
+					if (chosen && chosen.btn) chosen.btn.classList.add('is-active');
+				}
+
 				inputs.forEach(function(inp){
 					inp.addEventListener('input', function(){
 						var ci  = inp.getAttribute('data-criterion');
-						var val = parseInt(inp.value,10);
-						document.querySelectorAll('.clms-sg-rubric-levels[data-criterion="'+ci+'"] .clms-sg-rubric-level-btn').forEach(function(btn){
-							btn.classList.toggle('is-active', parseInt(btn.getAttribute('data-points'),10)===val);
-						});
+						var val = parseFloat((inp.value || '').replace(',', '.'));
+						if (inp.value.trim() === '') { val = NaN; }
+						syncActiveLevelFromValue(ci, val);
 						recalc();
 					});
 				});
 
-				if(gradeF) gradeF.addEventListener('input', function(){ userOverride = gradeF.value.trim()!==''; });
+				if(gradeF) gradeF.addEventListener('input', function(){
+					userOverride = gradeF.value.trim()!=='' && (gradeF.dataset ? gradeF.dataset.clmsDerived !== '1' : true);
+					if (gradeF.dataset) gradeF.dataset.clmsDerived = '0';
+				});
 				recalc();
 			})();
 			</script>

@@ -702,11 +702,46 @@ trait CLMS_Grading_SpeedGrade_Trait {
 			$total_criteria = is_array( $criteria ) ? count( $criteria ) : 0;
 			$scored_criteria = 0;
 
+			$score_precision = 2;
 			foreach ( (array) $criteria as $i => $c ) {
 				$max            = isset( $c['max_points'] ) ? absint( $c['max_points'] ) : 0;
 				$weight         = isset( $c['weight'] ) ? (float) $c['weight'] : 0.0;
 				$score_raw      = isset( $raw_scores[ $i ] ) ? trim( (string) $raw_scores[ $i ] ) : '';
-				$score          = '' !== $score_raw ? max( 0, min( $max, absint( $score_raw ) ) ) : '';
+				$score          = '';
+				if ( '' !== $score_raw ) {
+					$score_raw_norm = str_replace( ',', '.', $score_raw );
+					if ( ! is_numeric( $score_raw_norm ) ) {
+						return new \WP_Error( 'invalid_rubric_score', sprintf(
+							/* translators: %s: criterion name */
+							__( 'Puntaje inválido para el criterio "%s": debe ser un número.', 'atora-lms' ),
+							sanitize_text_field( (string) ( $c['name'] ?? (string) $i ) )
+						) );
+					}
+					$score_float = (float) $score_raw_norm;
+					$decimals    = 0;
+					$score_text  = (string) $score_raw_norm;
+					if ( false !== strpos( $score_text, '.' ) ) {
+						$parts    = explode( '.', $score_text, 2 );
+						$decimals = strlen( preg_replace( '/\D+/', '', (string) ( $parts[1] ?? '' ) ) );
+					}
+					if ( $decimals > $score_precision ) {
+						return new \WP_Error( 'invalid_rubric_score_precision', sprintf(
+							/* translators: 1: criterion name, 2: decimals */
+							__( 'Puntaje inválido para el criterio "%1$s": máximo %2$d decimales.', 'atora-lms' ),
+							sanitize_text_field( (string) ( $c['name'] ?? (string) $i ) ),
+							$score_precision
+						) );
+					}
+					if ( $score_float < 0 || $score_float > (float) $max ) {
+						return new \WP_Error( 'invalid_rubric_score_range', sprintf(
+							/* translators: 1: criterion name, 2: max */
+							__( 'Puntaje fuera de rango para el criterio "%1$s": debe estar entre 0 y %2$d.', 'atora-lms' ),
+							sanitize_text_field( (string) ( $c['name'] ?? (string) $i ) ),
+							$max
+						) );
+					}
+					$score = round( $score_float, $score_precision );
+				}
 				$rubric_fb_raw  = isset( $_POST['rubric_feedback'][ $i ] ) ? wp_unslash( $_POST['rubric_feedback'][ $i ] ) : '';
 				$rubric_fb_safe = ( $feedback_service && method_exists( $feedback_service, 'sanitize_rubric_comment' ) )
 					? $feedback_service->sanitize_rubric_comment( $rubric_fb_raw )
@@ -715,9 +750,9 @@ trait CLMS_Grading_SpeedGrade_Trait {
 				$total_pts  += $max;
 				$total_weight += max( 0.0, min( 100.0, $weight ) );
 				if ( '' !== (string) $score ) {
-					$earned_pts += absint( $score );
+					$earned_pts += (float) $score;
 					if ( $max > 0 ) {
-						$earned_weight += ( (float) absint( $score ) / (float) $max ) * max( 0.0, min( 100.0, $weight ) );
+						$earned_weight += ( (float) $score / (float) $max ) * max( 0.0, min( 100.0, $weight ) );
 					}
 					++$scored_criteria;
 				}

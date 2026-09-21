@@ -296,7 +296,7 @@ class CLMS_Rubric {
 							type="number"
 							min="0"
 							max="100"
-							step="0.1"
+							step="0.01"
 							class="clms-rubric-weight"
 							name="_clms_rubric_criteria[<?php echo esc_attr( $i ); ?>][weight]"
 							value="<?php echo esc_attr( (string) $weight ); ?>"
@@ -461,7 +461,7 @@ class CLMS_Rubric {
 						+ '<span class="clms-rubric-drag-handle" title="☰">☰</span>'
 						+ '<input type="text" class="clms-rubric-name" name="_clms_rubric_criteria[' + index + '][name]" value="' + escapeHtml(data.name || '') + '" placeholder="' + escapeHtml(i18n.namePlaceholder) + '">'
 						+ '<input type="number" min="1" max="999" class="clms-rubric-max-pts" name="_clms_rubric_criteria[' + index + '][max_points]" value="' + escapeHtml(String(maxPoints)) + '">'
-						+ '<input type="number" min="0" max="100" step="0.1" class="clms-rubric-weight" name="_clms_rubric_criteria[' + index + '][weight]" value="' + escapeHtml(String((data.weight !== undefined && data.weight !== null) ? data.weight : '')) + '" title="Peso (%)">'
+						+ '<input type="number" min="0" max="100" step="0.01" class="clms-rubric-weight" name="_clms_rubric_criteria[' + index + '][weight]" value="' + escapeHtml(String((data.weight !== undefined && data.weight !== null) ? data.weight : '')) + '" title="Peso (%)">'
 						+ '<button type="button" class="clms-rubric-icon-btn clms-rubric-duplicate" title="' + escapeHtml(i18n.duplicateCriterion) + '">⊕</button>'
 						+ '<button type="button" class="clms-rubric-icon-btn is-danger clms-rubric-delete" title="' + escapeHtml(i18n.removeCriterion) + '">✕</button>'
 						+ '<button type="button" class="clms-rubric-icon-btn clms-rubric-toggle-levels" title="' + escapeHtml(i18n.showLevels) + '" aria-expanded="false">▸</button>'
