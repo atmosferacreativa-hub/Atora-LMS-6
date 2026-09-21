@@ -91,7 +91,7 @@ final class ATORA_Delegation_Service {
 		$now = current_time( 'mysql', true );
 		$rows = (array) $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT id, scope, course_id, perms_json, expires_at
+				"SELECT id, scope, wp_course_id, perms_json, expires_at
 				 FROM {$table}
 				 WHERE institution_id = %d
 				   AND instructor_id = %d
@@ -110,10 +110,10 @@ final class ATORA_Delegation_Service {
 		foreach ( $rows as $row ) {
 			if ( ! is_array( $row ) ) { continue; }
 			$scope = sanitize_key( (string) ( $row['scope'] ?? 'instructor' ) );
-			$course_id = absint( $row['course_id'] ?? 0 );
+			$row_wp_course_id = absint( $row['wp_course_id'] ?? 0 );
 
 			if ( 'course' === $scope ) {
-				if ( $wp_course_id <= 0 || $course_id <= 0 || $wp_course_id !== $course_id ) {
+				if ( $wp_course_id <= 0 || $row_wp_course_id <= 0 || $wp_course_id !== $row_wp_course_id ) {
 					continue;
 				}
 			} elseif ( 'instructor' !== $scope ) {
@@ -193,7 +193,7 @@ final class ATORA_Delegation_Service {
 	 *
 	 * @param int   $instructor_id Titular.
 	 * @param int   $assistant_id  Asistente.
-	 * @param array $args          scope, course_id, perms, expires_at, created_by.
+	 * @param array $args          scope, wp_course_id, perms, expires_at, created_by.
 	 * @return int delegation_id
 	 */
 	public static function grant( int $instructor_id, int $assistant_id, array $args ): int {
@@ -217,8 +217,8 @@ final class ATORA_Delegation_Service {
 		if ( ! in_array( $scope, array( 'instructor', 'course' ), true ) ) {
 			$scope = 'instructor';
 		}
-		$course_id = absint( $args['course_id'] ?? 0 );
-		if ( 'course' === $scope && $course_id <= 0 ) {
+		$wp_course_id = absint( $args['wp_course_id'] ?? ( $args['course_id'] ?? 0 ) );
+		if ( 'course' === $scope && $wp_course_id <= 0 ) {
 			return 0;
 		}
 
@@ -242,12 +242,12 @@ final class ATORA_Delegation_Service {
 		$existing = (int) $wpdb->get_var(
 			$wpdb->prepare(
 				"SELECT id FROM {$table}
-				 WHERE instructor_id = %d AND assistant_id = %d AND scope = %s AND course_id = %d
+				 WHERE instructor_id = %d AND assistant_id = %d AND scope = %s AND wp_course_id = %d
 				 LIMIT 1",
 				$instructor_id,
 				$assistant_id,
 				$scope,
-				$course_id
+				$wp_course_id
 			)
 		);
 
@@ -269,7 +269,7 @@ final class ATORA_Delegation_Service {
 			self::audit( $institution_id, $created_by, $instructor_id, 0, 'delegation', $existing, 'grant', array(
 				'assistant_id' => $assistant_id,
 				'scope'        => $scope,
-				'course_id'    => $course_id,
+				'wp_course_id' => $wp_course_id,
 				'perms'        => $normalized,
 				'expires_at'   => $expires_at,
 			) );
@@ -283,7 +283,7 @@ final class ATORA_Delegation_Service {
 				'instructor_id'  => $instructor_id,
 				'assistant_id'   => $assistant_id,
 				'scope'          => $scope,
-				'course_id'      => $course_id,
+				'wp_course_id'   => $wp_course_id,
 				'status'         => 'active',
 				'perms_json'     => $perms_json,
 				'created_by'     => $created_by,
@@ -297,7 +297,7 @@ final class ATORA_Delegation_Service {
 		self::audit( $institution_id, $created_by, $instructor_id, 0, 'delegation', $id, 'grant', array(
 			'assistant_id' => $assistant_id,
 			'scope'        => $scope,
-			'course_id'    => $course_id,
+			'wp_course_id' => $wp_course_id,
 			'perms'        => $normalized,
 			'expires_at'   => $expires_at,
 		) );
@@ -401,6 +401,11 @@ final class ATORA_Delegation_Service {
 	}
 
 	private static function audit( int $institution_id, int $actor_id, int $on_behalf_of, int $target_user_id, string $object_type, int $object_id, string $action, array $payload ): void {
+		if ( class_exists( '\\ATORA\\LMS\\Tenancy_Audit_Service' ) ) {
+			\ATORA\LMS\Tenancy_Audit_Service::record( $institution_id, $actor_id, $on_behalf_of, $target_user_id, $object_type, $object_id, $action, $payload );
+			return;
+		}
+
 		global $wpdb;
 		$institution_id = absint( $institution_id );
 		$actor_id       = absint( $actor_id );
@@ -432,4 +437,3 @@ final class ATORA_Delegation_Service {
 		);
 	}
 }
-

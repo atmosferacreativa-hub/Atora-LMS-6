@@ -89,44 +89,117 @@ class V5_Installer {
 	private static function migrate_tenancy_columns(): bool {
 		global $wpdb;
 
-		$targets = array(
-			$wpdb->prefix . 'atora_programs'            => array(
-				"ALTER TABLE {$wpdb->prefix}atora_programs ADD COLUMN institution_id BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER id, ADD KEY institution_id (institution_id)",
-			),
-			$wpdb->prefix . 'atora_courses'             => array(
-				"ALTER TABLE {$wpdb->prefix}atora_courses ADD COLUMN institution_id BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER id, ADD KEY institution_id (institution_id)",
-			),
-			$wpdb->prefix . 'atora_enrollments'         => array(
-				"ALTER TABLE {$wpdb->prefix}atora_enrollments ADD COLUMN institution_id BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER id, ADD KEY institution_id (institution_id)",
-			),
-			$wpdb->prefix . 'atora_program_enrollments' => array(
-				"ALTER TABLE {$wpdb->prefix}atora_program_enrollments ADD COLUMN institution_id BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER id, ADD KEY institution_id (institution_id)",
-			),
-			$wpdb->prefix . 'clms_invitations'          => array(
-				"ALTER TABLE {$wpdb->prefix}clms_invitations ADD COLUMN institution_id BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER id, ADD KEY institution_id (institution_id)",
-			),
-		);
-
-		foreach ( $targets as $table => $ddl_list ) {
-			if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) ) !== $table ) {
-				continue;
-			}
-
-			$has = (int) $wpdb->get_var(
+		$has_column = static function( string $table, string $column ) use ( $wpdb ): bool {
+			return (int) $wpdb->get_var(
 				$wpdb->prepare(
 					"SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
-					 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND COLUMN_NAME = 'institution_id'",
-					$table
+					 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND COLUMN_NAME = %s",
+					$table,
+					$column
 				)
 			) > 0;
-			if ( $has ) {
-				continue;
-			}
+		};
 
-			foreach ( $ddl_list as $ddl ) {
+		$has_index = static function( string $table, string $index ) use ( $wpdb ): bool {
+			return (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS
+					 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND INDEX_NAME = %s",
+					$table,
+					$index
+				)
+			) > 0;
+		};
+
+		$ensure_column = static function( string $table, string $column, string $ddl ) use ( $has_column, $wpdb ): void {
+			if ( ! $has_column( $table, $column ) ) {
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
 				$wpdb->query( $ddl );
 			}
+		};
+
+		$ensure_index = static function( string $table, string $index, string $ddl ) use ( $has_index, $wpdb ): void {
+			if ( ! $has_index( $table, $index ) ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				$wpdb->query( $ddl );
+			}
+		};
+
+		// ── Columnas de tenencia en tablas existentes ───────────────────────
+
+		$programs = $wpdb->prefix . 'atora_programs';
+		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $programs ) ) ) === $programs ) {
+			$ensure_column( $programs, 'institution_id', "ALTER TABLE {$programs} ADD COLUMN institution_id BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER id" );
+			$ensure_index( $programs, 'institution_id', "ALTER TABLE {$programs} ADD KEY institution_id (institution_id)" );
+			$ensure_index( $programs, 'inst_status', "ALTER TABLE {$programs} ADD KEY inst_status (institution_id, status)" );
+		}
+
+		$courses = $wpdb->prefix . 'atora_courses';
+		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $courses ) ) ) === $courses ) {
+			$ensure_column( $courses, 'institution_id', "ALTER TABLE {$courses} ADD COLUMN institution_id BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER id" );
+			$ensure_column( $courses, 'scope', "ALTER TABLE {$courses} ADD COLUMN scope VARCHAR(20) NOT NULL DEFAULT 'institution' AFTER visibility" );
+			$ensure_index( $courses, 'institution_id', "ALTER TABLE {$courses} ADD KEY institution_id (institution_id)" );
+			$ensure_index( $courses, 'inst_status', "ALTER TABLE {$courses} ADD KEY inst_status (institution_id, status)" );
+		}
+
+		$enrollments = $wpdb->prefix . 'atora_enrollments';
+		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $enrollments ) ) ) === $enrollments ) {
+			$ensure_column( $enrollments, 'institution_id', "ALTER TABLE {$enrollments} ADD COLUMN institution_id BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER id" );
+			$ensure_column( $enrollments, 'cohort_id', "ALTER TABLE {$enrollments} ADD COLUMN cohort_id BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER course_id" );
+			$ensure_index( $enrollments, 'institution_id', "ALTER TABLE {$enrollments} ADD KEY institution_id (institution_id)" );
+			$ensure_index( $enrollments, 'cohort_id', "ALTER TABLE {$enrollments} ADD KEY cohort_id (cohort_id)" );
+			$ensure_index( $enrollments, 'inst_status_activity', "ALTER TABLE {$enrollments} ADD KEY inst_status_activity (institution_id, status, last_activity)" );
+		}
+
+		$program_enrollments = $wpdb->prefix . 'atora_program_enrollments';
+		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $program_enrollments ) ) ) === $program_enrollments ) {
+			$ensure_column( $program_enrollments, 'institution_id', "ALTER TABLE {$program_enrollments} ADD COLUMN institution_id BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER id" );
+			$ensure_column( $program_enrollments, 'cohort_id', "ALTER TABLE {$program_enrollments} ADD COLUMN cohort_id BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER program_id" );
+			$ensure_index( $program_enrollments, 'institution_id', "ALTER TABLE {$program_enrollments} ADD KEY institution_id (institution_id)" );
+			$ensure_index( $program_enrollments, 'cohort_id', "ALTER TABLE {$program_enrollments} ADD KEY cohort_id (cohort_id)" );
+		}
+
+		$invitations = $wpdb->prefix . 'clms_invitations';
+		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $invitations ) ) ) === $invitations ) {
+			$ensure_column( $invitations, 'institution_id', "ALTER TABLE {$invitations} ADD COLUMN institution_id BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER id" );
+			$ensure_column( $invitations, 'cohort_id', "ALTER TABLE {$invitations} ADD COLUMN cohort_id BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER program_id" );
+			$ensure_column( $invitations, 'batch_id', "ALTER TABLE {$invitations} ADD COLUMN batch_id VARCHAR(64) NOT NULL DEFAULT '' AFTER cohort_id" );
+			$ensure_index( $invitations, 'institution_id', "ALTER TABLE {$invitations} ADD KEY institution_id (institution_id)" );
+			$ensure_index( $invitations, 'cohort_id', "ALTER TABLE {$invitations} ADD KEY cohort_id (cohort_id)" );
+			$ensure_index( $invitations, 'batch_id', "ALTER TABLE {$invitations} ADD KEY batch_id (batch_id)" );
+		}
+
+		// ── E-10: normalización del nombre de columna wp_course_id ──────────
+		$delegations = $wpdb->prefix . 'atora_instructor_delegations';
+		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $delegations ) ) ) === $delegations ) {
+			if ( ! $has_column( $delegations, 'wp_course_id' ) && $has_column( $delegations, 'course_id' ) ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				$wpdb->query( "ALTER TABLE {$delegations} CHANGE COLUMN course_id wp_course_id BIGINT UNSIGNED NOT NULL DEFAULT 0" );
+			}
+
+			// Re-crear unique key solo si no coincide con la definición esperada.
+			$delegation_cols = (array) $wpdb->get_col(
+				$wpdb->prepare(
+					"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.STATISTICS
+					 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND INDEX_NAME = %s
+					 ORDER BY SEQ_IN_INDEX ASC",
+					$delegations,
+					'delegation'
+				)
+			);
+			$delegation_cols = array_values( array_filter( array_map( 'sanitize_key', $delegation_cols ) ) );
+			$expected_cols   = array( 'instructor_id', 'assistant_id', 'scope', 'wp_course_id' );
+			if ( $has_index( $delegations, 'delegation' ) && $delegation_cols !== $expected_cols ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				$wpdb->query( "ALTER TABLE {$delegations} DROP INDEX delegation" );
+			}
+			$ensure_index( $delegations, 'delegation', "ALTER TABLE {$delegations} ADD UNIQUE KEY delegation (instructor_id, assistant_id, scope, wp_course_id)" );
+
+			if ( $has_index( $delegations, 'course_id' ) ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				$wpdb->query( "ALTER TABLE {$delegations} DROP INDEX course_id" );
+			}
+			$ensure_index( $delegations, 'wp_course_id', "ALTER TABLE {$delegations} ADD KEY wp_course_id (wp_course_id)" );
 		}
 
 		return true;
@@ -1328,6 +1401,7 @@ class V5_Installer {
 			excerpt         TEXT            NOT NULL,
 			status          VARCHAR(20)     NOT NULL DEFAULT 'draft',
 			visibility      VARCHAR(20)     NOT NULL DEFAULT 'public',
+			scope           VARCHAR(20)     NOT NULL DEFAULT 'institution',
 			type            VARCHAR(20)     NOT NULL DEFAULT 'self_paced',
 			instructor_id   BIGINT UNSIGNED NOT NULL DEFAULT 0,
 			price           DECIMAL(10,2)   NOT NULL DEFAULT 0.00,
@@ -1347,6 +1421,7 @@ class V5_Installer {
 			UNIQUE KEY wp_post_id  (wp_post_id),
 			KEY status         (status),
 			KEY institution_id (institution_id),
+			KEY inst_status    (institution_id, status),
 			KEY instructor_id  (instructor_id),
 			KEY slug           (slug(200))
 		) $charset_collate;" );
@@ -1383,6 +1458,7 @@ class V5_Installer {
 			institution_id  BIGINT UNSIGNED NOT NULL DEFAULT 0,
 			user_id         BIGINT UNSIGNED NOT NULL,
 			course_id       BIGINT UNSIGNED NOT NULL,
+			cohort_id       BIGINT UNSIGNED NOT NULL DEFAULT 0,
 			wp_course_id    BIGINT UNSIGNED NOT NULL DEFAULT 0,
 			status          VARCHAR(20)     NOT NULL DEFAULT 'active',
 			progress_pct    TINYINT UNSIGNED NOT NULL DEFAULT 0,
@@ -1397,7 +1473,9 @@ class V5_Installer {
 			UNIQUE KEY user_course  (user_id, course_id),
 			KEY status      (status),
 			KEY institution_id (institution_id),
+			KEY inst_status_activity (institution_id, status, last_activity),
 			KEY course_id   (course_id),
+			KEY cohort_id   (cohort_id),
 			KEY enrolled_at (enrolled_at),
 			KEY last_activity (last_activity)
 		) $charset_collate;" );
@@ -1476,6 +1554,7 @@ class V5_Installer {
 			UNIQUE KEY wp_post_id    (wp_post_id),
 			KEY status               (status),
 			KEY institution_id       (institution_id),
+			KEY inst_status          (institution_id, status),
 			KEY instructor_id        (instructor_id),
 			KEY slug                 (slug(200))
 		) $charset_collate;" );
@@ -1486,6 +1565,7 @@ class V5_Installer {
 			institution_id  BIGINT UNSIGNED  NOT NULL DEFAULT 0,
 			user_id         BIGINT UNSIGNED  NOT NULL,
 			program_id      BIGINT UNSIGNED  NOT NULL,
+			cohort_id       BIGINT UNSIGNED  NOT NULL DEFAULT 0,
 			wp_program_id   BIGINT UNSIGNED  NOT NULL DEFAULT 0,
 			status          VARCHAR(20)      NOT NULL DEFAULT 'active',
 			enrolled_at     DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1498,6 +1578,7 @@ class V5_Installer {
 			KEY status               (status),
 			KEY institution_id       (institution_id),
 			KEY program_id           (program_id),
+			KEY cohort_id            (cohort_id),
 			KEY enrolled_at          (enrolled_at)
 		) $charset_collate;" );
 
@@ -1617,7 +1698,7 @@ class V5_Installer {
 			instructor_id   BIGINT UNSIGNED NOT NULL,
 			assistant_id    BIGINT UNSIGNED NOT NULL,
 			scope           VARCHAR(20)     NOT NULL DEFAULT 'instructor',
-			course_id       BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			wp_course_id    BIGINT UNSIGNED NOT NULL DEFAULT 0,
 			status          VARCHAR(20)     NOT NULL DEFAULT 'active',
 			perms_json      LONGTEXT                 DEFAULT NULL,
 			created_by      BIGINT UNSIGNED NOT NULL DEFAULT 0,
@@ -1626,10 +1707,10 @@ class V5_Installer {
 			revoked_by      BIGINT UNSIGNED NOT NULL DEFAULT 0,
 			revoked_at      DATETIME                 DEFAULT NULL,
 			PRIMARY KEY (id),
-			UNIQUE KEY delegation (instructor_id, assistant_id, scope, course_id),
+			UNIQUE KEY delegation (instructor_id, assistant_id, scope, wp_course_id),
 			KEY assistant_status (assistant_id, status),
 			KEY instructor_id (instructor_id),
-			KEY course_id (course_id),
+			KEY wp_course_id (wp_course_id),
 			KEY institution_id (institution_id)
 		) $charset_collate;" );
 

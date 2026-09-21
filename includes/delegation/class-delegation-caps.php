@@ -76,6 +76,11 @@ final class ATORA_Delegation_Caps {
 	 * @return array
 	 */
 	public static function user_has_cap( $allcaps, $caps, $args, $user ) {
+		static $resolving = false;
+		if ( $resolving ) {
+			return $allcaps;
+		}
+
 		if ( empty( $caps ) || ! is_array( $allcaps ) ) {
 			return $allcaps;
 		}
@@ -103,7 +108,10 @@ final class ATORA_Delegation_Caps {
 
 		$post = get_post( $object_id );
 		if ( $post && in_array( (string) $post->post_type, array( 'lm_course', 'lm_lesson' ), true ) ) {
-			if ( ATORA_Delegation_Service::covers( absint( $user->ID ), $post, $perm ) ) {
+			$resolving = true;
+			$covered = ATORA_Delegation_Service::covers( absint( $user->ID ), $post, $perm );
+			$resolving = false;
+			if ( $covered ) {
 				$allcaps[ $requested ] = true;
 			}
 			return $allcaps;
@@ -115,7 +123,10 @@ final class ATORA_Delegation_Caps {
 			if ( $wp_course_id > 0 ) {
 				$course = get_post( $wp_course_id );
 				if ( $course && 'lm_course' === (string) $course->post_type ) {
-					if ( ATORA_Delegation_Service::covers( absint( $user->ID ), $course, $perm ) ) {
+					$resolving = true;
+					$covered = ATORA_Delegation_Service::covers( absint( $user->ID ), $course, $perm );
+					$resolving = false;
+					if ( $covered ) {
 						$allcaps[ $requested ] = true;
 					}
 				}
@@ -125,4 +136,3 @@ final class ATORA_Delegation_Caps {
 		return $allcaps;
 	}
 }
-

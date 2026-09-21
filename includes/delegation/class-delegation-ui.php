@@ -89,7 +89,7 @@ final class ATORA_Delegation_UI {
 						$assistant_label = $assistant ? $assistant->user_login : '#' . absint( $row['assistant_id'] ?? 0 );
 						$scope = sanitize_key( (string) ( $row['scope'] ?? '' ) );
 						$label = ( 'course' === $scope )
-							? sprintf( __( 'Curso #%d', 'atora-lms' ), absint( $row['course_id'] ?? 0 ) )
+							? sprintf( __( 'Curso #%d', 'atora-lms' ), absint( $row['wp_course_id'] ?? 0 ) )
 							: __( 'Instructor', 'atora-lms' );
 						?>
 						<tr>
@@ -168,11 +168,10 @@ final class ATORA_Delegation_UI {
 		if ( class_exists( 'ATORA_Delegation_Service' ) ) {
 			ATORA_Delegation_Service::grant( $user_id, absint( $assistant->ID ), array(
 				'scope'      => $scope,
-				'course_id'  => $course_id,
+				'wp_course_id' => $course_id,
 				'perms'      => $perms,
 				'created_by' => $viewer_id,
 			) );
 		}
 	}
 }
-

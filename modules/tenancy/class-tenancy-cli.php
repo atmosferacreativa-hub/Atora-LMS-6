@@ -66,28 +66,34 @@ class Tenancy_CLI {
 		}
 
 		$column_tables = array(
-			$wpdb->prefix . 'atora_programs',
-			$wpdb->prefix . 'atora_courses',
-			$wpdb->prefix . 'atora_enrollments',
-			$wpdb->prefix . 'atora_program_enrollments',
-			$wpdb->prefix . 'clms_invitations',
+			$wpdb->prefix . 'atora_programs'            => array( 'institution_id' ),
+			$wpdb->prefix . 'atora_courses'             => array( 'institution_id', 'scope' ),
+			$wpdb->prefix . 'atora_enrollments'         => array( 'institution_id', 'cohort_id' ),
+			$wpdb->prefix . 'atora_program_enrollments' => array( 'institution_id', 'cohort_id' ),
+			$wpdb->prefix . 'clms_invitations'          => array( 'institution_id', 'cohort_id', 'batch_id' ),
 		);
 
-		foreach ( $column_tables as $table ) {
+		foreach ( $column_tables as $table => $columns ) {
 			$exists = (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) );
 			if ( $exists !== $table ) { continue; }
 
-			$has = (int) $wpdb->get_var(
-				$wpdb->prepare(
-					"SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
-					 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND COLUMN_NAME = 'institution_id'",
-					$table
-				)
-			) > 0;
+			foreach ( (array) $columns as $column ) {
+				$column = sanitize_key( (string) $column );
+				if ( '' === $column ) { continue; }
 
-			if ( $has ) {
-				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
-				$wpdb->query( "ALTER TABLE {$table} DROP COLUMN institution_id" );
+				$has = (int) $wpdb->get_var(
+					$wpdb->prepare(
+						"SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+						 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND COLUMN_NAME = %s",
+						$table,
+						$column
+					)
+				) > 0;
+
+				if ( $has ) {
+					// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+					$wpdb->query( "ALTER TABLE {$table} DROP COLUMN {$column}" );
+				}
 			}
 		}
 
