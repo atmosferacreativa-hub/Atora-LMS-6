@@ -229,7 +229,7 @@ class Outbound_Webhooks {
 	/** @return void */
 		public static function register_admin_menu(): void {
 			add_submenu_page(
-				'atora-growth-hub', // PT-4.4.3: reubicado bajo el hub "Crecimiento" (atora-growth-hub).
+				'clms-dashboard', // PT-4.4.3: acceso desde hub "Crecimiento" (atora-growth-hub); se oculta del sidebar en cleanup_atora_submenus().
 				__( 'Webhooks', 'atora-lms' ),
 				__( 'Webhooks', 'atora-lms' ),
 				'manage_options',

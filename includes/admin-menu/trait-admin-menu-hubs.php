@@ -1127,20 +1127,25 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 	 * Prioriza navegación por hubs, ocultando entradas de acceso duplicadas.
 	 */
 	public function cleanup_atora_submenus(): void {
-		$hidden_submenus = array(
-			'edit.php?post_type=lm_course',
-			'edit.php?post_type=lm_program',
-			'edit.php?post_type=lm_cohort',
-			'edit.php?post_type=lm_lesson',
-			'edit.php?post_type=atora_teacher',
-			'edit.php?post_type=clms_rubric',
-			'atora-analytics',
-			'atora-live-streaming',
-			// Entradas reubicadas al Panel ATORA (tarjetas + acceso rápido).
-			'atora-early-warning',
-			'atora-learning-analytics',
-			'atora-groups',
-			'clms-peer-review-reports',
+			$hidden_submenus = array(
+				'edit.php?post_type=lm_course',
+				'edit.php?post_type=lm_program',
+				'edit.php?post_type=lm_cohort',
+				'edit.php?post_type=lm_lesson',
+				'edit.php?post_type=atora_teacher',
+				'edit.php?post_type=clms_rubric',
+				'atora-analytics',
+				'atora-live-streaming',
+				// Reubicados a hubs (enlaces) — no deben aparecer como entradas fijas.
+				'atora-forms',
+				'atora-popups',
+				'atora-automations',
+				'atora-webhooks',
+				// Entradas reubicadas al Panel ATORA (tarjetas + acceso rápido).
+				'atora-early-warning',
+				'atora-learning-analytics',
+				'atora-groups',
+				'clms-peer-review-reports',
 			'atora-portfolios',
 			// Templates se operan desde tarjetas/hubs, no como item fijo del sidebar.
 			'clms-template-parts',

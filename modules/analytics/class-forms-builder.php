@@ -689,7 +689,7 @@ class Forms_Builder {
 		}
 
 			add_submenu_page(
-				'atora-reports-hub', // PT-4.4.3: reubicado bajo el hub "Informes" (atora-reports-hub).
+				'clms-dashboard', // PT-4.4.3: acceso desde hub "Informes" (atora-reports-hub); se oculta del sidebar en cleanup_atora_submenus().
 				__( 'Formularios', 'atora-lms' ),
 				__( 'Formularios', 'atora-lms' ),
 				'manage_options',

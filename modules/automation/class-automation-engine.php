@@ -1732,7 +1732,7 @@ class Automation_Engine {
 		}
 
 			add_submenu_page(
-				'atora-growth-hub', // PT-4.4.3: reubicado bajo el hub "Crecimiento" (atora-growth-hub).
+				'clms-dashboard', // PT-4.4.3: acceso desde hub "Crecimiento" (atora-growth-hub); se oculta del sidebar en cleanup_atora_submenus().
 				__( 'Automatizaciones', 'atora-lms' ),
 				__( 'Automatizaciones', 'atora-lms' ),
 				'manage_options',
