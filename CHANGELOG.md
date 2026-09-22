@@ -1,5 +1,24 @@
 # CHANGELOG — ATORA LMS
 
+## 6.26.5 (2026-09-21)
+
+### SpeedGrader + Rúbricas — fiabilidad del dato y trazabilidad
+
+- **FIX — puntajes por criterio**: el número escrito por el docente es la fuente de verdad (no se trunca), con validación de rango y decimales en cliente y servidor.
+- **MEJORA — total de rúbrica**: muestra parcial con cuántos criterios faltan y feedback claro cuando hay valores inválidos.
+- **FIX — resaltado de nivel**: pasa a regla de umbral (sin “inflación”), con etiqueta “entre X e Y” cuando corresponde y tooltip de franjas por criterio.
+- **MEJORA — nota final manual**: muestra el % de la rúbrica como referencia junto al campo de nota final y un botón para copiarlo.
+- **MEJORA — auditoría**: registra nota final + total/máximo/% de la rúbrica y revisión usada en la evaluación inmutable.
+
+### Formularios (landing pública)
+
+- **FIX — acentos rotos**: normaliza escapes unicode rotos (`u00e9`/`\u00e9`) al leer/guardar schema y migra schemas existentes una sola vez.
+- **FIX — select “Array”**: soporta opciones como strings o pares `{value,label}` y valida server-side que el valor enviado exista en las opciones del schema.
+
+### Sello de versión
+
+- **NUEVO — build info**: expone versión/commit en admin, `GET /discovery` y `wp atora version`; build-info se incluye en el ZIP de distribución y CI lo verifica.
+
 ## 6.3.0 (2026-08-18)
 
 ### Cutover + Modularidad — despliegue institucional
