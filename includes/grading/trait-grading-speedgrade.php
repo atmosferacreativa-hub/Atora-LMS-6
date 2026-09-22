@@ -325,8 +325,19 @@ trait CLMS_Grading_SpeedGrade_Trait {
 										$grade_label .= ' — ' . __( 'sobreescribe la rúbrica', 'atora-lms' );
 									}
 									?>
-									<label for="clms_sg_grade"><?php echo esc_html( $grade_label ); ?></label>
+									<label for="clms_sg_grade">
+										<?php echo esc_html( $grade_label ); ?>
+										<span style="font-weight:400;opacity:.75;margin-left:6px">
+											<?php esc_html_e( 'Rúbrica (referencia):', 'atora-lms' ); ?>
+											<span id="clms_sg_rubric_pct_ref">—</span>
+										</span>
+									</label>
 									<input type="number" min="0" max="100" step="1" id="clms_sg_grade" name="grade" value="<?php echo esc_attr( '' !== (string) $context['grade'] ? $context['grade'] : '' ); ?>">
+									<?php if ( ! empty( $criteria ) ) : ?>
+										<button type="button" id="clms_sg_use_rubric_pct" class="button button-small" style="margin-top:6px" disabled>
+											<?php esc_html_e( 'Usar % de la rúbrica', 'atora-lms' ); ?>
+										</button>
+									<?php endif; ?>
 								</div>
 
 								<div class="clms-sg-field">
@@ -696,11 +707,12 @@ trait CLMS_Grading_SpeedGrade_Trait {
 			$raw_scores  = isset( $_POST['rubric_scores'] ) ? wp_unslash( $_POST['rubric_scores'] ) : array();
 			$raw_scores  = is_array( $raw_scores ) ? $raw_scores : array();
 			$total_pts   = 0;
-			$earned_pts  = 0;
+			$earned_pts  = 0.0;
 			$total_weight = 0.0;
 			$earned_weight = 0.0;
 			$total_criteria = is_array( $criteria ) ? count( $criteria ) : 0;
 			$scored_criteria = 0;
+			$rubric_pct_ref = '';
 
 			$score_precision = 2;
 			foreach ( (array) $criteria as $i => $c ) {
@@ -768,14 +780,8 @@ trait CLMS_Grading_SpeedGrade_Trait {
 				}
 			}
 
-			// Derive overall grade 0-100 proportionally from rubric, only if all criteria scored
-			$all_scored = $total_criteria > 0 && $scored_criteria === $total_criteria;
-			if ( $all_scored && $total_pts > 0 ) {
-				if ( $total_weight > 0.0 ) {
-					$grade_from_rubric = (int) round( ( $earned_weight / $total_weight ) * 100 );
-				} else {
-					$grade_from_rubric = (int) round( ( $earned_pts / $total_pts ) * 100 );
-				}
+			if ( $total_pts > 0 && $scored_criteria > 0 ) {
+				$rubric_pct_ref = (string) (int) round( ( $earned_pts / (float) $total_pts ) * 100 );
 			}
 		}
 
@@ -786,8 +792,6 @@ trait CLMS_Grading_SpeedGrade_Trait {
 				return new WP_Error( 'invalid_grade', __( 'La nota debe ser numérica.', 'atora-lms' ) );
 			}
 			$grade = max( 0, min( 100, (int) round( (float) $grade_raw ) ) );
-		} elseif ( '' !== $grade_from_rubric ) {
-			$grade = $grade_from_rubric;
 		} else {
 			$grade = '';
 		}
@@ -961,7 +965,7 @@ trait CLMS_Grading_SpeedGrade_Trait {
 		}
 
 		$assessment_engine = clms_core('CLMS_Assessment_Engine');
-		$grade_source      = $this->has_speedgrade_rubric_scores( $rubric_scores ) ? 'rubric' : 'manual';
+		$grade_source      = 'manual';
 		if ( 'accept_ai_draft' === $submit_action ) {
 			$grade_source = 'ai_assisted';
 		}
@@ -1046,11 +1050,11 @@ trait CLMS_Grading_SpeedGrade_Trait {
 				$on_behalf_of = absint( (int) get_post_field( 'post_author', $lesson_id ) );
 			}
 
-			$earned_points = 0;
+			$earned_points = 0.0;
 			foreach ( (array) $rubric_scores as $row ) {
 				$row = is_array( $row ) ? $row : array();
 				if ( '' !== (string) ( $row['score'] ?? '' ) ) {
-					$earned_points += absint( $row['score'] ?? 0 );
+					$earned_points += (float) $row['score'];
 				}
 			}
 
@@ -1058,8 +1062,12 @@ trait CLMS_Grading_SpeedGrade_Trait {
 				'rubric'   => $rubric_snapshot,
 				'scores'   => $rubric_scores,
 				'grade'    => $grade,
+				'grade_manual' => '' !== (string) $grade_raw,
 				'status'   => $status,
 				'feedback' => $feedback,
+				'rubric_total_points' => $earned_points,
+				'rubric_max_points'   => absint( $rubric_snapshot['total_points'] ?? 0 ),
+				'rubric_percent'      => ( '' !== (string) $rubric_pct_ref ) ? absint( $rubric_pct_ref ) : '',
 			);
 
 			\ATORA\LMS\Rubric_Service::record_evaluation( array(
@@ -1070,7 +1078,7 @@ trait CLMS_Grading_SpeedGrade_Trait {
 				'rubric_id'        => $rubric_id,
 				'rubric_revision'  => absint( $rubric_snapshot['rubric_revision'] ?? 1 ),
 				'total_points'     => absint( $rubric_snapshot['total_points'] ?? 0 ),
-				'earned_points'    => absint( $earned_points ),
+				'earned_points'    => absint( (int) round( $earned_points ) ),
 				'scale_type'       => sanitize_key( (string) ( $rubric_snapshot['scale_type'] ?? '' ) ),
 				'scale_code'       => sanitize_key( (string) ( $rubric_snapshot['scale_code'] ?? '' ) ),
 				'source'           => 'speedgrader',

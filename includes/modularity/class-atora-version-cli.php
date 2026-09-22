@@ -34,13 +34,15 @@ final class ATORA_Version_CLI {
 		$info = ATORA_Build_Info::get();
 		$dirty = $info['dirty'] ?? null;
 		$dirty_label = null === $dirty ? 'unknown' : ( $dirty ? 'dirty' : 'clean' );
-		$dirty_suffix = 'unknown' === $dirty_label ? '' : ( ', ' . $dirty_label );
+		$dirty_suffix = 'unknown' === $dirty_label ? ', dirty: ?' : ( ', ' . $dirty_label );
+		$build_stale = ! empty( $info['build_stale'] ) ? ', build_stale' : '';
 		$line = sprintf(
-			'%s %s (%s%s)',
+			'%s %s (%s%s%s)',
 			$info['version'] ?? '',
 			$info['commit_short'] ?? '',
 			$info['origin'] ?? '',
-			$dirty_suffix
+			$dirty_suffix,
+			$build_stale
 		);
 
 		\WP_CLI::log( $line );

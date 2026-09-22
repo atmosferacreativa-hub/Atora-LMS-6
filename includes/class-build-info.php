@@ -13,12 +13,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 final class ATORA_Build_Info {
 
 	private const BUILD_INFO_FILE = 'build-info.json';
+	private const DIRTY_TRANSIENT_TTL = 60;
 
 	/**
 	 * Devuelve el sello de versión. Si hay un checkout (".git" legible),
 	 * prefiere Git para obtener el commit, y usa build-info.json como fallback.
 	 *
-	 * @return array{version:string,commit:string,commit_short:string,branch:string,tag:string,built_at:string,dirty:bool|null,dirty_method:string,origin:string}
+	 * @return array{version:string,commit:string,commit_short:string,branch:string,tag:string,built_at:string,dirty:bool|null,dirty_method:string,build_stale:bool,origin:string}
 	 */
 	public static function get(): array {
 		$version = defined( 'ATORA_LMS_VERSION' ) ? (string) ATORA_LMS_VERSION : '';
@@ -34,20 +35,28 @@ final class ATORA_Build_Info {
 		$tag    = $from_git['tag'] ?? (string) ( $from_build['tag'] ?? '' );
 		$built_at = (string) ( $from_build['built_at'] ?? '' );
 
+		$build_stale = false;
+		if ( 'git' === $origin && '' !== (string) ( $from_build['commit_short'] ?? '' ) && '' !== (string) $commit_short ) {
+			$build_stale = (string) $from_build['commit_short'] !== (string) $commit_short;
+		}
+
 		$dirty        = null;
 		$dirty_method = 'unknown';
 		if ( 'build' === $origin ) {
 			$dirty = isset( $from_build['dirty'] ) ? (bool) $from_build['dirty'] : null;
 			$dirty_method = isset( $from_build['dirty'] ) ? 'build' : 'unknown';
 		} elseif ( 'git' === $origin && '' !== $commit ) {
-			$dirty_probe = self::probe_dirty_by_mtime( $plugin_dir, (string) ( $from_git['git_dir'] ?? '' ) );
-			if ( null !== $dirty_probe ) {
-				$dirty = $dirty_probe;
-				$dirty_method = 'mtime';
-			}
-			if ( is_array( $from_build ) && isset( $from_build['commit_short'] ) && (string) $from_build['commit_short'] !== (string) $commit_short ) {
-				$dirty = true;
-				$dirty_method = 'build_mismatch';
+			$cached = self::get_dirty_cache( (string) $commit_short );
+			if ( is_array( $cached ) ) {
+				$dirty = $cached['dirty'];
+				$dirty_method = (string) $cached['dirty_method'];
+			} else {
+				$dirty_probe = self::probe_dirty_by_mtime( $plugin_dir, (string) ( $from_git['git_dir'] ?? '' ) );
+				if ( null !== $dirty_probe ) {
+					$dirty = $dirty_probe;
+					$dirty_method = 'mtime';
+				}
+				self::set_dirty_cache( (string) $commit_short, $dirty, $dirty_method );
 			}
 		}
 
@@ -60,12 +69,13 @@ final class ATORA_Build_Info {
 			'built_at'     => (string) $built_at,
 			'dirty'        => $dirty,
 			'dirty_method' => (string) $dirty_method,
+			'build_stale'  => (bool) $build_stale,
 			'origin'       => (string) $origin,
 		);
 	}
 
 	private static function read_build_info( string $plugin_dir ): array {
-		$file = trailingslashit( $plugin_dir ) . self::BUILD_INFO_FILE;
+		$file = self::slash( $plugin_dir ) . self::BUILD_INFO_FILE;
 		if ( ! file_exists( $file ) ) {
 			return array();
 		}
@@ -91,7 +101,7 @@ final class ATORA_Build_Info {
 			return array();
 		}
 
-		$head_file = trailingslashit( $git_dir ) . 'HEAD';
+		$head_file = self::slash( $git_dir ) . 'HEAD';
 		if ( ! is_readable( $head_file ) ) {
 			return array();
 		}
@@ -129,7 +139,7 @@ final class ATORA_Build_Info {
 	}
 
 	private static function resolve_git_dir( string $plugin_dir ): string {
-		$path = trailingslashit( $plugin_dir ) . '.git';
+		$path = self::slash( $plugin_dir ) . '.git';
 
 		// Caso normal: .git es un directorio.
 		if ( is_dir( $path ) ) {
@@ -144,7 +154,7 @@ final class ATORA_Build_Info {
 				if ( '' !== $gitdir ) {
 					$resolved = $gitdir;
 					if ( ! str_starts_with( $resolved, '/' ) ) {
-						$resolved = trailingslashit( $plugin_dir ) . $resolved;
+						$resolved = self::slash( $plugin_dir ) . $resolved;
 					}
 					$resolved = rtrim( (string) $resolved, '/' ) . '/';
 					if ( is_dir( $resolved ) ) {
@@ -159,13 +169,13 @@ final class ATORA_Build_Info {
 
 	private static function read_ref_hash( string $git_dir, string $ref ): string {
 		$ref = ltrim( $ref, '/' );
-		$ref_file = trailingslashit( $git_dir ) . $ref;
+		$ref_file = self::slash( $git_dir ) . $ref;
 		if ( is_readable( $ref_file ) ) {
 			return trim( (string) file_get_contents( $ref_file ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
 		}
 
 		// Fallback: refs empaquetados en packed-refs.
-		$packed = trailingslashit( $git_dir ) . 'packed-refs';
+		$packed = self::slash( $git_dir ) . 'packed-refs';
 		if ( ! is_readable( $packed ) ) {
 			return '';
 		}
@@ -190,7 +200,7 @@ final class ATORA_Build_Info {
 	}
 
 	private static function resolve_tag_for_commit( string $git_dir, string $commit ): string {
-		$tags_dir = trailingslashit( $git_dir ) . 'refs/tags';
+		$tags_dir = self::slash( $git_dir ) . 'refs/tags';
 		if ( is_dir( $tags_dir ) ) {
 			$it = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $tags_dir, \FilesystemIterator::SKIP_DOTS ) );
 			foreach ( $it as $file ) {
@@ -206,7 +216,7 @@ final class ATORA_Build_Info {
 			}
 		}
 
-		$packed = trailingslashit( $git_dir ) . 'packed-refs';
+		$packed = self::slash( $git_dir ) . 'packed-refs';
 		if ( ! is_readable( $packed ) ) {
 			return '';
 		}
@@ -235,7 +245,7 @@ final class ATORA_Build_Info {
 		if ( '' === $git_dir ) {
 			return null;
 		}
-		$index = trailingslashit( $git_dir ) . 'index';
+		$index = self::slash( $git_dir ) . 'index';
 		if ( ! is_readable( $index ) ) {
 			return null;
 		}
@@ -245,6 +255,15 @@ final class ATORA_Build_Info {
 		}
 
 		$max_mtime = 0;
+		$excludes = array(
+			DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR,
+			DIRECTORY_SEPARATOR . 'node_modules' . DIRECTORY_SEPARATOR,
+			DIRECTORY_SEPARATOR . 'dist' . DIRECTORY_SEPARATOR,
+			DIRECTORY_SEPARATOR . '.phpunit.cache' . DIRECTORY_SEPARATOR,
+			DIRECTORY_SEPARATOR . '.phpunit.result.cache',
+			DIRECTORY_SEPARATOR . self::BUILD_INFO_FILE,
+		);
+
 		$it = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $plugin_dir, \FilesystemIterator::SKIP_DOTS ) );
 		foreach ( $it as $file ) {
 			/** @var \SplFileInfo $file */
@@ -254,6 +273,11 @@ final class ATORA_Build_Info {
 			$path = $file->getPathname();
 			if ( false !== strpos( $path, DIRECTORY_SEPARATOR . '.git' . DIRECTORY_SEPARATOR ) ) {
 				continue;
+			}
+			foreach ( $excludes as $ex ) {
+				if ( false !== strpos( $path, $ex ) ) {
+					continue 2;
+				}
 			}
 			$ext = strtolower( (string) pathinfo( $path, PATHINFO_EXTENSION ) );
 			if ( ! in_array( $ext, array( 'php', 'js', 'css', 'json', 'html' ), true ) ) {
@@ -269,5 +293,32 @@ final class ATORA_Build_Info {
 		}
 
 		return false;
+	}
+
+	private static function get_dirty_cache( string $commit_short ): ?array {
+		if ( '' === $commit_short || ! function_exists( 'get_transient' ) ) {
+			return null;
+		}
+		$key = 'atora_build_dirty_' . preg_replace( '/[^a-z0-9_]/i', '', $commit_short );
+		$raw = get_transient( $key );
+		if ( ! is_array( $raw ) || ! array_key_exists( 'dirty', $raw ) ) {
+			return null;
+		}
+		return $raw;
+	}
+
+	private static function set_dirty_cache( string $commit_short, $dirty, string $dirty_method ): void {
+		if ( '' === $commit_short || ! function_exists( 'set_transient' ) ) {
+			return;
+		}
+		$key = 'atora_build_dirty_' . preg_replace( '/[^a-z0-9_]/i', '', $commit_short );
+		set_transient( $key, array(
+			'dirty'        => is_bool( $dirty ) ? $dirty : null,
+			'dirty_method' => $dirty_method,
+		), self::DIRTY_TRANSIENT_TTL );
+	}
+
+	private static function slash( string $path ): string {
+		return rtrim( $path, '/' ) . '/';
 	}
 }

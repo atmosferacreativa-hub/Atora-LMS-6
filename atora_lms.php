@@ -1002,12 +1002,14 @@ add_action( 'init', static function () {
 			$info = ATORA_Build_Info::get();
 			$dirty = $info['dirty'] ?? null;
 			$dirty_label = null === $dirty ? 'dirty: ?' : ( $dirty ? 'dirty' : 'clean' );
+			$build_stale = ! empty( $info['build_stale'] ) ? 'build: stale' : 'build: ok';
 			$stamp = trim( sprintf(
-				'ATORA LMS %s · %s (%s, %s)',
+				'ATORA LMS %s · %s (%s, %s, %s)',
 				(string) ( $info['version'] ?? '' ),
 				(string) ( $info['commit_short'] ?? '' ),
 				(string) ( $info['origin'] ?? '' ),
-				(string) $dirty_label
+				(string) $dirty_label,
+				(string) $build_stale
 			) );
 			return '' !== $text ? $text . ' · ' . esc_html( $stamp ) : esc_html( $stamp );
 		} );

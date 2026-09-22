@@ -121,16 +121,16 @@ namespace ATORA\Tests\SpeedGrade {
 		$this->assertSame( 'invalid_rubric_score_range', $result->get_error_code() );
 	}
 
-	/** @test */
-	public function derives_grade_from_rubric_when_all_criteria_scored(): void {
-		$_POST['rubric_scores'] = array( '0' => '15', '1' => '7.5' ); // 22.5/30 => 75%
+		/** @test */
+		public function does_not_derive_final_grade_from_rubric_when_grade_is_blank(): void {
+			$_POST['rubric_scores'] = array( '0' => '15', '1' => '7.5' ); // 22.5/30 => 75% (referencia)
 
-		$sg = new DummySpeedGrade();
-		$result = $this->invoke_handle_speedgrade_save( $sg, 500, 1 );
+			$sg = new DummySpeedGrade();
+			$result = $this->invoke_handle_speedgrade_save( $sg, 500, 1 );
 
-		$this->assertFalse( is_wp_error( $result ) );
-		$this->assertSame( 75, (int) get_post_meta( 500, '_clms_submission_grade', true ) );
-	}
+			$this->assertFalse( is_wp_error( $result ) );
+			$this->assertSame( '', (string) get_post_meta( 500, '_clms_submission_grade', true ) );
+		}
 
 		private function invoke_handle_speedgrade_save( DummySpeedGrade $sg, int $submission_id, int $user_id ) {
 			$ref = new \ReflectionClass( $sg );
