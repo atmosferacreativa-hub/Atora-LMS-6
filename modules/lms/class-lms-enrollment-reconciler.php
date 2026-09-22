@@ -36,7 +36,9 @@ class LMS_Enrollment_Reconciler {
 	public static function plan(): array {
 		$courses = get_posts( array(
 			'post_type'      => 'lm_course',
-			'post_status'    => array( 'publish', 'private', 'draft' ),
+			// Nota: 'any' NO incluye 'trash'. Lo incluimos explícitamente porque
+			// en Lab aparecieron cursos en trash con blobs de matrícula corruptos.
+			'post_status'    => array( 'any', 'trash' ),
 			'posts_per_page' => -1,
 			'fields'         => 'ids',
 		) );
@@ -44,7 +46,13 @@ class LMS_Enrollment_Reconciler {
 		$to_fix   = 0;
 		$to_prune = 0;
 		foreach ( $courses as $course_id ) {
-			$students = self::id_list( get_post_meta( (int) $course_id, self::COURSE_META, true ) );
+			$all_meta = get_post_meta( (int) $course_id, self::COURSE_META, false );
+			$students = array();
+			foreach ( (array) $all_meta as $raw ) {
+				$students = array_merge( $students, self::id_list( $raw ) );
+			}
+			$students = array_values( array_unique( array_filter( array_map( 'absint', $students ) ) ) );
+
 			foreach ( $students as $user_id ) {
 				if ( ! get_userdata( (int) $user_id ) ) {
 					$to_prune++;
@@ -76,7 +84,7 @@ class LMS_Enrollment_Reconciler {
 	public static function apply(): array {
 		$courses = get_posts( array(
 			'post_type'      => 'lm_course',
-			'post_status'    => array( 'publish', 'private', 'draft' ),
+			'post_status'    => array( 'any', 'trash' ),
 			'posts_per_page' => -1,
 			'fields'         => 'ids',
 		) );
@@ -87,7 +95,12 @@ class LMS_Enrollment_Reconciler {
 
 		foreach ( $courses as $course_id ) {
 			$course_id = (int) $course_id;
-			$students_raw = self::id_list( get_post_meta( $course_id, self::COURSE_META, true ) );
+			$all_meta = get_post_meta( $course_id, self::COURSE_META, false );
+			$students_raw = array();
+			foreach ( (array) $all_meta as $raw ) {
+				$students_raw = array_merge( $students_raw, self::id_list( $raw ) );
+			}
+			$students_raw = array_values( array_unique( array_filter( array_map( 'absint', $students_raw ) ) ) );
 			$students     = array();
 
 			foreach ( $students_raw as $user_id ) {
@@ -99,7 +112,8 @@ class LMS_Enrollment_Reconciler {
 			}
 
 			// Poda IDs inexistentes del blob del curso.
-			if ( count( $students ) !== count( $students_raw ) ) {
+			if ( count( $students ) !== count( $students_raw ) || count( (array) $all_meta ) > 1 ) {
+				delete_post_meta( $course_id, self::COURSE_META );
 				update_post_meta( $course_id, self::COURSE_META, array_values( array_unique( $students ) ) );
 			}
 
