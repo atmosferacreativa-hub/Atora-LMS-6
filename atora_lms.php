@@ -3,7 +3,7 @@
  * Plugin Name:       ATORA LMS
  * Plugin URI:        https://atora.studio
  * Description:       LMS modular para WordPress con IA, evaluaciones, certificados, CRM, mensajería multi-canal, afiliados, live streaming y más. Autor: Atora Studio. Creado por Atmósfera Creativa.
- * Version:           6.26.4
+ * Version:           6.26.5
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Atora Studio
@@ -52,7 +52,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * - Limpieza automática de notificaciones >90 días
  */
 if ( ! defined( 'ATORA_LMS_VERSION' ) ) {
-	define( 'ATORA_LMS_VERSION', '6.26.4' );
+	define( 'ATORA_LMS_VERSION', '6.26.5' );
 }
 
 if ( ! defined( 'ATORA_LMS_FILE' ) ) {
@@ -902,6 +902,9 @@ add_action( 'init', static function () {
 		ATORA_Security_Maintenance::init();
 	}
 
+	// 6.26.5: sello de versión (build-info.json / git).
+	require_once ATORA_LMS_DIR . 'includes/class-build-info.php';
+
 	// P10.1 (6.13.0): cifrado de tokens OAuth — bloqueante, debe cargar
 	// antes que Calendar_Sync y cualquier proveedor Google (Meet/Drive).
 	require_once ATORA_LMS_DIR . 'includes/security/class-token-crypto.php';
@@ -938,6 +941,11 @@ add_action( 'init', static function () {
 		atora_lms_require_module( 'includes/modularity/class-rest-audit-cli.php', static function() {
 			if ( class_exists( 'CLMS_Rest_Audit_CLI' ) ) {
 				CLMS_Rest_Audit_CLI::init();
+			}
+		} );
+		atora_lms_require_module( 'includes/modularity/class-atora-version-cli.php', static function() {
+			if ( class_exists( 'ATORA_Version_CLI' ) ) {
+				ATORA_Version_CLI::init();
 			}
 		} );
 	}
@@ -984,6 +992,28 @@ add_action( 'init', static function () {
 			ATORA\V5_Installer::install();
 		}
 	} );
+
+	// Mostrar sello de versión en admin (para depuración / QA).
+	if ( is_admin() ) {
+		add_filter( 'admin_footer_text', static function( string $text ): string {
+			if ( ! current_user_can( 'manage_options' ) || ! class_exists( 'ATORA_Build_Info' ) ) {
+				return $text;
+			}
+			$info = ATORA_Build_Info::get();
+			$dirty = $info['dirty'] ?? null;
+			$dirty_label = null === $dirty ? 'dirty: ?' : ( $dirty ? 'dirty' : 'clean' );
+			$build_stale = ! empty( $info['build_stale'] ) ? 'build: stale' : 'build: ok';
+			$stamp = trim( sprintf(
+				'ATORA LMS %s · %s (%s, %s, %s)',
+				(string) ( $info['version'] ?? '' ),
+				(string) ( $info['commit_short'] ?? '' ),
+				(string) ( $info['origin'] ?? '' ),
+				(string) $dirty_label,
+				(string) $build_stale
+			) );
+			return '' !== $text ? $text . ' · ' . esc_html( $stamp ) : esc_html( $stamp );
+		} );
+	}
 
 	// Bootstrap v5 modules (Security, Affiliates, …).
 	atora_lms_require_module( 'modules/class-v5-modules.php', static function() {
@@ -1054,6 +1084,13 @@ add_action( 'init', static function () {
 			}
 		} );
 
+		// ── 6.26.5: comando WP-CLI `wp atora rubrics migrate/verify` ──────────
+		atora_lms_require_module( 'modules/rubrics/class-rubrics-cli.php', static function() {
+			if ( class_exists( '\ATORA\LMS\Rubrics_CLI' ) ) {
+				\ATORA\LMS\Rubrics_CLI::init();
+			}
+		} );
+
 		// ── X-01: comando WP-CLI `wp atora tenancy rollback` ─────────────────
 		atora_lms_require_module( 'modules/tenancy/class-tenancy-cli.php', static function() {
 			atora_lms_require_module( 'modules/tenancy/class-institution-service.php' );
@@ -1077,6 +1114,8 @@ add_action( 'init', static function () {
 	atora_lms_require_module( 'modules/tenancy/class-institution-service.php' );
 	atora_lms_require_module( 'modules/tenancy/class-cohort-table-service.php' );
 	atora_lms_require_module( 'modules/tenancy/class-tenancy-audit.php' );
+	atora_lms_require_module( 'modules/rubrics/class-rubric-read-router.php' );
+	atora_lms_require_module( 'modules/rubrics/class-rubric-service.php' );
 	atora_lms_require_module( 'modules/tenancy/class-deployment-profile-service.php', static function() {
 		if ( class_exists( '\ATORA\LMS\Deployment_Profile_Service' ) ) {
 			\ATORA\LMS\Deployment_Profile_Service::init();

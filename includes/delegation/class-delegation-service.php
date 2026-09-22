@@ -97,7 +97,7 @@ final class ATORA_Delegation_Service {
 				   AND instructor_id = %d
 				   AND assistant_id = %d
 				   AND status = 'active'
-				   AND (expires_at IS NULL OR expires_at = '' OR expires_at > %s)",
+				   AND (expires_at IS NULL OR expires_at > %s)",
 				$institution_id,
 				$instructor_id,
 				$user_id,
@@ -176,7 +176,7 @@ final class ATORA_Delegation_Service {
 				 WHERE institution_id = %d
 				   AND assistant_id = %d
 				   AND status = 'active'
-				   AND (expires_at IS NULL OR expires_at = '' OR expires_at > %s)",
+				   AND (expires_at IS NULL OR expires_at > %s)",
 				$institution_id,
 				$user_id,
 				$now

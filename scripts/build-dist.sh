@@ -37,6 +37,10 @@ mkdir -p "$STAGE_DIR"
 
 rsync -a --exclude-from="$ROOT_DIR/.distignore" --exclude="dist" ./ "$STAGE_DIR/"
 
+# Generar build-info.json dentro del árbol a empaquetar (sin depender de gitignore).
+# En CI el árbol exportado debe estar limpio: dirty=false.
+./scripts/build-info.sh --out "$STAGE_DIR/build-info.json" --dirty false
+
 ( cd "$DIST_DIR" && zip -rq "atora-lms-${VERSION}.zip" atora-lms )
 rm -rf "$STAGE_DIR"
 

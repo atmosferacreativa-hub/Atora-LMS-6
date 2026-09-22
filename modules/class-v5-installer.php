@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class V5_Installer {
 
 	/** Versión del esquema. Incrementar para forzar re-instalación. */
-	const SCHEMA_VERSION = '6.26.4-tenant-unified';
+	const SCHEMA_VERSION = '6.26.5-rubrics-schema';
 
 	/** Option key que almacena la versión instalada. */
 	const OPTION_KEY = 'atora_v5_schema_version';
@@ -52,6 +52,8 @@ class V5_Installer {
 			&& self::ensure_parity_tables()
 			&& self::migrate_followup_plan_column()
 			&& self::migrate_followup_plan_domain_columns()
+			&& self::migrate_6265_offline_schema()
+			&& self::migrate_6265_content_revisions()
 			&& self::migrate_6131_schema_fixes() ) {
 			update_option( self::OPTION_KEY, self::SCHEMA_VERSION );
 		}
@@ -77,6 +79,8 @@ class V5_Installer {
 			&& self::ensure_parity_tables()
 			&& self::migrate_followup_plan_column()
 			&& self::migrate_followup_plan_domain_columns()
+			&& self::migrate_6265_offline_schema()
+			&& self::migrate_6265_content_revisions()
 			&& self::migrate_6131_schema_fixes() ) {
 			update_option( self::OPTION_KEY, self::SCHEMA_VERSION );
 		}
@@ -336,6 +340,115 @@ class V5_Installer {
 
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
 			$wpdb->query( "ALTER TABLE {$enrollments} DROP COLUMN {$legacy_column}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		}
+
+		return true;
+	}
+
+	/**
+	 * 6.26.5: idempotencia offline y doble marca de tiempo.
+	 *
+	 * dbDelta() no es confiable para ALTERs sobre tablas ya existentes.
+	 *
+	 * @return bool
+	 */
+	private static function migrate_6265_offline_schema(): bool {
+		global $wpdb;
+
+		$has_column = static function( string $table, string $column ) use ( $wpdb ): bool {
+			return (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+					 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND COLUMN_NAME = %s",
+					$table,
+					$column
+				)
+			) > 0;
+		};
+
+		$has_index = static function( string $table, string $index ) use ( $wpdb ): bool {
+			return (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS
+					 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND INDEX_NAME = %s",
+					$table,
+					$index
+				)
+			) > 0;
+		};
+
+		$ensure_table = static function( string $table ) use ( $wpdb ): bool {
+			return (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) ) === $table;
+		};
+
+		$progress = $wpdb->prefix . 'atora_lesson_progress';
+		if ( $ensure_table( $progress ) ) {
+			if ( ! $has_column( $progress, 'client_completed_at' ) ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				$wpdb->query( "ALTER TABLE {$progress} ADD COLUMN client_completed_at DATETIME NULL DEFAULT NULL AFTER completed_at" );
+			}
+			if ( ! $has_column( $progress, 'client_event_id' ) ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				$wpdb->query( "ALTER TABLE {$progress} ADD COLUMN client_event_id VARCHAR(64) NULL DEFAULT NULL AFTER client_completed_at" );
+			}
+			if ( ! $has_index( $progress, 'client_event' ) ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				$wpdb->query( "ALTER TABLE {$progress} ADD UNIQUE KEY client_event (user_id, client_event_id)" );
+			}
+		}
+
+		$quiz = $wpdb->prefix . 'atora_quiz_submissions';
+		if ( $ensure_table( $quiz ) ) {
+			if ( ! $has_column( $quiz, 'client_submitted_at' ) ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				$wpdb->query( "ALTER TABLE {$quiz} ADD COLUMN client_submitted_at DATETIME NULL DEFAULT NULL AFTER submitted_at" );
+			}
+			if ( ! $has_column( $quiz, 'client_event_id' ) ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				$wpdb->query( "ALTER TABLE {$quiz} ADD COLUMN client_event_id VARCHAR(64) NULL DEFAULT NULL AFTER client_submitted_at" );
+			}
+			if ( ! $has_index( $quiz, 'user_event' ) ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+				$wpdb->query( "ALTER TABLE {$quiz} ADD UNIQUE KEY user_event (user_id, client_event_id)" );
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * 6.26.5: revision de contenido (courses/lessons) para cache offline.
+	 *
+	 * @return bool
+	 */
+	private static function migrate_6265_content_revisions(): bool {
+		global $wpdb;
+
+		$has_column = static function( string $table, string $column ) use ( $wpdb ): bool {
+			return (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+					 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND COLUMN_NAME = %s",
+					$table,
+					$column
+				)
+			) > 0;
+		};
+
+		$ensure_table = static function( string $table ) use ( $wpdb ): bool {
+			return (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) ) === $table;
+		};
+
+		$courses = $wpdb->prefix . 'atora_courses';
+		if ( $ensure_table( $courses ) && ! $has_column( $courses, 'revision' ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$wpdb->query( "ALTER TABLE {$courses} ADD COLUMN revision INT UNSIGNED NOT NULL DEFAULT 1 AFTER excerpt" );
+		}
+
+		$lessons = $wpdb->prefix . 'atora_lessons';
+		if ( $ensure_table( $lessons ) && ! $has_column( $lessons, 'revision' ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$wpdb->query( "ALTER TABLE {$lessons} ADD COLUMN revision INT UNSIGNED NOT NULL DEFAULT 1 AFTER content" );
 		}
 
 		return true;
@@ -1535,6 +1648,7 @@ class V5_Installer {
 			slug            VARCHAR(500)    NOT NULL DEFAULT '',
 			description     LONGTEXT        NOT NULL,
 			excerpt         TEXT            NOT NULL,
+			revision        INT UNSIGNED    NOT NULL DEFAULT 1,
 			status          VARCHAR(20)     NOT NULL DEFAULT 'draft',
 			visibility      VARCHAR(20)     NOT NULL DEFAULT 'public',
 			scope           VARCHAR(20)     NOT NULL DEFAULT 'institution',
@@ -1569,6 +1683,7 @@ class V5_Installer {
 			title           VARCHAR(500)    NOT NULL DEFAULT '',
 			slug            VARCHAR(500)    NOT NULL DEFAULT '',
 			content         LONGTEXT        NOT NULL,
+			revision        INT UNSIGNED    NOT NULL DEFAULT 1,
 			lesson_order    SMALLINT UNSIGNED NOT NULL DEFAULT 0,
 			section         VARCHAR(200)    NOT NULL DEFAULT '',
 			section_order   TINYINT UNSIGNED NOT NULL DEFAULT 0,
@@ -1627,10 +1742,13 @@ class V5_Installer {
 			attempts        TINYINT UNSIGNED NOT NULL DEFAULT 1,
 			score           DECIMAL(5,2)             DEFAULT NULL,
 			completed_at    DATETIME                 DEFAULT NULL,
+			client_completed_at DATETIME             DEFAULT NULL,
+			client_event_id VARCHAR(64)              DEFAULT NULL,
 			last_viewed_at  DATETIME                 DEFAULT NULL,
 			meta_json       LONGTEXT        DEFAULT NULL,
 			PRIMARY KEY (id),
 			UNIQUE KEY user_lesson  (user_id, lesson_id),
+			UNIQUE KEY client_event (user_id, client_event_id),
 			KEY course_id       (course_id),
 			KEY status          (status),
 			KEY completed_at    (completed_at)
@@ -1882,14 +2000,174 @@ class V5_Installer {
 			feedback        TEXT                      DEFAULT NULL,
 			rubric_json     LONGTEXT                  DEFAULT NULL,
 			submitted_at    DATETIME                  DEFAULT NULL,
+			client_submitted_at DATETIME              DEFAULT NULL,
+			client_event_id VARCHAR(64)               DEFAULT NULL,
 			graded_at       DATETIME                  DEFAULT NULL,
 			meta_json       LONGTEXT                  DEFAULT NULL,
 			PRIMARY KEY (id),
 			UNIQUE KEY wp_post_id  (wp_post_id),
+			UNIQUE KEY user_event  (user_id, client_event_id),
 			KEY user_id            (user_id),
 			KEY lesson_id          (lesson_id),
 			KEY course_id          (course_id),
 			KEY status             (status)
+		) $charset_collate;" );
+
+		// ── Rúbricas a tablas (6.26.5) ───────────────────────────────────────
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_rubrics (
+			id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			institution_id  BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			wp_post_id      BIGINT UNSIGNED NULL DEFAULT NULL,
+			title           VARCHAR(500)    NOT NULL DEFAULT '',
+			slug            VARCHAR(190)    NOT NULL DEFAULT '',
+			scale_type      VARCHAR(40)     NOT NULL DEFAULT '',
+			scale_code      VARCHAR(60)     NOT NULL DEFAULT '',
+			is_holistic     TINYINT(1)      NOT NULL DEFAULT 0,
+			total_points    INT UNSIGNED    NOT NULL DEFAULT 0,
+			revision        INT UNSIGNED    NOT NULL DEFAULT 1,
+			scope           VARCHAR(20)     NOT NULL DEFAULT 'institution',
+			owner_id        BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			status          VARCHAR(20)     NOT NULL DEFAULT 'active',
+			created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			UNIQUE KEY wp_post_id (wp_post_id),
+			KEY inst_status       (institution_id, status),
+			KEY scope             (scope),
+			KEY owner_id          (owner_id)
+		) $charset_collate;" );
+
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_rubric_criteria (
+			id              BIGINT UNSIGNED   NOT NULL AUTO_INCREMENT,
+			rubric_id       BIGINT UNSIGNED   NOT NULL,
+			revision        INT UNSIGNED      NOT NULL DEFAULT 1,
+			criterion_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+			title           VARCHAR(500)      NOT NULL DEFAULT '',
+			description     TEXT              NOT NULL,
+			max_points      INT UNSIGNED      NOT NULL DEFAULT 0,
+			weight          DECIMAL(6,3)      NOT NULL DEFAULT 1.000,
+			type            VARCHAR(20)       NOT NULL DEFAULT 'structured' COMMENT 'structured|natural_language',
+			competency      VARCHAR(190)      NOT NULL DEFAULT '',
+			competency_id   VARCHAR(190)      NOT NULL DEFAULT '',
+			improvement_tip TEXT              NOT NULL,
+			nl_prompt       LONGTEXT                   DEFAULT NULL,
+			created_at      DATETIME          NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			KEY rubric_rev   (rubric_id, revision),
+			KEY rubric_order (rubric_id, revision, criterion_order)
+		) $charset_collate;" );
+
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_rubric_levels (
+			id              BIGINT UNSIGNED   NOT NULL AUTO_INCREMENT,
+			criterion_id    BIGINT UNSIGNED   NOT NULL,
+			level_order     SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+			label           VARCHAR(190)      NOT NULL DEFAULT '',
+			points          INT UNSIGNED      NOT NULL DEFAULT 0,
+			descriptor      TEXT              NOT NULL,
+			created_at      DATETIME          NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			KEY criterion_id (criterion_id),
+			KEY level_order  (criterion_id, level_order)
+		) $charset_collate;" );
+
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_rubric_evaluations (
+			id               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			institution_id   BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			submission_id    BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			wp_submission_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			student_id       BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			rubric_id        BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			rubric_revision  INT UNSIGNED    NOT NULL DEFAULT 1,
+			total_points     INT UNSIGNED    NOT NULL DEFAULT 0,
+			earned_points    INT UNSIGNED    NOT NULL DEFAULT 0,
+			scale_type       VARCHAR(40)     NOT NULL DEFAULT '',
+			scale_code       VARCHAR(60)     NOT NULL DEFAULT '',
+			holistic_score   INT UNSIGNED             DEFAULT NULL,
+			holistic_comment TEXT                     DEFAULT NULL,
+			snapshot_json    LONGTEXT        NOT NULL,
+			hash             CHAR(64)        NOT NULL DEFAULT '',
+			source           VARCHAR(20)     NOT NULL DEFAULT 'speedgrader',
+			grader_id        BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			on_behalf_of     BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			ai_assisted      TINYINT(1)      NOT NULL DEFAULT 0,
+			created_at       DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			KEY submission    (submission_id),
+			KEY wp_submission (wp_submission_id),
+			KEY student       (student_id),
+			KEY rubric_rev    (rubric_id, rubric_revision),
+			KEY inst_created  (institution_id, created_at)
+		) $charset_collate;" );
+
+		// ── Offline: entregas y subidas reanudables (6.26.5) ────────────────
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_assignment_submissions (
+			id                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			institution_id      BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			user_id             BIGINT UNSIGNED NOT NULL,
+			course_id           BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			lesson_id           BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			wp_post_id          BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			attempt             SMALLINT UNSIGNED NOT NULL DEFAULT 1,
+			status              VARCHAR(20)     NOT NULL DEFAULT 'draft',
+			body_text           LONGTEXT                 DEFAULT NULL,
+			files_json          LONGTEXT                 DEFAULT NULL,
+			client_event_id     VARCHAR(64)     NOT NULL DEFAULT '',
+			client_submitted_at DATETIME                 DEFAULT NULL,
+			server_received_at  DATETIME                 DEFAULT NULL,
+			due_at              DATETIME                 DEFAULT NULL,
+			is_late             TINYINT(1)      NOT NULL DEFAULT 0,
+			source              VARCHAR(20)     NOT NULL DEFAULT 'web',
+			created_at          DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			UNIQUE KEY user_event   (user_id, client_event_id),
+			KEY user_lesson_attempt (user_id, lesson_id, attempt),
+			KEY inst_status         (institution_id, status),
+			KEY lesson_status       (lesson_id, status)
+		) $charset_collate;" );
+
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_upload_sessions (
+			id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			institution_id  BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			user_id         BIGINT UNSIGNED NOT NULL,
+			submission_id   BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			upload_token    VARCHAR(64)     NOT NULL,
+			filename        VARCHAR(255)    NOT NULL DEFAULT '',
+			mime_type       VARCHAR(120)    NOT NULL DEFAULT '',
+			total_bytes     BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			received_bytes  BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			chunk_size      INT UNSIGNED    NOT NULL DEFAULT 0,
+			status          VARCHAR(20)     NOT NULL DEFAULT 'open',
+			storage_path    VARCHAR(500)    NOT NULL DEFAULT '',
+			created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			expires_at      DATETIME                 DEFAULT NULL,
+			PRIMARY KEY (id),
+			UNIQUE KEY upload_token (upload_token),
+			KEY user_status         (user_id, status),
+			KEY submission_id       (submission_id)
+		) $charset_collate;" );
+
+		// ── Sesiones móviles fuera de usermeta (6.26.5) ─────────────────────
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_mobile_sessions (
+			id               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			session_id       VARCHAR(32)     NOT NULL,
+			user_id          BIGINT UNSIGNED NOT NULL,
+			institution_id   BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			access_hash      VARCHAR(255)    NOT NULL DEFAULT '',
+			refresh_hash     VARCHAR(255)    NOT NULL DEFAULT '',
+			prev_access_hash VARCHAR(255)    NOT NULL DEFAULT '',
+			prev_refresh_hash VARCHAR(255)   NOT NULL DEFAULT '',
+			access_expires   DATETIME                 DEFAULT NULL,
+			refresh_expires  DATETIME                 DEFAULT NULL,
+			grace_until      DATETIME                 DEFAULT NULL,
+			device_name      VARCHAR(190)    NOT NULL DEFAULT '',
+			app_version      VARCHAR(40)     NOT NULL DEFAULT '',
+			created_at       DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			last_used_at     DATETIME                 DEFAULT NULL,
+			revoked_at       DATETIME                 DEFAULT NULL,
+			PRIMARY KEY (id),
+			UNIQUE KEY session_id  (session_id),
+			KEY user_active        (user_id, revoked_at),
+			KEY refresh_expires    (refresh_expires)
 		) $charset_collate;" );
 
 		// ── Gradebook institucional (6.22.0) ────────────────────────────────

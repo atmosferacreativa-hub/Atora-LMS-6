@@ -131,12 +131,14 @@ final class ATORA_Mobile_REST_Controller {
 		$seats_used = class_exists( '\\ATORA\\LMS\\Deployment_Profile_Service' )
 			? \ATORA\LMS\Deployment_Profile_Service::seats_used_total()
 			: 0;
+		$build = class_exists( 'ATORA_Build_Info' ) ? ATORA_Build_Info::get() : array();
 
 		return new WP_REST_Response( array(
 			'product'          => 'ATORA LMS',
 			'api'              => self::REST_NAMESPACE,
 			'api_version'      => 1,
 			'lms_version'      => defined( 'ATORA_LMS_VERSION' ) ? ATORA_LMS_VERSION : '',
+			'build'            => $build,
 			'site_name'        => get_bloginfo( 'name' ),
 			'site_url'         => home_url( '/' ),
 			'deployment_profile' => $deployment_profile,
@@ -373,6 +375,7 @@ final class ATORA_Mobile_REST_Controller {
 			'lesson' => array(
 				'id'           => $lesson_id,
 				'course_id'    => $course_id,
+				'revision'     => absint( $lesson['revision'] ?? 1 ),
 				'title'        => sanitize_text_field( (string) ( $lesson['title'] ?? '' ) ),
 				'type'         => sanitize_key( (string) ( $lesson['type'] ?? 'text' ) ),
 				'duration_min' => absint( $lesson['duration_min'] ?? 0 ),
@@ -910,6 +913,7 @@ final class ATORA_Mobile_REST_Controller {
 	private static function safe_course( array $course ): array {
 		return array(
 			'id'             => absint( $course['id'] ?? 0 ),
+			'revision'       => absint( $course['revision'] ?? 1 ),
 			'title'          => sanitize_text_field( (string) ( $course['title'] ?? '' ) ),
 			'excerpt'        => sanitize_textarea_field( (string) ( $course['excerpt'] ?? '' ) ),
 			'thumbnail_url'  => esc_url_raw( (string) ( $course['thumbnail_url'] ?? '' ) ),

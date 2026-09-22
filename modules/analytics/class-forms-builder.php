@@ -23,6 +23,8 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class Forms_Builder {
 
+	private const UNICODE_FIX_OPTION = 'atora_forms_schema_unicode_fix_6265';
+
 	/**
 	 * Inicializa el módulo.
 	 *
@@ -31,6 +33,7 @@ class Forms_Builder {
 	public static function init(): void {
 		// CPT para formularios.
 		add_action( 'init', array( __CLASS__, 'register_cpt' ) );
+		add_action( 'init', array( __CLASS__, 'maybe_migrate_schema_unicode_escapes' ), 20 );
 
 		// Shortcode.
 		add_shortcode( 'atora_form', array( __CLASS__, 'render_shortcode' ) );
@@ -70,6 +73,87 @@ class Forms_Builder {
 	// ── Shortcode ─────────────────────────────────────────────────────────────
 
 	/**
+	 * Decodifica escapes unicode rotos que llegaron como "u00e9" en vez de "é".
+	 *
+	 * @param mixed $value
+	 * @return mixed
+	 */
+	public static function normalize_unicode_escapes_for_schema( $value ) {
+		if ( is_array( $value ) ) {
+			$out = array();
+			foreach ( $value as $k => $v ) {
+				$out[ $k ] = self::normalize_unicode_escapes_for_schema( $v );
+			}
+			return $out;
+		}
+
+		if ( ! is_string( $value ) ) {
+			return $value;
+		}
+
+		$s = $value;
+		if ( ! preg_match( '/\\\\u[0-9a-fA-F]{4}|(?<!\\\\)u[0-9a-fA-F]{4}/', $s ) ) {
+			return $value;
+		}
+
+		// Insertar la barra que falta en uXXXX y convertir via json_decode de string.
+		$s = (string) preg_replace( '/(?<!\\\\)u([0-9a-fA-F]{4})/', '\\\\u$1', $s );
+
+		// Preservar \uXXXX al escapar el JSON.
+		$placeholder = "\x1A";
+		$s2 = str_replace( '\\u', $placeholder . 'u', $s );
+		$escaped = addcslashes( $s2, "\\\"\n\r\t" );
+		$escaped = str_replace( $placeholder . 'u', '\\u', $escaped );
+
+		$decoded = json_decode( '"' . $escaped . '"' );
+		return is_string( $decoded ) ? $decoded : $value;
+	}
+
+	/**
+	 * Migra schemas ya guardados que tienen escapes unicode rotos.
+	 *
+	 * @return void
+	 */
+	public static function maybe_migrate_schema_unicode_escapes(): void {
+		if ( get_option( self::UNICODE_FIX_OPTION ) ) {
+			return;
+		}
+
+		$ids = get_posts( array(
+			'post_type'      => 'atora_form',
+			'post_status'    => array( 'publish', 'draft', 'private' ),
+			'posts_per_page' => -1,
+			'fields'         => 'ids',
+		) );
+
+		foreach ( (array) $ids as $form_id ) {
+			$form_id = absint( $form_id );
+			if ( ! $form_id ) {
+				continue;
+			}
+
+			$raw = (string) get_post_meta( $form_id, 'atora_form_schema', true );
+			if ( '' === $raw ) {
+				continue;
+			}
+
+			$decoded = json_decode( $raw, true );
+			if ( ! is_array( $decoded ) ) {
+				continue;
+			}
+
+			$normalized = self::normalize_unicode_escapes_for_schema( $decoded );
+			if ( $normalized === $decoded ) {
+				continue;
+			}
+
+			update_post_meta( $form_id, 'atora_form_schema', wp_json_encode( $normalized ) );
+		}
+
+		update_option( self::UNICODE_FIX_OPTION, 1, false );
+	}
+
+	/**
 	 * Renderiza el formulario en el frontend.
 	 *
 	 * @param array $atts Atributos: id.
@@ -84,6 +168,7 @@ class Forms_Builder {
 		}
 
 		$schema = json_decode( get_post_meta( $form_id, 'atora_form_schema', true ), true );
+		$schema = self::normalize_unicode_escapes_for_schema( is_array( $schema ) ? $schema : array() );
 
 		if ( empty( $schema['fields'] ) ) {
 			return '';
@@ -156,8 +241,17 @@ class Forms_Builder {
 				        <?php echo $req_attr; // phpcs:ignore ?>
 				        style="width:100%;padding:8px 12px;border:1px solid var(--atora-border);border-radius:var(--ac-radius-xs);">
 					<option value=""><?php esc_html_e( '— Selecciona —', 'atora-lms' ); ?></option>
-					<?php foreach ( (array) $field['options'] as $opt ) : ?>
-						<option value="<?php echo esc_attr( $opt ); ?>"><?php echo esc_html( $opt ); ?></option>
+					<?php foreach ( (array) $field['options'] as $opt ) :
+						$pair = self::normalize_select_option( $opt );
+						$val  = (string) ( $pair['value'] ?? '' );
+						$lab  = (string) ( $pair['label'] ?? '' );
+						if ( '' === $val && '' === $lab ) {
+							continue;
+						}
+						if ( '' === $val ) { $val = $lab; }
+						if ( '' === $lab ) { $lab = $val; }
+					?>
+						<option value="<?php echo esc_attr( $val ); ?>"><?php echo esc_html( $lab ); ?></option>
 					<?php endforeach; ?>
 				</select>
 			<?php elseif ( 'checkbox' === $type ) : ?>
@@ -180,6 +274,28 @@ class Forms_Builder {
 		</div>
 		<?php
 		return ob_get_clean();
+	}
+
+	/**
+	 * Normaliza una opción de <select> para soportar:
+	 * - string: "Opción"
+	 * - array:  { value, label } o variantes históricas (text/val, name/id, etc.)
+	 *
+	 * @param mixed $opt
+	 * @return array{value:string,label:string}
+	 */
+	private static function normalize_select_option( $opt ): array {
+		if ( is_array( $opt ) ) {
+			$value = (string) ( $opt['value'] ?? $opt['val'] ?? $opt['id'] ?? $opt['key'] ?? $opt['label'] ?? $opt['text'] ?? $opt['name'] ?? '' );
+			$label = (string) ( $opt['label'] ?? $opt['text'] ?? $opt['name'] ?? $opt['value'] ?? $opt['val'] ?? $opt['id'] ?? '' );
+			return array(
+				'value' => sanitize_text_field( $value ),
+				'label' => sanitize_text_field( $label ),
+			);
+		}
+
+		$s = sanitize_text_field( (string) $opt );
+		return array( 'value' => $s, 'label' => $s );
 	}
 
 	// ── Submit ────────────────────────────────────────────────────────────────
@@ -268,6 +384,42 @@ class Forms_Builder {
 						),
 					) );
 				}
+			}
+		}
+
+		// Validar selects: el valor enviado debe existir en las opciones definidas.
+		foreach ( $schema['fields'] ?? array() as $field ) {
+			$type  = sanitize_key( $field['type'] ?? '' );
+			if ( 'select' !== $type || empty( $field['options'] ) ) {
+				continue;
+			}
+			$fname = sanitize_key( $field['name'] ?? '' );
+			if ( '' === $fname ) {
+				continue;
+			}
+			$val = (string) ( $submitted[ $fname ] ?? '' );
+			if ( '' === $val ) {
+				continue; // requerido ya fue validado arriba.
+			}
+
+			$allowed = array();
+			foreach ( (array) $field['options'] as $opt ) {
+				$pair = self::normalize_select_option( $opt );
+				$opt_val = (string) ( $pair['value'] ?? '' );
+				$opt_lab = (string) ( $pair['label'] ?? '' );
+				if ( '' === $opt_val ) { $opt_val = $opt_lab; }
+				if ( '' !== $opt_val ) {
+					$allowed[] = $opt_val;
+				}
+			}
+
+			if ( ! in_array( $val, $allowed, true ) ) {
+				wp_send_json_error( array(
+					'message' => sprintf(
+						__( 'El valor del campo "%s" no es válido.', 'atora-lms' ),
+						$field['label'] ?? $fname
+					),
+				) );
 			}
 		}
 
@@ -475,7 +627,13 @@ class Forms_Builder {
 
 		$title    = sanitize_text_field( wp_unslash( $_POST['title'] ?? '' ) );
 		$form_id  = absint( wp_unslash( $_POST['id'] ?? 0 ) );
-		$schema   = wp_json_encode( $_POST['schema'] ?? array() );
+		$schema_in = $_POST['schema'] ?? array();
+		if ( is_string( $schema_in ) ) {
+			$decoded = json_decode( (string) $schema_in, true );
+			$schema_in = is_array( $decoded ) ? $decoded : array();
+		}
+		$schema_in = self::normalize_unicode_escapes_for_schema( $schema_in );
+		$schema   = wp_json_encode( $schema_in );
 
 		$post_data = array(
 			'post_type'   => 'atora_form',

@@ -415,6 +415,9 @@ if ( ! class_exists( 'WP_User' ) ) {
 if ( ! function_exists( 'wpautop' ) ) {
 	function wpautop( string $s ): string { return '<p>' . $s . '</p>'; }
 }
+if ( ! function_exists( 'trailingslashit' ) ) {
+	function trailingslashit( string $s ): string { return rtrim( $s, '/' ) . '/'; }
+}
 if ( ! function_exists( 'sanitize_textarea_field' ) ) {
 	function sanitize_textarea_field( $s ): string { return trim( strip_tags( (string) $s ) ); }
 }
@@ -529,6 +532,10 @@ if ( ! function_exists( 'get_bloginfo' ) ) {
 }
 if ( ! function_exists( 'number_format_i18n' ) ) { function number_format_i18n( $n, int $dec = 0 ): string { return number_format( (float) $n, $dec ); } }
 if ( ! function_exists( '__' ) )               { function __( string $s, string $d = '' ): string { return $s; } }
+if ( ! function_exists( 'esc_html__' ) )       { function esc_html__( string $s, string $d = '' ): string { return esc_html( __( $s, $d ) ); } }
+if ( ! function_exists( 'esc_attr__' ) )       { function esc_attr__( string $s, string $d = '' ): string { return esc_attr( __( $s, $d ) ); } }
+if ( ! function_exists( 'esc_html_e' ) )       { function esc_html_e( string $s, string $d = '' ): void { echo esc_html__( $s, $d ); } }
+if ( ! function_exists( 'esc_attr_e' ) )       { function esc_attr_e( string $s, string $d = '' ): void { echo esc_attr__( $s, $d ); } }
 if ( ! function_exists( 'esc_html' ) )         { function esc_html( string $s ): string { return htmlspecialchars( $s, ENT_QUOTES ); } }
 if ( ! function_exists( 'esc_attr' ) )         { function esc_attr( string $s ): string { return htmlspecialchars( $s, ENT_QUOTES ); } }
 if ( ! function_exists( 'wp_send_json_success' ) ) { function wp_send_json_success( $d = null ): void { exit( json_encode( array( 'success' => true, 'data' => $d ) ) ); } }

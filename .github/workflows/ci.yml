@@ -398,6 +398,11 @@ jobs:
             || svn export --force "https://develop.svn.wordpress.org/tags/${WP_VERSION}.0/tests/phpunit/" "${WP_TESTS_DIR}" \
             || svn export --force "https://develop.svn.wordpress.org/trunk/tests/phpunit/" "${WP_TESTS_DIR}"
 
+          # wp-tests-config-sample.php vive en la raíz del repo de desarrollo, no dentro de tests/phpunit/.
+          svn export --force "https://develop.svn.wordpress.org/tags/${WP_VERSION}/wp-tests-config-sample.php" "${WP_TESTS_DIR}/wp-tests-config-sample.php" \
+            || svn export --force "https://develop.svn.wordpress.org/tags/${WP_VERSION}.0/wp-tests-config-sample.php" "${WP_TESTS_DIR}/wp-tests-config-sample.php" \
+            || svn export --force "https://develop.svn.wordpress.org/trunk/wp-tests-config-sample.php" "${WP_TESTS_DIR}/wp-tests-config-sample.php"
+
           cp "${WP_TESTS_DIR}/wp-tests-config-sample.php" "${WP_TESTS_DIR}/wp-tests-config.php"
 
           sed -i \
@@ -448,6 +453,8 @@ jobs:
         run: |
           unzip -t "dist/atora-lms-${VERSION}.zip"
           ! unzip -Z1 "dist/atora-lms-${VERSION}.zip" | grep -E '(^|/)(\.git|\.claude|tests|docs|vendor|composer\.(json|lock)|phpunit\.xml)(/|$)'
+          unzip -Z1 "dist/atora-lms-${VERSION}.zip" | grep -E '(^|/)build-info\.json$'
+          unzip -p "dist/atora-lms-${VERSION}.zip" "atora-lms/build-info.json" | grep -E '"commit"\\s*:\\s*"[0-9a-f]{40}"'
 
       - name: Upload distribution
         uses: actions/upload-artifact@v4

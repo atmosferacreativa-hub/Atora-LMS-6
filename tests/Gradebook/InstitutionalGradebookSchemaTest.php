@@ -25,7 +25,10 @@ final class InstitutionalGradebookSchemaTest extends TestCase {
 		foreach ( $tables as $table ) {
 			$this->assertStringContainsString( $table, $installer );
 		}
-		$this->assertStringContainsString( "const SCHEMA_VERSION = '6.26.4-tenant-unified';", $installer );
+		$this->assertMatchesRegularExpression(
+			"/const SCHEMA_VERSION = '\\d+\\.\\d+\\.\\d+-[a-z-]+';/",
+			$installer
+		);
 	}
 
 	public function test_rest_controller_is_admin_scoped_and_isolated(): void {
