@@ -32,6 +32,9 @@ class CLMS_Legacy_Slug_Redirects {
 			// PT-4.3.1 — Analytics ×3: atora-analytics-dashboard es el real.
 			'atora-analytics' => 'atora-analytics-dashboard',
 			'clms-analytics'  => 'atora-analytics-dashboard',
+			// B.2 (6.26.6): slug fantasma observado en enlaces viejos.
+			// La UI real de cohortes es el post type `lm_cohort`.
+			'clms-cohorts'    => 'edit.php?post_type=lm_cohort',
 		);
 	}
 
@@ -46,7 +49,11 @@ class CLMS_Legacy_Slug_Redirects {
 		$map = self::get_map();
 		if ( ! isset( $map[ $page ] ) ) { return; }
 
-		wp_safe_redirect( admin_url( 'admin.php?page=' . $map[ $page ] ), 301 );
+		$target = (string) $map[ $page ];
+		// Soporta targets que ya son admin.php?page=... (slug) o pantallas
+		// core como edit.php?post_type=...
+		$is_full_admin_path = false !== strpos( $target, '.php' ) || false !== strpos( $target, '?' );
+		wp_safe_redirect( admin_url( $is_full_admin_path ? $target : ( 'admin.php?page=' . $target ) ), 301 );
 		exit;
 	}
 }
