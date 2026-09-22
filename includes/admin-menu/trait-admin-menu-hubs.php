@@ -6,6 +6,41 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 trait CLMS_Admin_Menu_Hubs_Trait {
 	/**
+	 * Oculta páginas que deben quedar accesibles por URL pero no listarse en el sidebar.
+	 *
+	 * Importante: NO se debe tocar `$submenu` durante `admin_menu`, porque WordPress
+	 * usa ese array para resolver el parent del `plugin_page` antes de validar
+	 * acceso con `user_can_access_admin_page()`. Si se remueve ahí, el hookname
+	 * calculado no coincide con el registrado por `add_submenu_page()` y WP
+	 * responde con "Sorry, you are not allowed...".
+	 *
+	 * Esto corre en `admin_head` (después de la validación), y antes de renderizar
+	 * el HTML del menú.
+	 */
+	private function hide_hub_linked_pages_from_sidebar(): void {
+		global $submenu;
+
+		$hide_keep_access = array(
+			'atora-forms'       => true,
+			'atora-popups'      => true,
+			'atora-automations' => true,
+			'atora-webhooks'    => true,
+		);
+
+		if ( isset( $submenu['clms-dashboard'] ) && is_array( $submenu['clms-dashboard'] ) ) {
+			$submenu['clms-dashboard'] = array_values(
+				array_filter(
+					(array) $submenu['clms-dashboard'],
+					static function( $item ) use ( $hide_keep_access ) {
+						$slug = is_array( $item ) && isset( $item[2] ) ? (string) $item[2] : '';
+						return '' === $slug || ! isset( $hide_keep_access[ $slug ] );
+					}
+				)
+			);
+		}
+	}
+
+	/**
 	 * Encola el design system global de admin (Fase 12B).
 	 */
 	public function enqueue_atora_admin_styles( string $hook ): void {
@@ -99,6 +134,7 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 	 * fondo azul, icono ámbar, texto blanco, submenú azul oscuro.
 	 */
 	public function render_atora_menu_styles(): void {
+		$this->hide_hub_linked_pages_from_sidebar();
 		?>
 		<style id="atora-menu-brand">
 		/* ── ATORA Menu Tab: Blue background, amber icon, white text ── */
@@ -1153,28 +1189,9 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 				remove_submenu_page( 'clms-dashboard', $submenu_slug );
 			}
 
-			// Páginas "ocultas con enlace desde hub": deben NO aparecer en el sidebar,
-			// pero SÍ seguir accesibles por URL (admin.php?page=...).
-			// remove_submenu_page() des-registra el hook y rompe el acceso directo,
-			// así que aquí solo se quitan del array $submenu.
-			global $submenu;
-			$hide_keep_access = array(
-				'atora-forms'       => true,
-				'atora-popups'      => true,
-				'atora-automations' => true,
-				'atora-webhooks'    => true,
-			);
-			if ( isset( $submenu['clms-dashboard'] ) && is_array( $submenu['clms-dashboard'] ) ) {
-				$submenu['clms-dashboard'] = array_values(
-					array_filter(
-						(array) $submenu['clms-dashboard'],
-						static function( $item ) use ( $hide_keep_access ) {
-							$slug = is_array( $item ) && isset( $item[2] ) ? (string) $item[2] : '';
-							return '' === $slug || ! isset( $hide_keep_access[ $slug ] );
-						}
-					)
-				);
-			}
+			// Páginas "ocultas con enlace desde hub": se ocultan del sidebar en
+			// `admin_head` (ver hide_hub_linked_pages_from_sidebar()) para no romper
+			// el cálculo del parent/hookname durante la validación de acceso.
 
 			// Icono para "Presets de rúbrica" (CPT) — WordPress no muestra iconos
 			// en submenús por defecto, así que se antepone un emoji al label.
