@@ -30,6 +30,9 @@ class Popups {
 	 * @return void
 	 */
 	public static function init(): void {
+		// CPT para popups (para evitar notices de map_meta_cap y normalizar capacidades).
+		add_action( 'init', array( __CLASS__, 'register_cpt' ) );
+
 		// Inyectar popups activos en el footer.
 		add_action( 'wp_footer', array( __CLASS__, 'render_active_popups' ) );
 
@@ -44,6 +47,22 @@ class Popups {
 			add_action( 'atora_lms_admin_menu',     array( __CLASS__, 'register_admin_menu' ) );
 			add_action( 'wp_ajax_atora_popup_save', array( __CLASS__, 'ajax_save' ) );
 		}
+	}
+
+	// ── CPT ───────────────────────────────────────────────────────────────────
+
+	/** @return void */
+	public static function register_cpt(): void {
+		register_post_type( 'atora_popup', array(
+			'labels'       => array(
+				'name'          => __( 'Popups', 'atora-lms' ),
+				'singular_name' => __( 'Popup', 'atora-lms' ),
+			),
+			'public'       => false,
+			'show_in_menu' => false,
+			'supports'     => array( 'title' ),
+			'show_in_rest' => true,
+		) );
 	}
 
 	/**

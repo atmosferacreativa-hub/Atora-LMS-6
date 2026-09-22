@@ -75,6 +75,86 @@ fi
 
 echo "Usuarios: instructor=$INSTRUCTOR_ID assistant=$ASSISTANT_ID student=$STUDENT_ID"
 
+echo "Creando datos demo (Formularios/Popups/Webhooks/Automatizaciones)…"
+FORM_ID=$($WP post list --post_type=atora_form --post_status=publish,draft,private --field=ID --format=ids | awk '{print $1}')
+if [ -z "${FORM_ID}" ]; then
+  FORM_ID=$($WP post create --post_type=atora_form --post_status=publish --post_author="$ADMIN_ID" --post_title="Formulario Demo" --porcelain)
+  $WP eval "
+  \$form_id = (int) ${FORM_ID};
+  update_post_meta( \$form_id, 'atora_form_schema', wp_json_encode( array(
+    'title' => 'Formulario Demo',
+    'submit_text' => 'Enviar',
+    'fields' => array(
+      array( 'type' => 'text',  'name' => 'nombre', 'label' => 'Nombre', 'required' => true ),
+      array( 'type' => 'email', 'name' => 'email',  'label' => 'Email',  'required' => true ),
+    ),
+  ) ) );
+  echo \"ok\\n\";
+  " >/dev/null
+fi
+
+POPUP_ID=$($WP post list --post_type=atora_popup --post_status=publish,draft,private --field=ID --format=ids | awk '{print $1}')
+if [ -z "${POPUP_ID}" ]; then
+  POPUP_ID=$($WP post create --post_type=atora_popup --post_status=publish --post_author="$ADMIN_ID" --post_title="Popup Demo" --porcelain)
+  $WP eval "
+  \$popup_id = (int) ${POPUP_ID};
+  update_post_meta( \$popup_id, 'atora_popup_active', 0 );
+  update_post_meta( \$popup_id, 'atora_popup_targeting', wp_json_encode( array( 'pages' => 'all' ) ) );
+  update_post_meta( \$popup_id, 'atora_popup_config', wp_json_encode( array(
+    'title' => 'Popup Demo',
+    'content' => 'Popup de prueba para validar el panel.',
+    'trigger' => 'entry',
+    'frequency' => 'once_session',
+    'delay_seconds' => 3,
+    'form_id' => (int) ${FORM_ID},
+  ) ) );
+  echo \"ok\\n\";
+  " >/dev/null
+fi
+
+$WP eval "
+\$webhooks = (array) get_option( 'atora_outbound_webhooks', array() );
+if ( empty( \$webhooks ) ) {
+  \$webhooks[] = (object) array(
+    'id' => 1001,
+    'name' => 'Webhook Demo',
+    'url' => 'https://example.com/webhook',
+    'trigger' => 'course_enrolled',
+    'method' => 'POST',
+    'payload_template' => '{\"event_timestamp\":\"{{event_timestamp}}\",\"user_id\":\"{{user_id}}\",\"site_url\":\"{{site_url}}\"}',
+    'active' => 0,
+  );
+  update_option( 'atora_outbound_webhooks', \$webhooks, false );
+}
+echo \"ok\\n\";
+" >/dev/null
+
+$WP eval "
+global \$wpdb;
+\$table = \$wpdb->prefix . 'atora_automations';
+\$exists = \$wpdb->get_var( \$wpdb->prepare( 'SHOW TABLES LIKE %s', \$table ) );
+if ( \$exists ) {
+  \$count = (int) \$wpdb->get_var( \"SELECT COUNT(*) FROM {\$table}\" );
+  if ( 0 === \$count ) {
+    \$wpdb->insert(
+      \$table,
+      array(
+        'name' => 'Automatización Demo',
+        'description' => 'Fila de prueba para validar el panel de Automatizaciones.',
+        'trigger_type' => 'course_enrolled',
+        'trigger_config' => wp_json_encode( array() ),
+        'conditions' => wp_json_encode( array() ),
+        'actions' => wp_json_encode( array() ),
+        'active' => 0,
+        'priority' => 10,
+      ),
+      array( '%s','%s','%s','%s','%s','%s','%d','%d' )
+    );
+  }
+}
+echo \"ok\\n\";
+" >/dev/null
+
 echo "Creando curso/lección…"
 COURSE_POST_ID=$($WP post create --post_type=lm_course --post_status=publish --post_author="$INSTRUCTOR_ID" --post_title="Curso Seed 6.26.5" --porcelain)
 LESSON_POST_ID=$($WP post create --post_type=lm_lesson --post_status=publish --post_author="$INSTRUCTOR_ID" --post_title="Lección Seed 6.26.5" --post_content="Contenido de prueba." --porcelain)
