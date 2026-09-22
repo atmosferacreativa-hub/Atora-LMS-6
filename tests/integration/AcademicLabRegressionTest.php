@@ -48,7 +48,9 @@ final class AcademicLabRegressionTest extends WP_UnitTestCase {
 
 	public function test_table_enrollment_grade_appears_in_gradebook_without_legacy_roster(): void {
 		global $wpdb;
-		$table_course = \ATORA\LMS\LMS_Course_Service::create_from_legacy( array( 'wp_post_id' => $this->course, 'title' => 'Curso de tablas', 'slug' => 'lab-' . $this->course ) );
+		// The real save_post bridge may already have created the table row.
+		$row = \ATORA\LMS\LMS_Course_Service::get_by_wp_post( $this->course );
+		$table_course = $row ? (int) $row['id'] : \ATORA\LMS\LMS_Course_Service::create_from_legacy( array( 'wp_post_id' => $this->course, 'title' => 'Curso de tablas', 'slug' => 'lab-' . $this->course ) );
 		$this->assertGreaterThan( 0, $table_course );
 		$this->assertNotSame( $this->course, $table_course );
 		\ATORA\LMS\LMS_Enrollment_Service::enroll( $this->student, $table_course );
