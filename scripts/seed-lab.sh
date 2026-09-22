@@ -13,7 +13,8 @@ echo "== Seed ATORA Lab 6.26.5 =="
 ADMIN_ID=${ADMIN_ID:-}
 INSTRUCTOR_LOGIN=${INSTRUCTOR_LOGIN:-docente_prueba}
 ASSISTANT_LOGIN=${ASSISTANT_LOGIN:-asistente_prueba}
-STUDENT_LOGIN=${STUDENT_LOGIN:-est_prueba}
+STUDENT_LOGIN=${STUDENT_LOGIN:-estudiante_demo}
+STUDENT_EMAIL=${STUDENT_EMAIL:-estudiante.demo@atora.test}
 STUDENT_PASS=${STUDENT_PASS:-"atora_lab_6265"}
 
 echo "Asegurando usuarios…"
@@ -27,7 +28,8 @@ fi
 
 INSTRUCTOR_ID=$($WP user create "$INSTRUCTOR_LOGIN" "${INSTRUCTOR_LOGIN}@example.com" --role=author --user_pass="atora_lab_6265" --display_name="Docente Prueba" --porcelain || $WP user get "$INSTRUCTOR_LOGIN" --field=ID)
 ASSISTANT_ID=$($WP user create "$ASSISTANT_LOGIN" "${ASSISTANT_LOGIN}@example.com" --role=subscriber --user_pass="atora_lab_6265" --display_name="Asistente Prueba" --porcelain || $WP user get "$ASSISTANT_LOGIN" --field=ID)
-STUDENT_ID=$($WP user create "$STUDENT_LOGIN" "${STUDENT_LOGIN}@example.com" --role=subscriber --user_pass="$STUDENT_PASS" --display_name="Estudiante Prueba" --porcelain || $WP user get "$STUDENT_LOGIN" --field=ID)
+STUDENT_ROLE=$($WP eval 'echo get_role("student") ? "student" : "subscriber";')
+STUDENT_ID=$($WP user create "$STUDENT_LOGIN" "$STUDENT_EMAIL" --role="$STUDENT_ROLE" --user_pass="$STUDENT_PASS" --display_name="Estudiante Demo" --porcelain || $WP user get "$STUDENT_LOGIN" --field=ID)
 
 echo "Usuarios: instructor=$INSTRUCTOR_ID assistant=$ASSISTANT_ID student=$STUDENT_ID"
 
