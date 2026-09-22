@@ -21,8 +21,10 @@ if ( ! file_exists( $wp_load ) ) {
 	fwrite( STDERR, "No encuentro wp-load.php en {$wp_load}\n" );
 	exit( 1 );
 }
-define( 'WP_USE_THEMES', false );
-require_once $wp_load;
+	if ( ! defined( 'WP_USE_THEMES' ) ) {
+		define( 'WP_USE_THEMES', false );
+	}
+	require_once $wp_load;
 
 if ( ! function_exists( 'get_post_meta' ) ) {
 	fwrite( STDERR, "WordPress no cargó correctamente.\n" );
@@ -266,4 +268,3 @@ printf( "Divergencias entre las dos copias:          %d\n",
 	count( $solo_curso ) + count( $solo_alumno ) );
 
 echo "\nNada de esto se ha modificado. Script de solo lectura.\n";
-

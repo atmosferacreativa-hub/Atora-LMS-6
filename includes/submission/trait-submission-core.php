@@ -455,14 +455,16 @@ trait CLMS_Submission_Core_Trait {
 	 *
 	 * @return void
 	 */
-	public function handle_submission_request() {
-		if ( is_admin() ) {
-			return;
-		}
+		public function handle_submission_request() {
+			if ( is_admin() ) {
+				return;
+			}
 
-		if ( 'POST' !== strtoupper( (string) wp_unslash( $_SERVER['REQUEST_METHOD'] ) ) ) {
-			return;
-		}
+			// En CLI (scripts de diagnóstico / WP-CLI) puede no existir REQUEST_METHOD.
+			$request_method = isset( $_SERVER['REQUEST_METHOD'] ) ? (string) wp_unslash( $_SERVER['REQUEST_METHOD'] ) : '';
+			if ( 'POST' !== strtoupper( $request_method ) ) {
+				return;
+			}
 
 		$action = isset( $_POST['clms_action'] ) ? sanitize_key( wp_unslash( $_POST['clms_action'] ) ) : '';
 
