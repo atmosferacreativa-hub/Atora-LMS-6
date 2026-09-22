@@ -11,6 +11,9 @@ WP=${WP:-"wp --allow-root"}
 echo "== Seed ATORA Lab 6.26.5 =="
 
 ADMIN_ID=${ADMIN_ID:-}
+ADMIN_LOGIN=${ADMIN_LOGIN:-atora}
+ADMIN_EMAIL=${ADMIN_EMAIL:-admin@atora.test}
+ADMIN_PASS=${ADMIN_PASS:-"atora_lab_6265"}
 INSTRUCTOR_LOGIN=${INSTRUCTOR_LOGIN:-docente_prueba}
 ASSISTANT_LOGIN=${ASSISTANT_LOGIN:-asistente_prueba}
 STUDENT_LOGIN=${STUDENT_LOGIN:-estudiante_demo}
@@ -37,11 +40,18 @@ $WP eval 'if ( defined( "WP_PLUGIN_DIR" ) ) { $f = WP_PLUGIN_DIR . "/atora-lms/m
 
 echo "Asegurando usuarios…"
 if [ -z "${ADMIN_ID}" ]; then
-  ADMIN_ID=$($WP user list --role=administrator --field=ID --format=ids | awk '{print $1}')
+  if $WP user get "$ADMIN_LOGIN" --field=ID >/dev/null 2>&1; then
+    ADMIN_ID=$($WP user get "$ADMIN_LOGIN" --field=ID)
+  else
+    ADMIN_ID=$($WP user create "$ADMIN_LOGIN" "$ADMIN_EMAIL" --role=administrator --user_pass="$ADMIN_PASS" --display_name="Admin ATORA" --porcelain)
+  fi
 fi
 if [ -z "${ADMIN_ID}" ]; then
   echo "No se pudo resolver un administrador (ADMIN_ID)." >&2
   exit 1
+fi
+if $WP user get "$ADMIN_ID" --field=ID >/dev/null 2>&1; then
+  $WP user update "$ADMIN_ID" --user_pass="$ADMIN_PASS" >/dev/null
 fi
 
 if $WP user get "$INSTRUCTOR_LOGIN" --field=ID >/dev/null 2>&1; then
