@@ -41,10 +41,24 @@ if [ -z "${ADMIN_ID}" ]; then
   exit 1
 fi
 
-INSTRUCTOR_ID=$($WP user create "$INSTRUCTOR_LOGIN" "${INSTRUCTOR_LOGIN}@example.com" --role=author --user_pass="atora_lab_6265" --display_name="Docente Prueba" --porcelain || $WP user get "$INSTRUCTOR_LOGIN" --field=ID)
-ASSISTANT_ID=$($WP user create "$ASSISTANT_LOGIN" "${ASSISTANT_LOGIN}@example.com" --role=subscriber --user_pass="atora_lab_6265" --display_name="Asistente Prueba" --porcelain || $WP user get "$ASSISTANT_LOGIN" --field=ID)
+if $WP user get "$INSTRUCTOR_LOGIN" --field=ID >/dev/null 2>&1; then
+  INSTRUCTOR_ID=$($WP user get "$INSTRUCTOR_LOGIN" --field=ID)
+else
+  INSTRUCTOR_ID=$($WP user create "$INSTRUCTOR_LOGIN" "${INSTRUCTOR_LOGIN}@example.com" --role=author --user_pass="atora_lab_6265" --display_name="Docente Prueba" --porcelain)
+fi
+
+if $WP user get "$ASSISTANT_LOGIN" --field=ID >/dev/null 2>&1; then
+  ASSISTANT_ID=$($WP user get "$ASSISTANT_LOGIN" --field=ID)
+else
+  ASSISTANT_ID=$($WP user create "$ASSISTANT_LOGIN" "${ASSISTANT_LOGIN}@example.com" --role=subscriber --user_pass="atora_lab_6265" --display_name="Asistente Prueba" --porcelain)
+fi
+
 STUDENT_ROLE=$($WP eval 'echo get_role("student") ? "student" : "subscriber";')
-STUDENT_ID=$($WP user create "$STUDENT_LOGIN" "$STUDENT_EMAIL" --role="$STUDENT_ROLE" --user_pass="$STUDENT_PASS" --display_name="Estudiante Demo" --porcelain || $WP user get "$STUDENT_LOGIN" --field=ID)
+if $WP user get "$STUDENT_LOGIN" --field=ID >/dev/null 2>&1; then
+  STUDENT_ID=$($WP user get "$STUDENT_LOGIN" --field=ID)
+else
+  STUDENT_ID=$($WP user create "$STUDENT_LOGIN" "$STUDENT_EMAIL" --role="$STUDENT_ROLE" --user_pass="$STUDENT_PASS" --display_name="Estudiante Demo" --porcelain)
+fi
 
 echo "Usuarios: instructor=$INSTRUCTOR_ID assistant=$ASSISTANT_ID student=$STUDENT_ID"
 
