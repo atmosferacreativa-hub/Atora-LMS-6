@@ -1236,9 +1236,16 @@ trait CLMS_Admin_Menu_Widgets_And_Hubs_Trait {
 			$this->build_nav_item( __( 'Comercio', 'atora-lms' ), __( 'Ventas, carritos y checkout.', 'atora-lms' ), admin_url( 'admin.php?page=clms-commercial-hub' ) ),
 			$this->build_nav_item( __( 'Afiliados', 'atora-lms' ), __( 'Programa de afiliados y comisiones.', 'atora-lms' ), admin_url( 'admin.php?page=atora-affiliates' ) ),
 			$this->build_nav_item( __( 'Marketing', 'atora-lms' ), __( 'Campañas de email y CRM.', 'atora-lms' ), admin_url( 'admin.php?page=clms-email-hub' ) ),
-			$this->build_nav_item( __( 'Automatizaciones', 'atora-lms' ), __( 'Reglas automáticas.', 'atora-lms' ), admin_url( 'admin.php?page=atora-automations' ) ),
-			$this->build_nav_item( __( 'Webhooks', 'atora-lms' ), __( 'Integraciones salientes.', 'atora-lms' ), admin_url( 'admin.php?page=atora-webhooks' ) ),
 		);
+
+		$automation_active = ! class_exists( 'CLMS_Module_Registry' ) || CLMS_Module_Registry::is_active( 'automation' );
+		if ( $automation_active && class_exists( '\ATORA\Automation\Automation_Engine' ) ) {
+			$links[] = $this->build_nav_item( __( 'Automatizaciones', 'atora-lms' ), __( 'Reglas automáticas.', 'atora-lms' ), admin_url( 'admin.php?page=atora-automations' ) );
+		}
+		if ( $automation_active && class_exists( '\ATORA\Automation\Outbound_Webhooks' ) ) {
+			$links[] = $this->build_nav_item( __( 'Webhooks', 'atora-lms' ), __( 'Integraciones salientes.', 'atora-lms' ), admin_url( 'admin.php?page=atora-webhooks' ) );
+		}
+
 		$this->render_simple_hub_page(
 			__( 'Crecimiento', 'atora-lms' ),
 			__( 'Crecimiento', 'atora-lms' ),
@@ -1252,9 +1259,16 @@ trait CLMS_Admin_Menu_Widgets_And_Hubs_Trait {
 		$links = array(
 			$this->build_nav_item( __( 'Analytics', 'atora-lms' ), __( 'Panel de analítica de la plataforma.', 'atora-lms' ), admin_url( 'admin.php?page=atora-analytics-dashboard' ) ),
 			$this->build_nav_item( __( 'Reportes académicos', 'atora-lms' ), __( 'Reportes de desempeño académico.', 'atora-lms' ), admin_url( 'admin.php?page=clms-academic-reports' ) ),
-			$this->build_nav_item( __( 'Formularios', 'atora-lms' ), __( 'Constructor de formularios.', 'atora-lms' ), admin_url( 'admin.php?page=atora-forms' ) ),
-			$this->build_nav_item( __( 'Popups', 'atora-lms' ), __( 'Gestor de popups.', 'atora-lms' ), admin_url( 'admin.php?page=atora-popups' ) ),
 		);
+
+		$analytics_active = ! class_exists( 'CLMS_Module_Registry' ) || CLMS_Module_Registry::is_active( 'analytics' );
+		if ( $analytics_active && class_exists( '\ATORA\Analytics\Forms_Builder' ) ) {
+			$links[] = $this->build_nav_item( __( 'Formularios', 'atora-lms' ), __( 'Constructor de formularios.', 'atora-lms' ), admin_url( 'admin.php?page=atora-forms' ) );
+		}
+		if ( $analytics_active && class_exists( '\ATORA\Analytics\Popups' ) ) {
+			$links[] = $this->build_nav_item( __( 'Popups', 'atora-lms' ), __( 'Gestor de popups.', 'atora-lms' ), admin_url( 'admin.php?page=atora-popups' ) );
+		}
+
 		$this->render_simple_hub_page(
 			__( 'Informes', 'atora-lms' ),
 			__( 'Informes', 'atora-lms' ),

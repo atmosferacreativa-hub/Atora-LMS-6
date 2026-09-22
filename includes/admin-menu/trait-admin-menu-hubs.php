@@ -1737,34 +1737,35 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 			__( 'Define canal y acción: email, mensajería o webhook.', 'atora-lms' ),
 			__( 'Monitorea ejecución, errores y reintentos desde los logs.', 'atora-lms' ),
 		);
-		$cards = array(
-			array(
-				'variant'     => 'slate',
-				'icon'        => '⚡',
-				'title'       => __( 'Automatizaciones', 'atora-lms' ),
-				'description' => __( 'Diseña y opera reglas automáticas para lifecycle comercial y académico.', 'atora-lms' ),
-				'features'    => array(
-					__( 'Triggers, condiciones y acciones en un flujo central.', 'atora-lms' ),
-					__( 'Integración con CRM, mensajería y evaluación.', 'atora-lms' ),
-					__( 'Ejecución con trazabilidad y reintentos.', 'atora-lms' ),
-				),
-				'url'         => admin_url( 'admin.php?page=atora-automations' ),
-				'button'      => __( 'Abrir automatizaciones', 'atora-lms' ),
-			),
-			array(
-				'variant'     => 'indigo',
-				'icon'        => '🔗',
-				'title'       => __( 'Webhooks', 'atora-lms' ),
-				'description' => __( 'Conecta ATORA con servicios externos por eventos salientes y endpoints controlados.', 'atora-lms' ),
-				'features'    => array(
-					__( 'Activadores por eventos clave del CRM.', 'atora-lms' ),
-					__( 'Integración con sistemas externos y APIs.', 'atora-lms' ),
-					__( 'Gestión de endpoints sin salir del ecosistema.', 'atora-lms' ),
-				),
-				'url'         => admin_url( 'admin.php?page=atora-webhooks' ),
-				'button'      => __( 'Abrir webhooks', 'atora-lms' ),
-			),
-		);
+			$cards = array(
+				( class_exists( '\ATORA\Automation\Automation_Engine' ) ? array(
+					'variant'     => 'slate',
+					'icon'        => '⚡',
+					'title'       => __( 'Automatizaciones', 'atora-lms' ),
+					'description' => __( 'Diseña y opera reglas automáticas para lifecycle comercial y académico.', 'atora-lms' ),
+					'features'    => array(
+						__( 'Triggers, condiciones y acciones en un flujo central.', 'atora-lms' ),
+						__( 'Integración con CRM, mensajería y evaluación.', 'atora-lms' ),
+						__( 'Ejecución con trazabilidad y reintentos.', 'atora-lms' ),
+					),
+					'url'         => admin_url( 'admin.php?page=atora-automations' ),
+					'button'      => __( 'Abrir automatizaciones', 'atora-lms' ),
+				) : array() ),
+				( class_exists( '\ATORA\Automation\Outbound_Webhooks' ) ? array(
+					'variant'     => 'indigo',
+					'icon'        => '🔗',
+					'title'       => __( 'Webhooks', 'atora-lms' ),
+					'description' => __( 'Conecta ATORA con servicios externos por eventos salientes y endpoints controlados.', 'atora-lms' ),
+					'features'    => array(
+						__( 'Activadores por eventos clave del CRM.', 'atora-lms' ),
+						__( 'Integración con sistemas externos y APIs.', 'atora-lms' ),
+						__( 'Gestión de endpoints sin salir del ecosistema.', 'atora-lms' ),
+					),
+					'url'         => admin_url( 'admin.php?page=atora-webhooks' ),
+					'button'      => __( 'Abrir webhooks', 'atora-lms' ),
+				) : array() ),
+			);
+			$cards = array_values( array_filter( $cards ) );
 
 		$quick_links = $this->get_operational_hub_links( 'clms-automation-hub', 8 );
 			?>
