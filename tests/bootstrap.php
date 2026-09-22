@@ -86,6 +86,12 @@ if ( ! function_exists( 'wp_unslash' ) ) {
 	}
 }
 if ( ! function_exists( 'current_time' ) )     { function current_time( string $t, bool $gmt = false ): string { return date( 'Y-m-d H:i:s' ); } }
+if ( ! function_exists( 'wp_date' ) ) {
+	function wp_date( string $format, $timestamp = null, $timezone = null ): string {
+		$ts = null === $timestamp ? time() : ( is_numeric( $timestamp ) ? (int) $timestamp : strtotime( (string) $timestamp ) );
+		return date( $format, $ts ?: time() );
+	}
+}
 $GLOBALS['__atora_test_current_user_id'] = 1;
 if ( ! function_exists( 'get_current_user_id' ) ) {
 	function get_current_user_id(): int { return (int) ( $GLOBALS['__atora_test_current_user_id'] ?? 1 ); }
@@ -568,9 +574,35 @@ if ( ! function_exists( 'admin_url' ) ) {
 if ( ! function_exists( 'esc_url' ) )          { function esc_url( string $s ): string { return $s; } }
 if ( ! function_exists( 'esc_html__' ) )       { function esc_html__( string $s, string $d = '' ): string { return $s; } }
 if ( ! function_exists( 'esc_attr__' ) )       { function esc_attr__( string $s, string $d = '' ): string { return $s; } }
-if ( ! function_exists( 'nocache_headers' ) )  { function nocache_headers(): void {} }
-if ( ! function_exists( 'is_admin' ) )         { function is_admin(): bool { return true; } }
-if ( ! function_exists( 'add_submenu_page' ) ) { function add_submenu_page( ...$args ): void {} }
+	if ( ! function_exists( 'nocache_headers' ) )  { function nocache_headers(): void {} }
+	if ( ! function_exists( 'is_admin' ) )         { function is_admin(): bool { return true; } }
+	$GLOBALS['__atora_test_admin_menu_calls'] = array();
+	if ( ! function_exists( 'add_submenu_page' ) ) {
+		function add_submenu_page( ...$args ): void {
+			// args: parent_slug, page_title, menu_title, capability, menu_slug, callback
+			$GLOBALS['__atora_test_admin_menu_calls'][] = array(
+				'fn'   => 'add_submenu_page',
+				'args' => $args,
+			);
+		}
+	}
+	if ( ! function_exists( 'add_menu_page' ) ) {
+		function add_menu_page( ...$args ): void {
+			$GLOBALS['__atora_test_admin_menu_calls'][] = array(
+				'fn'   => 'add_menu_page',
+				'args' => $args,
+			);
+		}
+	}
+	if ( ! function_exists( 'remove_submenu_page' ) ) {
+		function remove_submenu_page( string $menu_slug, string $submenu_slug ): bool {
+			$GLOBALS['__atora_test_admin_menu_calls'][] = array(
+				'fn'   => 'remove_submenu_page',
+				'args' => array( $menu_slug, $submenu_slug ),
+			);
+			return true;
+		}
+	}
 $GLOBALS['__atora_test_wp_redirects'] = array();
 if ( ! function_exists( 'wp_safe_redirect' ) ) {
 	function wp_safe_redirect( string $location, int $status = 302 ): bool {
@@ -817,6 +849,27 @@ foreach ( array( 'class-module-registry.php', 'class-install-profiles.php', 'cla
 	$path = __DIR__ . '/../includes/modularity/' . $mod_file;
 	if ( file_exists( $path ) ) {
 		require_once $path;
+	}
+}
+
+$admin_menu_file = __DIR__ . '/../includes/class-admin-menu.php';
+if ( file_exists( $admin_menu_file ) ) {
+	require_once $admin_menu_file;
+}
+
+$legacy_slug_redirects_file = __DIR__ . '/../includes/admin-menu/class-legacy-slug-redirects.php';
+if ( file_exists( $legacy_slug_redirects_file ) ) {
+	require_once $legacy_slug_redirects_file;
+}
+
+foreach ( array(
+	__DIR__ . '/../modules/analytics/class-forms-builder.php',
+	__DIR__ . '/../modules/analytics/class-popups.php',
+	__DIR__ . '/../modules/automation/class-automation-engine.php',
+	__DIR__ . '/../modules/automation/class-outbound-webhooks.php',
+) as $module_file ) {
+	if ( file_exists( $module_file ) ) {
+		require_once $module_file;
 	}
 }
 

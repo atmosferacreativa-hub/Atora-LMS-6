@@ -1346,7 +1346,20 @@ function atora_lms_activate(): void {
 		atora_lms_require_module( 'includes/modularity/class-module-registry.php' );
 		atora_lms_require_module( 'includes/modularity/class-install-profiles.php' );
 		if ( class_exists( 'CLMS_Install_Profiles' ) && false === get_option( CLMS_Install_Profiles::OPTION, false ) ) {
-			CLMS_Install_Profiles::apply( 'docente' );
+			$default_profile = defined( 'ATORA_LMS_DEFAULT_INSTALL_PROFILE' ) ? (string) ATORA_LMS_DEFAULT_INSTALL_PROFILE : 'docente';
+			/**
+			 * Permite override del perfil por defecto aplicado en una instalación nueva.
+			 *
+			 * Útil para entornos de Lab/QA donde se quiere "todo activo" sin depender
+			 * del wizard. En producción, el default sigue siendo 'docente'.
+			 *
+			 * @param string $default_profile Perfil por defecto a aplicar.
+			 */
+			$default_profile = (string) apply_filters( 'atora/install/default_profile', $default_profile );
+
+			if ( ! CLMS_Install_Profiles::apply( $default_profile ) ) {
+				CLMS_Install_Profiles::apply( 'docente' );
+			}
 		}
 	}
 

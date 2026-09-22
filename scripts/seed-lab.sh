@@ -16,6 +16,20 @@ ASSISTANT_LOGIN=${ASSISTANT_LOGIN:-asistente_prueba}
 STUDENT_LOGIN=${STUDENT_LOGIN:-estudiante_demo}
 STUDENT_EMAIL=${STUDENT_EMAIL:-estudiante.demo@atora.test}
 STUDENT_PASS=${STUDENT_PASS:-"atora_lab_6265"}
+INSTALL_PROFILE=${INSTALL_PROFILE:-academia}
+
+echo "Asegurando perfil de instalación (módulos)…"
+$WP eval "
+if ( class_exists( 'CLMS_Install_Profiles' ) ) {
+  \$profile = (string) '${INSTALL_PROFILE}';
+  if ( ! CLMS_Install_Profiles::apply( \$profile ) ) {
+    CLMS_Install_Profiles::apply( 'academia' );
+  }
+  echo 'profile=' . CLMS_Install_Profiles::current() . \"\\n\";
+} else {
+  echo \"no-install-profiles\\n\";
+}
+"
 
 echo "Asegurando usuarios…"
 if [ -z "${ADMIN_ID}" ]; then
