@@ -155,6 +155,7 @@ jobs:
 
   wordpress-smoke:
     name: WordPress ${{ matrix.wordpress }} / PHP 8.1
+    needs: distribution
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -221,26 +222,34 @@ jobs:
             --admin_email=ci@example.test \
             --skip-email
 
-      - name: Install and activate ATORA LMS
+      - name: Download verified distribution
+        uses: actions/download-artifact@v4
+        with:
+          name: atora-lms-${{ steps.plugin_version.outputs.version }}
+          path: ${{ runner.temp }}/atora-dist
+
+      - name: Install and activate ATORA LMS from ZIP
         shell: bash
+        env:
+          VERSION: ${{ steps.plugin_version.outputs.version }}
         run: |
-          mkdir -p /tmp/wordpress/wp-content/plugins/atora-lms
-          rsync -a \
-            --exclude=.git \
-            --exclude=vendor \
-            --exclude=dist \
-            ./ /tmp/wordpress/wp-content/plugins/atora-lms/
-          wp plugin activate atora-lms --path=/tmp/wordpress
+          wp plugin install "${RUNNER_TEMP}/atora-dist/atora-lms-${VERSION}.zip" --activate --path=/tmp/wordpress
 
       - name: Verify runtime bootstrap
         shell: bash
         env:
           EXPECTED_VERSION: ${{ steps.plugin_version.outputs.version }}
+          EXPECTED_COMMIT: ${{ github.sha }}
         run: |
           wp eval '
             $expected = getenv( "EXPECTED_VERSION" );
             if ( ! defined( "ATORA_LMS_VERSION" ) || $expected !== ATORA_LMS_VERSION ) {
               fwrite( STDERR, "Unexpected ATORA LMS version\n" );
+              exit( 1 );
+            }
+            $build = json_decode( file_get_contents( WP_PLUGIN_DIR . "/atora-lms/build-info.json" ), true );
+            if ( ! is_array( $build ) || ( $build["commit"] ?? "" ) !== getenv( "EXPECTED_COMMIT" ) || ( $build["version"] ?? "" ) !== $expected ) {
+              fwrite( STDERR, "Installed ZIP build metadata does not match this workflow\n" );
               exit( 1 );
             }
             if ( ! post_type_exists( "lm_course" ) ) {
@@ -443,6 +452,9 @@ jobs:
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
+      - name: Test distribution inspection
+        run: python3 tests/Build/test_distribution.py
+
       - name: Build ZIP
         run: ./scripts/build-dist.sh "${{ steps.plugin_version.outputs.version }}"
 
@@ -450,11 +462,9 @@ jobs:
         shell: bash
         env:
           VERSION: ${{ steps.plugin_version.outputs.version }}
+          EXPECTED_COMMIT: ${{ github.sha }}
         run: |
-          unzip -t "dist/atora-lms-${VERSION}.zip"
-          ! unzip -Z1 "dist/atora-lms-${VERSION}.zip" | grep -E '(^|/)(\.git|\.claude|tests|docs|vendor|composer\.(json|lock)|phpunit\.xml)(/|$)'
-          unzip -Z1 "dist/atora-lms-${VERSION}.zip" | grep -E '(^|/)build-info\.json$'
-          unzip -p "dist/atora-lms-${VERSION}.zip" "atora-lms/build-info.json" | grep -E '"commit"\\s*:\\s*"[0-9a-f]{40}"'
+          python3 scripts/inspect-dist.py "dist/atora-lms-${VERSION}.zip" "$VERSION" "$EXPECTED_COMMIT"
 
       - name: Upload distribution
         uses: actions/upload-artifact@v4
