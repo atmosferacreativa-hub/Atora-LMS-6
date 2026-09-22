@@ -40,6 +40,10 @@ class CLMS_Legacy_Slug_Redirects {
 
 	public static function init(): void {
 		add_action( 'admin_init', array( __CLASS__, 'maybe_redirect' ) );
+		// Si la página no está registrada, WordPress dispara admin_page_access_denied
+		// y luego hace wp_die("Sorry..."). Este hook permite rescatar slugs legacy
+		// incluso cuando admin_init no alcanza a redirigir.
+		add_action( 'admin_page_access_denied', array( __CLASS__, 'maybe_redirect' ) );
 	}
 
 	public static function maybe_redirect(): void {

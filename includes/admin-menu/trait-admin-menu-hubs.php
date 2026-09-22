@@ -1136,11 +1136,6 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 				'edit.php?post_type=clms_rubric',
 				'atora-analytics',
 				'atora-live-streaming',
-				// Reubicados a hubs (enlaces) — no deben aparecer como entradas fijas.
-				'atora-forms',
-				'atora-popups',
-				'atora-automations',
-				'atora-webhooks',
 				// Entradas reubicadas al Panel ATORA (tarjetas + acceso rápido).
 				'atora-early-warning',
 				'atora-learning-analytics',
@@ -1154,16 +1149,38 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 			'atora-classroom',
 			);
 
-		foreach ( $hidden_submenus as $submenu_slug ) {
-			remove_submenu_page( 'clms-dashboard', $submenu_slug );
-		}
+			foreach ( $hidden_submenus as $submenu_slug ) {
+				remove_submenu_page( 'clms-dashboard', $submenu_slug );
+			}
 
-		// Icono para "Presets de rúbrica" (CPT) — WordPress no muestra iconos
-		// en submenús por defecto, así que se antepone un emoji al label.
-		global $submenu;
-		$dashboard_items = isset( $submenu['clms-dashboard'] ) && is_array( $submenu['clms-dashboard'] )
-			? (array) $submenu['clms-dashboard']
-			: array();
+			// Páginas "ocultas con enlace desde hub": deben NO aparecer en el sidebar,
+			// pero SÍ seguir accesibles por URL (admin.php?page=...).
+			// remove_submenu_page() des-registra el hook y rompe el acceso directo,
+			// así que aquí solo se quitan del array $submenu.
+			global $submenu;
+			$hide_keep_access = array(
+				'atora-forms'       => true,
+				'atora-popups'      => true,
+				'atora-automations' => true,
+				'atora-webhooks'    => true,
+			);
+			if ( isset( $submenu['clms-dashboard'] ) && is_array( $submenu['clms-dashboard'] ) ) {
+				$submenu['clms-dashboard'] = array_values(
+					array_filter(
+						(array) $submenu['clms-dashboard'],
+						static function( $item ) use ( $hide_keep_access ) {
+							$slug = is_array( $item ) && isset( $item[2] ) ? (string) $item[2] : '';
+							return '' === $slug || ! isset( $hide_keep_access[ $slug ] );
+						}
+					)
+				);
+			}
+
+			// Icono para "Presets de rúbrica" (CPT) — WordPress no muestra iconos
+			// en submenús por defecto, así que se antepone un emoji al label.
+			$dashboard_items = isset( $submenu['clms-dashboard'] ) && is_array( $submenu['clms-dashboard'] )
+				? (array) $submenu['clms-dashboard']
+				: array();
 		if ( $dashboard_items ) {
 			foreach ( $dashboard_items as $i => $item ) {
 				$slug = isset( $item[2] ) ? (string) $item[2] : '';
