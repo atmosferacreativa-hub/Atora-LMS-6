@@ -2,6 +2,15 @@
 /**
  * Admin menu — páginas ocultas accesibles / enlaces de hubs.
  *
+ * Los casos de CLMS_Legacy_Slug_Redirects::maybe_redirect() corren en un
+ * proceso PHP aparte (ver run_redirect_scenario() y
+ * tests/AdminMenu/fixtures/run-legacy-slug-redirect.php): maybe_redirect()
+ * termina con un exit() real después de wp_safe_redirect(), igual que en
+ * WordPress real, y ese exit() no es capturable dentro del propio proceso
+ * de PHPUnit — lo mata antes de llegar a cualquier aserción, y el test
+ * "pasa" con exit code 0 sin haber comprobado nada. Mismo patrón ya usado
+ * en tests/Analytics/FormsSubmitOrderTest.php.
+ *
  * @package ATORA_LMS\Tests\AdminMenu
  */
 
@@ -12,6 +21,8 @@ namespace ATORA\Tests\AdminMenu;
 use PHPUnit\Framework\TestCase;
 
 final class HiddenPagesTest extends TestCase {
+
+	private ?string $marker = null;
 
 	protected function setUp(): void {
 		parent::setUp();
@@ -30,7 +41,58 @@ final class HiddenPagesTest extends TestCase {
 		if ( class_exists( '\CLMS_Module_Registry' ) ) {
 			\CLMS_Module_Registry::flush_cache();
 		}
+		if ( $this->marker && file_exists( $this->marker ) ) {
+			@unlink( $this->marker );
+		}
+		$this->marker = null;
 		parent::tearDown();
+	}
+
+	/**
+	 * Lanza CLMS_Legacy_Slug_Redirects::maybe_redirect() en un proceso PHP
+	 * aparte con $_GET['page'] = $page, y devuelve el destino que
+	 * wp_safe_redirect() recibió antes del exit() — o null si
+	 * maybe_redirect() nunca llegó a llamarlo (slug no mapeado).
+	 */
+	private function run_redirect_scenario( string $page ): ?string {
+		$this->marker = sys_get_temp_dir() . '/atora_test_legacy_redirect_marker_' . bin2hex( random_bytes( 8 ) ) . '.txt';
+		@unlink( $this->marker );
+
+		$php_bin = defined( 'PHP_BINARY' ) && PHP_BINARY ? PHP_BINARY : 'php';
+		$script  = __DIR__ . '/fixtures/run-legacy-slug-redirect.php';
+
+		$env = array_merge(
+			$_ENV ?? array(),
+			array(
+				'ATORA_TEST_MARKER' => $this->marker,
+				'ATORA_TEST_PAGE'   => $page,
+			)
+		);
+
+		$process = proc_open(
+			array( $php_bin, $script ),
+			array( 1 => array( 'pipe', 'w' ), 2 => array( 'pipe', 'w' ) ),
+			$pipes,
+			null,
+			$env
+		);
+
+		if ( ! is_resource( $process ) ) {
+			$this->fail( 'no se pudo lanzar el proceso PHP hijo para el test aislado del redirect' );
+		}
+
+		stream_get_contents( $pipes[1] );
+		stream_get_contents( $pipes[2] );
+		fclose( $pipes[1] );
+		fclose( $pipes[2] );
+		proc_close( $process );
+
+		if ( ! file_exists( $this->marker ) ) {
+			$this->fail( 'el proceso hijo no llegó a su shutdown function — no se pudo capturar el redirect' );
+		}
+
+		$captured = (string) file_get_contents( $this->marker );
+		return '' === $captured ? null : $captured;
 	}
 
 	/** @test */
@@ -140,9 +202,15 @@ final class HiddenPagesTest extends TestCase {
 	public function test_legacy_cohorts_slug_redirects_to_cohort_post_type_screen(): void {
 		$this->assertTrue( class_exists( '\CLMS_Legacy_Slug_Redirects' ) );
 
-		$_GET['page'] = 'clms-cohorts';
-		\CLMS_Legacy_Slug_Redirects::maybe_redirect();
+		$redirect = $this->run_redirect_scenario( 'clms-cohorts' );
 
-		$this->assertSame( 'https://example.test/wp-admin/edit.php?post_type=lm_cohort', atora_test_last_redirect() );
+		$this->assertSame( 'https://example.test/wp-admin/edit.php?post_type=lm_cohort', $redirect );
+	}
+
+	/** Control negativo: un slug no mapeado no debe disparar ningún redirect. */
+	public function test_unmapped_slug_does_not_redirect(): void {
+		$redirect = $this->run_redirect_scenario( 'atora-license' );
+
+		$this->assertNull( $redirect, 'un slug fuera del mapa legacy no debe generar ningún wp_safe_redirect()' );
 	}
 }
