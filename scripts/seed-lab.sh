@@ -33,7 +33,7 @@ if ( class_exists( 'CLMS_Install_Profiles' ) ) {
 "
 
 echo "Asegurando tablas de módulos activos (dbDelta)…"
-$WP eval 'if ( defined( "WP_PLUGIN_DIR" ) ) { $f = WP_PLUGIN_DIR . "/atora-lms/modules/class-v5-installer.php"; if ( file_exists( $f ) ) { require_once $f; } } if ( class_exists( "ATORA\\\\V5_Installer" ) && method_exists( "ATORA\\\\V5_Installer", "ensure_active_module_tables" ) ) { \ATORA\V5_Installer::ensure_active_module_tables(); echo "tables_ok\n"; } else { echo "tables_skip\n"; }'
+$WP eval 'if ( defined( "WP_PLUGIN_DIR" ) ) { $f = WP_PLUGIN_DIR . "/atora-lms/modules/class-v5-installer.php"; if ( file_exists( $f ) ) { require_once $f; } } if ( class_exists( "ATORA\\V5_Installer" ) && method_exists( "ATORA\\V5_Installer", "ensure_active_module_tables" ) ) { \ATORA\V5_Installer::ensure_active_module_tables(); echo "tables_ok\n"; } else { echo "tables_skip\n"; }'
 
 echo "Asegurando usuarios…"
 if [ -z "${ADMIN_ID}" ]; then
