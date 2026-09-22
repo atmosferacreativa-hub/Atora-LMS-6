@@ -141,8 +141,9 @@ trait CLMS_Admin_Menu_Navigation_Trait {
 			return $items;
 		}
 
-		$items[] = array( 'label' => __( 'Programas', 'atora-lms' ), 'value' => $this->count_posts_by_type( 'lm_program' ) );
-		$items[] = array( 'label' => __( 'Cursos', 'atora-lms' ), 'value' => $this->count_posts_by_type( 'lm_course' ) );
+			// Para el Panel/Hub: no contamos borradores ni papelera como contenido real.
+			$items[] = array( 'label' => __( 'Programas', 'atora-lms' ), 'value' => $this->count_posts_by_type( 'lm_program', array( 'publish', 'private' ) ) );
+			$items[] = array( 'label' => __( 'Cursos', 'atora-lms' ), 'value' => $this->count_posts_by_type( 'lm_course', array( 'publish', 'private' ) ) );
 		$items[] = array( 'label' => __( 'Cohortes', 'atora-lms' ), 'value' => $this->count_posts_by_type( 'lm_cohort' ) );
 		$items[] = array( 'label' => __( 'Lecciones', 'atora-lms' ), 'value' => $this->count_posts_by_type( 'lm_lesson' ) );
 		$items[] = array( 'label' => __( 'Entregas', 'atora-lms' ), 'value' => $this->count_posts_by_type( 'clms_submission' ) );
@@ -294,13 +295,13 @@ trait CLMS_Admin_Menu_Navigation_Trait {
 			);
 		}
 
-		return array(
-			array( 'label' => __( 'Programas', 'atora-lms' ), 'value' => $this->count_posts_by_type( 'lm_program' ) ),
-			array( 'label' => __( 'Cursos', 'atora-lms' ), 'value' => $this->count_posts_by_type( 'lm_course' ) ),
-			array( 'label' => __( 'Lecciones', 'atora-lms' ), 'value' => $this->count_posts_by_type( 'lm_lesson' ) ),
-			array( 'label' => __( 'Entregas', 'atora-lms' ), 'value' => $this->count_posts_by_type( 'clms_submission' ) ),
-		);
-	}
+			return array(
+				array( 'label' => __( 'Programas', 'atora-lms' ), 'value' => $this->count_posts_by_type( 'lm_program', array( 'publish', 'private' ) ) ),
+				array( 'label' => __( 'Cursos', 'atora-lms' ), 'value' => $this->count_posts_by_type( 'lm_course', array( 'publish', 'private' ) ) ),
+				array( 'label' => __( 'Lecciones', 'atora-lms' ), 'value' => $this->count_posts_by_type( 'lm_lesson' ) ),
+				array( 'label' => __( 'Entregas', 'atora-lms' ), 'value' => $this->count_posts_by_type( 'clms_submission' ) ),
+			);
+		}
 
 	protected function build_nav_item( $title, $description, $url ) {
 		return array(
@@ -442,15 +443,36 @@ trait CLMS_Admin_Menu_Navigation_Trait {
 		);
 	}
 
-	protected function count_posts_by_type( $post_type ) {
-		$count = wp_count_posts( $post_type );
+		/**
+		 * Cuenta posts por tipo, opcionalmente restringiendo a ciertos estados.
+		 *
+		 * Nota: `wp_count_posts()` devuelve un objeto con contadores por estado
+		 * incluyendo `trash` y `auto-draft`. Para los contadores del Panel/Hub
+		 * que se presentan como "contenido real", se pasa una lista explícita
+		 * de estados (p.ej. `publish` y `private`) desde el callsite.
+		 */
+		protected function count_posts_by_type( $post_type, $statuses = null ) {
+			$count = wp_count_posts( $post_type );
 
-		if ( ! $count ) {
-			return 0;
+			if ( ! $count ) {
+				return 0;
+			}
+
+			if ( null === $statuses ) {
+				return absint( array_sum( (array) $count ) );
+			}
+
+			$total = 0;
+			foreach ( (array) $statuses as $status ) {
+				$status = sanitize_key( (string) $status );
+				if ( '' === $status ) {
+					continue;
+				}
+				$total += (int) ( $count->{$status} ?? 0 );
+			}
+
+			return absint( $total );
 		}
-
-		return absint( array_sum( (array) $count ) );
-	}
 
 	protected function count_commercial_entities( $post_type ) {
 		$query = new WP_Query(

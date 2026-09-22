@@ -1289,12 +1289,12 @@ trait CLMS_Admin_Menu_Widgets_And_Hubs_Trait {
 		$role_context = $this->get_current_role_context();
 		$role_label   = $this->get_role_context_label( $role_context );
 
-		$program_count = 'instructor' === $role_context
-			? count( $this->get_programs_owned_by_user( $user_id ) )
-			: $this->count_posts_by_type( 'lm_program' );
-		$course_count = 'instructor' === $role_context
-			? count( $this->get_courses_owned_by_user( $user_id ) )
-			: $this->count_posts_by_type( 'lm_course' );
+			$program_count = 'instructor' === $role_context
+				? count( $this->get_programs_owned_by_user( $user_id ) )
+				: $this->count_posts_by_type( 'lm_program', array( 'publish', 'private' ) );
+			$course_count = 'instructor' === $role_context
+				? count( $this->get_courses_owned_by_user( $user_id ) )
+				: $this->count_posts_by_type( 'lm_course', array( 'publish', 'private' ) );
 		$cohort_count = $this->count_posts_by_type( 'lm_cohort' );
 		$lesson_count = 'instructor' === $role_context
 			? count( $this->get_lessons_owned_by_user( $user_id ) )
