@@ -94,45 +94,46 @@ trait CLMS_Admin_Menu_Navigation_Trait {
 				'collaborator' => __( 'Tienes foco operativo en operación comercial, seguimiento, analítica y coordinación transversal.', 'atora-lms' ),
 				'student'      => __( 'Aquí encuentras tus accesos rápidos, perfil y visibilidad de tu ruta de aprendizaje.', 'atora-lms' ),
 			);
-
-		return isset( $descriptions[ $role_context ] ) ? $descriptions[ $role_context ] : '';
-	}
-
-	protected function get_role_summary_metrics( $role_context, $user_id ) {
-		$user_id = absint( $user_id );
-		$items   = array();
-
-		if ( 'student' === $role_context ) {
-			$items[] = array(
-				'label' => __( 'Programas', 'atora-lms' ),
-				'value' => class_exists( 'CLMS_Helper' ) && method_exists( 'CLMS_Helper', 'get_user_enrolled_programs' ) ? count( ( method_exists('CLMS_Helper','get_user_enrolled_programs') ? CLMS_Helper::get_user_enrolled_programs( $user_id ) : array() ) ) : 0,
-			);
-			$items[] = array(
-				'label' => __( 'Cursos', 'atora-lms' ),
-				'value' => class_exists( 'CLMS_Helper' ) ? count( ( class_exists('\\ATORA\\LMS\\LMS_Enrollment_Service') ? array_column( (array) \ATORA\LMS\LMS_Enrollment_Service::get_user_enrollments( $user_id ), 'course_id' ) : \CLMS_Helper::get_user_enrolled_courses( $user_id ) ) ) : 0,
-			);
-			$completed = get_user_meta( $user_id, '_clms_completed_lessons', true );
-			$items[] = array(
-				'label' => __( 'Lecciones', 'atora-lms' ),
-				'value' => is_array( $completed ) ? count( array_filter( array_map( 'absint', $completed ) ) ) : 0,
-			);
-			return $items;
+	
+			return isset( $descriptions[ $role_context ] ) ? $descriptions[ $role_context ] : '';
 		}
 
-		if ( 'instructor' === $role_context ) {
-			$course_ids = $this->get_courses_owned_by_user( $user_id );
-			$lesson_ids = $this->get_lessons_owned_by_user( $user_id );
-			$cohort_service = $this->get_cohort_service();
-			$cohort_count = ( $cohort_service && method_exists( $cohort_service, 'get_visible_cohort_ids' ) )
-				? count( (array) $cohort_service->get_visible_cohort_ids( $user_id, array(), 200 ) )
-				: 0;
-			$items[] = array( 'label' => __( 'Programas', 'atora-lms' ), 'value' => count( $this->get_programs_owned_by_user( $user_id ) ) );
-			$items[] = array( 'label' => __( 'Cursos', 'atora-lms' ), 'value' => count( $course_ids ) );
-			$items[] = array( 'label' => __( 'Cohortes', 'atora-lms' ), 'value' => $cohort_count );
-			$items[] = array( 'label' => __( 'Lecciones', 'atora-lms' ), 'value' => count( $lesson_ids ) );
-			$items[] = array( 'label' => __( 'Evaluaciones', 'atora-lms' ), 'value' => $this->count_submissions_for_courses( $course_ids ) );
-			return $items;
-		}
+		protected function get_role_summary_metrics( $role_context, $user_id ) {
+			$user_id = absint( $user_id );
+			$items   = array();
+
+			if ( 'student' === $role_context ) {
+				$items[] = array(
+					'label' => __( 'Programas matriculados', 'atora-lms' ),
+					'value' => class_exists( 'CLMS_Helper' ) && method_exists( 'CLMS_Helper', 'get_user_enrolled_programs' ) ? count( ( method_exists('CLMS_Helper','get_user_enrolled_programs') ? CLMS_Helper::get_user_enrolled_programs( $user_id ) : array() ) ) : 0,
+				);
+				$items[] = array(
+					'label' => __( 'Cursos matriculados', 'atora-lms' ),
+					'value' => class_exists( 'CLMS_Helper' ) ? count( ( class_exists('\\ATORA\\LMS\\LMS_Enrollment_Service') ? array_column( (array) \ATORA\LMS\LMS_Enrollment_Service::get_user_enrollments( $user_id ), 'course_id' ) : \CLMS_Helper::get_user_enrolled_courses( $user_id ) ) ) : 0,
+				);
+				$completed = get_user_meta( $user_id, '_clms_completed_lessons', true );
+				$items[] = array(
+					'label' => __( 'Lecciones completadas', 'atora-lms' ),
+					'value' => is_array( $completed ) ? count( array_filter( array_map( 'absint', $completed ) ) ) : 0,
+				);
+				return $items;
+			}
+
+			if ( 'instructor' === $role_context ) {
+				$course_ids     = $this->get_courses_owned_by_user( $user_id );
+				$lesson_ids     = $this->get_lessons_owned_by_user( $user_id );
+				$cohort_service = $this->get_cohort_service();
+				$cohort_count   = ( $cohort_service && method_exists( $cohort_service, 'get_visible_cohort_ids' ) )
+					? count( (array) $cohort_service->get_visible_cohort_ids( $user_id, array(), 200 ) )
+					: 0;
+
+				$items[] = array( 'label' => __( 'Programas creados', 'atora-lms' ), 'value' => count( $this->get_programs_owned_by_user( $user_id ) ) );
+				$items[] = array( 'label' => __( 'Cursos creados', 'atora-lms' ), 'value' => count( $course_ids ) );
+				$items[] = array( 'label' => __( 'Cohortes', 'atora-lms' ), 'value' => $cohort_count );
+				$items[] = array( 'label' => __( 'Lecciones creadas', 'atora-lms' ), 'value' => count( $lesson_ids ) );
+				$items[] = array( 'label' => __( 'Evaluaciones', 'atora-lms' ), 'value' => $this->count_submissions_for_courses( $course_ids ) );
+				return $items;
+			}
 
 		if ( 'collaborator' === $role_context ) {
 			$items[] = array( 'label' => __( 'Productos', 'atora-lms' ), 'value' => post_type_exists( 'product' ) ? $this->count_posts_by_type( 'product' ) : 0 );
@@ -144,9 +145,9 @@ trait CLMS_Admin_Menu_Navigation_Trait {
 			// Para el Panel/Hub: no contamos borradores ni papelera como contenido real.
 			$items[] = array( 'label' => __( 'Programas', 'atora-lms' ), 'value' => $this->count_posts_by_type( 'lm_program', array( 'publish', 'private' ) ) );
 			$items[] = array( 'label' => __( 'Cursos', 'atora-lms' ), 'value' => $this->count_posts_by_type( 'lm_course', array( 'publish', 'private' ) ) );
-		$items[] = array( 'label' => __( 'Cohortes', 'atora-lms' ), 'value' => $this->count_posts_by_type( 'lm_cohort' ) );
-		$items[] = array( 'label' => __( 'Lecciones', 'atora-lms' ), 'value' => $this->count_posts_by_type( 'lm_lesson' ) );
-		$items[] = array( 'label' => __( 'Entregas', 'atora-lms' ), 'value' => $this->count_posts_by_type( 'clms_submission' ) );
+			$items[] = array( 'label' => __( 'Cohortes', 'atora-lms' ), 'value' => $this->count_posts_by_type( 'lm_cohort' ) );
+			$items[] = array( 'label' => __( 'Lecciones', 'atora-lms' ), 'value' => $this->count_posts_by_type( 'lm_lesson' ) );
+			$items[] = array( 'label' => __( 'Entregas', 'atora-lms' ), 'value' => $this->count_posts_by_type( 'clms_submission' ) );
 
 		return $items;
 	}
@@ -279,9 +280,9 @@ trait CLMS_Admin_Menu_Navigation_Trait {
 		if ( 'instructor' === $role_context ) {
 			$course_ids = $this->get_courses_owned_by_user( $user_id );
 			return array(
-				array( 'label' => __( 'Programas', 'atora-lms' ), 'value' => count( $this->get_programs_owned_by_user( $user_id ) ) ),
-				array( 'label' => __( 'Cursos', 'atora-lms' ), 'value' => count( $course_ids ) ),
-				array( 'label' => __( 'Lecciones', 'atora-lms' ), 'value' => count( $this->get_lessons_owned_by_user( $user_id ) ) ),
+				array( 'label' => __( 'Programas creados', 'atora-lms' ), 'value' => count( $this->get_programs_owned_by_user( $user_id ) ) ),
+				array( 'label' => __( 'Cursos creados', 'atora-lms' ), 'value' => count( $course_ids ) ),
+				array( 'label' => __( 'Lecciones creadas', 'atora-lms' ), 'value' => count( $this->get_lessons_owned_by_user( $user_id ) ) ),
 				array( 'label' => __( 'Entregas pendientes', 'atora-lms' ), 'value' => $this->count_submissions_for_courses( $course_ids, 'submitted' ) ),
 			);
 		}
@@ -295,13 +296,13 @@ trait CLMS_Admin_Menu_Navigation_Trait {
 			);
 		}
 
-			return array(
-				array( 'label' => __( 'Programas', 'atora-lms' ), 'value' => $this->count_posts_by_type( 'lm_program', array( 'publish', 'private' ) ) ),
-				array( 'label' => __( 'Cursos', 'atora-lms' ), 'value' => $this->count_posts_by_type( 'lm_course', array( 'publish', 'private' ) ) ),
-				array( 'label' => __( 'Lecciones', 'atora-lms' ), 'value' => $this->count_posts_by_type( 'lm_lesson' ) ),
-				array( 'label' => __( 'Entregas', 'atora-lms' ), 'value' => $this->count_posts_by_type( 'clms_submission' ) ),
-			);
-		}
+		return array(
+			array( 'label' => __( 'Programas', 'atora-lms' ), 'value' => $this->count_posts_by_type( 'lm_program', array( 'publish', 'private' ) ) ),
+			array( 'label' => __( 'Cursos', 'atora-lms' ), 'value' => $this->count_posts_by_type( 'lm_course', array( 'publish', 'private' ) ) ),
+			array( 'label' => __( 'Lecciones', 'atora-lms' ), 'value' => $this->count_posts_by_type( 'lm_lesson' ) ),
+			array( 'label' => __( 'Entregas', 'atora-lms' ), 'value' => $this->count_posts_by_type( 'clms_submission' ) ),
+		);
+	}
 
 	protected function build_nav_item( $title, $description, $url ) {
 		return array(

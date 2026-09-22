@@ -1295,10 +1295,10 @@ trait CLMS_Admin_Menu_Widgets_And_Hubs_Trait {
 			$course_count = 'instructor' === $role_context
 				? count( $this->get_courses_owned_by_user( $user_id ) )
 				: $this->count_posts_by_type( 'lm_course', array( 'publish', 'private' ) );
-		$cohort_count = $this->count_posts_by_type( 'lm_cohort' );
-		$lesson_count = 'instructor' === $role_context
-			? count( $this->get_lessons_owned_by_user( $user_id ) )
-			: $this->count_posts_by_type( 'lm_lesson' );
+			$cohort_count = $this->count_posts_by_type( 'lm_cohort' );
+			$lesson_count = 'instructor' === $role_context
+				? count( $this->get_lessons_owned_by_user( $user_id ) )
+				: $this->count_posts_by_type( 'lm_lesson' );
 		$rubric_count = $this->count_posts_by_type( 'clms_rubric' );
 		$teacher_count = $this->count_posts_by_type( 'atora_teacher' );
 		$pending_submissions = 'instructor' === $role_context
@@ -1324,12 +1324,19 @@ trait CLMS_Admin_Menu_Widgets_And_Hubs_Trait {
 			)
 		);
 
-		$stats = array(
-			array( 'label' => __( 'Programas', 'atora-lms' ), 'value' => $program_count ),
-			array( 'label' => __( 'Cursos', 'atora-lms' ), 'value' => $course_count ),
-			array( 'label' => __( 'Lecciones', 'atora-lms' ), 'value' => $lesson_count ),
-			array( 'label' => __( 'Evaluaciones pendientes', 'atora-lms' ), 'value' => $pending_submissions ),
-		);
+			$program_label = 'instructor' === $role_context
+				? __( 'Programas creados', 'atora-lms' )
+				: ( 'student' === $role_context ? __( 'Programas matriculados', 'atora-lms' ) : __( 'Programas', 'atora-lms' ) );
+			$course_label  = 'instructor' === $role_context
+				? __( 'Cursos creados', 'atora-lms' )
+				: ( 'student' === $role_context ? __( 'Cursos matriculados', 'atora-lms' ) : __( 'Cursos', 'atora-lms' ) );
+
+			$stats = array(
+				array( 'label' => $program_label, 'value' => $program_count ),
+				array( 'label' => $course_label, 'value' => $course_count ),
+				array( 'label' => __( 'Lecciones', 'atora-lms' ), 'value' => $lesson_count ),
+				array( 'label' => __( 'Evaluaciones pendientes', 'atora-lms' ), 'value' => $pending_submissions ),
+			);
 		$primary_links = array(
 			array(
 				'icon'  => '🏗️',
