@@ -1077,17 +1077,24 @@ add_action( 'init', static function () {
 	atora_lms_require_module( 'modules/lms/class-lms-section-projector.php' );
 
 	// ── F4 task 1.6: comando WP-CLI `wp atora lms cutover` ───────────────────
-	if ( defined( 'WP_CLI' ) && WP_CLI ) {
-		atora_lms_require_module( 'modules/lms/class-lms-cli.php', static function() {
-			if ( class_exists( '\ATORA\LMS\LMS_CLI' ) ) {
-				\ATORA\LMS\LMS_CLI::init();
-			}
-		} );
+		if ( defined( 'WP_CLI' ) && WP_CLI ) {
+			atora_lms_require_module( 'modules/lms/class-lms-cli.php', static function() {
+				if ( class_exists( '\ATORA\LMS\LMS_CLI' ) ) {
+					\ATORA\LMS\LMS_CLI::init();
+				}
+			} );
 
-		// ── 6.26.5: comando WP-CLI `wp atora rubrics migrate/verify` ──────────
-		atora_lms_require_module( 'modules/rubrics/class-rubrics-cli.php', static function() {
-			if ( class_exists( '\ATORA\LMS\Rubrics_CLI' ) ) {
-				\ATORA\LMS\Rubrics_CLI::init();
+			// ── B.1: comando WP-CLI `wp atora enrollment reconcile` ──────────────
+			atora_lms_require_module( 'modules/lms/class-lms-enrollment-cli.php', static function() {
+				if ( class_exists( '\ATORA\LMS\LMS_Enrollment_CLI' ) ) {
+					\ATORA\LMS\LMS_Enrollment_CLI::init();
+				}
+			} );
+
+			// ── 6.26.5: comando WP-CLI `wp atora rubrics migrate/verify` ──────────
+			atora_lms_require_module( 'modules/rubrics/class-rubrics-cli.php', static function() {
+				if ( class_exists( '\ATORA\LMS\Rubrics_CLI' ) ) {
+					\ATORA\LMS\Rubrics_CLI::init();
 			}
 		} );
 

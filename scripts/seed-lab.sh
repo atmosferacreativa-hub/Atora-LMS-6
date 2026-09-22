@@ -111,10 +111,12 @@ echo \"ok\\n\";
 
 echo "Asignando rúbrica estructurada a la lección…"
 $WP post meta update "$LESSON_POST_ID" _clms_rubric_id "$RUBRIC_STRUCT_ID" >/dev/null
+$WP post meta update "$LESSON_POST_ID" _clms_course_id "$COURSE_POST_ID" >/dev/null
 
 echo "Creando entrega (clms_submission)…"
 SUBMISSION_ID=$($WP post create --post_type=clms_submission --post_status=publish --post_author="$STUDENT_ID" --post_title="Entrega Seed 6.26.5" --porcelain)
 $WP post meta update "$SUBMISSION_ID" _clms_submission_lesson_id "$LESSON_POST_ID" >/dev/null
+$WP post meta update "$SUBMISSION_ID" _clms_submission_course_id "$COURSE_POST_ID" >/dev/null
 $WP post meta update "$SUBMISSION_ID" _clms_submission_user_id "$STUDENT_ID" >/dev/null
 $WP post meta update "$SUBMISSION_ID" _clms_submission_status submitted >/dev/null
 
@@ -133,23 +135,24 @@ $WP eval "
 ) );
 \\ATORA\\LMS\\LMS_Course_Service::link_to_legacy_post( \$course_id, (int) ${COURSE_POST_ID} );
 
-\\ATORA\\LMS\\LMS_Course_Service::upsert_lesson( array(
-  'wp_post_id' => (int) ${LESSON_POST_ID},
-  'course_id' => \$course_id,
-  'title' => 'Lección Seed 6.26.5',
-  'slug' => 'leccion-seed-6265',
+	\\ATORA\\LMS\\LMS_Course_Service::upsert_lesson( array(
+	  'wp_post_id' => (int) ${LESSON_POST_ID},
+	  'course_id' => \$course_id,
+	  'title' => 'Lección Seed 6.26.5',
+	  'slug' => 'leccion-seed-6265',
   'content' => 'Contenido de prueba.',
   'lesson_order' => 1,
   'section' => 'General',
   'section_order' => 0,
   'type' => 'text',
   'duration_min' => 5,
-  'status' => 'published',
-) );
+	  'status' => 'published',
+	) );
 
-\\ATORA\\LMS\\LMS_Enrollment_Service::enroll( (int) ${STUDENT_ID}, \$course_id, 0 );
-echo \"ok\\n\";
-" >/dev/null
+	// Matrícula legacy autoritativa (escribe ambos metas + dispara compat layer).
+	CLMS_Helper::enroll_user_in_course( (int) ${STUDENT_ID}, (int) ${COURSE_POST_ID} );
+	echo \"ok\\n\";
+	" >/dev/null
 
 echo "Creando delegación instructor→assistant (perm grade)…"
 $WP eval "
