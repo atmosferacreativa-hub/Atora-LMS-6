@@ -32,6 +32,16 @@ if ( class_exists( 'CLMS_Install_Profiles' ) ) {
 }
 "
 
+echo "Asegurando tablas de módulos activos (dbDelta)…"
+$WP eval "
+if ( class_exists( '\\\\ATORA\\\\V5_Installer' ) && method_exists( '\\\\ATORA\\\\V5_Installer', 'ensure_active_module_tables' ) ) {
+  \\\\ATORA\\\\V5_Installer::ensure_active_module_tables();
+  echo \"tables_ok\\n\";
+} else {
+  echo \"tables_skip\\n\";
+}
+"
+
 echo "Asegurando usuarios…"
 if [ -z "${ADMIN_ID}" ]; then
   ADMIN_ID=$($WP user list --role=administrator --field=ID --format=ids | awk '{print $1}')

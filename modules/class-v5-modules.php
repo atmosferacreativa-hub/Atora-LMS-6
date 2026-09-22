@@ -375,6 +375,22 @@ class V5_Modules {
 			if ( class_exists( 'ATORA\Analytics\Analytics_Engine' ) ) {
 				\ATORA\Analytics\Analytics_Engine::init();
 			}
+
+			// En admin necesitamos que existan las páginas ocultas (atora-forms,
+			// atora-popups) para que puedan abrirse por URL directa y desde los hubs.
+			// Estas clases también aportan shortcodes/AJAX/frontend, pero su init()
+			// es segura en admin (gatea lo que no aplica) y registra el menú vía
+			// `atora_lms_admin_menu`.
+			if ( $ctx['is_admin'] ) {
+				self::require_file( $dir . 'class-forms-builder.php' );
+				self::require_file( $dir . 'class-popups.php' );
+				if ( class_exists( 'ATORA\Analytics\Forms_Builder' ) ) {
+					\ATORA\Analytics\Forms_Builder::init();
+				}
+				if ( class_exists( 'ATORA\Analytics\Popups' ) ) {
+					\ATORA\Analytics\Popups::init();
+				}
+			}
 		}
 
 		$needs_front_analytics = $ctx['is_front'] || $ctx['is_ajax'];
