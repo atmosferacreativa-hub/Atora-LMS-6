@@ -241,6 +241,22 @@ class LMS_Enrollment_Service {
 
 	// ── F3.1 — Lectores de tabla (fuente sombra para shadow-read) ────────────
 
+	/** Academic roster by WordPress course ID; never compare it with a table ID. */
+	public static function get_student_ids_by_wp_course_id( int $wp_course_id ): array {
+		global $wpdb;
+		if ( $wp_course_id <= 0 ) { return array(); }
+		$ids = (array) $wpdb->get_col( $wpdb->prepare(
+			"SELECT DISTINCT e.user_id
+			 FROM {$wpdb->prefix}atora_enrollments e
+			 INNER JOIN {$wpdb->prefix}atora_courses c ON c.id = e.course_id
+			 WHERE c.wp_post_id = %d AND e.status IN ('active', 'completed')
+			 ORDER BY e.user_id",
+			$wp_course_id
+		) );
+		// Expired access does not erase academic records. This is not an access check.
+		return array_values( array_unique( array_filter( array_map( 'absint', $ids ) ) ) );
+	}
+
 	/**
 	 * IDs de WP post de cursos con matrícula activa en tabla.
 	 * Equivalente tabular de CLMS_Helper::get_user_enrolled_courses().

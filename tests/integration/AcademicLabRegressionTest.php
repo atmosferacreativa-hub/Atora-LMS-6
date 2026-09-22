@@ -122,4 +122,67 @@ final class AcademicLabRegressionTest extends WP_UnitTestCase {
 		$this->assertSame( (string) $this->submission, $query['submission_id'] );
 		$this->assertArrayHasKey( 'clms_return', $query );
 	}
+
+	public function test_unrelated_page_does_not_become_speedgrader(): void {
+		$page = self::factory()->post->create( array( 'post_type' => 'page', 'post_status' => 'publish' ) );
+		$this->go_to( get_permalink( $page ) );
+		$_GET['submission_id'] = (string) $this->submission;
+		$this->assertSame( 0, clms_core( 'CLMS_Grading' )->get_speedgrade_request_submission_id() );
+	}
+
+	public function test_short_url_dispatches_document_on_repeated_requests(): void {
+		$this->go_to( home_url( '/?submission_id=' . $this->submission ) );
+		$_GET = array( 'submission_id' => (string) $this->submission );
+		$grading = new class extends CLMS_Grading {
+			protected function get_speedgrade_document( $submission_id ) {
+				throw new RuntimeException( 'document:' . $submission_id );
+			}
+		};
+		for ( $request = 0; $request < 2; ++$request ) {
+			try {
+				$grading->maybe_render_speedgrade_screen();
+				$this->fail( 'Short URL did not dispatch SpeedGrader' );
+			} catch ( RuntimeException $e ) {
+				$this->assertSame( 'document:' . $this->submission, $e->getMessage() );
+			}
+		}
+	}
+
+	public function test_short_url_does_not_expose_markup_to_visitor_or_student(): void {
+		$grading = clms_core( 'CLMS_Grading' );
+		$method = new ReflectionMethod( $grading, 'get_speedgrade_markup' );
+		$method->setAccessible( true );
+		foreach ( array( 0, $this->student ) as $actor ) {
+			wp_set_current_user( $actor );
+			$html = $method->invoke( $grading, $this->submission );
+			$this->assertStringNotContainsString( 'Estudiante de prueba', $html );
+			$this->assertStringNotContainsString( 'name="clms_speedgrade_action"', $html );
+		}
+	}
+
+	public function test_group_submitter_has_a_label(): void {
+		delete_post_meta( $this->submission, '_clms_submission_user_id' );
+		update_post_meta( $this->submission, '_clms_submission_group_master', '1' );
+		update_post_meta( $this->submission, '_clms_submission_submitted_by', $this->student );
+		$grading = clms_core( 'CLMS_Grading' );
+		$context = $grading->get_submission_context( $this->submission, $this->admin );
+		$this->assertSame( $this->student, $context['student_id'] );
+		$this->assertSame( 'Estudiante de prueba', $context['student_name'] );
+	}
+
+	public function test_admin_counts_match_publish_private_inventory(): void {
+		foreach ( array( 'lm_course', 'lm_program' ) as $type ) {
+			foreach ( array( 'publish', 'private', 'draft', 'trash' ) as $status ) {
+				self::factory()->post->create( array( 'post_type' => $type, 'post_status' => $status ) );
+			}
+		}
+		$menu = new class extends CLMS_Admin_Menu {
+			public function metrics() { return $this->get_role_summary_metrics( 'admin', get_current_user_id() ); }
+		};
+		$metrics = array_column( $menu->metrics(), 'value', 'label' );
+		foreach ( array( 'Cursos' => 'lm_course', 'Programas' => 'lm_program' ) as $label => $type ) {
+			$listed = get_posts( array( 'post_type' => $type, 'post_status' => array( 'publish', 'private' ), 'posts_per_page' => -1, 'fields' => 'ids' ) );
+			$this->assertSame( count( $listed ), (int) $metrics[ $label ] );
+		}
+	}
 }

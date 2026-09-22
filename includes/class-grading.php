@@ -33,7 +33,7 @@ class CLMS_Grading {
 
 	public function __construct() {
 		add_shortcode( 'clms_speedgrade', array( $this, 'render_speedgrade_shortcode' ) );
-		add_action( 'template_redirect', array( $this, 'maybe_render_speedgrade_screen' ) );
+		add_action( 'template_redirect', array( $this, 'maybe_render_speedgrade_screen' ), 0 );
 		add_action( 'wp_ajax_clms_generate_ai_review', array( $this, 'ajax_generate_ai_review' ) );
 		add_action( 'clms_submission_created', array( $this, 'invalidate_cache_from_submission' ), 10, 3 );
 		add_action( 'clms_submission_graded', array( $this, 'invalidate_cache_from_graded_submission' ), 10, 2 );

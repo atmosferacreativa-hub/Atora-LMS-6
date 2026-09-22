@@ -29,12 +29,21 @@ trait CLMS_Grading_SpeedGrade_Trait {
 		return $this->get_speedgrade_markup( $submission_id );
 	}
 
+	/** Recover root deep links while leaving unrelated pages and invalid IDs alone. */
+	public function get_speedgrade_request_submission_id() {
+		$raw = $_GET['submission_id'] ?? '';
+		if ( ! is_scalar( $raw ) || ! ctype_digit( (string) $raw ) ) { return 0; }
+		$id = absint( $raw );
+		if ( ! $id || self::SUBMISSION_CPT !== get_post_type( $id ) ) { return 0; }
+		if ( empty( $_GET[ self::SPEEDGRADE_VAR ] ) && ! is_front_page() && ! is_home() ) { return 0; }
+		return $id;
+	}
+
 	public function maybe_render_speedgrade_screen() {
-		if ( empty( $_GET[ self::SPEEDGRADE_VAR ] ) ) {
+		$submission_id = $this->get_speedgrade_request_submission_id();
+		if ( ! $submission_id && empty( $_GET[ self::SPEEDGRADE_VAR ] ) ) {
 			return;
 		}
-
-		$submission_id = isset( $_GET['submission_id'] ) ? absint( wp_unslash( $_GET['submission_id'] ) ) : 0;
 
 		status_header( 200 );
 		nocache_headers();
@@ -1123,6 +1132,29 @@ trait CLMS_Grading_SpeedGrade_Trait {
 		return $lesson_id && CLMS_Helper::user_can_manage_lms( $lesson_id );
 	}
 
+	/** Same legacy identity fallback used when publishing a grade. */
+	protected function resolve_speedgrade_student_id( $submission_id ) {
+		$student_id = absint( get_post_meta( $submission_id, '_clms_submission_user_id', true ) );
+		if ( ! $student_id ) {
+			$student_id = absint( get_post_meta( $submission_id, '_clms_submission_student_id', true ) );
+		}
+		if ( ! $student_id && '1' === (string) get_post_meta( $submission_id, '_clms_submission_group_master', true ) ) {
+			$student_id = absint( get_post_meta( $submission_id, '_clms_submission_submitted_by', true ) );
+		}
+		return $student_id ?: absint( get_post_field( 'post_author', $submission_id ) );
+	}
+
+	protected function speedgrade_student_label( $student_id ) {
+		$student = $student_id ? get_user_by( 'id', $student_id ) : false;
+		if ( $student ) {
+			$name = trim( (string) $student->display_name );
+			return '' !== $name ? $name : (string) $student->user_login;
+		}
+		return $student_id
+			? sprintf( __( 'Estudiante no disponible (ID %d)', 'atora-lms' ), $student_id )
+			: __( 'Estudiante no identificado', 'atora-lms' );
+	}
+
 	public function get_submission_context( $submission_id, $user_id = 0 ) {
 		$submission_id = absint( $submission_id );
 		$user_id       = $user_id ? absint( $user_id ) : get_current_user_id();
@@ -1131,10 +1163,7 @@ trait CLMS_Grading_SpeedGrade_Trait {
 			return array();
 		}
 
-		$student_id  = absint( get_post_meta( $submission_id, '_clms_submission_user_id', true ) );
-		if ( ! $student_id && '1' === (string) get_post_meta( $submission_id, '_clms_submission_group_master', true ) ) {
-			$student_id = absint( get_post_meta( $submission_id, '_clms_submission_submitted_by', true ) );
-		}
+		$student_id  = $this->resolve_speedgrade_student_id( $submission_id );
 		$lesson_id   = absint( get_post_meta( $submission_id, '_clms_submission_lesson_id', true ) );
 		$course_id   = absint( get_post_meta( $submission_id, '_clms_submission_course_id', true ) );
 		$status      = (string) get_post_meta( $submission_id, '_clms_submission_status', true );
@@ -1158,7 +1187,6 @@ trait CLMS_Grading_SpeedGrade_Trait {
 
 		$attachments = is_array( $attachments ) ? array_values( array_filter( array_map( 'absint', $attachments ) ) ) : array();
 
-		$student = $student_id ? get_user_by( 'id', $student_id ) : false;
 		$files   = array();
 
 		foreach ( $attachments as $file_id ) {
@@ -1194,10 +1222,7 @@ trait CLMS_Grading_SpeedGrade_Trait {
 			$submitted = get_post_time( 'Y-m-d H:i:s', false, $submission_id );
 		}
 
-		$student_name = '';
-		if ( $student ) {
-			$student_name = $student->display_name ? $student->display_name : $student->user_login;
-		}
+		$student_name = $this->speedgrade_student_label( $student_id );
 
 		$student_snapshot = $this->build_student_course_snapshot( $student_id, $course_id );
 		$recent_history   = $this->get_student_recent_submission_history( $student_id, $course_id, $lesson_id, $submission_id, 5 );
@@ -1659,8 +1684,7 @@ trait CLMS_Grading_SpeedGrade_Trait {
 				continue;
 			}
 
-			$student_id   = absint( get_post_meta( $queue_id, '_clms_submission_user_id', true ) );
-			$student      = $student_id ? get_user_by( 'id', $student_id ) : false;
+			$student_id   = $this->resolve_speedgrade_student_id( $queue_id );
 			$lesson_id    = absint( get_post_meta( $queue_id, '_clms_submission_lesson_id', true ) );
 			$status       = (string) get_post_meta( $queue_id, '_clms_submission_status', true );
 			$assessment_engine = clms_core('CLMS_Assessment_Engine');
@@ -1669,7 +1693,7 @@ trait CLMS_Grading_SpeedGrade_Trait {
 				: array();
 			$ai_pending   = $this->is_submission_ai_pending_validation( $queue_id, $status, $assessment_record );
 			$priority     = $this->get_submission_queue_priority_data( $queue_id, $status, $assessment_record );
-			$student_name = $student && $student->display_name ? $student->display_name : ( $student ? $student->user_login : __( 'Estudiante', 'atora-lms' ) );
+			$student_name = $this->speedgrade_student_label( $student_id );
 
 			if ( '' === $status ) {
 				$status = 'submitted';

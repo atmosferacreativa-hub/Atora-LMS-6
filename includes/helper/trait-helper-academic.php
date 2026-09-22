@@ -915,6 +915,13 @@ trait CLMS_Helper_Academic_Trait {
 			return array();
 		}
 
+		// Match the canonical read source used by the other enrollment readers.
+		// Do not merge stale legacy rosters after F4 (withdrawn students could reappear).
+		if ( class_exists( '\\ATORA\\LMS\\LMS_Read_Router' ) && \ATORA\LMS\LMS_Read_Router::is_tables()
+			&& class_exists( '\\ATORA\\LMS\\LMS_Enrollment_Service' ) ) {
+			return \ATORA\LMS\LMS_Enrollment_Service::get_student_ids_by_wp_course_id( $course_id );
+		}
+
 		$student_ids = get_post_meta( $course_id, self::COURSE_ENROLLED_META, true );
 		$student_ids = is_array( $student_ids ) ? array_map( 'absint', $student_ids ) : array();
 
