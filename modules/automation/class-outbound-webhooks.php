@@ -227,13 +227,13 @@ class Outbound_Webhooks {
 	// ── Admin ─────────────────────────────────────────────────────────────────
 
 	/** @return void */
-	public static function register_admin_menu(): void {
-		add_submenu_page(
-			'', // PT-4.4.3: reubicado bajo el hub "Crecimiento" (atora-growth-hub).
-			__( 'Webhooks', 'atora-lms' ),
-			__( 'Webhooks', 'atora-lms' ),
-			'manage_options',
-			'atora-webhooks',
+		public static function register_admin_menu(): void {
+			add_submenu_page(
+				'atora-growth-hub', // PT-4.4.3: reubicado bajo el hub "Crecimiento" (atora-growth-hub).
+				__( 'Webhooks', 'atora-lms' ),
+				__( 'Webhooks', 'atora-lms' ),
+				'manage_options',
+				'atora-webhooks',
 			static function () {
 				$view = ATORA_LMS_MODULES_DIR . 'automation/views/webhooks.php';
 				if ( file_exists( $view ) ) { require $view; }

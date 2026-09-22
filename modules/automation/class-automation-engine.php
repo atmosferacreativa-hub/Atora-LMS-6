@@ -1731,12 +1731,12 @@ class Automation_Engine {
 			}
 		}
 
-		add_submenu_page(
-			'', // PT-4.4.3: reubicado bajo el hub "Crecimiento" (atora-growth-hub).
-			__( 'Automatizaciones', 'atora-lms' ),
-			__( 'Automatizaciones', 'atora-lms' ),
-			'manage_options',
-			'atora-automations',
+			add_submenu_page(
+				'atora-growth-hub', // PT-4.4.3: reubicado bajo el hub "Crecimiento" (atora-growth-hub).
+				__( 'Automatizaciones', 'atora-lms' ),
+				__( 'Automatizaciones', 'atora-lms' ),
+				'manage_options',
+				'atora-automations',
 			static function () {
 				$view = ATORA_LMS_MODULES_DIR . 'automation/views/admin.php';
 				if ( file_exists( $view ) ) { require $view; }

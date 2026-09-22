@@ -216,12 +216,12 @@ class Popups {
 			}
 		}
 
-		add_submenu_page(
-			'', // PT-4.4.3: reubicado bajo el hub "Informes" (atora-reports-hub).
-			__( 'Popups', 'atora-lms' ),
-			__( 'Popups', 'atora-lms' ),
-			'manage_options',
-			'atora-popups',
+			add_submenu_page(
+				'atora-reports-hub', // PT-4.4.3: reubicado bajo el hub "Informes" (atora-reports-hub).
+				__( 'Popups', 'atora-lms' ),
+				__( 'Popups', 'atora-lms' ),
+				'manage_options',
+				'atora-popups',
 			static function () {
 				$view = ATORA_LMS_MODULES_DIR . 'analytics/popups/admin.php';
 				if ( file_exists( $view ) ) {

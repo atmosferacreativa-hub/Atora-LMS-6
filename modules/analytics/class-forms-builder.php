@@ -688,12 +688,12 @@ class Forms_Builder {
 			}
 		}
 
-		add_submenu_page(
-			'', // PT-4.4.3: reubicado bajo el hub "Informes" (atora-reports-hub).
-			__( 'Formularios', 'atora-lms' ),
-			__( 'Formularios', 'atora-lms' ),
-			'manage_options',
-			'atora-forms',
+			add_submenu_page(
+				'atora-reports-hub', // PT-4.4.3: reubicado bajo el hub "Informes" (atora-reports-hub).
+				__( 'Formularios', 'atora-lms' ),
+				__( 'Formularios', 'atora-lms' ),
+				'manage_options',
+				'atora-forms',
 			static function () {
 				$view = ATORA_LMS_MODULES_DIR . 'analytics/forms/admin.php';
 				if ( file_exists( $view ) ) {
