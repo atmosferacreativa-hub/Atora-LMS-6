@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Seed mínimo y repetible para ATORA Lab (6.26.5).
+# Seed mínimo y repetible para ATORA Lab (6.26.7).
 #
 # Requiere WP-CLI. En el contenedor de Lab normalmente se ejecuta como root,
 # por eso usamos --allow-root por defecto.
 
 WP=${WP:-"wp --allow-root"}
 
-echo "== Seed ATORA Lab 6.26.5 =="
+echo "== Seed ATORA Lab 6.26.7 =="
 
 ADMIN_ID=${ADMIN_ID:-}
 ADMIN_LOGIN=${ADMIN_LOGIN:-atora}
@@ -156,8 +156,8 @@ echo \"ok\\n\";
 " >/dev/null
 
 echo "Creando curso/lección…"
-COURSE_POST_ID=$($WP post create --post_type=lm_course --post_status=publish --post_author="$INSTRUCTOR_ID" --post_title="Curso Seed 6.26.5" --porcelain)
-LESSON_POST_ID=$($WP post create --post_type=lm_lesson --post_status=publish --post_author="$INSTRUCTOR_ID" --post_title="Lección Seed 6.26.5" --post_content="Contenido de prueba." --porcelain)
+COURSE_POST_ID=$($WP post create --post_type=lm_course --post_status=publish --post_author="$INSTRUCTOR_ID" --post_title="Curso Seed 6.26.7" --porcelain)
+LESSON_POST_ID=$($WP post create --post_type=lm_lesson --post_status=publish --post_author="$INSTRUCTOR_ID" --post_title="Lección Seed 6.26.7" --post_content="Contenido de prueba." --porcelain)
 
 echo "Creando rúbricas (postmeta)…"
 RUBRIC_STRUCT_ID=$($WP post create --post_type=clms_rubric --post_status=publish --post_author="$INSTRUCTOR_ID" --post_title="Rúbrica Estructurada" --porcelain)
@@ -238,7 +238,7 @@ $WP post meta update "$LESSON_POST_ID" _clms_rubric_id "$RUBRIC_STRUCT_ID" >/dev
 $WP post meta update "$LESSON_POST_ID" _clms_course_id "$COURSE_POST_ID" >/dev/null
 
 echo "Creando entrega (clms_submission)…"
-SUBMISSION_ID=$($WP post create --post_type=clms_submission --post_status=publish --post_author="$STUDENT_ID" --post_title="Entrega Seed 6.26.5" --porcelain)
+SUBMISSION_ID=$($WP post create --post_type=clms_submission --post_status=publish --post_author="$STUDENT_ID" --post_title="Entrega Seed 6.26.7" --porcelain)
 $WP post meta update "$SUBMISSION_ID" _clms_submission_lesson_id "$LESSON_POST_ID" >/dev/null
 $WP post meta update "$SUBMISSION_ID" _clms_submission_course_id "$COURSE_POST_ID" >/dev/null
 $WP post meta update "$SUBMISSION_ID" _clms_submission_user_id "$STUDENT_ID" >/dev/null
@@ -262,7 +262,7 @@ $WP eval "
 	\\ATORA\\LMS\\LMS_Course_Service::upsert_lesson( array(
 	  'wp_post_id' => (int) ${LESSON_POST_ID},
 	  'course_id' => \$course_id,
-	  'title' => 'Lección Seed 6.26.5',
+	  'title' => 'Lección Seed 6.26.7',
 	  'slug' => 'leccion-seed-6265',
   'content' => 'Contenido de prueba.',
   'lesson_order' => 1,

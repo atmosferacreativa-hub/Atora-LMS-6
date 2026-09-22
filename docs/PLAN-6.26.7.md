@@ -3,7 +3,7 @@
 Alcance actualizado por instrucción del usuario: incorporar B.1–B.5 y ejecutar las
 correcciones verificables sin nuevas confirmaciones rutinarias. Este registro no
 declara lista la versión ni sustituye las pruebas del laboratorio con sus datos.
-La versión del plugin continúa en 6.26.5 hasta autorizar su publicación.
+La versión del plugin se incrementa a 6.26.7 para consolidar los fixes del laboratorio.
 
 Base: main `5793f8458969614181aaba62c5bae65d3e838300`.
 Respaldo: `backup/pre-6.26.7-20260922-5793f84`.
@@ -29,7 +29,7 @@ Dependencia: PR #16 (distribución), sin fusionar a main.
 1. Ejecutar `vendor/bin/phpunit -c phpunit.integration.xml tests/integration/AcademicLabRegressionTest.php`
    en el entorno de integración WordPress/MySQL y después los runners completos de CI.
 2. Construir e inspeccionar ZIP con `bash scripts/build-dist.sh` y
-   `python3 scripts/inspect-dist.py dist/atora-lms-6.26.5.zip 6.26.5 "$(git rev-parse HEAD)"`.
+   `python3 scripts/inspect-dist.py dist/atora-lms-6.26.7.zip 6.26.7 "$(git rev-parse HEAD)"`.
 3. En un Lab con copia de seguridad propia de DB y archivos, instalar el ZIP de esta
    rama. La rama backup de Git no contiene DB ni uploads.
 4. Desde un checkout montado en Docker y con WP-CLI:
