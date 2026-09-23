@@ -13,12 +13,12 @@ echo "== Seed ATORA Lab 6.26.7 =="
 ADMIN_ID=${ADMIN_ID:-}
 ADMIN_LOGIN=${ADMIN_LOGIN:-atora}
 ADMIN_EMAIL=${ADMIN_EMAIL:-admin@atora.test}
-ADMIN_PASS=${ADMIN_PASS:-"atora_lab_6265"}
+ADMIN_PASS=${ADMIN_PASS:-"atora_lab_6267"}
 INSTRUCTOR_LOGIN=${INSTRUCTOR_LOGIN:-docente_prueba}
 ASSISTANT_LOGIN=${ASSISTANT_LOGIN:-asistente_prueba}
 STUDENT_LOGIN=${STUDENT_LOGIN:-estudiante_demo}
 STUDENT_EMAIL=${STUDENT_EMAIL:-estudiante.demo@atora.test}
-STUDENT_PASS=${STUDENT_PASS:-"atora_lab_6265"}
+STUDENT_PASS=${STUDENT_PASS:-"atora_lab_6267"}
 
 echo "Aplicando perfil de instalación 'academia' (módulos)…"
 $WP eval "
@@ -57,13 +57,13 @@ fi
 if $WP user get "$INSTRUCTOR_LOGIN" --field=ID >/dev/null 2>&1; then
   INSTRUCTOR_ID=$($WP user get "$INSTRUCTOR_LOGIN" --field=ID)
 else
-  INSTRUCTOR_ID=$($WP user create "$INSTRUCTOR_LOGIN" "${INSTRUCTOR_LOGIN}@example.com" --role=author --user_pass="atora_lab_6265" --display_name="Docente Prueba" --porcelain)
+  INSTRUCTOR_ID=$($WP user create "$INSTRUCTOR_LOGIN" "${INSTRUCTOR_LOGIN}@example.com" --role=author --user_pass="atora_lab_6267" --display_name="Docente Prueba" --porcelain)
 fi
 
 if $WP user get "$ASSISTANT_LOGIN" --field=ID >/dev/null 2>&1; then
   ASSISTANT_ID=$($WP user get "$ASSISTANT_LOGIN" --field=ID)
 else
-  ASSISTANT_ID=$($WP user create "$ASSISTANT_LOGIN" "${ASSISTANT_LOGIN}@example.com" --role=subscriber --user_pass="atora_lab_6265" --display_name="Asistente Prueba" --porcelain)
+  ASSISTANT_ID=$($WP user create "$ASSISTANT_LOGIN" "${ASSISTANT_LOGIN}@example.com" --role=subscriber --user_pass="atora_lab_6267" --display_name="Asistente Prueba" --porcelain)
 fi
 
 STUDENT_ROLE=$($WP eval 'echo get_role("student") ? "student" : "subscriber";')
