@@ -5,7 +5,11 @@
 /dist/
 .phpunit.result.cache
 build-info.json
+.tmp/
 .atora-baseline/*
 !.atora-baseline/ROLLBACK.md
 !.atora-baseline/esquema-antes.txt
 .claude/settings.local.json
+__pycache__/
+*.pyc
+.pytest_cache/

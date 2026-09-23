@@ -1,6 +1,6 @@
 <?php
 /**
- * PHPUnit Bootstrap — ATORA LMS v6.26.2
+ * PHPUnit Bootstrap — ATORA LMS v6.26.7
  *
  * Usa Brain\Monkey para mockear funciones de WordPress sin necesitar
  * una instalación completa. Compatible con PHPUnit 10+ y PHP 8.1+.
@@ -28,7 +28,7 @@ require_once $autoload;
 
 // Definir constantes WP mínimas
 if ( ! defined( 'ABSPATH' ) )         { define( 'ABSPATH', '/tmp/wp/' ); }
-if ( ! defined( 'ATORA_LMS_VERSION' ) ) { define( 'ATORA_LMS_VERSION', '6.26.4' ); }
+if ( ! defined( 'ATORA_LMS_VERSION' ) ) { define( 'ATORA_LMS_VERSION', '6.26.7' ); }
 if ( ! defined( 'DAY_IN_SECONDS' ) )  { define( 'DAY_IN_SECONDS', 86400 ); }
 if ( ! defined( 'HOUR_IN_SECONDS' ) ) { define( 'HOUR_IN_SECONDS', 3600 ); }
 if ( ! defined( 'MINUTE_IN_SECONDS' ) ) { define( 'MINUTE_IN_SECONDS', 60 ); }

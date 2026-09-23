@@ -1,5 +1,13 @@
 # CHANGELOG — ATORA LMS
 
+## 6.26.7 (2026-09-22)
+
+### Hotfix Lab — estabilidad académica + QA
+
+- **FIX — Gradebook roster en modo `tables`**: el roster y las celdas de SpeedGrader vuelven a resolverse con identidad correcta aun si faltan metadatos legacy de matrícula.
+- **FIX — enlaces profundos SpeedGrader**: enlaces canónicos y cortos preservan `submission_id` y retorno sin ser absorbidos por redirecciones del catálogo.
+- **TEST — redirect `clms-cohorts`**: el test se ejecuta en un proceso PHP separado para evitar falsos positivos por `exit()` en `maybe_redirect()`.
+
 ## 6.26.5 (2026-09-21)
 
 ### SpeedGrader + Rúbricas — fiabilidad del dato y trazabilidad

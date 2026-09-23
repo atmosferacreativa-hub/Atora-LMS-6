@@ -10,6 +10,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+if ( class_exists( 'CLMS_SpeedGrade_Moderation_Policy', false ) ) {
+	return;
+}
+
 class CLMS_SpeedGrade_Moderation_Policy {
 
 	const TRANSITIONS = array(
