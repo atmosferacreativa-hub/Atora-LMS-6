@@ -9,6 +9,7 @@ declare( strict_types = 1 );
 
 namespace {
 	require_once __DIR__ . '/../../includes/grading/trait-grading-speedgrade.php';
+	require_once __DIR__ . '/../../includes/speedgrade/class-speedgrade-moderation-policy.php';
 
 	if ( ! function_exists( 'get_the_title' ) ) {
 		function get_the_title( $id ): string { return 'Rúbrica'; }
@@ -37,12 +38,6 @@ namespace {
 		// phpcs:ignore PSR1.Classes.ClassDeclaration.MultipleClasses
 		class CLMS_SpeedGrade_Actions {
 			public static function normalize_submit_action( $s ): string { return (string) $s; }
-		}
-	}
-	if ( ! class_exists( 'CLMS_SpeedGrade_Moderation_Policy' ) ) {
-		// phpcs:ignore PSR1.Classes.ClassDeclaration.MultipleClasses
-		class CLMS_SpeedGrade_Moderation_Policy {
-			public static function direct_publish_allowed( bool $institutional, string $status ): bool { return true; }
 		}
 	}
 }

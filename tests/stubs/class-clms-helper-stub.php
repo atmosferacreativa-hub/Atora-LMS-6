@@ -58,11 +58,35 @@ if ( ! function_exists( 'atora_test_reset_clms_helper_stub' ) ) {
 		$GLOBALS['__atora_test_course_enrollment']       = array();
 		$GLOBALS['__atora_test_enroll_should_succeed']   = true;
 		$GLOBALS['__atora_test_enroll_calls']            = array();
+
+		if ( class_exists( 'CLMS_Helper' ) && property_exists( 'CLMS_Helper', 'enrolled' ) ) {
+			CLMS_Helper::$enrolled  = array();
+			CLMS_Helper::$completed = array();
+		}
 	}
 }
 
 if ( ! class_exists( 'CLMS_Helper' ) ) {
 	final class CLMS_Helper {
+		/**
+		 * Estado legacy para rutas móviles (lista de wp_post_id por usuario).
+		 *
+		 * @var array<int, array<int>>
+		 */
+		public static array $enrolled = array(); // [user_id] => wp_course_post_ids
+
+		/**
+		 * Estado legacy de completitud (lista de wp_post_id por usuario).
+		 *
+		 * @var array<int, array<int>>
+		 */
+		public static array $completed = array(); // [user_id] => wp_course_post_ids
+
+		public static function get_user_enrolled_courses( $user_id ): array {
+			$user_id = (int) $user_id;
+			return (array) ( self::$enrolled[ $user_id ] ?? array() );
+		}
+
 		public static function user_can_manage_lms( $post_id = 0 ): bool {
 			unset( $post_id );
 			return ! empty( $GLOBALS['__atora_test_can_manage_course'] );
@@ -79,9 +103,22 @@ if ( ! class_exists( 'CLMS_Helper' ) ) {
 		public static function get_course_lessons( int $course_id ): array {
 			return $GLOBALS['__atora_test_course_lessons'][ $course_id ] ?? array();
 		}
+
 		public static function user_is_enrolled_in_course( int $user_id, int $course_id ): bool {
-			return ! empty( $GLOBALS['__atora_test_course_enrollment'][ $user_id . ':' . $course_id ] );
+			$key = $user_id . ':' . $course_id;
+			if ( array_key_exists( $key, (array) ( $GLOBALS['__atora_test_course_enrollment'] ?? array() ) ) ) {
+				return ! empty( $GLOBALS['__atora_test_course_enrollment'][ $key ] );
+			}
+
+			return in_array( $course_id, (array) ( self::$enrolled[ $user_id ] ?? array() ), true );
 		}
+
+		public static function is_course_completed( $user_id, $course_id ): bool {
+			$user_id   = (int) $user_id;
+			$course_id = (int) $course_id;
+			return in_array( $course_id, (array) ( self::$completed[ $user_id ] ?? array() ), true );
+		}
+
 		public static function enroll_user_in_course( int $user_id, int $course_id ): bool {
 			$GLOBALS['__atora_test_enroll_calls'][] = array( 'user_id' => $user_id, 'course_id' => $course_id );
 			$ok = array_key_exists( '__atora_test_enroll_should_succeed', $GLOBALS )
@@ -89,6 +126,10 @@ if ( ! class_exists( 'CLMS_Helper' ) ) {
 				: true;
 			if ( $ok ) {
 				$GLOBALS['__atora_test_course_enrollment'][ $user_id . ':' . $course_id ] = true;
+				self::$enrolled[ $user_id ] ??= array();
+				if ( ! in_array( $course_id, self::$enrolled[ $user_id ], true ) ) {
+					self::$enrolled[ $user_id ][] = $course_id;
+				}
 			}
 			return $ok;
 		}
