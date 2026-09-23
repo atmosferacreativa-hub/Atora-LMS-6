@@ -5,6 +5,7 @@
 /dist/
 .phpunit.result.cache
 build-info.json
+.tmp/
 .atora-baseline/*
 !.atora-baseline/ROLLBACK.md
 !.atora-baseline/esquema-antes.txt
