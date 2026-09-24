@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       ATORA LMS
  * Plugin URI:        https://atora.studio
- * Description:       LMS modular para WordPress con IA, evaluaciones, certificados, CRM, mensajería multi-canal, afiliados, live streaming y más. Autor: Atora Studio. Creado por Atmósfera Creativa.
+ * Description:       LMS modular para WordPress con IA, evaluaciones, certificados, CRM, mensajería multi-canal, afiliados, live streaming y más. Autor: Atora Studio.
  * Version:           6.26.7
  * Requires at least: 6.4
  * Requires PHP:      8.1
