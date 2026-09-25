@@ -450,6 +450,9 @@ final class ATORA_Mobile_REST_Controller {
 				$best_before,
 				$attempts_allowed
 			);
+			if ( is_wp_error( $result ) ) {
+				return $result;
+			}
 			return new WP_REST_Response( array( 'result' => $result ), 200 );
 		}
 		if ( ! class_exists( 'CLMS_Quiz' ) ) {
@@ -599,7 +602,7 @@ final class ATORA_Mobile_REST_Controller {
 		);
 	}
 
-	private static function grade_table_quiz( int $user_id, int $lesson_id, int $course_id, array $row, array $answers, int $attempt, int $best_before, int $attempts_allowed ): array {
+	private static function grade_table_quiz( int $user_id, int $lesson_id, int $course_id, array $row, array $answers, int $attempt, int $best_before, int $attempts_allowed ) {
 		$user_id   = absint( $user_id );
 		$lesson_id = absint( $lesson_id );
 		$course_id = absint( $course_id );
@@ -648,7 +651,10 @@ final class ATORA_Mobile_REST_Controller {
 
 		$pct = $total > 0 ? (int) round( min( 100, max( 0, ( $score / $total ) * 100 ) ) ) : 0;
 
-		self::persist_table_quiz_submission( $user_id, $lesson_id, $course_id, absint( $row['id'] ?? 0 ), $pct, $graded_answers );
+		$persist = self::persist_table_quiz_submission( $user_id, $lesson_id, $course_id, absint( $row['id'] ?? 0 ), $pct, $graded_answers );
+		if ( is_wp_error( $persist ) ) {
+			return $persist;
+		}
 		$best = max( $best_before, $pct );
 		$can_retry = $attempt < $attempts_allowed;
 
@@ -661,12 +667,12 @@ final class ATORA_Mobile_REST_Controller {
 		);
 	}
 
-	private static function persist_table_quiz_submission( int $user_id, int $lesson_id, int $course_id, int $quiz_id, int $pct, array $graded_answers ): void {
+	private static function persist_table_quiz_submission( int $user_id, int $lesson_id, int $course_id, int $quiz_id, int $pct, array $graded_answers ) {
 		global $wpdb;
 		$table = $wpdb->prefix . 'atora_quiz_submissions';
 		$exists = (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) );
 		if ( $exists !== $table ) {
-			return;
+			return new WP_Error( 'atora_mobile_quiz_persist_unavailable', __( 'No se pudo guardar la calificación (tabla no disponible).', 'atora-lms' ), array( 'status' => 503 ) );
 		}
 
 		$lesson = \ATORA\LMS\LMS_Course_Service::get_lesson( $lesson_id );
@@ -684,7 +690,7 @@ final class ATORA_Mobile_REST_Controller {
 			true
 		);
 		if ( is_wp_error( $submission_id ) || ! $submission_id ) {
-			return;
+			return new WP_Error( 'atora_mobile_quiz_persist_failed', __( 'No se pudo guardar la calificación (error al crear el submission).', 'atora-lms' ), array( 'status' => 500 ) );
 		}
 
 		update_post_meta( $submission_id, '_clms_submission_user_id', $user_id );
@@ -694,7 +700,7 @@ final class ATORA_Mobile_REST_Controller {
 		update_post_meta( $submission_id, '_clms_submission_grade', $pct );
 		update_post_meta( $submission_id, '_clms_submission_submitted_at', current_time( 'mysql' ) );
 
-		$wpdb->insert(
+		$ok = $wpdb->insert(
 			$table,
 			array(
 				'wp_post_id'    => absint( $submission_id ),
@@ -712,6 +718,10 @@ final class ATORA_Mobile_REST_Controller {
 			),
 			array( '%d','%d','%d','%d','%d','%d','%d','%s','%f','%s','%s','%s' )
 		);
+		if ( ! $ok ) {
+			return new WP_Error( 'atora_mobile_quiz_persist_failed', __( 'No se pudo guardar la calificación (error al persistir).', 'atora-lms' ), array( 'status' => 500 ) );
+		}
+		return true;
 	}
 
 	public static function complete_lesson( WP_REST_Request $request ) {
