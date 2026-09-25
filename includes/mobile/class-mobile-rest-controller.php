@@ -427,19 +427,10 @@ final class ATORA_Mobile_REST_Controller {
 				return $lock_key;
 			}
 
-				try {
-				// Test hook (solo entorno dev): permite simular sección crítica lenta para validar locks.
-				$debug_sleep = 0;
-				if ( defined( 'ATORA_DEV_MODE' ) && ATORA_DEV_MODE ) {
-					$debug_sleep = absint( $params['__debug_sleep_sec'] ?? 0 );
-				}
-				if ( $debug_sleep > 0 ) {
-					sleep( min( 120, $debug_sleep ) );
-				}
-
+			try {
 				$settings = json_decode( (string) ( $table_quiz_row['settings_json'] ?? '{}' ), true );
 				$settings = is_array( $settings ) ? $settings : array();
-					$time_limit_seconds = absint( $settings['time_limit_seconds'] ?? 0 );
+				$time_limit_seconds = absint( $settings['time_limit_seconds'] ?? 0 );
 					$attempts_allowed   = absint( $settings['attempts'] ?? 1 );
 					if ( $attempts_allowed <= 0 ) { $attempts_allowed = 1; }
 
