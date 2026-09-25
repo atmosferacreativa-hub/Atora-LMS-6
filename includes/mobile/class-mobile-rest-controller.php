@@ -764,9 +764,35 @@ final class ATORA_Mobile_REST_Controller {
 			array( '%d','%d','%d','%d','%d','%d','%d','%s','%f','%s','%s','%s' )
 		);
 		if ( ! $ok ) {
+			self::rollback_table_quiz_submission_post( absint( $submission_id ) );
 			return new WP_Error( 'atora_mobile_quiz_persist_failed', __( 'No se pudo guardar la calificación (error al persistir).', 'atora-lms' ), array( 'status' => 500 ) );
 		}
 		return true;
+	}
+
+	private static function rollback_table_quiz_submission_post( int $submission_id ): void {
+		if ( $submission_id <= 0 ) {
+			return;
+		}
+
+		// Limpieza defensiva: asegurar que no queda un submission "graded" huérfano.
+		$meta_keys = array(
+			'_clms_submission_user_id',
+			'_clms_submission_lesson_id',
+			'_clms_submission_course_id',
+			'_clms_submission_status',
+			'_clms_submission_grade',
+			'_clms_submission_submitted_at',
+		);
+		foreach ( $meta_keys as $key ) {
+			if ( function_exists( 'delete_post_meta' ) ) {
+				delete_post_meta( $submission_id, (string) $key );
+			}
+		}
+
+		if ( function_exists( 'wp_delete_post' ) ) {
+			wp_delete_post( $submission_id, true );
+		}
 	}
 
 	public static function complete_lesson( WP_REST_Request $request ) {

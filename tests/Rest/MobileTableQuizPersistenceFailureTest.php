@@ -117,6 +117,8 @@ namespace ATORA\Tests\Rest {
 			atora_test_reset_post_types();
 			atora_test_set_post_type( 5001, 'lm_lesson' );
 			atora_test_reset_transients();
+			atora_test_reset_deleted_posts();
+			atora_test_reset_post_meta();
 		}
 
 		public function test_submit_quiz_returns_error_when_wp_insert_post_fails(): void {
@@ -151,6 +153,9 @@ namespace ATORA\Tests\Rest {
 			$result = \ATORA_Mobile_REST_Controller::submit_quiz( $req );
 			$this->assertTrue( is_wp_error( $result ) );
 			$this->assertSame( 'atora_mobile_quiz_persist_failed', $result->get_error_code() );
+
+			$this->assertSame( array( 12345 ), array_values( (array) ( $GLOBALS['__atora_test_deleted_posts'] ?? array() ) ) );
+			$this->assertSame( '', (string) get_post_meta( 12345, '_clms_submission_status', true ) );
 		}
 	}
 }

@@ -412,6 +412,19 @@ if ( ! function_exists( 'delete_post_meta' ) ) {
 if ( ! function_exists( 'atora_test_reset_post_meta' ) ) {
 	function atora_test_reset_post_meta(): void { $GLOBALS['__atora_test_post_meta'] = array(); }
 }
+
+$GLOBALS['__atora_test_deleted_posts'] = array();
+if ( ! function_exists( 'wp_delete_post' ) ) {
+	function wp_delete_post( int $post_id, bool $force_delete = false ) {
+		$GLOBALS['__atora_test_deleted_posts'][] = $post_id;
+		unset( $GLOBALS['__atora_test_posts'][ $post_id ] );
+		unset( $GLOBALS['__atora_test_post_meta'][ $post_id ] );
+		return true;
+	}
+}
+if ( ! function_exists( 'atora_test_reset_deleted_posts' ) ) {
+	function atora_test_reset_deleted_posts(): void { $GLOBALS['__atora_test_deleted_posts'] = array(); }
+}
 if ( ! function_exists( 'atora_test_set_user_cap' ) ) {
 	function atora_test_set_user_cap( int $user_id, string $capability, bool $has = true ): void {
 		$GLOBALS['__atora_test_user_caps'][ $user_id ][ $capability ] = $has;
