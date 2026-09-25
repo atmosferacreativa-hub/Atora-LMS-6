@@ -32,6 +32,7 @@ namespace ATORA\Tests\Rest {
 		public string $usermeta = 'wp_usermeta';
 		public int $insert_id = 123;
 		public bool $fail_insert = false;
+		public int $insert_count = 0;
 
 		public function prepare( string $sql, ...$args ): string {
 			$i = 0;
@@ -102,6 +103,7 @@ namespace ATORA\Tests\Rest {
 			if ( $this->fail_insert ) {
 				return 0;
 			}
+			$this->insert_count++;
 			$this->insert_id++;
 			return 1;
 		}
@@ -157,6 +159,38 @@ namespace ATORA\Tests\Rest {
 
 			$this->assertSame( array( 12345 ), array_values( (array) ( $GLOBALS['__atora_test_deleted_posts'] ?? array() ) ) );
 			$this->assertSame( '', (string) get_post_meta( 12345, '_clms_submission_status', true ) );
+		}
+
+		public function test_retry_after_persist_failure_creates_a_single_final_attempt(): void {
+			global $wpdb;
+			$wpdb->fail_insert = true;
+
+			$req_quiz = new \WP_REST_Request( array( 'lesson_id' => 12 ) );
+			$response = \ATORA_Mobile_REST_Controller::quiz( $req_quiz );
+			$this->assertFalse( is_wp_error( $response ) );
+			$quiz  = (array) $response->get_data();
+			$token = (string) ( ( $quiz['quiz']['token'] ?? '' ) ?: '' );
+			$this->assertNotSame( '', $token );
+
+			$req = new \WP_REST_Request( array( 'lesson_id' => 12, 'answers' => array( '4' ), 'token' => $token ) );
+			$result = \ATORA_Mobile_REST_Controller::submit_quiz( $req );
+			$this->assertTrue( is_wp_error( $result ) );
+			$this->assertSame( 'atora_mobile_quiz_persist_failed', $result->get_error_code() );
+			$this->assertSame( 0, (int) $wpdb->insert_count );
+			$this->assertSame( array( 12345 ), array_values( (array) ( $GLOBALS['__atora_test_deleted_posts'] ?? array() ) ) );
+			$this->assertSame( '', (string) get_post_meta( 12345, '_clms_submission_status', true ) );
+
+			// New GET issues a fresh transient and allows retry.
+			$wpdb->fail_insert = false;
+			atora_test_reset_transients();
+			$response2 = \ATORA_Mobile_REST_Controller::quiz( new \WP_REST_Request( array( 'lesson_id' => 12 ) ) );
+			$this->assertFalse( is_wp_error( $response2 ) );
+			$quiz2  = (array) $response2->get_data();
+			$token2 = (string) ( ( $quiz2['quiz']['token'] ?? '' ) ?: '' );
+			$this->assertNotSame( '', $token2 );
+			$result2 = \ATORA_Mobile_REST_Controller::submit_quiz( new \WP_REST_Request( array( 'lesson_id' => 12, 'answers' => array( '4' ), 'token' => $token2 ) ) );
+			$this->assertFalse( is_wp_error( $result2 ) );
+			$this->assertSame( 1, (int) $wpdb->insert_count );
 		}
 	}
 }
