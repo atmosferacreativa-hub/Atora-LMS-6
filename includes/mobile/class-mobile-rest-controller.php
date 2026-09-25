@@ -560,14 +560,46 @@ final class ATORA_Mobile_REST_Controller {
 		$best_score = isset( $stats['best_score'] ) ? absint( $stats['best_score'] ) : null;
 		$attempts_used = absint( $stats['attempts_used'] ?? 0 );
 		$can_submit = $attempts_used < $attempts;
-		$token = $can_submit ? self::issue_table_quiz_token( absint( $user_id ), $lesson_id ) : '';
+		$token = '';
+		$token_issued_at = 0;
+		$remaining_seconds = $time_limit > 0 ? $time_limit : 0;
+		if ( $can_submit ) {
+			$stored = get_transient( self::table_quiz_token_key( $user_id, $lesson_id ) );
+			if ( is_array( $stored ) ) {
+				$token          = (string) ( $stored['token'] ?? '' );
+				$token_issued_at = absint( $stored['issued_at'] ?? 0 );
+			} elseif ( is_string( $stored ) ) {
+				$token = (string) $stored;
+			}
+
+			if ( '' === $token ) {
+				$token = self::issue_table_quiz_token( absint( $user_id ), $lesson_id );
+				$token_issued_at = time();
+			} elseif ( $time_limit > 0 && $token_issued_at <= 0 ) {
+				// Normaliza transients legacy (token sin timestamp) para que el límite sea verificable.
+				$token_issued_at = time();
+				set_transient(
+					self::table_quiz_token_key( $user_id, $lesson_id ),
+					array( 'token' => (string) $token, 'issued_at' => $token_issued_at ),
+					HOUR_IN_SECONDS
+				);
+			}
+
+			if ( $time_limit > 0 && $token_issued_at > 0 ) {
+				$elapsed = time() - $token_issued_at;
+				$remaining_seconds = max( 0, $time_limit - max( 0, (int) $elapsed ) );
+			} else {
+				$remaining_seconds = $time_limit > 0 ? $time_limit : 0;
+			}
+		}
 
 		return array(
 			'lesson_id'         => $lesson_id,
 			'token'             => $token,
 			'questions'         => $public_questions,
 			'can_submit'        => $can_submit,
-			'remaining_seconds' => $time_limit > 0 ? $time_limit : 0,
+			'remaining_seconds' => $remaining_seconds,
+			'token_issued_at'   => $token_issued_at,
 			'attempts'          => $attempts,
 			'best_score'        => $best_score,
 			'retry_context'     => (object) array( 'source' => 'atora_table' ),

@@ -170,6 +170,42 @@ namespace ATORA\Tests\Rest {
 			$this->assertFalse( isset( $GLOBALS['__atora_test_transients'][ $key ] ) );
 		}
 
+		public function test_quiz_get_does_not_reset_time_window(): void {
+			$req_quiz = new \WP_REST_Request( array( 'lesson_id' => 12 ) );
+			$response = \ATORA_Mobile_REST_Controller::quiz( $req_quiz );
+			$this->assertFalse( is_wp_error( $response ) );
+			$quiz = (array) $response->get_data();
+			$token = (string) ( ( $quiz['quiz']['token'] ?? '' ) ?: '' );
+			$this->assertNotSame( '', $token );
+
+			$key = 'atora_table_quiz_token_10_12';
+			$GLOBALS['__atora_test_transients'][ $key ] = array( 'token' => $token, 'issued_at' => time() - 1 );
+
+			$response2 = \ATORA_Mobile_REST_Controller::quiz( $req_quiz );
+			$this->assertFalse( is_wp_error( $response2 ) );
+			$quiz2 = (array) $response2->get_data();
+			$this->assertSame( $token, (string) ( $quiz2['quiz']['token'] ?? '' ) );
+			$this->assertLessThanOrEqual( 1, (int) ( $quiz2['quiz']['remaining_seconds'] ?? 999 ) );
+		}
+
+		public function test_quiz_get_does_not_renew_after_expiry(): void {
+			$req_quiz = new \WP_REST_Request( array( 'lesson_id' => 12 ) );
+			$response = \ATORA_Mobile_REST_Controller::quiz( $req_quiz );
+			$this->assertFalse( is_wp_error( $response ) );
+			$quiz = (array) $response->get_data();
+			$token = (string) ( ( $quiz['quiz']['token'] ?? '' ) ?: '' );
+			$this->assertNotSame( '', $token );
+
+			$key = 'atora_table_quiz_token_10_12';
+			$GLOBALS['__atora_test_transients'][ $key ] = array( 'token' => $token, 'issued_at' => time() - 999 );
+
+			$response2 = \ATORA_Mobile_REST_Controller::quiz( $req_quiz );
+			$this->assertFalse( is_wp_error( $response2 ) );
+			$quiz2 = (array) $response2->get_data();
+			$this->assertSame( $token, (string) ( $quiz2['quiz']['token'] ?? '' ) );
+			$this->assertSame( 0, (int) ( $quiz2['quiz']['remaining_seconds'] ?? -1 ) );
+		}
+
 		public function test_submit_quiz_allows_within_time_limit(): void {
 			$req_quiz = new \WP_REST_Request( array( 'lesson_id' => 12 ) );
 			$response = \ATORA_Mobile_REST_Controller::quiz( $req_quiz );
