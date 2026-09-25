@@ -422,14 +422,23 @@ final class ATORA_Mobile_REST_Controller {
 			$lesson_id = absint( $context['lesson_id'] );
 			$course_id = absint( $context['course_id'] );
 
-			$lock_owner = self::acquire_table_quiz_lock( $user_id, $lesson_id );
-			if ( is_wp_error( $lock_owner ) ) {
-				return $lock_owner;
+			$lock_key = self::acquire_table_quiz_lock( $user_id, $lesson_id );
+			if ( is_wp_error( $lock_key ) ) {
+				return $lock_key;
 			}
 
 				try {
-					$settings = json_decode( (string) ( $table_quiz_row['settings_json'] ?? '{}' ), true );
-					$settings = is_array( $settings ) ? $settings : array();
+				// Test hook (solo entorno dev): permite simular sección crítica lenta para validar locks.
+				$debug_sleep = 0;
+				if ( defined( 'ATORA_DEV_MODE' ) && ATORA_DEV_MODE ) {
+					$debug_sleep = absint( $params['__debug_sleep_sec'] ?? 0 );
+				}
+				if ( $debug_sleep > 0 ) {
+					sleep( min( 120, $debug_sleep ) );
+				}
+
+				$settings = json_decode( (string) ( $table_quiz_row['settings_json'] ?? '{}' ), true );
+				$settings = is_array( $settings ) ? $settings : array();
 					$time_limit_seconds = absint( $settings['time_limit_seconds'] ?? 0 );
 					$attempts_allowed   = absint( $settings['attempts'] ?? 1 );
 					if ( $attempts_allowed <= 0 ) { $attempts_allowed = 1; }
@@ -466,7 +475,7 @@ final class ATORA_Mobile_REST_Controller {
 				}
 				return new WP_REST_Response( array( 'result' => $result ), 200 );
 			} finally {
-				self::release_table_quiz_lock( $user_id, $lesson_id, (string) $lock_owner );
+				self::release_table_quiz_lock( (string) $lock_key );
 			}
 		}
 		if ( ! class_exists( 'CLMS_Quiz' ) ) {
@@ -574,66 +583,28 @@ final class ATORA_Mobile_REST_Controller {
 	}
 
 	private static function acquire_table_quiz_lock( int $user_id, int $lesson_id ) {
-		$lock_key = self::table_quiz_lock_key( $user_id, $lesson_id );
-		$now      = time();
-		$ttl      = 30;
-
-		if ( ! ( function_exists( 'add_option' ) && function_exists( 'get_option' ) && function_exists( 'delete_option' ) ) ) {
+		global $wpdb;
+		if ( ! isset( $wpdb ) || ! method_exists( $wpdb, 'get_var' ) || ! method_exists( $wpdb, 'prepare' ) ) {
 			return new WP_Error( 'atora_mobile_quiz_lock_unavailable', __( 'No se puede procesar la evaluación (lock no disponible).', 'atora-lms' ), array( 'status' => 503 ) );
 		}
-
-		$owner = function_exists( 'wp_generate_uuid4' ) ? wp_generate_uuid4() : wp_generate_password( 32, false );
-		$value = $owner . '|' . $now;
-		if ( add_option( $lock_key, $value, '', 'no' ) ) {
-			return $owner;
+		$lock_key = self::table_quiz_lock_key( $user_id, $lesson_id );
+		$got      = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 0)', $lock_key ) );
+		if ( 1 === (int) $got ) {
+			return $lock_key;
 		}
-
-		$existing_raw = (string) get_option( $lock_key, '' );
-		$existing     = self::parse_table_quiz_lock( $existing_raw );
-		if ( $existing['ts'] > 0 && ( $now - $existing['ts'] ) > $ttl ) {
-			global $wpdb;
-			if ( isset( $wpdb ) && isset( $wpdb->options ) ) {
-				$updated = (int) $wpdb->query(
-					$wpdb->prepare(
-						"UPDATE {$wpdb->options} SET option_value = %s WHERE option_name = %s AND option_value = %s",
-						$value,
-						$lock_key,
-						$existing_raw
-					)
-				);
-				if ( $updated > 0 ) {
-					return $owner;
-				}
-			}
-		}
-
 		return new WP_Error( 'atora_mobile_quiz_submission_locked', __( 'Tu evaluación ya se está procesando.', 'atora-lms' ), array( 'status' => 429 ) );
 	}
 
-	private static function release_table_quiz_lock( int $user_id, int $lesson_id, string $owner ): void {
-		$lock_key = self::table_quiz_lock_key( $user_id, $lesson_id );
-		if ( ! ( function_exists( 'get_option' ) && function_exists( 'delete_option' ) ) ) {
+	private static function release_table_quiz_lock( string $lock_key ): void {
+		$lock_key = trim( (string) $lock_key );
+		if ( '' === $lock_key ) {
 			return;
 		}
-		$existing = self::parse_table_quiz_lock( (string) get_option( $lock_key, '' ) );
-		if ( '' !== $owner && $owner === (string) $existing['owner'] ) {
-			delete_option( $lock_key );
+		global $wpdb;
+		if ( ! isset( $wpdb ) || ! method_exists( $wpdb, 'get_var' ) || ! method_exists( $wpdb, 'prepare' ) ) {
+			return;
 		}
-	}
-
-	private static function parse_table_quiz_lock( string $value ): array {
-		$value = trim( (string) $value );
-		if ( '' === $value ) {
-			return array( 'owner' => '', 'ts' => 0 );
-		}
-		$parts = explode( '|', $value );
-		if ( count( $parts ) < 2 ) {
-			return array( 'owner' => '', 'ts' => absint( $value ) );
-		}
-		return array(
-			'owner' => (string) $parts[0],
-			'ts'    => absint( $parts[1] ),
-		);
+		$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock_key ) );
 	}
 
 	private static function issue_table_quiz_token( int $user_id, int $lesson_id ): string {

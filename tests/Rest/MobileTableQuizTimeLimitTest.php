@@ -23,12 +23,18 @@ namespace ATORA\Tests\Rest {
 	require_once __DIR__ . '/../../includes/mobile/class-mobile-rest-controller.php';
 
 	final class TimeLimitWpdb {
+		public static array $advisory_locks = array();
+		public string $connection_id;
 		public string $prefix = 'wp_';
 		public string $posts = 'wp_posts';
 		public string $postmeta = 'wp_postmeta';
 		public string $usermeta = 'wp_usermeta';
 		public int $insert_id = 99;
 		public int $insert_count = 0;
+
+		public function __construct( string $connection_id = 'conn' ) {
+			$this->connection_id = $connection_id;
+		}
 
 		public function prepare( string $sql, ...$args ): string {
 			$i = 0;
@@ -42,6 +48,30 @@ namespace ATORA\Tests\Rest {
 		}
 
 		public function get_var( $sql ) {
+			if ( is_string( $sql ) && str_contains( $sql, 'GET_LOCK(' ) ) {
+				preg_match( '/GET_LOCK\(([^,]+),/i', $sql, $m );
+				$lock_key = trim( (string) ( $m[1] ?? '' ), " \t\n\r\0\x0B'\"" );
+				if ( '' === $lock_key ) {
+					return 0;
+				}
+				if ( ! isset( self::$advisory_locks[ $lock_key ] ) ) {
+					self::$advisory_locks[ $lock_key ] = $this->connection_id;
+					return 1;
+				}
+				return 0;
+			}
+			if ( is_string( $sql ) && str_contains( $sql, 'RELEASE_LOCK(' ) ) {
+				preg_match( '/RELEASE_LOCK\(([^\)]+)\)/i', $sql, $m );
+				$lock_key = trim( (string) ( $m[1] ?? '' ), " \t\n\r\0\x0B'\"" );
+				if ( '' === $lock_key ) {
+					return 0;
+				}
+				if ( isset( self::$advisory_locks[ $lock_key ] ) && self::$advisory_locks[ $lock_key ] === $this->connection_id ) {
+					unset( self::$advisory_locks[ $lock_key ] );
+					return 1;
+				}
+				return 0;
+			}
 			if ( is_string( $sql ) && str_contains( $sql, 'SHOW TABLES LIKE' ) ) {
 				if ( str_contains( $sql, 'atora\\_quizzes' ) || str_contains( $sql, 'atora_quizzes' ) ) {
 					return 'wp_atora_quizzes';
@@ -106,10 +136,11 @@ namespace ATORA\Tests\Rest {
 	}
 
 	final class MobileTableQuizTimeLimitTest extends TestCase {
-		protected function setUp(): void {
+	protected function setUp(): void {
 			parent::setUp();
-			global $wpdb;
-			$wpdb = new TimeLimitWpdb();
+		global $wpdb;
+		TimeLimitWpdb::$advisory_locks = array();
+		$wpdb = new TimeLimitWpdb( 'conn-a' );
 			$GLOBALS['__atora_test_current_user_id'] = 10;
 			atora_test_set_drip_available( true );
 			atora_test_reset_post_types();

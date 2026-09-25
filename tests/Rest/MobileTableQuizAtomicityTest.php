@@ -18,11 +18,17 @@ namespace ATORA\Tests\Rest {
 	require_once __DIR__ . '/../../includes/mobile/class-mobile-rest-controller.php';
 
 	final class AtomicityWpdb {
+		public static array $advisory_locks = array();
+		public string $connection_id;
 		public string $prefix = 'wp_';
 		public string $posts = 'wp_posts';
 		public string $postmeta = 'wp_postmeta';
 		public string $usermeta = 'wp_usermeta';
 		public int $insert_id = 200;
+
+		public function __construct( string $connection_id = 'conn' ) {
+			$this->connection_id = $connection_id;
+		}
 
 		public function prepare( string $sql, ...$args ): string {
 			$i = 0;
@@ -36,6 +42,30 @@ namespace ATORA\Tests\Rest {
 		}
 
 		public function get_var( $sql ) {
+			if ( is_string( $sql ) && str_contains( $sql, 'GET_LOCK(' ) ) {
+				preg_match( '/GET_LOCK\(([^,]+),/i', $sql, $m );
+				$lock_key = trim( (string) ( $m[1] ?? '' ), " \t\n\r\0\x0B'\"" );
+				if ( '' === $lock_key ) {
+					return 0;
+				}
+				if ( ! isset( self::$advisory_locks[ $lock_key ] ) ) {
+					self::$advisory_locks[ $lock_key ] = $this->connection_id;
+					return 1;
+				}
+				return 0;
+			}
+			if ( is_string( $sql ) && str_contains( $sql, 'RELEASE_LOCK(' ) ) {
+				preg_match( '/RELEASE_LOCK\(([^\)]+)\)/i', $sql, $m );
+				$lock_key = trim( (string) ( $m[1] ?? '' ), " \t\n\r\0\x0B'\"" );
+				if ( '' === $lock_key ) {
+					return 0;
+				}
+				if ( isset( self::$advisory_locks[ $lock_key ] ) && self::$advisory_locks[ $lock_key ] === $this->connection_id ) {
+					unset( self::$advisory_locks[ $lock_key ] );
+					return 1;
+				}
+				return 0;
+			}
 			if ( is_string( $sql ) && str_contains( $sql, 'SHOW TABLES LIKE' ) ) {
 				if ( str_contains( $sql, 'atora\\_quizzes' ) || str_contains( $sql, 'atora_quizzes' ) ) {
 					return 'wp_atora_quizzes';
@@ -86,41 +116,52 @@ namespace ATORA\Tests\Rest {
 	}
 
 	final class MobileTableQuizAtomicityTest extends TestCase {
-		protected function setUp(): void {
+	protected function setUp(): void {
 			parent::setUp();
-			global $wpdb;
-			$wpdb = new AtomicityWpdb();
+		global $wpdb;
+		AtomicityWpdb::$advisory_locks = array();
+		$wpdb = new AtomicityWpdb( 'conn-a' );
 			$GLOBALS['__atora_test_current_user_id'] = 10;
 			atora_test_set_drip_available( true );
 			atora_test_reset_post_types();
 			atora_test_set_post_type( 5001, 'lm_lesson' );
 			atora_test_reset_transients();
 			atora_test_reset_options();
-		}
+	}
 
-		public function test_submit_quiz_denies_when_lock_is_held(): void {
-			// Create a lock entry as if another request is in-flight.
-			add_option( 'atora_table_quiz_lock_10_12', 'other|' . (string) time(), '', 'no' );
+	public function test_submit_quiz_denies_when_lock_is_held(): void {
+		global $wpdb;
+		$ref = new \ReflectionClass( \ATORA_Mobile_REST_Controller::class );
+		$m   = $ref->getMethod( 'acquire_table_quiz_lock' );
+		$m->setAccessible( true );
+		$m->invokeArgs( null, array( 10, 12 ) );
 
-			$req = new \WP_REST_Request( array( 'lesson_id' => 12, 'answers' => array( '4' ), 'token' => 'anything' ) );
-			$result = \ATORA_Mobile_REST_Controller::submit_quiz( $req );
-			$this->assertTrue( is_wp_error( $result ) );
-			$this->assertSame( 'atora_mobile_quiz_submission_locked', $result->get_error_code() );
-		}
+		$wpdb = new AtomicityWpdb( 'conn-b' );
 
-		public function test_lock_release_does_not_delete_other_owners_lock(): void {
-			add_option( 'atora_table_quiz_lock_10_12', 'owner-a|' . (string) time(), '', 'no' );
+		$req = new \WP_REST_Request( array( 'lesson_id' => 12, 'answers' => array( '4' ), 'token' => 'anything' ) );
+		$result = \ATORA_Mobile_REST_Controller::submit_quiz( $req );
+		$this->assertTrue( is_wp_error( $result ) );
+		$this->assertSame( 'atora_mobile_quiz_submission_locked', $result->get_error_code() );
+	}
 
-			$ref = new \ReflectionClass( \ATORA_Mobile_REST_Controller::class );
-			$m   = $ref->getMethod( 'release_table_quiz_lock' );
-			$m->setAccessible( true );
-			$m->invokeArgs( null, array( 10, 12, 'owner-b' ) );
+	public function test_lock_release_does_not_delete_other_owners_lock(): void {
+		global $wpdb;
+		$ref = new \ReflectionClass( \ATORA_Mobile_REST_Controller::class );
+		$acquire = $ref->getMethod( 'acquire_table_quiz_lock' );
+		$acquire->setAccessible( true );
+		$lock_key = (string) $acquire->invokeArgs( null, array( 10, 12 ) );
+		$this->assertNotSame( '', $lock_key );
 
-			$this->assertNotSame( '', (string) get_option( 'atora_table_quiz_lock_10_12', '' ) );
-			$req = new \WP_REST_Request( array( 'lesson_id' => 12, 'answers' => array( '4' ), 'token' => 'anything' ) );
-			$result = \ATORA_Mobile_REST_Controller::submit_quiz( $req );
-			$this->assertTrue( is_wp_error( $result ) );
-			$this->assertSame( 'atora_mobile_quiz_submission_locked', $result->get_error_code() );
-		}
+		$wpdb = new AtomicityWpdb( 'conn-b' );
+
+		$m = $ref->getMethod( 'release_table_quiz_lock' );
+		$m->setAccessible( true );
+		$m->invokeArgs( null, array( $lock_key ) );
+
+		$req = new \WP_REST_Request( array( 'lesson_id' => 12, 'answers' => array( '4' ), 'token' => 'anything' ) );
+		$result = \ATORA_Mobile_REST_Controller::submit_quiz( $req );
+		$this->assertTrue( is_wp_error( $result ) );
+		$this->assertSame( 'atora_mobile_quiz_submission_locked', $result->get_error_code() );
+	}
 	}
 }
