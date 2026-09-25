@@ -564,7 +564,7 @@ final class ATORA_Mobile_REST_Controller {
 			}
 
 			if ( '' === $token ) {
-				$token = self::issue_table_quiz_token( absint( $user_id ), $lesson_id );
+				$token = self::issue_table_quiz_token( absint( $user_id ), $lesson_id, $time_limit );
 				$token_issued_at = time();
 			} elseif ( $time_limit > 0 && $token_issued_at <= 0 ) {
 				// Normaliza transients legacy (token sin timestamp) para que el límite sea verificable.
@@ -572,7 +572,7 @@ final class ATORA_Mobile_REST_Controller {
 				set_transient(
 					self::table_quiz_token_key( $user_id, $lesson_id ),
 					array( 'token' => (string) $token, 'issued_at' => $token_issued_at ),
-					HOUR_IN_SECONDS
+					max( HOUR_IN_SECONDS, $time_limit + HOUR_IN_SECONDS )
 				);
 			}
 
@@ -630,7 +630,7 @@ final class ATORA_Mobile_REST_Controller {
 		$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock_key ) );
 	}
 
-	private static function issue_table_quiz_token( int $user_id, int $lesson_id ): string {
+	private static function issue_table_quiz_token( int $user_id, int $lesson_id, int $time_limit_seconds = 0 ): string {
 		$token = function_exists( 'wp_generate_password' )
 			? wp_generate_password( 20, false )
 			: substr( sha1( (string) ( microtime( true ) . rand() ) ), 0, 20 );
@@ -640,7 +640,7 @@ final class ATORA_Mobile_REST_Controller {
 				'token'     => (string) $token,
 				'issued_at' => time(),
 			),
-			HOUR_IN_SECONDS
+			max( HOUR_IN_SECONDS, $time_limit_seconds + HOUR_IN_SECONDS )
 		);
 		return (string) $token;
 	}
@@ -661,7 +661,7 @@ final class ATORA_Mobile_REST_Controller {
 			return false;
 		}
 		if ( $time_limit_seconds > 0 && $issued_at > 0 ) {
-			if ( ( time() - $issued_at ) > $time_limit_seconds ) {
+			if ( ( time() - $issued_at ) >= $time_limit_seconds ) {
 				delete_transient( self::table_quiz_token_key( $user_id, $lesson_id ) );
 				return new WP_Error( 'atora_mobile_quiz_time_expired', __( 'Se agotó el tiempo de la evaluación. Vuelve a abrirla para reintentar.', 'atora-lms' ), array( 'status' => 409 ) );
 			}

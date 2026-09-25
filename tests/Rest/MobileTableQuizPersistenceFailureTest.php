@@ -3,6 +3,15 @@
 declare( strict_types = 1 );
 
 namespace {
+	// Keep this stub local to the file-isolated quiz tests. The H5P security
+	// suite uses Patchwork to intercept wp_delete_post() in its own process.
+	if ( ! function_exists( 'wp_delete_post' ) ) {
+		function wp_delete_post( int $post_id, bool $force_delete = false ) {
+			$GLOBALS['__atora_test_deleted_posts'][] = $post_id;
+			unset( $GLOBALS['__atora_test_posts'][ $post_id ], $GLOBALS['__atora_test_post_meta'][ $post_id ] );
+			return true;
+		}
+	}
 	if ( ! function_exists( 'wp_insert_post' ) ) {
 		function wp_insert_post( array $postarr, $wp_error = false ) {
 			if ( ! empty( $GLOBALS['__atora_test_wp_insert_post_fail'] ) ) {

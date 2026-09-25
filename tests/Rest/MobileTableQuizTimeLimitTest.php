@@ -99,7 +99,7 @@ namespace ATORA\Tests\Rest {
 					'lesson_id'     => 12,
 					'course_id'     => 29,
 					'questions_json'=> json_encode( array( array( 'id' => 1, 'type' => 'single', 'question' => '2+2', 'options' => array( '4' ), 'answer' => '4', 'weight' => 1 ) ) ),
-					'settings_json' => json_encode( array( 'attempts' => 2, 'time_limit_seconds' => 2 ) ),
+					'settings_json' => json_encode( array( 'attempts' => 2, 'time_limit_seconds' => (int) ( $GLOBALS['__atora_time_limit_seconds'] ?? 2 ) ) ),
 				);
 			}
 			if ( str_contains( $sql, 'COUNT(*) AS attempts_used' ) ) {
@@ -152,6 +152,7 @@ namespace ATORA\Tests\Rest {
 		atora_test_reset_transients();
 		atora_test_reset_options();
 			$GLOBALS['__atora_time_limit_attempts_used'] = 0;
+			$GLOBALS['__atora_time_limit_seconds'] = 2;
 		}
 
 		public function test_submit_quiz_denies_when_time_limit_expired(): void {
@@ -208,6 +209,37 @@ namespace ATORA\Tests\Rest {
 			$quiz2 = (array) $response2->get_data();
 			$this->assertSame( $token, (string) ( $quiz2['quiz']['token'] ?? '' ) );
 			$this->assertSame( 0, (int) ( $quiz2['quiz']['remaining_seconds'] ?? -1 ) );
+		}
+
+		public function test_token_outlives_a_quiz_limit_longer_than_one_hour(): void {
+			$GLOBALS['__atora_time_limit_seconds'] = 7200;
+			$quiz = \ATORA_Mobile_REST_Controller::quiz( new \WP_REST_Request( array( 'lesson_id' => 12 ) ) );
+			$this->assertFalse( is_wp_error( $quiz ) );
+			$key = 'atora_table_quiz_token_10_12';
+			$this->assertGreaterThan( 7200, (int) ( $GLOBALS['__atora_test_transient_expirations'][ $key ] ?? 0 ) );
+		}
+
+		public function test_submit_quiz_denies_at_exact_time_boundary_and_allows_new_get(): void {
+			$req_quiz = new \WP_REST_Request( array( 'lesson_id' => 12 ) );
+			$response = \ATORA_Mobile_REST_Controller::quiz( $req_quiz );
+			$this->assertFalse( is_wp_error( $response ) );
+			$quiz = (array) $response->get_data();
+			$token = (string) ( $quiz['quiz']['token'] ?? '' );
+			$this->assertNotSame( '', $token );
+
+			$key = 'atora_table_quiz_token_10_12';
+			$GLOBALS['__atora_test_transients'][ $key ] = array( 'token' => $token, 'issued_at' => time() - 2 );
+			$expired = \ATORA_Mobile_REST_Controller::quiz( $req_quiz );
+			$this->assertSame( 0, (int) ( $expired->get_data()['quiz']['remaining_seconds'] ?? -1 ) );
+
+			$result = \ATORA_Mobile_REST_Controller::submit_quiz( new \WP_REST_Request( array( 'lesson_id' => 12, 'answers' => array( '4' ), 'token' => $token ) ) );
+			$this->assertTrue( is_wp_error( $result ) );
+			$this->assertSame( 'atora_mobile_quiz_time_expired', $result->get_error_code() );
+			$this->assertFalse( isset( $GLOBALS['__atora_test_transients'][ $key ] ) );
+
+			$retry = \ATORA_Mobile_REST_Controller::quiz( $req_quiz );
+			$this->assertFalse( is_wp_error( $retry ) );
+			$this->assertNotSame( '', (string) ( $retry->get_data()['quiz']['token'] ?? '' ) );
 		}
 
 		public function test_submit_quiz_allows_within_time_limit(): void {

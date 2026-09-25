@@ -94,16 +94,6 @@ if ( ! function_exists( 'current_time' ) ) {
 	}
 }
 
-// wp_insert_post() se usa para persistir submissions del LMS.
-// En tests unitarios lo stubeamos para poder forzar fallos y verificar rollback.
-if ( ! function_exists( 'wp_insert_post' ) ) {
-	function wp_insert_post( array $postarr, $wp_error = false ) {
-		if ( ! empty( $GLOBALS['__atora_test_wp_insert_post_fail'] ) ) {
-			return new \WP_Error( 'wp_insert_post_failed', 'forced failure' );
-		}
-		return absint( $GLOBALS['__atora_test_wp_insert_post_id'] ?? 10001 );
-	}
-}
 if ( ! function_exists( 'wp_date' ) ) {
 	function wp_date( string $format, $timestamp = null, $timezone = null ): string {
 		$ts = null === $timestamp ? time() : ( is_numeric( $timestamp ) ? (int) $timestamp : strtotime( (string) $timestamp ) );
@@ -432,14 +422,6 @@ if ( ! function_exists( 'atora_test_reset_post_meta' ) ) {
 }
 
 $GLOBALS['__atora_test_deleted_posts'] = array();
-if ( ! function_exists( 'wp_delete_post' ) ) {
-	function wp_delete_post( int $post_id, bool $force_delete = false ) {
-		$GLOBALS['__atora_test_deleted_posts'][] = $post_id;
-		unset( $GLOBALS['__atora_test_posts'][ $post_id ] );
-		unset( $GLOBALS['__atora_test_post_meta'][ $post_id ] );
-		return true;
-	}
-}
 if ( ! function_exists( 'atora_test_reset_deleted_posts' ) ) {
 	function atora_test_reset_deleted_posts(): void { $GLOBALS['__atora_test_deleted_posts'] = array(); }
 }
@@ -566,20 +548,22 @@ if ( ! function_exists( 'wp_hash' ) )  { function wp_hash( string $data ): strin
 if ( ! function_exists( 'wp_salt' ) )  { function wp_salt( string $scheme = 'auth' ): string { return 'test-salt-' . $scheme; } }
 if ( ! function_exists( 'wp_rand' ) )  { function wp_rand( int $min = 0, int $max = 0 ): int { return random_int( $min, $max ?: PHP_INT_MAX ); } }
 $GLOBALS['__atora_test_transients'] = array();
+$GLOBALS['__atora_test_transient_expirations'] = array();
 if ( ! function_exists( 'get_transient' ) ) {
 	function get_transient( string $key ) { return $GLOBALS['__atora_test_transients'][ $key ] ?? false; }
 }
 if ( ! function_exists( 'set_transient' ) ) {
 	function set_transient( string $key, $value, int $expiration = 0 ): bool {
 		$GLOBALS['__atora_test_transients'][ $key ] = $value;
+		$GLOBALS['__atora_test_transient_expirations'][ $key ] = $expiration;
 		return true;
 	}
 }
 if ( ! function_exists( 'delete_transient' ) ) {
-	function delete_transient( string $key ): bool { unset( $GLOBALS['__atora_test_transients'][ $key ] ); return true; }
+	function delete_transient( string $key ): bool { unset( $GLOBALS['__atora_test_transients'][ $key ], $GLOBALS['__atora_test_transient_expirations'][ $key ] ); return true; }
 }
 if ( ! function_exists( 'atora_test_reset_transients' ) ) {
-	function atora_test_reset_transients(): void { $GLOBALS['__atora_test_transients'] = array(); }
+	function atora_test_reset_transients(): void { $GLOBALS['__atora_test_transients'] = array(); $GLOBALS['__atora_test_transient_expirations'] = array(); }
 }
 if ( ! function_exists( 'wp_cache_get' ) )     { function wp_cache_get( string $k, string $g = '' ) { return false; } }
 if ( ! function_exists( 'wp_cache_set' ) )     { function wp_cache_set( string $k, $v, string $g = '', int $ttl = 0 ): bool { return true; } }
