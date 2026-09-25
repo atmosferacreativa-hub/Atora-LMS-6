@@ -427,16 +427,21 @@ final class ATORA_Mobile_REST_Controller {
 				return $lock_owner;
 			}
 
-			try {
-				if ( ! self::validate_table_quiz_token( $user_id, $lesson_id, $token ) ) {
-					return new WP_Error( 'atora_mobile_quiz_token_invalid', __( 'La evaluación venció. Vuelve a abrirla para continuar.', 'atora-lms' ), array( 'status' => 409 ) );
-				}
-				self::consume_table_quiz_token( $user_id, $lesson_id );
+				try {
+					$settings = json_decode( (string) ( $table_quiz_row['settings_json'] ?? '{}' ), true );
+					$settings = is_array( $settings ) ? $settings : array();
+					$time_limit_seconds = absint( $settings['time_limit_seconds'] ?? 0 );
 
-				$settings = json_decode( (string) ( $table_quiz_row['settings_json'] ?? '{}' ), true );
-				$settings = is_array( $settings ) ? $settings : array();
-				$attempts_allowed = absint( $settings['attempts'] ?? 1 );
-				if ( $attempts_allowed <= 0 ) { $attempts_allowed = 1; }
+					$validation = self::validate_table_quiz_token( $user_id, $lesson_id, $token, $time_limit_seconds );
+					if ( is_wp_error( $validation ) ) {
+						return $validation;
+					}
+					if ( ! $validation ) {
+						return new WP_Error( 'atora_mobile_quiz_token_invalid', __( 'La evaluación venció. Vuelve a abrirla para continuar.', 'atora-lms' ), array( 'status' => 409 ) );
+					}
+					self::consume_table_quiz_token( $user_id, $lesson_id );
+					$attempts_allowed = absint( $settings['attempts'] ?? 1 );
+					if ( $attempts_allowed <= 0 ) { $attempts_allowed = 1; }
 
 				$quiz_id = absint( $table_quiz_row['id'] ?? 0 );
 				$stats   = self::table_quiz_stats( $user_id, $lesson_id, $quiz_id );
@@ -635,15 +640,39 @@ final class ATORA_Mobile_REST_Controller {
 		$token = function_exists( 'wp_generate_password' )
 			? wp_generate_password( 20, false )
 			: substr( sha1( (string) ( microtime( true ) . rand() ) ), 0, 20 );
-		set_transient( self::table_quiz_token_key( $user_id, $lesson_id ), $token, HOUR_IN_SECONDS );
+		set_transient(
+			self::table_quiz_token_key( $user_id, $lesson_id ),
+			array(
+				'token'     => (string) $token,
+				'issued_at' => time(),
+			),
+			HOUR_IN_SECONDS
+		);
 		return (string) $token;
 	}
 
-	private static function validate_table_quiz_token( int $user_id, int $lesson_id, string $token ): bool {
+	private static function validate_table_quiz_token( int $user_id, int $lesson_id, string $token, int $time_limit_seconds = 0 ) {
 		$token = trim( (string) $token );
 		if ( '' === $token ) { return false; }
-		$stored = (string) get_transient( self::table_quiz_token_key( $user_id, $lesson_id ) );
-		return '' !== $stored && hash_equals( $stored, $token );
+		$stored = get_transient( self::table_quiz_token_key( $user_id, $lesson_id ) );
+		$stored_token = '';
+		$issued_at    = 0;
+		if ( is_array( $stored ) ) {
+			$stored_token = (string) ( $stored['token'] ?? '' );
+			$issued_at    = absint( $stored['issued_at'] ?? 0 );
+		} else {
+			$stored_token = (string) $stored;
+		}
+		if ( '' === $stored_token || ! hash_equals( $stored_token, $token ) ) {
+			return false;
+		}
+		if ( $time_limit_seconds > 0 && $issued_at > 0 ) {
+			if ( ( time() - $issued_at ) > $time_limit_seconds ) {
+				delete_transient( self::table_quiz_token_key( $user_id, $lesson_id ) );
+				return new WP_Error( 'atora_mobile_quiz_time_expired', __( 'Se agotó el tiempo de la evaluación. Vuelve a abrirla para reintentar.', 'atora-lms' ), array( 'status' => 409 ) );
+			}
+		}
+		return true;
 	}
 
 	private static function consume_table_quiz_token( int $user_id, int $lesson_id ): void {
