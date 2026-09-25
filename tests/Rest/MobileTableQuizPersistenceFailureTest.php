@@ -3,6 +3,8 @@
 declare( strict_types = 1 );
 
 namespace {
+	require_once __DIR__ . '/Fixtures/table-quiz-wp-insert-post.php';
+
 	// Keep this stub local to the file-isolated quiz tests. The H5P security
 	// suite uses Patchwork to intercept wp_delete_post() in its own process.
 	if ( ! function_exists( 'wp_delete_post' ) ) {

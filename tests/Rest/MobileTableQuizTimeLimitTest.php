@@ -3,6 +3,8 @@
 declare( strict_types = 1 );
 
 namespace {
+	require_once __DIR__ . '/Fixtures/table-quiz-wp-insert-post.php';
+
 	if ( ! function_exists( 'wp_generate_password' ) ) {
 		function wp_generate_password( $length = 12, $special_chars = true, $extra_special_chars = false ): string {
 			$length = max( 1, (int) $length );
@@ -137,6 +139,8 @@ namespace ATORA\Tests\Rest {
 		TimeLimitWpdb::$advisory_locks = array();
 		$wpdb = new TimeLimitWpdb( 'conn-a' );
 		$GLOBALS['__atora_test_current_user_id'] = 10;
+		$GLOBALS['__atora_test_wp_insert_post_fail'] = false;
+		$GLOBALS['__atora_test_wp_insert_post_id'] = 55555;
 		$ref = new \ReflectionClass( \ATORA_Mobile_REST_Controller::class );
 		$p = $ref->getProperty( 'enrollment_index_cache' );
 		$p->setAccessible( true );
