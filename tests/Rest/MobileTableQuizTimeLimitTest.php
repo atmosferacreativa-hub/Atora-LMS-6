@@ -73,7 +73,10 @@ namespace ATORA\Tests\Rest {
 				);
 			}
 			if ( str_contains( $sql, 'COUNT(*) AS attempts_used' ) ) {
-				return array( 'attempts_used' => 0, 'best_score' => 0 );
+				return array(
+					'attempts_used' => (int) ( $GLOBALS['__atora_time_limit_attempts_used'] ?? 0 ),
+					'best_score'    => 0,
+				);
 			}
 			return null;
 		}
@@ -113,6 +116,7 @@ namespace ATORA\Tests\Rest {
 			atora_test_set_post_type( 5001, 'lm_lesson' );
 			atora_test_reset_transients();
 			atora_test_reset_options();
+			$GLOBALS['__atora_time_limit_attempts_used'] = 0;
 		}
 
 		public function test_submit_quiz_denies_when_time_limit_expired(): void {
@@ -153,6 +157,14 @@ namespace ATORA\Tests\Rest {
 			$this->assertInstanceOf( \WP_REST_Response::class, $result );
 			$this->assertGreaterThan( 0, (int) $wpdb->insert_count );
 		}
+
+		public function test_submit_quiz_reports_attempts_exceeded_even_without_token(): void {
+			$GLOBALS['__atora_time_limit_attempts_used'] = 2;
+
+			$req = new \WP_REST_Request( array( 'lesson_id' => 12, 'answers' => array( '4' ), 'token' => '' ) );
+			$result = \ATORA_Mobile_REST_Controller::submit_quiz( $req );
+			$this->assertTrue( is_wp_error( $result ) );
+			$this->assertSame( 'atora_mobile_quiz_attempts_exceeded', $result->get_error_code() );
+		}
 	}
 }
-

@@ -431,6 +431,17 @@ final class ATORA_Mobile_REST_Controller {
 					$settings = json_decode( (string) ( $table_quiz_row['settings_json'] ?? '{}' ), true );
 					$settings = is_array( $settings ) ? $settings : array();
 					$time_limit_seconds = absint( $settings['time_limit_seconds'] ?? 0 );
+					$attempts_allowed   = absint( $settings['attempts'] ?? 1 );
+					if ( $attempts_allowed <= 0 ) { $attempts_allowed = 1; }
+
+					$quiz_id = absint( $table_quiz_row['id'] ?? 0 );
+					$stats   = self::table_quiz_stats( $user_id, $lesson_id, $quiz_id );
+					$attempts_used = absint( $stats['attempts_used'] ?? 0 );
+					$best_before   = absint( $stats['best_score'] ?? 0 );
+					$attempt       = $attempts_used + 1;
+					if ( $attempt > $attempts_allowed ) {
+						return new WP_Error( 'atora_mobile_quiz_attempts_exceeded', __( 'Ya no tienes más intentos disponibles.', 'atora-lms' ), array( 'status' => 409 ) );
+					}
 
 					$validation = self::validate_table_quiz_token( $user_id, $lesson_id, $token, $time_limit_seconds );
 					if ( is_wp_error( $validation ) ) {
@@ -440,17 +451,6 @@ final class ATORA_Mobile_REST_Controller {
 						return new WP_Error( 'atora_mobile_quiz_token_invalid', __( 'La evaluación venció. Vuelve a abrirla para continuar.', 'atora-lms' ), array( 'status' => 409 ) );
 					}
 					self::consume_table_quiz_token( $user_id, $lesson_id );
-					$attempts_allowed = absint( $settings['attempts'] ?? 1 );
-					if ( $attempts_allowed <= 0 ) { $attempts_allowed = 1; }
-
-				$quiz_id = absint( $table_quiz_row['id'] ?? 0 );
-				$stats   = self::table_quiz_stats( $user_id, $lesson_id, $quiz_id );
-				$attempts_used = absint( $stats['attempts_used'] ?? 0 );
-				$best_before   = absint( $stats['best_score'] ?? 0 );
-				$attempt       = $attempts_used + 1;
-				if ( $attempt > $attempts_allowed ) {
-					return new WP_Error( 'atora_mobile_quiz_attempts_exceeded', __( 'Ya no tienes más intentos disponibles.', 'atora-lms' ), array( 'status' => 409 ) );
-				}
 				$result  = self::grade_table_quiz(
 					$user_id,
 					$lesson_id,
