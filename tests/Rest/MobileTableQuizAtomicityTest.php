@@ -3,13 +3,6 @@
 declare( strict_types = 1 );
 
 namespace {
-	if ( ! class_exists( 'CLMS_Drip' ) ) {
-		class CLMS_Drip {
-			public static function is_lesson_available( $user_id, $lesson_id ): bool {
-				return true;
-			}
-		}
-	}
 	if ( ! function_exists( 'wp_generate_password' ) ) {
 		function wp_generate_password( $length = 12, $special_chars = true, $extra_special_chars = false ): string {
 			$length = max( 1, (int) $length );
@@ -98,6 +91,7 @@ namespace ATORA\Tests\Rest {
 			global $wpdb;
 			$wpdb = new AtomicityWpdb();
 			$GLOBALS['__atora_test_current_user_id'] = 10;
+			atora_test_set_drip_available( true );
 			atora_test_reset_post_types();
 			atora_test_set_post_type( 5001, 'lm_lesson' );
 			atora_test_reset_transients();
@@ -115,4 +109,3 @@ namespace ATORA\Tests\Rest {
 		}
 	}
 }
-

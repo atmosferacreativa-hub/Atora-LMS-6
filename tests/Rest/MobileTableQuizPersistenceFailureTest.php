@@ -17,14 +17,6 @@ namespace {
 			return str_repeat( 'a', $length );
 		}
 	}
-
-	if ( ! class_exists( 'CLMS_Drip' ) ) {
-		class CLMS_Drip {
-			public static function is_lesson_available( $user_id, $lesson_id ): bool {
-				return true;
-			}
-		}
-	}
 }
 
 namespace ATORA\Tests\Rest {
@@ -121,6 +113,7 @@ namespace ATORA\Tests\Rest {
 			global $wpdb;
 			$wpdb = new PersistenceFailureWpdb();
 			$GLOBALS['__atora_test_current_user_id'] = 10;
+			atora_test_set_drip_available( true );
 			atora_test_reset_post_types();
 			atora_test_set_post_type( 5001, 'lm_lesson' );
 			atora_test_reset_transients();

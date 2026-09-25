@@ -96,6 +96,19 @@ $GLOBALS['__atora_test_current_user_id'] = 1;
 if ( ! function_exists( 'get_current_user_id' ) ) {
 	function get_current_user_id(): int { return (int) ( $GLOBALS['__atora_test_current_user_id'] ?? 1 ); }
 }
+
+// Drip: por defecto disponible (no bloquea). Tests pueden forzarlo.
+$GLOBALS['__atora_test_drip_available'] = true;
+if ( ! class_exists( 'CLMS_Drip' ) ) {
+	class CLMS_Drip {
+		public static function is_lesson_available( $user_id, $lesson_id ): bool {
+			return (bool) ( $GLOBALS['__atora_test_drip_available'] ?? true );
+		}
+	}
+}
+if ( ! function_exists( 'atora_test_set_drip_available' ) ) {
+	function atora_test_set_drip_available( bool $available ): void { $GLOBALS['__atora_test_drip_available'] = $available; }
+}
 if ( ! function_exists( 'wp_generate_uuid4' ) ) {
 	function wp_generate_uuid4(): string {
 		return sprintf( '%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
