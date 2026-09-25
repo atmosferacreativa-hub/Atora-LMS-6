@@ -12,14 +12,6 @@ namespace {
 			return true;
 		}
 	}
-	if ( ! function_exists( 'wp_insert_post' ) ) {
-		function wp_insert_post( array $postarr, $wp_error = false ) {
-			if ( ! empty( $GLOBALS['__atora_test_wp_insert_post_fail'] ) ) {
-				return new \WP_Error( 'wp_insert_post_failed', 'forced failure' );
-			}
-			return 12345;
-		}
-	}
 	if ( ! function_exists( 'wp_generate_password' ) ) {
 		function wp_generate_password( $length = 12, $special_chars = true, $extra_special_chars = false ): string {
 			$length = max( 1, (int) $length );

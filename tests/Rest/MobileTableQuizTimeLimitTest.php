@@ -3,11 +3,6 @@
 declare( strict_types = 1 );
 
 namespace {
-	if ( ! function_exists( 'wp_insert_post' ) ) {
-		function wp_insert_post( array $postarr, $wp_error = false ) {
-			return 55555;
-		}
-	}
 	if ( ! function_exists( 'wp_generate_password' ) ) {
 		function wp_generate_password( $length = 12, $special_chars = true, $extra_special_chars = false ): string {
 			$length = max( 1, (int) $length );
