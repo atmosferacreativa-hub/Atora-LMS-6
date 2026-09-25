@@ -85,7 +85,14 @@ if ( ! function_exists( 'wp_unslash' ) ) {
 		return is_array( $value ) ? array_map( 'wp_unslash', $value ) : ( is_string( $value ) ? stripslashes( $value ) : $value );
 	}
 }
-if ( ! function_exists( 'current_time' ) )     { function current_time( string $t, bool $gmt = false ): string { return date( 'Y-m-d H:i:s' ); } }
+if ( ! function_exists( 'current_time' ) ) {
+	function current_time( string $type, bool $gmt = false ) {
+		if ( 'timestamp' === $type ) {
+			return time();
+		}
+		return date( 'Y-m-d H:i:s' );
+	}
+}
 if ( ! function_exists( 'wp_date' ) ) {
 	function wp_date( string $format, $timestamp = null, $timezone = null ): string {
 		$ts = null === $timestamp ? time() : ( is_numeric( $timestamp ) ? (int) $timestamp : strtotime( (string) $timestamp ) );

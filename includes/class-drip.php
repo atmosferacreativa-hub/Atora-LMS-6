@@ -204,7 +204,7 @@ class CLMS_Drip {
 			);
 		}
 
-		$now = current_time( 'timestamp' );
+		$now = current_time( 'timestamp', true );
 
 		if ( 'date' === $drip_type ) {
 			$date_value = (string) get_post_meta( $lesson_id, self::META_DATE, true );
@@ -541,6 +541,25 @@ class CLMS_Drip {
 			$value = get_user_meta( $user_id, $key, true );
 			if ( ! empty( $value ) ) {
 				return true;
+			}
+		}
+
+		// Fase 11: progreso completado en tabla (atora_lesson_progress).
+		global $wpdb;
+		if ( isset( $wpdb ) && isset( $wpdb->prefix ) ) {
+			$table  = $wpdb->prefix . 'atora_lesson_progress';
+			$exists = (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) );
+			if ( $exists === $table ) {
+				$has = (int) $wpdb->get_var(
+					$wpdb->prepare(
+						"SELECT 1 FROM {$table} WHERE user_id = %d AND wp_lesson_id = %d AND status = 'completed' LIMIT 1",
+						$user_id,
+						$lesson_id
+					)
+				);
+				if ( $has ) {
+					return true;
+				}
 			}
 		}
 
