@@ -496,13 +496,47 @@ class CLMS_Quiz {
 	--------------------------------------------------------------- */
 
 	/**
+	 * Access check for mobile REST clients.
+	 *
+	 * Legacy web flows still rely on CLMS_Helper. For mobile REST, we also
+	 * accept a valid table enrollment (atora_enrollments) keyed by wp_course_id,
+	 * so mobile can work when dualwrite is disabled.
+	 */
+	private function user_can_access_lesson_mobile_rest( int $user_id, int $lesson_id ): bool {
+		$user_id   = absint( $user_id );
+		$lesson_id = absint( $lesson_id );
+		if ( ! $user_id || ! $lesson_id ) {
+			return false;
+		}
+
+		if ( class_exists( 'CLMS_Helper' ) && method_exists( 'CLMS_Helper', 'user_can_access_lesson' ) ) {
+			if ( (bool) \CLMS_Helper::user_can_access_lesson( $user_id, $lesson_id ) ) {
+				return true;
+			}
+		}
+
+		if ( class_exists( '\\ATORA\\LMS\\LMS_Enrollment_Service' )
+			&& method_exists( '\\ATORA\\LMS\\LMS_Enrollment_Service', 'is_enrolled_by_wp_id' ) ) {
+			$wp_course_id = absint( get_post_meta( $lesson_id, '_clms_lesson_course_id', true ) );
+			if ( ! $wp_course_id ) {
+				$wp_course_id = absint( get_post_meta( $lesson_id, '_clms_course_id', true ) );
+			}
+			if ( $wp_course_id && \ATORA\LMS\LMS_Enrollment_Service::is_enrolled_by_wp_id( $user_id, $wp_course_id ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
 	 * Prepara una evaluación para clientes móviles sin exponer claves ni feedback.
 	 */
 	public function get_quiz_rest( $user_id, $lesson_id ) {
 		$user_id   = absint( $user_id );
 		$lesson_id = absint( $lesson_id );
 
-		if ( ! $user_id || ! $lesson_id || ! CLMS_Helper::user_can_access_lesson( $user_id, $lesson_id ) ) {
+		if ( ! $user_id || ! $lesson_id || ! $this->user_can_access_lesson_mobile_rest( $user_id, $lesson_id ) ) {
 			return new WP_Error( 'clms_quiz_forbidden', __( 'No tienes acceso a esta evaluación.', 'atora-lms' ), array( 'status' => 403 ) );
 		}
 		if ( ! $this->is_quiz_enabled( $lesson_id ) ) {
@@ -557,7 +591,7 @@ class CLMS_Quiz {
 		$user_id   = absint( $user_id );
 		$lesson_id = absint( $lesson_id );
 		$token     = sanitize_text_field( (string) $token );
-		if ( ! $user_id || ! $lesson_id || ! CLMS_Helper::user_can_access_lesson( $user_id, $lesson_id ) ) {
+		if ( ! $user_id || ! $lesson_id || ! $this->user_can_access_lesson_mobile_rest( $user_id, $lesson_id ) ) {
 			return new WP_Error( 'clms_quiz_forbidden', __( 'No tienes acceso a esta evaluación.', 'atora-lms' ), array( 'status' => 403 ) );
 		}
 		$date_check = $this->validate_availability_window( $lesson_id );

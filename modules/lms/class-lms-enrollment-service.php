@@ -384,6 +384,7 @@ class LMS_Enrollment_Service {
 			'id'            => absint( $row['id'] ),
 			'user_id'       => absint( $row['user_id'] ),
 			'course_id'     => absint( $row['course_id'] ),
+			'wp_course_id'  => absint( $row['wp_course_id'] ?? 0 ),
 			'status'        => sanitize_key( (string) ( $row['status']      ?? 'active' ) ),
 			'progress_pct'  => absint( $row['progress_pct'] ?? 0 ),
 			'grade'         => isset( $row['grade'] ) && $row['grade'] !== null ? (float) $row['grade'] : null,
@@ -391,6 +392,7 @@ class LMS_Enrollment_Service {
 			'enrolled_at'   => sanitize_text_field( (string) ( $row['enrolled_at']   ?? '' ) ),
 			'completed_at'  => sanitize_text_field( (string) ( $row['completed_at']  ?? '' ) ),
 			'last_activity' => sanitize_text_field( (string) ( $row['last_activity'] ?? '' ) ),
+			'expires_at'    => sanitize_text_field( (string) ( $row['expires_at']    ?? '' ) ),
 		);
 	}
 }

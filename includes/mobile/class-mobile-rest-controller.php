@@ -805,17 +805,23 @@ final class ATORA_Mobile_REST_Controller {
 			return self::$enrollment_index_cache[ $user_id ];
 		}
 
-		$by_course = array();
-		$ordered   = array();
+			$by_course = array();
+			$ordered   = array();
+			$now       = current_time( 'mysql', true );
 
-		// 1) Tablas: active + completed.
-		if ( class_exists( '\\ATORA\\LMS\\LMS_Enrollment_Service' ) ) {
-			foreach ( array( 'active', 'completed' ) as $status ) {
-				$rows = (array) \ATORA\LMS\LMS_Enrollment_Service::get_user_enrollments( $user_id, $status );
-				foreach ( $rows as $row ) {
-					if ( ! is_array( $row ) ) { continue; }
-					$course_id = absint( $row['course_id'] ?? 0 );
-					if ( $course_id <= 0 ) { continue; }
+			// 1) Tablas: active + completed.
+			if ( class_exists( '\\ATORA\\LMS\\LMS_Enrollment_Service' ) ) {
+				foreach ( array( 'active', 'completed' ) as $status ) {
+					$rows = (array) \ATORA\LMS\LMS_Enrollment_Service::get_user_enrollments( $user_id, $status );
+					foreach ( $rows as $row ) {
+						if ( ! is_array( $row ) ) { continue; }
+
+						$expires_at = sanitize_text_field( (string) ( $row['expires_at'] ?? '' ) );
+						if ( '' !== $expires_at && $expires_at < $now ) {
+							continue;
+						}
+						$course_id = absint( $row['course_id'] ?? 0 );
+						if ( $course_id <= 0 ) { continue; }
 
 					$row_status = sanitize_key( (string) ( $row['status'] ?? $status ) );
 					if ( '' === $row_status ) { $row_status = $status; }
