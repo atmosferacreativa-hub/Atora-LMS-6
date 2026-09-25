@@ -177,6 +177,15 @@ if ( ! function_exists( 'update_option' ) )    {
 		return true;
 	}
 }
+if ( ! function_exists( 'add_option' ) ) {
+	function add_option( string $k, $v, $deprecated = '', $autoload = 'yes' ): bool {
+		if ( array_key_exists( $k, $GLOBALS['__atora_test_options'] ) ) {
+			return false;
+		}
+		$GLOBALS['__atora_test_options'][ $k ] = $v;
+		return true;
+	}
+}
 if ( ! function_exists( 'atora_test_reset_options' ) ) {
 	function atora_test_reset_options(): void { $GLOBALS['__atora_test_options'] = array(); }
 }
