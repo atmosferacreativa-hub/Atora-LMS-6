@@ -100,8 +100,23 @@ namespace ATORA\Tests\Rest {
 
 		public function test_submit_quiz_denies_when_lock_is_held(): void {
 			// Create a lock entry as if another request is in-flight.
-			add_option( 'atora_table_quiz_lock_10_12', (string) time(), '', 'no' );
+			add_option( 'atora_table_quiz_lock_10_12', 'other|' . (string) time(), '', 'no' );
 
+			$req = new \WP_REST_Request( array( 'lesson_id' => 12, 'answers' => array( '4' ), 'token' => 'anything' ) );
+			$result = \ATORA_Mobile_REST_Controller::submit_quiz( $req );
+			$this->assertTrue( is_wp_error( $result ) );
+			$this->assertSame( 'atora_mobile_quiz_submission_locked', $result->get_error_code() );
+		}
+
+		public function test_lock_release_does_not_delete_other_owners_lock(): void {
+			add_option( 'atora_table_quiz_lock_10_12', 'owner-a|' . (string) time(), '', 'no' );
+
+			$ref = new \ReflectionClass( \ATORA_Mobile_REST_Controller::class );
+			$m   = $ref->getMethod( 'release_table_quiz_lock' );
+			$m->setAccessible( true );
+			$m->invokeArgs( null, array( 10, 12, 'owner-b' ) );
+
+			$this->assertNotSame( '', (string) get_option( 'atora_table_quiz_lock_10_12', '' ) );
 			$req = new \WP_REST_Request( array( 'lesson_id' => 12, 'answers' => array( '4' ), 'token' => 'anything' ) );
 			$result = \ATORA_Mobile_REST_Controller::submit_quiz( $req );
 			$this->assertTrue( is_wp_error( $result ) );
