@@ -113,7 +113,7 @@ namespace ATORA\Tests\Rest {
 		}
 
 		public function get_results( $sql, $output = OBJECT ): array {
-			if ( is_string( $sql ) && str_contains( $sql, 'FROM wp_atora_enrollments e' ) ) {
+			if ( is_string( $sql ) && str_contains( $sql, 'atora_enrollments' ) ) {
 				return array(
 					array(
 						'id'          => 1,
@@ -141,16 +141,22 @@ namespace ATORA\Tests\Rest {
 
 	final class MobileTableQuizPersistenceFailureTest extends TestCase {
 	protected function setUp(): void {
-			parent::setUp();
+		parent::setUp();
 		global $wpdb;
 		PersistenceFailureWpdb::$advisory_locks = array();
 		$wpdb = new PersistenceFailureWpdb( 'conn-a' );
-			$GLOBALS['__atora_test_current_user_id'] = 10;
-			atora_test_set_drip_available( true );
-			atora_test_reset_post_types();
-			atora_test_set_post_type( 5001, 'lm_lesson' );
-			atora_test_reset_transients();
-			atora_test_reset_options();
+		$GLOBALS['__atora_test_current_user_id'] = 10;
+		$GLOBALS['__atora_test_wp_insert_post_id'] = 12345;
+		$GLOBALS['__atora_test_wp_insert_post_fail'] = false;
+		$ref = new \ReflectionClass( \ATORA_Mobile_REST_Controller::class );
+		$p = $ref->getProperty( 'enrollment_index_cache' );
+		$p->setAccessible( true );
+		$p->setValue( null, array() );
+		atora_test_set_drip_available( true );
+		atora_test_reset_post_types();
+		atora_test_set_post_type( 5001, 'lm_lesson' );
+		atora_test_reset_transients();
+		atora_test_reset_options();
 			atora_test_reset_deleted_posts();
 			atora_test_reset_post_meta();
 		}

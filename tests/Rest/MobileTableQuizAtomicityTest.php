@@ -103,7 +103,7 @@ namespace ATORA\Tests\Rest {
 		}
 
 		public function get_results( $sql, $output = OBJECT ): array {
-			if ( is_string( $sql ) && str_contains( $sql, 'FROM wp_atora_enrollments e' ) ) {
+			if ( is_string( $sql ) && str_contains( $sql, 'atora_enrollments' ) ) {
 				return array( array( 'id' => 1, 'user_id' => 10, 'course_id' => 29, 'wp_course_id' => 428, 'status' => 'active', 'expires_at' => '', 'last_activity' => '' ) );
 			}
 			return array();
@@ -117,16 +117,20 @@ namespace ATORA\Tests\Rest {
 
 	final class MobileTableQuizAtomicityTest extends TestCase {
 	protected function setUp(): void {
-			parent::setUp();
+		parent::setUp();
 		global $wpdb;
 		AtomicityWpdb::$advisory_locks = array();
 		$wpdb = new AtomicityWpdb( 'conn-a' );
-			$GLOBALS['__atora_test_current_user_id'] = 10;
-			atora_test_set_drip_available( true );
-			atora_test_reset_post_types();
-			atora_test_set_post_type( 5001, 'lm_lesson' );
-			atora_test_reset_transients();
-			atora_test_reset_options();
+		$GLOBALS['__atora_test_current_user_id'] = 10;
+		$ref = new \ReflectionClass( \ATORA_Mobile_REST_Controller::class );
+		$p = $ref->getProperty( 'enrollment_index_cache' );
+		$p->setAccessible( true );
+		$p->setValue( null, array() );
+		atora_test_set_drip_available( true );
+		atora_test_reset_post_types();
+		atora_test_set_post_type( 5001, 'lm_lesson' );
+		atora_test_reset_transients();
+		atora_test_reset_options();
 	}
 
 	public function test_submit_quiz_denies_when_lock_is_held(): void {

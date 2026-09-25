@@ -93,6 +93,17 @@ if ( ! function_exists( 'current_time' ) ) {
 		return date( 'Y-m-d H:i:s' );
 	}
 }
+
+// wp_insert_post() se usa para persistir submissions del LMS.
+// En tests unitarios lo stubeamos para poder forzar fallos y verificar rollback.
+if ( ! function_exists( 'wp_insert_post' ) ) {
+	function wp_insert_post( array $postarr, $wp_error = false ) {
+		if ( ! empty( $GLOBALS['__atora_test_wp_insert_post_fail'] ) ) {
+			return new \WP_Error( 'wp_insert_post_failed', 'forced failure' );
+		}
+		return absint( $GLOBALS['__atora_test_wp_insert_post_id'] ?? 10001 );
+	}
+}
 if ( ! function_exists( 'wp_date' ) ) {
 	function wp_date( string $format, $timestamp = null, $timezone = null ): string {
 		$ts = null === $timestamp ? time() : ( is_numeric( $timestamp ) ? (int) $timestamp : strtotime( (string) $timestamp ) );
