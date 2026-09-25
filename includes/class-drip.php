@@ -378,6 +378,15 @@ class CLMS_Drip {
 			return true;
 		}
 
+		// Fase 11: si existe matrícula activa en tablas (atora_enrollments), respetarla.
+		if ( class_exists( '\\ATORA\\LMS\\LMS_Enrollment_Service' )
+			&& is_callable( array( '\\ATORA\\LMS\\LMS_Enrollment_Service', 'is_enrolled_by_wp_id' ) )
+		) {
+			if ( \ATORA\LMS\LMS_Enrollment_Service::is_enrolled_by_wp_id( $user_id, $course_id ) ) {
+				return true;
+			}
+		}
+
 		$user_courses = get_user_meta( $user_id, '_clms_enrolled_courses', true );
 		if ( is_array( $user_courses ) && in_array( $course_id, array_map( 'absint', $user_courses ), true ) ) {
 			return true;
@@ -397,6 +406,28 @@ class CLMS_Drip {
 
 		if ( ! $user_id || ! $course_id ) {
 			return 0;
+		}
+
+		// Fase 11: intentar desde atora_enrollments (usa GMT/UTC).
+		global $wpdb;
+		if ( isset( $wpdb ) && isset( $wpdb->prefix ) ) {
+			$table  = $wpdb->prefix . 'atora_enrollments';
+			$exists = (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) );
+			if ( $exists === $table ) {
+				$enrolled_at = (string) $wpdb->get_var(
+					$wpdb->prepare(
+						"SELECT enrolled_at FROM {$table} WHERE user_id = %d AND wp_course_id = %d AND status IN ('active','completed') ORDER BY enrolled_at DESC LIMIT 1",
+						$user_id,
+						$course_id
+					)
+				);
+				if ( '' !== $enrolled_at ) {
+					$ts = strtotime( $enrolled_at . ' UTC' );
+					if ( false !== $ts ) {
+						return (int) $ts;
+					}
+				}
+			}
 		}
 
 		$user_dates = get_user_meta( $user_id, '_clms_enrollment_dates', true );
@@ -522,6 +553,28 @@ class CLMS_Drip {
 
 		if ( ! $user_id || ! $lesson_id ) {
 			return 0;
+		}
+
+		// Fase 11: leer completación desde atora_lesson_progress (usa GMT/UTC).
+		global $wpdb;
+		if ( isset( $wpdb ) && isset( $wpdb->prefix ) ) {
+			$table  = $wpdb->prefix . 'atora_lesson_progress';
+			$exists = (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) );
+			if ( $exists === $table ) {
+				$completed_at = (string) $wpdb->get_var(
+					$wpdb->prepare(
+						"SELECT completed_at FROM {$table} WHERE user_id = %d AND wp_lesson_id = %d AND status = 'completed' ORDER BY completed_at DESC LIMIT 1",
+						$user_id,
+						$lesson_id
+					)
+				);
+				if ( '' !== $completed_at ) {
+					$ts = strtotime( $completed_at . ' UTC' );
+					if ( false !== $ts ) {
+						return (int) $ts;
+					}
+				}
+			}
 		}
 
 		$timestamp_keys = array(
