@@ -278,6 +278,8 @@ namespace ATORA\Tests\Rest {
 
 			$submission_id = absint( $GLOBALS['__atora_test_wp_insert_post_id'] ?? 0 );
 			$this->assertGreaterThan( 0, $submission_id );
+			$this->assertSame( 'clms_submission', (string) get_post_type( $submission_id ) );
+			$this->assertSame( 10, absint( get_post_field( 'post_author', $submission_id ) ) );
 			$this->assertSame( 10, absint( get_post_meta( $submission_id, '_clms_submission_user_id', true ) ) );
 			$this->assertSame( 5001, absint( get_post_meta( $submission_id, '_clms_submission_lesson_id', true ) ) );
 			$this->assertSame( 428, absint( get_post_meta( $submission_id, '_clms_submission_course_id', true ) ) );
