@@ -488,9 +488,96 @@ final class ATORA_Mobile_REST_Controller {
 		$course_id = absint( $lesson['course_id'] ?? 0 );
 		$auth = self::authorize_course_id( get_current_user_id(), $course_id );
 		if ( is_wp_error( $auth ) ) { return $auth; }
-		$wp_post_id = absint( $lesson['wp_post_id'] ?? 0 );
+		$wp_post_id     = absint( $lesson['wp_post_id'] ?? 0 );
+		$table_quiz_row = self::get_table_quiz_row( $lesson_id );
+		$has_table_quiz = (bool) $table_quiz_row;
 		if ( ! $wp_post_id || 'lm_lesson' !== get_post_type( $wp_post_id ) ) {
-			return new WP_Error( 'atora_mobile_quiz_not_found', __( 'Esta lección no contiene una evaluación móvil.', 'atora-lms' ), array( 'status' => 404 ) );
+			if ( ! $has_table_quiz ) {
+				return new WP_Error( 'atora_mobile_quiz_not_found', __( 'Esta lección no contiene una evaluación móvil.', 'atora-lms' ), array( 'status' => 404 ) );
+			}
+
+			// Table-only lessons still need a legacy lm_lesson identity for:
+			// - Drip availability enforcement
+			// - Gradebook/SpeedGrader linkage (_clms_submission_lesson_id/course_id)
+			// A permanent CPT-less mode requires native tables support for Drip
+			// and grading UIs, which is out of scope for this contract fix.
+			return new WP_Error(
+				'atora_mobile_quiz_requires_wp_identity',
+				__( 'Esta evaluación requiere identidad WordPress (lección) para registrar y bloquear por Drip.', 'atora-lms' ),
+				array( 'status' => 409 )
+			);
+		}
+
+		// Quizzes en tablas requieren identidad WP coherente para asegurar:
+		// - Drip (depende de lm_lesson y su relación con lm_course)
+		// - Gradebook/SpeedGrader (submission enlazado con _clms_submission_*).
+		if ( $has_table_quiz ) {
+			$course = \ATORA\LMS\LMS_Course_Service::get( $course_id );
+			$wp_course_id = absint( is_array( $course ) ? ( $course['wp_post_id'] ?? 0 ) : 0 );
+			if ( ! $wp_course_id || 'lm_course' !== get_post_type( $wp_course_id ) ) {
+				return new WP_Error(
+					'atora_mobile_quiz_requires_wp_course_identity',
+					__( 'Esta evaluación requiere identidad WordPress (curso) para registrarse correctamente.', 'atora-lms' ),
+					array( 'status' => 409 )
+				);
+			}
+
+			// Resolver el course_id de la lección WP con la misma precedencia
+			// que CLMS_Helper::get_lesson_course_id(), pero sin escribir metadata
+			// en GET/POST (no llamamos al helper).
+			$relation_keys = array(
+				'_clms_course_id',
+				'lm_course_id',
+				'_clms_lesson_course_id',
+				'course_id',
+				'_lesson_course_id',
+				'lesson_course_id',
+			);
+			$non_empty_values = array();
+			foreach ( $relation_keys as $meta_key ) {
+				$value_raw = get_post_meta( $wp_post_id, (string) $meta_key, true );
+				if ( '' === (string) $value_raw || null === $value_raw ) {
+					continue;
+				}
+				$value = absint( $value_raw );
+				if ( $value > 0 ) {
+					$non_empty_values[ (string) $meta_key ] = $value;
+				}
+			}
+
+			$unique = array_values( array_unique( array_values( $non_empty_values ) ) );
+			if ( count( $unique ) > 1 ) {
+				return new WP_Error(
+					'atora_mobile_quiz_identity_conflict',
+					__( 'La lección contiene claves de relación curso–lección contradictorias.', 'atora-lms' ),
+					array( 'status' => 409 )
+				);
+			}
+
+			$lesson_course_wp = 0;
+			foreach ( $relation_keys as $meta_key ) {
+				if ( isset( $non_empty_values[ (string) $meta_key ] ) ) {
+					$lesson_course_wp = absint( $non_empty_values[ (string) $meta_key ] );
+					break;
+				}
+			}
+
+			if ( ! $lesson_course_wp || $lesson_course_wp !== $wp_course_id ) {
+				return new WP_Error(
+					'atora_mobile_quiz_identity_mismatch',
+					__( 'La identidad WordPress (lección/curso) no coincide con las tablas.', 'atora-lms' ),
+					array( 'status' => 409 )
+				);
+			}
+
+			$quiz_course_id = absint( is_array( $table_quiz_row ) ? ( $table_quiz_row['course_id'] ?? 0 ) : 0 );
+			if ( ! $quiz_course_id || $quiz_course_id !== $course_id ) {
+				return new WP_Error(
+					'atora_mobile_quiz_identity_mismatch',
+					__( 'La identidad WordPress (lección/curso) no coincide con las tablas.', 'atora-lms' ),
+					array( 'status' => 409 )
+				);
+			}
 		}
 
 		// Drip: si la lección aún no está disponible, bloquear también quizzes móviles.

@@ -3,6 +3,8 @@
 declare( strict_types = 1 );
 
 namespace {
+	require_once __DIR__ . '/Fixtures/table-quiz-wp-insert-post.php';
+
 	if ( ! function_exists( 'wp_generate_password' ) ) {
 		function wp_generate_password( $length = 12, $special_chars = true, $extra_special_chars = false ): string {
 			$length = max( 1, (int) $length );
@@ -17,14 +19,15 @@ namespace ATORA\Tests\Rest {
 
 	require_once __DIR__ . '/../../includes/mobile/class-mobile-rest-controller.php';
 
-	final class AtomicityWpdb {
+	final class TableOnlyLessonWpdb {
 		public static array $advisory_locks = array();
 		public string $connection_id;
 		public string $prefix = 'wp_';
 		public string $posts = 'wp_posts';
 		public string $postmeta = 'wp_postmeta';
 		public string $usermeta = 'wp_usermeta';
-		public int $insert_id = 200;
+		public int $insert_id = 99;
+		public int $insert_count = 0;
 
 		public function __construct( string $connection_id = 'conn' ) {
 			$this->connection_id = $connection_id;
@@ -82,17 +85,17 @@ namespace ATORA\Tests\Rest {
 				return null;
 			}
 			if ( str_contains( $sql, 'FROM wp_atora_lessons WHERE id =' ) ) {
-				return array( 'id' => 12, 'course_id' => 29, 'status' => 'published', 'wp_post_id' => 5001, 'title' => 'Lección', 'type' => 'text' );
+				return array( 'id' => 12, 'course_id' => 29, 'status' => 'published', 'wp_post_id' => 0, 'title' => 'Lección', 'type' => 'text' );
 			}
 			if ( str_contains( $sql, 'FROM wp_atora_courses WHERE id =' ) ) {
-				return array( 'id' => 29, 'wp_post_id' => 428, 'status' => 'published', 'title' => 'Curso' );
+				return array( 'id' => 29, 'wp_post_id' => 0, 'status' => 'published', 'title' => 'Curso', 'excerpt' => '', 'thumbnail_url' => '', 'duration_hours' => 0, 'level' => '', 'language' => 'es' );
 			}
 			if ( str_contains( $sql, 'FROM wp_atora_quizzes' ) && str_contains( $sql, 'lesson_id' ) ) {
 				return array(
 					'id'            => 2,
 					'lesson_id'     => 12,
 					'course_id'     => 29,
-					'questions_json'=> json_encode( array( array( 'id' => 1, 'type' => 'single', 'options' => array( '4' ), 'answer' => '4', 'weight' => 1 ) ) ),
+					'questions_json'=> json_encode( array( array( 'id' => 1, 'type' => 'single', 'question' => '2+2', 'options' => array( '4' ), 'answer' => '4', 'weight' => 1 ) ) ),
 					'settings_json' => json_encode( array( 'attempts' => 2, 'time_limit_seconds' => 0 ) ),
 				);
 			}
@@ -104,71 +107,62 @@ namespace ATORA\Tests\Rest {
 
 		public function get_results( $sql, $output = OBJECT ): array {
 			if ( is_string( $sql ) && str_contains( $sql, 'atora_enrollments' ) ) {
-				return array( array( 'id' => 1, 'user_id' => 10, 'course_id' => 29, 'wp_course_id' => 428, 'status' => 'active', 'expires_at' => '', 'last_activity' => '' ) );
+				return array(
+					array(
+						'id'            => 1,
+						'user_id'       => 10,
+						'course_id'     => 29,
+						'wp_course_id'  => 0,
+						'status'        => 'active',
+						'expires_at'    => '',
+						'last_activity' => '2026-01-01 00:00:00',
+					),
+				);
 			}
 			return array();
 		}
 
 		public function insert( $table, $data, $format = null ) {
-			$this->insert_id++;
+			$this->insert_count++;
 			return 1;
 		}
 	}
 
-	final class MobileTableQuizAtomicityTest extends TestCase {
-	protected function setUp(): void {
-		parent::setUp();
-		global $wpdb;
-		AtomicityWpdb::$advisory_locks = array();
-		$wpdb = new AtomicityWpdb( 'conn-a' );
-		$GLOBALS['__atora_test_current_user_id'] = 10;
-		$ref = new \ReflectionClass( \ATORA_Mobile_REST_Controller::class );
-		$p = $ref->getProperty( 'enrollment_index_cache' );
-		$p->setAccessible( true );
-		$p->setValue( null, array() );
-		atora_test_set_drip_available( true );
-		atora_test_reset_post_types();
-		atora_test_set_post_type( 5001, 'lm_lesson' );
-		atora_test_set_post_type( 428, 'lm_course' );
-		atora_test_reset_transients();
-		atora_test_reset_options();
-		atora_test_reset_post_meta();
-		atora_test_set_post_meta( 5001, '_clms_lesson_course_id', 428 );
-	}
+	final class MobileTableQuizLessonWithoutWpPostTest extends TestCase {
+		protected function setUp(): void {
+			parent::setUp();
+			global $wpdb;
+			TableOnlyLessonWpdb::$advisory_locks = array();
+			$wpdb = new TableOnlyLessonWpdb( 'conn-a' );
+			$GLOBALS['__atora_test_current_user_id'] = 10;
+			$GLOBALS['__atora_test_wp_insert_post_fail'] = false;
+			$GLOBALS['__atora_test_wp_insert_post_id'] = 55555;
+			$GLOBALS['__atora_test_wp_insert_post_calls'] = 0;
+			$GLOBALS['__atora_test_wp_insert_post_last'] = array();
+			$ref = new \ReflectionClass( \ATORA_Mobile_REST_Controller::class );
+			$p = $ref->getProperty( 'enrollment_index_cache' );
+			$p->setAccessible( true );
+			$p->setValue( null, array() );
+			atora_test_set_drip_available( true );
+			atora_test_reset_post_types();
+			atora_test_reset_transients();
+			atora_test_reset_options();
+		}
 
-	public function test_submit_quiz_denies_when_lock_is_held(): void {
-		global $wpdb;
-		$ref = new \ReflectionClass( \ATORA_Mobile_REST_Controller::class );
-		$m   = $ref->getMethod( 'acquire_table_quiz_lock' );
-		$m->setAccessible( true );
-		$m->invokeArgs( null, array( 10, 12 ) );
+		public function test_quiz_denies_table_only_lesson_when_wp_identity_is_missing(): void {
+			$response = \ATORA_Mobile_REST_Controller::quiz( new \WP_REST_Request( array( 'lesson_id' => 12 ) ) );
+			$this->assertTrue( is_wp_error( $response ) );
+			$this->assertSame( 'atora_mobile_quiz_requires_wp_identity', $response->get_error_code() );
+		}
 
-		$wpdb = new AtomicityWpdb( 'conn-b' );
-
-		$req = new \WP_REST_Request( array( 'lesson_id' => 12, 'answers' => array( '4' ), 'token' => 'anything' ) );
-		$result = \ATORA_Mobile_REST_Controller::submit_quiz( $req );
-		$this->assertTrue( is_wp_error( $result ) );
-		$this->assertSame( 'atora_mobile_quiz_submission_locked', $result->get_error_code() );
-	}
-
-	public function test_lock_release_does_not_delete_other_owners_lock(): void {
-		global $wpdb;
-		$ref = new \ReflectionClass( \ATORA_Mobile_REST_Controller::class );
-		$acquire = $ref->getMethod( 'acquire_table_quiz_lock' );
-		$acquire->setAccessible( true );
-		$lock_key = (string) $acquire->invokeArgs( null, array( 10, 12 ) );
-		$this->assertNotSame( '', $lock_key );
-
-		$wpdb = new AtomicityWpdb( 'conn-b' );
-
-		$m = $ref->getMethod( 'release_table_quiz_lock' );
-		$m->setAccessible( true );
-		$m->invokeArgs( null, array( $lock_key ) );
-
-		$req = new \WP_REST_Request( array( 'lesson_id' => 12, 'answers' => array( '4' ), 'token' => 'anything' ) );
-		$result = \ATORA_Mobile_REST_Controller::submit_quiz( $req );
-		$this->assertTrue( is_wp_error( $result ) );
-		$this->assertSame( 'atora_mobile_quiz_submission_locked', $result->get_error_code() );
-	}
+		public function test_submit_does_not_persist_or_issue_tokens_when_wp_identity_is_missing(): void {
+			global $wpdb;
+			$result = \ATORA_Mobile_REST_Controller::submit_quiz( new \WP_REST_Request( array( 'lesson_id' => 12, 'answers' => array( '4' ), 'token' => 'anything' ) ) );
+			$this->assertTrue( is_wp_error( $result ) );
+			$this->assertSame( 'atora_mobile_quiz_requires_wp_identity', $result->get_error_code() );
+			$this->assertSame( 0, (int) $wpdb->insert_count );
+			$this->assertSame( 0, (int) ( $GLOBALS['__atora_test_wp_insert_post_calls'] ?? 0 ) );
+			$this->assertSame( array(), (array) ( $GLOBALS['__atora_test_transients'] ?? array() ) );
+		}
 	}
 }
