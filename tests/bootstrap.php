@@ -437,7 +437,42 @@ if ( ! function_exists( 'is_email' ) ) {
 	function is_email( $email ) { return filter_var( (string) $email, FILTER_VALIDATE_EMAIL ) ? $email : false; }
 }
 if ( ! function_exists( 'get_user_by' ) ) {
-	function get_user_by( string $field, $value ) { return false; }
+	function get_user_by( string $field, $value ) {
+		$field = strtolower( (string) $field );
+		if ( 'id' !== $field && 'user_id' !== $field ) {
+			return false;
+		}
+		$id = absint( $value );
+		if ( ! $id ) {
+			return false;
+		}
+		if ( isset( $GLOBALS['__atora_test_users'][ $id ] ) ) {
+			return $GLOBALS['__atora_test_users'][ $id ];
+		}
+		$data = get_userdata( $id );
+		if ( $data && isset( $data->user_email ) ) {
+			return new WP_User( $id, (string) $data->user_email, (string) ( $data->display_name ?? '' ) );
+		}
+		return false;
+	}
+}
+
+$GLOBALS['__atora_test_users'] = array();
+if ( ! function_exists( 'atora_test_set_user' ) ) {
+	function atora_test_set_user( int $id, array $fields = array() ): void {
+		$defaults = array(
+			'ID'           => $id,
+			'user_email'   => 'user' . $id . '@example.test',
+			'display_name' => 'User ' . $id,
+			'user_login'   => 'user' . $id,
+		);
+		$row = array_merge( $defaults, $fields );
+		$GLOBALS['__atora_test_users'][ $id ] = new WP_User( $id, (string) $row['user_email'], (string) $row['display_name'] );
+		$GLOBALS['__atora_test_users'][ $id ]->user_login = (string) $row['user_login'];
+	}
+}
+if ( ! function_exists( 'atora_test_reset_users' ) ) {
+	function atora_test_reset_users(): void { $GLOBALS['__atora_test_users'] = array(); }
 }
 if ( ! class_exists( 'WP_User' ) ) {
 	class WP_User {

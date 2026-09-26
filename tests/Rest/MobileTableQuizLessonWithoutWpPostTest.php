@@ -137,6 +137,8 @@ namespace ATORA\Tests\Rest {
 			$GLOBALS['__atora_test_current_user_id'] = 10;
 			$GLOBALS['__atora_test_wp_insert_post_fail'] = false;
 			$GLOBALS['__atora_test_wp_insert_post_id'] = 55555;
+			$GLOBALS['__atora_test_wp_insert_post_calls'] = 0;
+			$GLOBALS['__atora_test_wp_insert_post_last'] = array();
 			$ref = new \ReflectionClass( \ATORA_Mobile_REST_Controller::class );
 			$p = $ref->getProperty( 'enrollment_index_cache' );
 			$p->setAccessible( true );
@@ -159,6 +161,7 @@ namespace ATORA\Tests\Rest {
 			$this->assertTrue( is_wp_error( $result ) );
 			$this->assertSame( 'atora_mobile_quiz_requires_wp_identity', $result->get_error_code() );
 			$this->assertSame( 0, (int) $wpdb->insert_count );
+			$this->assertSame( 0, (int) ( $GLOBALS['__atora_test_wp_insert_post_calls'] ?? 0 ) );
 			$this->assertSame( array(), (array) ( $GLOBALS['__atora_test_transients'] ?? array() ) );
 		}
 	}

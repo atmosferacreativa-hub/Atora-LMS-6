@@ -151,6 +151,8 @@ namespace ATORA\Tests\Rest {
 		$GLOBALS['__atora_test_current_user_id'] = 10;
 		$GLOBALS['__atora_test_wp_insert_post_id'] = 12345;
 		$GLOBALS['__atora_test_wp_insert_post_fail'] = false;
+		$GLOBALS['__atora_test_wp_insert_post_calls'] = 0;
+		$GLOBALS['__atora_test_wp_insert_post_last'] = array();
 		$ref = new \ReflectionClass( \ATORA_Mobile_REST_Controller::class );
 		$p = $ref->getProperty( 'enrollment_index_cache' );
 		$p->setAccessible( true );
