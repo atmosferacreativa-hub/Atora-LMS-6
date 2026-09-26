@@ -976,6 +976,14 @@ add_action( 'init', static function () {
 		}
 	} );
 
+	// Sync: cuando una submission se califica, reflejar la nota en la tabla
+	// atora_quiz_submissions (solo si existe una fila vinculada por wp_post_id).
+	atora_lms_require_module( 'includes/grading/class-table-quiz-submission-sync.php', static function() {
+		if ( class_exists( 'CLMS_Table_Quiz_Submission_Sync' ) && method_exists( 'CLMS_Table_Quiz_Submission_Sync', 'register_hooks' ) ) {
+			CLMS_Table_Quiz_Submission_Sync::register_hooks();
+		}
+	} );
+
 	// Keep roles/caps in sync across updates (not only on activation).
 	$installed_version = get_option( 'atora_lms_roles_version', '' );
 	if ( $installed_version !== ATORA_LMS_VERSION ) {
