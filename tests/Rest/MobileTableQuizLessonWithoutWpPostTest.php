@@ -147,25 +147,19 @@ namespace ATORA\Tests\Rest {
 			atora_test_reset_options();
 		}
 
-		public function test_quiz_allows_table_only_lesson_when_table_quiz_exists(): void {
+		public function test_quiz_denies_table_only_lesson_when_wp_identity_is_missing(): void {
 			$response = \ATORA_Mobile_REST_Controller::quiz( new \WP_REST_Request( array( 'lesson_id' => 12 ) ) );
-			$this->assertFalse( is_wp_error( $response ) );
-			$data = (array) $response->get_data();
-			$this->assertSame( 12, (int) ( $data['quiz']['lesson_id'] ?? 0 ) );
-			$this->assertNotSame( '', (string) ( $data['quiz']['token'] ?? '' ) );
+			$this->assertTrue( is_wp_error( $response ) );
+			$this->assertSame( 'atora_mobile_quiz_requires_wp_identity', $response->get_error_code() );
 		}
 
-		public function test_submit_persists_table_quiz_for_table_only_lesson(): void {
-			$quiz = \ATORA_Mobile_REST_Controller::quiz( new \WP_REST_Request( array( 'lesson_id' => 12 ) ) );
-			$this->assertFalse( is_wp_error( $quiz ) );
-			$token = (string) ( $quiz->get_data()['quiz']['token'] ?? '' );
-			$this->assertNotSame( '', $token );
-
+		public function test_submit_does_not_persist_or_issue_tokens_when_wp_identity_is_missing(): void {
 			global $wpdb;
-			$result = \ATORA_Mobile_REST_Controller::submit_quiz( new \WP_REST_Request( array( 'lesson_id' => 12, 'answers' => array( '4' ), 'token' => $token ) ) );
-			$this->assertFalse( is_wp_error( $result ) );
-			$this->assertSame( 1, (int) $wpdb->insert_count );
+			$result = \ATORA_Mobile_REST_Controller::submit_quiz( new \WP_REST_Request( array( 'lesson_id' => 12, 'answers' => array( '4' ), 'token' => 'anything' ) ) );
+			$this->assertTrue( is_wp_error( $result ) );
+			$this->assertSame( 'atora_mobile_quiz_requires_wp_identity', $result->get_error_code() );
+			$this->assertSame( 0, (int) $wpdb->insert_count );
+			$this->assertSame( array(), (array) ( $GLOBALS['__atora_test_transients'] ?? array() ) );
 		}
 	}
 }
-
