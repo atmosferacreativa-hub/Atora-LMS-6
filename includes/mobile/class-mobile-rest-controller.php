@@ -489,7 +489,8 @@ final class ATORA_Mobile_REST_Controller {
 		$auth = self::authorize_course_id( get_current_user_id(), $course_id );
 		if ( is_wp_error( $auth ) ) { return $auth; }
 		$wp_post_id     = absint( $lesson['wp_post_id'] ?? 0 );
-		$has_table_quiz = self::has_table_quiz( $lesson_id );
+		$table_quiz_row = self::get_table_quiz_row( $lesson_id );
+		$has_table_quiz = (bool) $table_quiz_row;
 		if ( ! $wp_post_id || 'lm_lesson' !== get_post_type( $wp_post_id ) ) {
 			if ( ! $has_table_quiz ) {
 				return new WP_Error( 'atora_mobile_quiz_not_found', __( 'Esta lección no contiene una evaluación móvil.', 'atora-lms' ), array( 'status' => 404 ) );
@@ -505,6 +506,42 @@ final class ATORA_Mobile_REST_Controller {
 				__( 'Esta evaluación requiere identidad WordPress (lección) para registrar y bloquear por Drip.', 'atora-lms' ),
 				array( 'status' => 409 )
 			);
+		}
+
+		// Quizzes en tablas requieren identidad WP coherente para asegurar:
+		// - Drip (depende de lm_lesson y su relación con lm_course)
+		// - Gradebook/SpeedGrader (submission enlazado con _clms_submission_*).
+		if ( $has_table_quiz ) {
+			$course = \ATORA\LMS\LMS_Course_Service::get( $course_id );
+			$wp_course_id = absint( is_array( $course ) ? ( $course['wp_post_id'] ?? 0 ) : 0 );
+			if ( ! $wp_course_id || 'lm_course' !== get_post_type( $wp_course_id ) ) {
+				return new WP_Error(
+					'atora_mobile_quiz_requires_wp_course_identity',
+					__( 'Esta evaluación requiere identidad WordPress (curso) para registrarse correctamente.', 'atora-lms' ),
+					array( 'status' => 409 )
+				);
+			}
+
+			$lesson_course_wp = absint( get_post_meta( $wp_post_id, '_clms_lesson_course_id', true ) );
+			if ( ! $lesson_course_wp ) {
+				$lesson_course_wp = absint( get_post_meta( $wp_post_id, '_clms_course_id', true ) );
+			}
+			if ( ! $lesson_course_wp || $lesson_course_wp !== $wp_course_id ) {
+				return new WP_Error(
+					'atora_mobile_quiz_identity_mismatch',
+					__( 'La identidad WordPress (lección/curso) no coincide con las tablas.', 'atora-lms' ),
+					array( 'status' => 409 )
+				);
+			}
+
+			$quiz_course_id = absint( is_array( $table_quiz_row ) ? ( $table_quiz_row['course_id'] ?? 0 ) : 0 );
+			if ( ! $quiz_course_id || $quiz_course_id !== $course_id ) {
+				return new WP_Error(
+					'atora_mobile_quiz_identity_mismatch',
+					__( 'La identidad WordPress (lección/curso) no coincide con las tablas.', 'atora-lms' ),
+					array( 'status' => 409 )
+				);
+			}
 		}
 
 		// Drip: si la lección aún no está disponible, bloquear también quizzes móviles.
