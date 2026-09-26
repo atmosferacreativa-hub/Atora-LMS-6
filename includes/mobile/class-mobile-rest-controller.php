@@ -488,15 +488,22 @@ final class ATORA_Mobile_REST_Controller {
 		$course_id = absint( $lesson['course_id'] ?? 0 );
 		$auth = self::authorize_course_id( get_current_user_id(), $course_id );
 		if ( is_wp_error( $auth ) ) { return $auth; }
-		$wp_post_id = absint( $lesson['wp_post_id'] ?? 0 );
+		$wp_post_id     = absint( $lesson['wp_post_id'] ?? 0 );
+		$has_table_quiz = self::has_table_quiz( $lesson_id );
 		if ( ! $wp_post_id || 'lm_lesson' !== get_post_type( $wp_post_id ) ) {
-			return new WP_Error( 'atora_mobile_quiz_not_found', __( 'Esta lección no contiene una evaluación móvil.', 'atora-lms' ), array( 'status' => 404 ) );
+			// Tabla-only lesson support: allow the mobile quiz contract when a
+			// table quiz exists, even if the lesson has no lm_lesson CPT.
+			if ( ! $has_table_quiz ) {
+				return new WP_Error( 'atora_mobile_quiz_not_found', __( 'Esta lección no contiene una evaluación móvil.', 'atora-lms' ), array( 'status' => 404 ) );
+			}
+			$wp_post_id = 0;
 		}
 
 		// Drip: si la lección aún no está disponible, bloquear también quizzes móviles.
 		// Importante: en mobile podemos estar matriculados solo en tablas; por eso
 		// NO delegamos esta decisión a CLMS_Helper::user_can_access_lesson().
-		if ( class_exists( 'CLMS_Drip' ) && is_callable( array( 'CLMS_Drip', 'is_lesson_available' ) ) ) {
+		// Drip enforcement requires a legacy lm_lesson post id.
+		if ( $wp_post_id && class_exists( 'CLMS_Drip' ) && is_callable( array( 'CLMS_Drip', 'is_lesson_available' ) ) ) {
 			$available = (bool) \CLMS_Drip::is_lesson_available( get_current_user_id(), $wp_post_id );
 			if ( ! $available ) {
 				return new WP_Error( 'clms_lesson_locked', __( 'La lección aún no está disponible.', 'atora-lms' ), array( 'status' => 403 ) );
