@@ -114,7 +114,17 @@ namespace ATORA\Tests\Grading {
 			$this->assertCount( 1, $wpdb->queries );
 			$this->assertStringContainsString( 'grade = NULL', (string) $wpdb->queries[0] );
 			$this->assertStringContainsString( 'graded_at = NULL', (string) $wpdb->queries[0] );
-			$this->assertStringContainsString( 'status = pending', (string) $wpdb->queries[0] );
+			$this->assertStringContainsString( 'status = graded', (string) $wpdb->queries[0] );
+		}
+
+		public function test_keeps_status_when_grade_is_cleared(): void {
+			global $wpdb;
+			$wpdb->existing_wp_post_ids = array( 123 );
+
+			$this->assertTrue( \CLMS_Table_Quiz_Submission_Sync::sync( 123, 'graded', '' ) );
+			$this->assertCount( 1, $wpdb->queries );
+			$this->assertStringContainsString( 'status = graded', (string) $wpdb->queries[0] );
+			$this->assertStringContainsString( 'graded_at = NULL', (string) $wpdb->queries[0] );
 		}
 
 		public function test_noop_for_legacy_submission_without_table_row(): void {

@@ -107,13 +107,12 @@ final class CLMS_Table_Quiz_Submission_Sync {
 			// Importante: no castear '' a 0. Si el docente borró la nota,
 			// persistir NULL en la tabla.
 			// Semántica: sin nota publicada => graded_at debe ser NULL para no
-			// presentar la entrega como calificada; status vuelve a 'pending'
-			// por coherencia con grade=NULL.
+			// presentar la entrega como calificada. El status debe reflejar el
+			// estado del publicador WP (p.ej. puede seguir siendo 'graded').
 			$status_on_clear = sanitize_key( $status );
-			if ( '' === $status_on_clear || 'graded' === $status_on_clear ) {
-				$status_on_clear = 'pending';
-			}
-			$sql = $wpdb->prepare( "UPDATE {$table} SET grade = NULL, graded_at = NULL, status = %s WHERE wp_post_id = %d", $status_on_clear, $submission_id ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$sql = '' !== $status_on_clear
+				? $wpdb->prepare( "UPDATE {$table} SET grade = NULL, graded_at = NULL, status = %s WHERE wp_post_id = %d", $status_on_clear, $submission_id ) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				: $wpdb->prepare( "UPDATE {$table} SET grade = NULL, graded_at = NULL WHERE wp_post_id = %d", $submission_id ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			$result = $wpdb->query( $sql ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 			if ( false === $result ) {
 				self::log_db_failure( $submission_id, $wpdb->last_error ?? '' );
