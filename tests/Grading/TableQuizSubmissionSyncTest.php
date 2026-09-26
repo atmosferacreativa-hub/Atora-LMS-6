@@ -10,6 +10,9 @@ namespace ATORA\Tests\Grading {
 	final class TableQuizSubmissionSyncWpdb {
 		public string $prefix = 'wp_';
 		public string $last_error = '';
+		public bool $table_exists = true;
+		public bool $fail_show_tables = false;
+		public bool $fail_select = false;
 		public array $existing_wp_post_ids = array();
 		public array $updates = array();
 		public array $queries = array();
@@ -32,12 +35,22 @@ namespace ATORA\Tests\Grading {
 				return null;
 			}
 			if ( str_contains( $sql, 'SHOW TABLES LIKE' ) ) {
-				return 'wp_atora_quiz_submissions';
+				if ( $this->fail_show_tables ) {
+					$this->last_error = 'show_tables_failed';
+					return null;
+				}
+				$this->last_error = '';
+				return $this->table_exists ? 'wp_atora_quiz_submissions' : null;
 			}
 			if ( str_contains( $sql, 'FROM wp_atora_quiz_submissions' ) && str_contains( $sql, 'wp_post_id' ) ) {
+				if ( $this->fail_select ) {
+					$this->last_error = 'select_failed';
+					return null;
+				}
+				$this->last_error = '';
 				if ( preg_match( '/wp_post_id\s*=\s*(\d+)/', $sql, $m ) ) {
 					$wp_post_id = (int) $m[1];
-					return in_array( $wp_post_id, $this->existing_wp_post_ids, true ) ? 777 : null;
+					return in_array( $wp_post_id, $this->existing_wp_post_ids, true ) ? 1 : null;
 				}
 			}
 			return null;
@@ -100,6 +113,8 @@ namespace ATORA\Tests\Grading {
 			$this->assertCount( 0, $wpdb->updates );
 			$this->assertCount( 1, $wpdb->queries );
 			$this->assertStringContainsString( 'grade = NULL', (string) $wpdb->queries[0] );
+			$this->assertStringContainsString( 'graded_at = NULL', (string) $wpdb->queries[0] );
+			$this->assertStringContainsString( 'status = pending', (string) $wpdb->queries[0] );
 		}
 
 		public function test_noop_for_legacy_submission_without_table_row(): void {
@@ -119,6 +134,31 @@ namespace ATORA\Tests\Grading {
 
 			$this->assertFalse( \CLMS_Table_Quiz_Submission_Sync::sync( 123, 'graded', 80 ) );
 		}
+
+		public function test_noop_when_table_is_missing(): void {
+			global $wpdb;
+			$wpdb->table_exists = false;
+			$wpdb->existing_wp_post_ids = array( 123 );
+
+			$this->assertTrue( \CLMS_Table_Quiz_Submission_Sync::sync( 123, 'graded', 80 ) );
+			$this->assertCount( 0, $wpdb->updates );
+			$this->assertCount( 0, $wpdb->queries );
+		}
+
+		public function test_returns_false_when_show_tables_query_fails(): void {
+			global $wpdb;
+			$wpdb->fail_show_tables = true;
+			$wpdb->existing_wp_post_ids = array( 123 );
+
+			$this->assertFalse( \CLMS_Table_Quiz_Submission_Sync::sync( 123, 'graded', 80 ) );
+		}
+
+		public function test_returns_false_when_select_query_fails(): void {
+			global $wpdb;
+			$wpdb->existing_wp_post_ids = array( 123 );
+			$wpdb->fail_select = true;
+
+			$this->assertFalse( \CLMS_Table_Quiz_Submission_Sync::sync( 123, 'graded', 80 ) );
+		}
 	}
 }
-

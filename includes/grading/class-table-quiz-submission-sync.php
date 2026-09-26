@@ -72,16 +72,28 @@ final class CLMS_Table_Quiz_Submission_Sync {
 		}
 
 		$table = $wpdb->prefix . 'atora_quiz_submissions';
-		$exists = (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		if ( $exists !== $table ) {
+		$exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		if ( null === $exists ) {
+			// Distinguir tabla realmente ausente (no-op) de fallo de consulta.
+			if ( ! empty( $wpdb->last_error ) ) {
+				self::log_db_failure( $submission_id, (string) $wpdb->last_error );
+				return false;
+			}
+			return true;
+		}
+		if ( (string) $exists !== $table ) {
 			return true;
 		}
 
-		$row_id = $wpdb->get_var(
-			$wpdb->prepare( "SELECT id FROM {$table} WHERE wp_post_id = %d LIMIT 1", $submission_id ) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$linked = $wpdb->get_var(
+			$wpdb->prepare( "SELECT 1 FROM {$table} WHERE wp_post_id = %d LIMIT 1", $submission_id ) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		);
-		if ( ! $row_id ) {
-			// No hay fila para este submission → probablemente entrega legacy.
+		if ( null === $linked ) {
+			// Distinguir entrega legacy (sin fila; no-op) de fallo SQL.
+			if ( ! empty( $wpdb->last_error ) ) {
+				self::log_db_failure( $submission_id, (string) $wpdb->last_error );
+				return false;
+			}
 			return true;
 		}
 
@@ -94,9 +106,14 @@ final class CLMS_Table_Quiz_Submission_Sync {
 		if ( $grade_is_empty ) {
 			// Importante: no castear '' a 0. Si el docente borró la nota,
 			// persistir NULL en la tabla.
-			$sql = '' !== $status
-				? $wpdb->prepare( "UPDATE {$table} SET grade = NULL, status = %s WHERE wp_post_id = %d", $status, $submission_id ) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-				: $wpdb->prepare( "UPDATE {$table} SET grade = NULL WHERE wp_post_id = %d", $submission_id ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			// Semántica: sin nota publicada => graded_at debe ser NULL para no
+			// presentar la entrega como calificada; status vuelve a 'pending'
+			// por coherencia con grade=NULL.
+			$status_on_clear = sanitize_key( $status );
+			if ( '' === $status_on_clear || 'graded' === $status_on_clear ) {
+				$status_on_clear = 'pending';
+			}
+			$sql = $wpdb->prepare( "UPDATE {$table} SET grade = NULL, graded_at = NULL, status = %s WHERE wp_post_id = %d", $status_on_clear, $submission_id ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			$result = $wpdb->query( $sql ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 			if ( false === $result ) {
 				self::log_db_failure( $submission_id, $wpdb->last_error ?? '' );
@@ -144,4 +161,3 @@ final class CLMS_Table_Quiz_Submission_Sync {
 		}
 	}
 }
-
