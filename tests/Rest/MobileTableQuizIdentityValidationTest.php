@@ -187,6 +187,23 @@ namespace ATORA\Tests\Rest {
 			$wpdb->quiz_course_id = 999;
 			$this->assert_denied_without_side_effects( 'atora_mobile_quiz_identity_mismatch' );
 		}
+
+		public function test_denies_when_relation_keys_are_contradictory_non_empty(): void {
+			atora_test_reset_post_meta();
+			atora_test_set_post_meta( 5001, '_clms_course_id', 428 );
+			atora_test_set_post_meta( 5001, 'lm_course_id', 9999 );
+			$this->assert_denied_without_side_effects( 'atora_mobile_quiz_identity_conflict' );
+		}
+
+		public function test_allows_when_only_legacy_key_is_present_and_matches_course(): void {
+			atora_test_reset_post_meta();
+			atora_test_set_post_meta( 5001, 'lm_course_id', 428 );
+
+			$response = \ATORA_Mobile_REST_Controller::quiz( new \WP_REST_Request( array( 'lesson_id' => 12 ) ) );
+			$this->assertFalse( is_wp_error( $response ) );
+			$data = (array) $response->get_data();
+			$token = (string) ( $data['quiz']['token'] ?? '' );
+			$this->assertNotSame( '', $token );
+		}
 	}
 }
-

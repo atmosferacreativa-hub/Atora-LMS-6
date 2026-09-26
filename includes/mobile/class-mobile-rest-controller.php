@@ -522,10 +522,46 @@ final class ATORA_Mobile_REST_Controller {
 				);
 			}
 
-			$lesson_course_wp = absint( get_post_meta( $wp_post_id, '_clms_lesson_course_id', true ) );
-			if ( ! $lesson_course_wp ) {
-				$lesson_course_wp = absint( get_post_meta( $wp_post_id, '_clms_course_id', true ) );
+			// Resolver el course_id de la lección WP con la misma precedencia
+			// que CLMS_Helper::get_lesson_course_id(), pero sin escribir metadata
+			// en GET/POST (no llamamos al helper).
+			$relation_keys = array(
+				'_clms_course_id',
+				'lm_course_id',
+				'_clms_lesson_course_id',
+				'course_id',
+				'_lesson_course_id',
+				'lesson_course_id',
+			);
+			$non_empty_values = array();
+			foreach ( $relation_keys as $meta_key ) {
+				$value_raw = get_post_meta( $wp_post_id, (string) $meta_key, true );
+				if ( '' === (string) $value_raw || null === $value_raw ) {
+					continue;
+				}
+				$value = absint( $value_raw );
+				if ( $value > 0 ) {
+					$non_empty_values[ (string) $meta_key ] = $value;
+				}
 			}
+
+			$unique = array_values( array_unique( array_values( $non_empty_values ) ) );
+			if ( count( $unique ) > 1 ) {
+				return new WP_Error(
+					'atora_mobile_quiz_identity_conflict',
+					__( 'La lección contiene claves de relación curso–lección contradictorias.', 'atora-lms' ),
+					array( 'status' => 409 )
+				);
+			}
+
+			$lesson_course_wp = 0;
+			foreach ( $relation_keys as $meta_key ) {
+				if ( isset( $non_empty_values[ (string) $meta_key ] ) ) {
+					$lesson_course_wp = absint( $non_empty_values[ (string) $meta_key ] );
+					break;
+				}
+			}
+
 			if ( ! $lesson_course_wp || $lesson_course_wp !== $wp_course_id ) {
 				return new WP_Error(
 					'atora_mobile_quiz_identity_mismatch',
