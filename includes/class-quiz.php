@@ -820,7 +820,11 @@ class CLMS_Quiz {
 		$elapsed = time() - (int) $start;
 
 		if ( $elapsed > $allowed ) {
-			return new WP_Error( 'quiz_time_expired', __( 'El tiempo para responder esta evaluación ha terminado.', 'atora-lms' ) );
+			return new WP_Error(
+				'quiz_time_expired',
+				__( 'El tiempo para responder esta evaluación ha terminado.', 'atora-lms' ),
+				array( 'status' => 409 )
+			);
 		}
 
 		return true;
