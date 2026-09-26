@@ -28,14 +28,31 @@ namespace {
 				return in_array( $course_id, (array) ( self::$enrolled[ $user_id ] ?? array() ), true );
 			}
 
-			public static function is_course_completed( $user_id, $course_id ): bool {
-				$user_id   = (int) $user_id;
-				$course_id = (int) $course_id;
-				return in_array( $course_id, (array) ( self::$completed[ $user_id ] ?? array() ), true );
+				public static function is_course_completed( $user_id, $course_id ): bool {
+					$user_id   = (int) $user_id;
+					$course_id = (int) $course_id;
+					return in_array( $course_id, (array) ( self::$completed[ $user_id ] ?? array() ), true );
+				}
+
+				public static function get_post_meta_first( $post_id, $key, $default = '' ) {
+					$post_id = (int) $post_id;
+					if ( is_array( $key ) ) {
+						foreach ( $key as $candidate ) {
+							$candidate = (string) $candidate;
+							$value     = get_post_meta( $post_id, $candidate, true );
+							if ( '' !== (string) $value ) {
+								return $value;
+							}
+						}
+						return $default;
+					}
+					$key   = (string) $key;
+					$value = get_post_meta( $post_id, $key, true );
+					return '' !== (string) $value ? $value : $default;
+				}
 			}
 		}
 	}
-}
 
 namespace ATORA\Tests\Rest {
 
@@ -230,6 +247,34 @@ namespace ATORA\Tests\Rest {
 			);
 
 			$result = \ATORA_Mobile_REST_Controller::course( new \WP_REST_Request( array( 'course_id' => 99 ) ) );
+			$this->assertTrue( is_wp_error( $result ) );
+			$this->assertSame( 'atora_mobile_course_forbidden', $result->get_error_code() );
+		}
+
+		public function test_course_denies_when_table_enrollment_is_expired(): void {
+			$GLOBALS['__atora_mobile_test_db']['enrollments'][10]['active'] = array(
+				array(
+					'id'            => 900,
+					'user_id'       => 10,
+					'course_id'     => 55,
+					'status'        => 'active',
+					'expires_at'    => '2000-01-01 00:00:00',
+					'last_activity' => '2026-01-01 00:00:00',
+				),
+			);
+			$GLOBALS['__atora_mobile_test_db']['courses'][55] = array(
+				'id'             => 55,
+				'status'         => 'published',
+				'title'          => 'Curso 55',
+				'excerpt'        => '',
+				'thumbnail_url'  => '',
+				'duration_hours' => 0,
+				'level'          => '',
+				'language'       => 'es',
+				'wp_post_id'     => 0,
+			);
+
+			$result = \ATORA_Mobile_REST_Controller::course( new \WP_REST_Request( array( 'course_id' => 55 ) ) );
 			$this->assertTrue( is_wp_error( $result ) );
 			$this->assertSame( 'atora_mobile_course_forbidden', $result->get_error_code() );
 		}

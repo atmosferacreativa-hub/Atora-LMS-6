@@ -396,7 +396,7 @@ final class ATORA_Mobile_REST_Controller {
 		if ( is_wp_error( $context ) ) {
 			return $context;
 		}
-		$table_quiz = self::get_table_quiz_payload( absint( $context['lesson_id'] ) );
+		$table_quiz = self::get_table_quiz_payload( get_current_user_id(), absint( $context['lesson_id'] ) );
 		if ( $table_quiz ) {
 			return new WP_REST_Response( array( 'quiz' => $table_quiz ), 200 );
 		}
@@ -417,14 +417,57 @@ final class ATORA_Mobile_REST_Controller {
 		if ( $table_quiz_row ) {
 			$params  = (array) $request->get_json_params();
 			$answers = isset( $params['answers'] ) && is_array( $params['answers'] ) ? array_values( $params['answers'] ) : array();
-			$result  = self::grade_table_quiz(
-				get_current_user_id(),
-				absint( $context['lesson_id'] ),
-				absint( $context['course_id'] ),
-				$table_quiz_row,
-				$answers
-			);
-			return new WP_REST_Response( array( 'result' => $result ), 200 );
+			$token   = sanitize_text_field( (string) ( $params['token'] ?? '' ) );
+			$user_id = get_current_user_id();
+			$lesson_id = absint( $context['lesson_id'] );
+			$course_id = absint( $context['course_id'] );
+
+			$lock_key = self::acquire_table_quiz_lock( $user_id, $lesson_id );
+			if ( is_wp_error( $lock_key ) ) {
+				return $lock_key;
+			}
+
+			try {
+				$settings = json_decode( (string) ( $table_quiz_row['settings_json'] ?? '{}' ), true );
+				$settings = is_array( $settings ) ? $settings : array();
+				$time_limit_seconds = absint( $settings['time_limit_seconds'] ?? 0 );
+					$attempts_allowed   = absint( $settings['attempts'] ?? 1 );
+					if ( $attempts_allowed <= 0 ) { $attempts_allowed = 1; }
+
+					$quiz_id = absint( $table_quiz_row['id'] ?? 0 );
+					$stats   = self::table_quiz_stats( $user_id, $lesson_id, $quiz_id );
+					$attempts_used = absint( $stats['attempts_used'] ?? 0 );
+					$best_before   = absint( $stats['best_score'] ?? 0 );
+					$attempt       = $attempts_used + 1;
+					if ( $attempt > $attempts_allowed ) {
+						return new WP_Error( 'atora_mobile_quiz_attempts_exceeded', __( 'Ya no tienes más intentos disponibles.', 'atora-lms' ), array( 'status' => 409 ) );
+					}
+
+					$validation = self::validate_table_quiz_token( $user_id, $lesson_id, $token, $time_limit_seconds );
+					if ( is_wp_error( $validation ) ) {
+						return $validation;
+					}
+					if ( ! $validation ) {
+						return new WP_Error( 'atora_mobile_quiz_token_invalid', __( 'La evaluación venció. Vuelve a abrirla para continuar.', 'atora-lms' ), array( 'status' => 409 ) );
+					}
+					self::consume_table_quiz_token( $user_id, $lesson_id );
+				$result  = self::grade_table_quiz(
+					$user_id,
+					$lesson_id,
+					$course_id,
+					$table_quiz_row,
+					$answers,
+					$attempt,
+					$best_before,
+					$attempts_allowed
+				);
+				if ( is_wp_error( $result ) ) {
+					return $result;
+				}
+				return new WP_REST_Response( array( 'result' => $result ), 200 );
+			} finally {
+				self::release_table_quiz_lock( (string) $lock_key );
+			}
 		}
 		if ( ! class_exists( 'CLMS_Quiz' ) ) {
 			return new WP_Error( 'atora_mobile_quiz_unavailable', __( 'El motor de evaluaciones no está disponible.', 'atora-lms' ), array( 'status' => 503 ) );
@@ -449,6 +492,16 @@ final class ATORA_Mobile_REST_Controller {
 		if ( ! $wp_post_id || 'lm_lesson' !== get_post_type( $wp_post_id ) ) {
 			return new WP_Error( 'atora_mobile_quiz_not_found', __( 'Esta lección no contiene una evaluación móvil.', 'atora-lms' ), array( 'status' => 404 ) );
 		}
+
+		// Drip: si la lección aún no está disponible, bloquear también quizzes móviles.
+		// Importante: en mobile podemos estar matriculados solo en tablas; por eso
+		// NO delegamos esta decisión a CLMS_Helper::user_can_access_lesson().
+		if ( class_exists( 'CLMS_Drip' ) && is_callable( array( 'CLMS_Drip', 'is_lesson_available' ) ) ) {
+			$available = (bool) \CLMS_Drip::is_lesson_available( get_current_user_id(), $wp_post_id );
+			if ( ! $available ) {
+				return new WP_Error( 'clms_lesson_locked', __( 'La lección aún no está disponible.', 'atora-lms' ), array( 'status' => 403 ) );
+			}
+		}
 		return array( 'lesson_id' => $lesson_id, 'course_id' => $course_id, 'wp_post_id' => $wp_post_id );
 	}
 
@@ -468,7 +521,7 @@ final class ATORA_Mobile_REST_Controller {
 		return $row && is_array( $row ) ? $row : null;
 	}
 
-	private static function get_table_quiz_payload( int $lesson_id ): ?array {
+	private static function get_table_quiz_payload( int $user_id, int $lesson_id ): ?array {
 		$row = self::get_table_quiz_row( $lesson_id );
 		if ( ! $row ) { return null; }
 
@@ -492,23 +545,169 @@ final class ATORA_Mobile_REST_Controller {
 		$settings = is_array( $settings ) ? $settings : array();
 		$time_limit = absint( $settings['time_limit_seconds'] ?? 0 );
 		$attempts   = absint( $settings['attempts'] ?? 1 );
+		if ( $attempts <= 0 ) { $attempts = 1; }
+		$quiz_id    = absint( $row['id'] ?? 0 );
+		$stats      = self::table_quiz_stats( absint( $user_id ), $lesson_id, $quiz_id );
+		$best_score = isset( $stats['best_score'] ) ? absint( $stats['best_score'] ) : null;
+		$attempts_used = absint( $stats['attempts_used'] ?? 0 );
+		$can_submit = $attempts_used < $attempts;
+		$token = '';
+		$token_issued_at = 0;
+		$remaining_seconds = $time_limit > 0 ? $time_limit : 0;
+		if ( $can_submit ) {
+			$stored = get_transient( self::table_quiz_token_key( $user_id, $lesson_id ) );
+			if ( is_array( $stored ) ) {
+				$token          = (string) ( $stored['token'] ?? '' );
+				$token_issued_at = absint( $stored['issued_at'] ?? 0 );
+			} elseif ( is_string( $stored ) ) {
+				$token = (string) $stored;
+			}
+
+			if ( '' === $token ) {
+				$token = self::issue_table_quiz_token( absint( $user_id ), $lesson_id, $time_limit );
+				$token_issued_at = time();
+			} elseif ( $time_limit > 0 && $token_issued_at <= 0 ) {
+				// Normaliza transients legacy (token sin timestamp) para que el límite sea verificable.
+				$token_issued_at = time();
+				set_transient(
+					self::table_quiz_token_key( $user_id, $lesson_id ),
+					array( 'token' => (string) $token, 'issued_at' => $token_issued_at ),
+					max( HOUR_IN_SECONDS, $time_limit + HOUR_IN_SECONDS )
+				);
+			}
+
+			if ( $time_limit > 0 && $token_issued_at > 0 ) {
+				$elapsed = time() - $token_issued_at;
+				$remaining_seconds = max( 0, $time_limit - max( 0, (int) $elapsed ) );
+			} else {
+				$remaining_seconds = $time_limit > 0 ? $time_limit : 0;
+			}
+		}
 
 		return array(
 			'lesson_id'         => $lesson_id,
-			'token'             => wp_generate_password( 20, false ),
+			'token'             => $token,
 			'questions'         => $public_questions,
-			'can_submit'        => true,
-			'remaining_seconds' => $time_limit > 0 ? $time_limit : 0,
-			'attempts'          => $attempts > 0 ? $attempts : 1,
-			'best_score'        => null,
+			'can_submit'        => $can_submit,
+			'remaining_seconds' => $remaining_seconds,
+			'token_issued_at'   => $token_issued_at,
+			'attempts'          => $attempts,
+			'best_score'        => $best_score,
 			'retry_context'     => (object) array( 'source' => 'atora_table' ),
 		);
 	}
 
-	private static function grade_table_quiz( int $user_id, int $lesson_id, int $course_id, array $row, array $answers ): array {
+	private static function table_quiz_token_key( int $user_id, int $lesson_id ): string {
+		return 'atora_table_quiz_token_' . absint( $user_id ) . '_' . absint( $lesson_id );
+	}
+
+	private static function table_quiz_lock_key( int $user_id, int $lesson_id ): string {
+		return 'atora_table_quiz_lock_' . absint( $user_id ) . '_' . absint( $lesson_id );
+	}
+
+	private static function acquire_table_quiz_lock( int $user_id, int $lesson_id ) {
+		global $wpdb;
+		if ( ! isset( $wpdb ) || ! method_exists( $wpdb, 'get_var' ) || ! method_exists( $wpdb, 'prepare' ) ) {
+			return new WP_Error( 'atora_mobile_quiz_lock_unavailable', __( 'No se puede procesar la evaluación (lock no disponible).', 'atora-lms' ), array( 'status' => 503 ) );
+		}
+		$lock_key = self::table_quiz_lock_key( $user_id, $lesson_id );
+		$got      = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 0)', $lock_key ) );
+		if ( 1 === (int) $got ) {
+			return $lock_key;
+		}
+		return new WP_Error( 'atora_mobile_quiz_submission_locked', __( 'Tu evaluación ya se está procesando.', 'atora-lms' ), array( 'status' => 429 ) );
+	}
+
+	private static function release_table_quiz_lock( string $lock_key ): void {
+		$lock_key = trim( (string) $lock_key );
+		if ( '' === $lock_key ) {
+			return;
+		}
+		global $wpdb;
+		if ( ! isset( $wpdb ) || ! method_exists( $wpdb, 'get_var' ) || ! method_exists( $wpdb, 'prepare' ) ) {
+			return;
+		}
+		$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock_key ) );
+	}
+
+	private static function issue_table_quiz_token( int $user_id, int $lesson_id, int $time_limit_seconds = 0 ): string {
+		$token = function_exists( 'wp_generate_password' )
+			? wp_generate_password( 20, false )
+			: substr( sha1( (string) ( microtime( true ) . rand() ) ), 0, 20 );
+		set_transient(
+			self::table_quiz_token_key( $user_id, $lesson_id ),
+			array(
+				'token'     => (string) $token,
+				'issued_at' => time(),
+			),
+			max( HOUR_IN_SECONDS, $time_limit_seconds + HOUR_IN_SECONDS )
+		);
+		return (string) $token;
+	}
+
+	private static function validate_table_quiz_token( int $user_id, int $lesson_id, string $token, int $time_limit_seconds = 0 ) {
+		$token = trim( (string) $token );
+		if ( '' === $token ) { return false; }
+		$stored = get_transient( self::table_quiz_token_key( $user_id, $lesson_id ) );
+		$stored_token = '';
+		$issued_at    = 0;
+		if ( is_array( $stored ) ) {
+			$stored_token = (string) ( $stored['token'] ?? '' );
+			$issued_at    = absint( $stored['issued_at'] ?? 0 );
+		} else {
+			$stored_token = (string) $stored;
+		}
+		if ( '' === $stored_token || ! hash_equals( $stored_token, $token ) ) {
+			return false;
+		}
+		if ( $time_limit_seconds > 0 && $issued_at > 0 ) {
+			if ( ( time() - $issued_at ) >= $time_limit_seconds ) {
+				delete_transient( self::table_quiz_token_key( $user_id, $lesson_id ) );
+				return new WP_Error( 'atora_mobile_quiz_time_expired', __( 'Se agotó el tiempo de la evaluación. Vuelve a abrirla para reintentar.', 'atora-lms' ), array( 'status' => 409 ) );
+			}
+		}
+		return true;
+	}
+
+	private static function consume_table_quiz_token( int $user_id, int $lesson_id ): void {
+		delete_transient( self::table_quiz_token_key( $user_id, $lesson_id ) );
+	}
+
+	private static function table_quiz_stats( int $user_id, int $lesson_id, int $quiz_id ): array {
+		global $wpdb;
+		$user_id   = absint( $user_id );
+		$lesson_id = absint( $lesson_id );
+		$quiz_id   = absint( $quiz_id );
+		if ( ! $user_id || ! $lesson_id || ! $quiz_id ) {
+			return array( 'attempts_used' => 0, 'best_score' => null );
+		}
+		$table  = $wpdb->prefix . 'atora_quiz_submissions';
+		$exists = (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) );
+		if ( $exists !== $table ) {
+			return array( 'attempts_used' => 0, 'best_score' => null );
+		}
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT COUNT(*) AS attempts_used, MAX(grade) AS best_score FROM {$table} WHERE user_id = %d AND lesson_id = %d AND quiz_id = %d",
+				$user_id,
+				$lesson_id,
+				$quiz_id
+			),
+			ARRAY_A
+		);
+		return array(
+			'attempts_used' => absint( $row['attempts_used'] ?? 0 ),
+			'best_score'    => null !== ( $row['best_score'] ?? null ) ? absint( (int) $row['best_score'] ) : null,
+		);
+	}
+
+	private static function grade_table_quiz( int $user_id, int $lesson_id, int $course_id, array $row, array $answers, int $attempt, int $best_before, int $attempts_allowed ) {
 		$user_id   = absint( $user_id );
 		$lesson_id = absint( $lesson_id );
 		$course_id = absint( $course_id );
+		$attempt   = max( 1, absint( $attempt ) );
+		$best_before = max( 0, absint( $best_before ) );
+		$attempts_allowed = max( 1, absint( $attempts_allowed ) );
 
 		$questions = json_decode( (string) ( $row['questions_json'] ?? '[]' ), true );
 		$questions = is_array( $questions ) ? $questions : array();
@@ -551,23 +750,28 @@ final class ATORA_Mobile_REST_Controller {
 
 		$pct = $total > 0 ? (int) round( min( 100, max( 0, ( $score / $total ) * 100 ) ) ) : 0;
 
-		self::persist_table_quiz_submission( $user_id, $lesson_id, $course_id, absint( $row['id'] ?? 0 ), $pct, $graded_answers );
+		$persist = self::persist_table_quiz_submission( $user_id, $lesson_id, $course_id, absint( $row['id'] ?? 0 ), $pct, $graded_answers );
+		if ( is_wp_error( $persist ) ) {
+			return $persist;
+		}
+		$best = max( $best_before, $pct );
+		$can_retry = $attempt < $attempts_allowed;
 
 		return array(
 			'score'          => $pct,
-			'best_score'     => $pct,
-			'attempt'        => 1,
+			'best_score'     => $best,
+			'attempt'        => $attempt,
 			'student_message'=> $pct >= 70 ? __( '¡Bien! Tu resultado quedó registrado.', 'atora-lms' ) : __( 'Tu resultado quedó registrado. Puedes intentar nuevamente para mejorar.', 'atora-lms' ),
-			'can_retry'      => true,
+			'can_retry'      => $can_retry,
 		);
 	}
 
-	private static function persist_table_quiz_submission( int $user_id, int $lesson_id, int $course_id, int $quiz_id, int $pct, array $graded_answers ): void {
+	private static function persist_table_quiz_submission( int $user_id, int $lesson_id, int $course_id, int $quiz_id, int $pct, array $graded_answers ) {
 		global $wpdb;
 		$table = $wpdb->prefix . 'atora_quiz_submissions';
 		$exists = (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) );
 		if ( $exists !== $table ) {
-			return;
+			return new WP_Error( 'atora_mobile_quiz_persist_unavailable', __( 'No se pudo guardar la calificación (tabla no disponible).', 'atora-lms' ), array( 'status' => 503 ) );
 		}
 
 		$lesson = \ATORA\LMS\LMS_Course_Service::get_lesson( $lesson_id );
@@ -585,7 +789,7 @@ final class ATORA_Mobile_REST_Controller {
 			true
 		);
 		if ( is_wp_error( $submission_id ) || ! $submission_id ) {
-			return;
+			return new WP_Error( 'atora_mobile_quiz_persist_failed', __( 'No se pudo guardar la calificación (error al crear el submission).', 'atora-lms' ), array( 'status' => 500 ) );
 		}
 
 		update_post_meta( $submission_id, '_clms_submission_user_id', $user_id );
@@ -595,7 +799,7 @@ final class ATORA_Mobile_REST_Controller {
 		update_post_meta( $submission_id, '_clms_submission_grade', $pct );
 		update_post_meta( $submission_id, '_clms_submission_submitted_at', current_time( 'mysql' ) );
 
-		$wpdb->insert(
+		$ok = $wpdb->insert(
 			$table,
 			array(
 				'wp_post_id'    => absint( $submission_id ),
@@ -613,6 +817,36 @@ final class ATORA_Mobile_REST_Controller {
 			),
 			array( '%d','%d','%d','%d','%d','%d','%d','%s','%f','%s','%s','%s' )
 		);
+		if ( ! $ok ) {
+			self::rollback_table_quiz_submission_post( absint( $submission_id ) );
+			return new WP_Error( 'atora_mobile_quiz_persist_failed', __( 'No se pudo guardar la calificación (error al persistir).', 'atora-lms' ), array( 'status' => 500 ) );
+		}
+		return true;
+	}
+
+	private static function rollback_table_quiz_submission_post( int $submission_id ): void {
+		if ( $submission_id <= 0 ) {
+			return;
+		}
+
+		// Limpieza defensiva: asegurar que no queda un submission "graded" huérfano.
+		$meta_keys = array(
+			'_clms_submission_user_id',
+			'_clms_submission_lesson_id',
+			'_clms_submission_course_id',
+			'_clms_submission_status',
+			'_clms_submission_grade',
+			'_clms_submission_submitted_at',
+		);
+		foreach ( $meta_keys as $key ) {
+			if ( function_exists( 'delete_post_meta' ) ) {
+				delete_post_meta( $submission_id, (string) $key );
+			}
+		}
+
+		if ( function_exists( 'wp_delete_post' ) ) {
+			wp_delete_post( $submission_id, true );
+		}
 	}
 
 	public static function complete_lesson( WP_REST_Request $request ) {
@@ -805,17 +1039,23 @@ final class ATORA_Mobile_REST_Controller {
 			return self::$enrollment_index_cache[ $user_id ];
 		}
 
-		$by_course = array();
-		$ordered   = array();
+			$by_course = array();
+			$ordered   = array();
+			$now       = current_time( 'mysql', true );
 
-		// 1) Tablas: active + completed.
-		if ( class_exists( '\\ATORA\\LMS\\LMS_Enrollment_Service' ) ) {
-			foreach ( array( 'active', 'completed' ) as $status ) {
-				$rows = (array) \ATORA\LMS\LMS_Enrollment_Service::get_user_enrollments( $user_id, $status );
-				foreach ( $rows as $row ) {
-					if ( ! is_array( $row ) ) { continue; }
-					$course_id = absint( $row['course_id'] ?? 0 );
-					if ( $course_id <= 0 ) { continue; }
+			// 1) Tablas: active + completed.
+			if ( class_exists( '\\ATORA\\LMS\\LMS_Enrollment_Service' ) ) {
+				foreach ( array( 'active', 'completed' ) as $status ) {
+					$rows = (array) \ATORA\LMS\LMS_Enrollment_Service::get_user_enrollments( $user_id, $status );
+					foreach ( $rows as $row ) {
+						if ( ! is_array( $row ) ) { continue; }
+
+						$expires_at = sanitize_text_field( (string) ( $row['expires_at'] ?? '' ) );
+						if ( '' !== $expires_at && $expires_at < $now ) {
+							continue;
+						}
+						$course_id = absint( $row['course_id'] ?? 0 );
+						if ( $course_id <= 0 ) { continue; }
 
 					$row_status = sanitize_key( (string) ( $row['status'] ?? $status ) );
 					if ( '' === $row_status ) { $row_status = $status; }

@@ -85,7 +85,15 @@ if ( ! function_exists( 'wp_unslash' ) ) {
 		return is_array( $value ) ? array_map( 'wp_unslash', $value ) : ( is_string( $value ) ? stripslashes( $value ) : $value );
 	}
 }
-if ( ! function_exists( 'current_time' ) )     { function current_time( string $t, bool $gmt = false ): string { return date( 'Y-m-d H:i:s' ); } }
+if ( ! function_exists( 'current_time' ) ) {
+	function current_time( string $type, bool $gmt = false ) {
+		if ( 'timestamp' === $type ) {
+			return time();
+		}
+		return date( 'Y-m-d H:i:s' );
+	}
+}
+
 if ( ! function_exists( 'wp_date' ) ) {
 	function wp_date( string $format, $timestamp = null, $timezone = null ): string {
 		$ts = null === $timestamp ? time() : ( is_numeric( $timestamp ) ? (int) $timestamp : strtotime( (string) $timestamp ) );
@@ -95,6 +103,19 @@ if ( ! function_exists( 'wp_date' ) ) {
 $GLOBALS['__atora_test_current_user_id'] = 1;
 if ( ! function_exists( 'get_current_user_id' ) ) {
 	function get_current_user_id(): int { return (int) ( $GLOBALS['__atora_test_current_user_id'] ?? 1 ); }
+}
+
+// Drip: por defecto disponible (no bloquea). Tests pueden forzarlo.
+$GLOBALS['__atora_test_drip_available'] = true;
+if ( ! class_exists( 'CLMS_Drip' ) ) {
+	class CLMS_Drip {
+		public static function is_lesson_available( $user_id, $lesson_id ): bool {
+			return (bool) ( $GLOBALS['__atora_test_drip_available'] ?? true );
+		}
+	}
+}
+if ( ! function_exists( 'atora_test_set_drip_available' ) ) {
+	function atora_test_set_drip_available( bool $available ): void { $GLOBALS['__atora_test_drip_available'] = $available; }
 }
 if ( ! function_exists( 'wp_generate_uuid4' ) ) {
 	function wp_generate_uuid4(): string {
@@ -173,6 +194,15 @@ if ( ! function_exists( 'get_option' ) )       {
 }
 if ( ! function_exists( 'update_option' ) )    {
 	function update_option( string $k, $v, $autoload = null ): bool {
+		$GLOBALS['__atora_test_options'][ $k ] = $v;
+		return true;
+	}
+}
+if ( ! function_exists( 'add_option' ) ) {
+	function add_option( string $k, $v, $deprecated = '', $autoload = 'yes' ): bool {
+		if ( array_key_exists( $k, $GLOBALS['__atora_test_options'] ) ) {
+			return false;
+		}
 		$GLOBALS['__atora_test_options'][ $k ] = $v;
 		return true;
 	}
@@ -390,6 +420,11 @@ if ( ! function_exists( 'delete_post_meta' ) ) {
 if ( ! function_exists( 'atora_test_reset_post_meta' ) ) {
 	function atora_test_reset_post_meta(): void { $GLOBALS['__atora_test_post_meta'] = array(); }
 }
+
+$GLOBALS['__atora_test_deleted_posts'] = array();
+if ( ! function_exists( 'atora_test_reset_deleted_posts' ) ) {
+	function atora_test_reset_deleted_posts(): void { $GLOBALS['__atora_test_deleted_posts'] = array(); }
+}
 if ( ! function_exists( 'atora_test_set_user_cap' ) ) {
 	function atora_test_set_user_cap( int $user_id, string $capability, bool $has = true ): void {
 		$GLOBALS['__atora_test_user_caps'][ $user_id ][ $capability ] = $has;
@@ -513,20 +548,22 @@ if ( ! function_exists( 'wp_hash' ) )  { function wp_hash( string $data ): strin
 if ( ! function_exists( 'wp_salt' ) )  { function wp_salt( string $scheme = 'auth' ): string { return 'test-salt-' . $scheme; } }
 if ( ! function_exists( 'wp_rand' ) )  { function wp_rand( int $min = 0, int $max = 0 ): int { return random_int( $min, $max ?: PHP_INT_MAX ); } }
 $GLOBALS['__atora_test_transients'] = array();
+$GLOBALS['__atora_test_transient_expirations'] = array();
 if ( ! function_exists( 'get_transient' ) ) {
 	function get_transient( string $key ) { return $GLOBALS['__atora_test_transients'][ $key ] ?? false; }
 }
 if ( ! function_exists( 'set_transient' ) ) {
 	function set_transient( string $key, $value, int $expiration = 0 ): bool {
 		$GLOBALS['__atora_test_transients'][ $key ] = $value;
+		$GLOBALS['__atora_test_transient_expirations'][ $key ] = $expiration;
 		return true;
 	}
 }
 if ( ! function_exists( 'delete_transient' ) ) {
-	function delete_transient( string $key ): bool { unset( $GLOBALS['__atora_test_transients'][ $key ] ); return true; }
+	function delete_transient( string $key ): bool { unset( $GLOBALS['__atora_test_transients'][ $key ], $GLOBALS['__atora_test_transient_expirations'][ $key ] ); return true; }
 }
 if ( ! function_exists( 'atora_test_reset_transients' ) ) {
-	function atora_test_reset_transients(): void { $GLOBALS['__atora_test_transients'] = array(); }
+	function atora_test_reset_transients(): void { $GLOBALS['__atora_test_transients'] = array(); $GLOBALS['__atora_test_transient_expirations'] = array(); }
 }
 if ( ! function_exists( 'wp_cache_get' ) )     { function wp_cache_get( string $k, string $g = '' ) { return false; } }
 if ( ! function_exists( 'wp_cache_set' ) )     { function wp_cache_set( string $k, $v, string $g = '', int $ttl = 0 ): bool { return true; } }
