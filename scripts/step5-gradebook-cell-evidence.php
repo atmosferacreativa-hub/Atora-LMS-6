@@ -95,7 +95,7 @@ $report['gradebook']['first_columns'] = array_slice( array_map( static function 
 $matches = array();
 foreach ( $rows as $row ) {
 	$row = is_array( $row ) ? $row : array();
-	$row_student = absint( $row['student']['id'] ?? ( $row['user_id'] ?? 0 ) );
+	$row_student = absint( $row['student_id'] ?? ( $row['student']['id'] ?? ( $row['user_id'] ?? 0 ) ) );
 	$cells = is_array( $row['cells'] ?? null ) ? $row['cells'] : array();
 	foreach ( $cells as $cell ) {
 		$cell = is_array( $cell ) ? $cell : array();
@@ -103,8 +103,12 @@ foreach ( $rows as $row ) {
 		if ( $cell_submission_id !== $submission_id ) {
 			continue;
 		}
+		$cell_lesson_id = absint( $cell['lesson_id'] ?? 0 );
 		$matches[] = array(
 			'row_student_id' => $row_student,
+			'cell_lesson_id' => $cell_lesson_id,
+			'same_student'   => $row_student === $student_id,
+			'same_lesson'    => $cell_lesson_id === $lesson_id,
 			'cell_grade'     => $cell['grade'] ?? null,
 			'cell_status'    => $cell['status'] ?? null,
 			'cell_keys'      => array_values( array_keys( $cell ) ),
