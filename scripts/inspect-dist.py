@@ -10,7 +10,7 @@ import zipfile
 def inspect(archive_path, version, commit):
     if not re.fullmatch(r"[0-9a-f]{40}", commit):
         raise ValueError("Expected commit must be a full Git SHA")
-    forbidden = {".git", ".claude", "tests", "docs", "vendor", "composer.json", "composer.lock", "phpunit.xml"}
+    forbidden = {".git", ".claude", "tests", "docs", "vendor", "composer.json", "composer.lock", "phpunit.xml", ".atora-baseline", ".tmp", ".phpunit.result.cache"}
     with zipfile.ZipFile(archive_path) as archive:
         names = archive.namelist()
         if len(names) != len(set(names)):
