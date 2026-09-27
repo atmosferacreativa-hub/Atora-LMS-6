@@ -1218,11 +1218,23 @@ class LMS_Migrator {
 
 	public static function get_status(): array {
 		global $wpdb;
+		$statuses = "'" . implode( "','", array_map( 'esc_sql', self::$migratable_post_statuses ) ) . "'";
 
 		$total_cpt_courses = self::count_migratable_posts( 'lm_course' );
 		$total_cpt_lessons = self::count_migratable_posts( 'lm_lesson' );
-		$migrated_courses  = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}atora_courses WHERE wp_post_id > 0" ); // phpcs:ignore
-		$migrated_lessons  = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}atora_lessons WHERE wp_post_id > 0" ); // phpcs:ignore
+
+		// Migrados = filas cuya referencia a wp_posts existe y apunta al CPT correcto,
+		// en un estado que este migrador realmente procesa (publish/draft/private).
+		$migrated_courses  = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			"SELECT COUNT(DISTINCT p.ID) FROM {$wpdb->prefix}atora_courses c
+			 INNER JOIN {$wpdb->posts} p ON p.ID = c.wp_post_id
+			 WHERE c.wp_post_id > 0 AND p.post_type = 'lm_course' AND p.post_status IN ({$statuses})"
+		);
+		$migrated_lessons  = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			"SELECT COUNT(DISTINCT p.ID) FROM {$wpdb->prefix}atora_lessons l
+			 INNER JOIN {$wpdb->posts} p ON p.ID = l.wp_post_id
+			 WHERE l.wp_post_id > 0 AND p.post_type = 'lm_lesson' AND p.post_status IN ({$statuses})"
+		);
 		$migrated_enroll   = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}atora_enrollments" ); // phpcs:ignore
 
 		$reconcile     = self::reconcile();
