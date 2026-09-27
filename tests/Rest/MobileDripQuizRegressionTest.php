@@ -3,6 +3,8 @@
 declare( strict_types = 1 );
 
 namespace {
+	require_once __DIR__ . '/Fixtures/table-quiz-wp-insert-post.php';
+
 	if ( ! function_exists( 'wp_generate_password' ) ) {
 		function wp_generate_password( $length = 12, $special_chars = true, $extra_special_chars = false ): string {
 			$length = max( 1, (int) $length );
@@ -109,6 +111,10 @@ namespace ATORA\Tests\Rest {
 		DripLockedWpdb::$advisory_locks = array();
 		$wpdb = new DripLockedWpdb( 'conn-a' );
 		$GLOBALS['__atora_test_current_user_id'] = 10;
+		$GLOBALS['__atora_test_wp_insert_post_fail'] = false;
+		$GLOBALS['__atora_test_wp_insert_post_id'] = 55555;
+		$GLOBALS['__atora_test_wp_insert_post_calls'] = 0;
+		$GLOBALS['__atora_test_wp_insert_post_last'] = array();
 		$ref = new \ReflectionClass( \ATORA_Mobile_REST_Controller::class );
 		$p = $ref->getProperty( 'enrollment_index_cache' );
 		$p->setAccessible( true );
@@ -134,6 +140,7 @@ namespace ATORA\Tests\Rest {
 			$this->assertTrue( is_wp_error( $result ) );
 			$this->assertSame( 'clms_lesson_locked', $result->get_error_code() );
 			$this->assertSame( 0, (int) $wpdb->insert_count );
+			$this->assertSame( 0, (int) ( $GLOBALS['__atora_test_wp_insert_post_calls'] ?? 0 ) );
 		}
 	}
 }

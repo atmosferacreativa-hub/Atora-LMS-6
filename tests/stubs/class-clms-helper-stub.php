@@ -104,6 +104,27 @@ if ( ! class_exists( 'CLMS_Helper' ) ) {
 			return $GLOBALS['__atora_test_course_lessons'][ $course_id ] ?? array();
 		}
 
+		/**
+		 * get_post_meta_first() — helper legacy: devuelve el primer meta no vacío.
+		 *
+		 * En producción acepta array de keys; en tests basta con emularlo.
+		 */
+		public static function get_post_meta_first( int $post_id, $keys, $default = '' ) {
+			$post_id = absint( $post_id );
+			$keys    = is_array( $keys ) ? $keys : array( $keys );
+			foreach ( $keys as $key ) {
+				$key = (string) $key;
+				if ( '' === $key ) {
+					continue;
+				}
+				$value = get_post_meta( $post_id, $key, true );
+				if ( '' !== (string) $value ) {
+					return $value;
+				}
+			}
+			return $default;
+		}
+
 		public static function user_is_enrolled_in_course( int $user_id, int $course_id ): bool {
 			$key = $user_id . ':' . $course_id;
 			if ( array_key_exists( $key, (array) ( $GLOBALS['__atora_test_course_enrollment'] ?? array() ) ) ) {
