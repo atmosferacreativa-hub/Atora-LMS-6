@@ -55,6 +55,9 @@ class LMS_REST_Controller {
 		register_rest_route( $ns, '/lessons/(?P<lesson_id>\d+)/complete', array(
 			'methods' => 'POST', 'callback' => array( __CLASS__, 'complete_lesson' ), 'permission_callback' => 'is_user_logged_in',
 		) );
+		register_rest_route( $ns, '/lessons/(?P<lesson_id>\d+)', array(
+			array( 'methods' => 'POST', 'callback' => array( __CLASS__, 'update_lesson' ), 'permission_callback' => $can_inst ),
+		) );
 		register_rest_route( $ns, '/migration/status', array(
 			'methods' => 'GET', 'callback' => array( __CLASS__, 'migration_status' ), 'permission_callback' => $can_admin,
 		) );
@@ -113,6 +116,28 @@ class LMS_REST_Controller {
 
 		return current_user_can( 'clms_manage_courses' )
 			&& (int) ( $course['instructor_id'] ?? 0 ) === get_current_user_id();
+	}
+
+	private static function can_manage_this_lesson( int $lesson_id ): bool {
+		$lesson = LMS_Course_Service::get_lesson( $lesson_id );
+		if ( ! $lesson ) {
+			return false;
+		}
+		$course_id = absint( $lesson['course_id'] ?? 0 );
+		if ( ! $course_id ) {
+			return false;
+		}
+		return self::can_manage_this_course( $course_id );
+	}
+
+	private static function error_response( \WP_Error $error, int $fallback_status = 400 ): \WP_REST_Response {
+		$data = $error->get_error_data();
+		$status = is_array( $data ) && isset( $data['status'] ) ? absint( $data['status'] ) : $fallback_status;
+		$status = $status ?: $fallback_status;
+		return new \WP_REST_Response(
+			array( 'success' => false, 'message' => $error->get_error_message() ),
+			$status
+		);
 	}
 
 	/**
@@ -250,11 +275,34 @@ class LMS_REST_Controller {
 		// create_course() para el porqué completo.
 		unset( $data['wp_post_id'] );
 
-		$ok = LMS_Course_Service::update( $id, $data );
-		if ( ! $ok ) {
-			return new \WP_REST_Response( array( 'success' => false, 'message' => __( 'No se pudo actualizar.', 'atora-lms' ) ), 400 );
+		$result = LMS_Course_Service::update( $id, $data );
+		if ( is_wp_error( $result ) ) {
+			return self::error_response( $result );
 		}
 		return new \WP_REST_Response( array( 'success' => true, 'course' => LMS_Course_Service::get( $id ) ), 200 );
+	}
+
+	public static function update_lesson( \WP_REST_Request $r ): \WP_REST_Response {
+		$lesson_id = absint( $r->get_param( 'lesson_id' ) );
+		if ( ! self::can_manage_this_lesson( $lesson_id ) ) {
+			return self::forbidden_course_response();
+		}
+
+		$data = $r->get_json_params() ?: array();
+		unset( $data['wp_post_id'] );
+		unset( $data['course_id'] );
+
+		$result = LMS_Course_Service::update_lesson( $lesson_id, $data );
+		if ( is_wp_error( $result ) ) {
+			return self::error_response( $result );
+		}
+
+		$lesson = LMS_Course_Service::get_lesson( $lesson_id );
+		if ( $lesson ) {
+			LMS_Course_Service::invalidate_curriculum_cache( absint( $lesson['course_id'] ?? 0 ) );
+		}
+
+		return new \WP_REST_Response( array( 'success' => true, 'lesson' => $lesson ), 200 );
 	}
 
 	public static function course_stats( \WP_REST_Request $r ): \WP_REST_Response {

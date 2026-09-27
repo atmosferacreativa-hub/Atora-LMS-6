@@ -134,19 +134,104 @@ class LMS_Course_Service {
 	 * @param array $data
 	 * @return bool
 	 */
-	public static function update( int $course_id, array $data ): bool {
+	/**
+	 * Actualiza un curso en tablas, incrementando revision exactamente una vez.
+	 *
+	 * Si el cliente envía `revision`, se interpreta como revision esperada
+	 * (optimistic concurrency).
+	 *
+	 * @param int   $course_id
+	 * @param array $data
+	 * @return bool|\WP_Error
+	 */
+	public static function update( int $course_id, array $data ): bool|\WP_Error {
 		global $wpdb;
+		$expected_revision = absint( $data['revision'] ?? 0 );
+		unset( $data['revision'] );
 		unset( $data['wp_post_id'] );
 		$row = self::sanitize_course_data( $data );
 		unset( $row['created_at'] );
-		if ( empty( $row ) ) { return false; }
-		return false !== $wpdb->update(
+		if ( empty( $row ) ) {
+			return new \WP_Error( 'atora_course_no_changes', __( 'No se enviaron cambios para guardar.', 'atora-lms' ), array( 'status' => 400 ) );
+		}
+
+		$current = $wpdb->get_row(
+			$wpdb->prepare( "SELECT id, revision FROM {$wpdb->prefix}atora_courses WHERE id = %d LIMIT 1", $course_id ),
+			ARRAY_A
+		);
+		if ( ! $current ) {
+			return new \WP_Error( 'atora_course_not_found', __( 'Curso no encontrado.', 'atora-lms' ), array( 'status' => 404 ) );
+		}
+		$current_revision = absint( $current['revision'] ?? 1 );
+		if ( $expected_revision && $expected_revision !== $current_revision ) {
+			return new \WP_Error( 'atora_course_revision_conflict', __( 'El curso cambió. Actualiza antes de guardar.', 'atora-lms' ), array( 'status' => 409 ) );
+		}
+
+		$row['revision'] = $current_revision + 1;
+
+		$result = $wpdb->update(
 			$wpdb->prefix . 'atora_courses',
 			$row,
-			array( 'id' => $course_id ),
+			array( 'id' => $course_id, 'revision' => $current_revision ),
 			null,
-			array( '%d' )
+			array( '%d', '%d' )
 		);
+
+		if ( false === $result ) {
+			return new \WP_Error( 'atora_course_update_failed', __( 'No se pudo actualizar.', 'atora-lms' ), array( 'status' => 500 ) );
+		}
+		if ( 1 !== $result ) {
+			return new \WP_Error( 'atora_course_concurrent_update', __( 'No se pudo actualizar porque el curso cambió durante la operación.', 'atora-lms' ), array( 'status' => 409 ) );
+		}
+		return true;
+	}
+
+	/**
+	 * Actualiza una lección en tablas, incrementando revision exactamente una vez.
+	 *
+	 * @param int   $lesson_id
+	 * @param array $data
+	 * @return bool|\WP_Error
+	 */
+	public static function update_lesson( int $lesson_id, array $data ): bool|\WP_Error {
+		global $wpdb;
+		$expected_revision = absint( $data['revision'] ?? 0 );
+		unset( $data['revision'] );
+		unset( $data['wp_post_id'] );
+		$row = self::sanitize_lesson_data( $data );
+		unset( $row['created_at'] );
+		if ( empty( $row ) ) {
+			return new \WP_Error( 'atora_lesson_no_changes', __( 'No se enviaron cambios para guardar.', 'atora-lms' ), array( 'status' => 400 ) );
+		}
+
+		$current = $wpdb->get_row(
+			$wpdb->prepare( "SELECT id, revision FROM {$wpdb->prefix}atora_lessons WHERE id = %d LIMIT 1", $lesson_id ),
+			ARRAY_A
+		);
+		if ( ! $current ) {
+			return new \WP_Error( 'atora_lesson_not_found', __( 'Lección no encontrada.', 'atora-lms' ), array( 'status' => 404 ) );
+		}
+		$current_revision = absint( $current['revision'] ?? 1 );
+		if ( $expected_revision && $expected_revision !== $current_revision ) {
+			return new \WP_Error( 'atora_lesson_revision_conflict', __( 'La lección cambió. Actualiza antes de guardar.', 'atora-lms' ), array( 'status' => 409 ) );
+		}
+
+		$row['revision'] = $current_revision + 1;
+
+		$result = $wpdb->update(
+			$wpdb->prefix . 'atora_lessons',
+			$row,
+			array( 'id' => $lesson_id, 'revision' => $current_revision ),
+			null,
+			array( '%d', '%d' )
+		);
+		if ( false === $result ) {
+			return new \WP_Error( 'atora_lesson_update_failed', __( 'No se pudo actualizar.', 'atora-lms' ), array( 'status' => 500 ) );
+		}
+		if ( 1 !== $result ) {
+			return new \WP_Error( 'atora_lesson_concurrent_update', __( 'No se pudo actualizar porque la lección cambió durante la operación.', 'atora-lms' ), array( 'status' => 409 ) );
+		}
+		return true;
 	}
 
 	/**
