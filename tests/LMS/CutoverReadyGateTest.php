@@ -100,6 +100,86 @@ class CutoverReadyGateTest extends WpdbSwapTestCase {
 	}
 
 	/** @test */
+	public function test_ready_when_program_enrollments_table_is_empty_but_reconcile_is_clean_and_recent(): void {
+		$fake = $this->swap_wpdb();
+		$fake->get_var_queue = array(
+			0,
+			5, 5,
+			'wp_atora_courses', 5,
+			'wp_atora_lessons', 5,
+			'wp_atora_enrollments', 5,
+			'wp_atora_program_enrollments', 0,
+		);
+		update_option( 'atora_lms_dualwrite', true );
+		update_option( 'atora_lms_reconcile_result', array( 'total' => 0, 'checked_at' => gmdate( 'Y-m-d H:i:s' ) ) );
+
+		$gate = \ATORA\LMS\LMS_Parity::cutover_ready();
+
+		$this->assertTrue( $gate['ready'] );
+		$this->assertSame( array(), $gate['reasons'] );
+	}
+
+	/** @test */
+	public function test_not_ready_when_program_enrollments_table_is_missing_even_if_reconcile_is_clean(): void {
+		$fake = $this->swap_wpdb();
+		$fake->get_var_queue = array(
+			0,
+			5, 5,
+			'wp_atora_courses', 5,
+			'wp_atora_lessons', 5,
+			'wp_atora_enrollments', 5,
+			null, // core table 4: atora_program_enrollments missing
+		);
+		update_option( 'atora_lms_dualwrite', true );
+		update_option( 'atora_lms_reconcile_result', array( 'total' => 0, 'checked_at' => gmdate( 'Y-m-d H:i:s' ) ) );
+
+		$gate = \ATORA\LMS\LMS_Parity::cutover_ready();
+
+		$this->assertFalse( $gate['ready'] );
+		$this->assertNotEmpty( array_filter( $gate['reasons'], fn( $r ) => str_contains( $r, 'atora_program_enrollments' ) && str_contains( $r, 'no existe' ) ) );
+	}
+
+	/** @test */
+	public function test_not_ready_when_program_enrollments_table_is_empty_and_reconcile_has_pending(): void {
+		$fake = $this->swap_wpdb();
+		$fake->get_var_queue = array(
+			0,
+			5, 5,
+			'wp_atora_courses', 5,
+			'wp_atora_lessons', 5,
+			'wp_atora_enrollments', 5,
+			'wp_atora_program_enrollments', 0,
+		);
+		update_option( 'atora_lms_dualwrite', true );
+		update_option( 'atora_lms_reconcile_result', array( 'total' => 3, 'checked_at' => gmdate( 'Y-m-d H:i:s' ) ) );
+
+		$gate = \ATORA\LMS\LMS_Parity::cutover_ready();
+
+		$this->assertFalse( $gate['ready'] );
+		$this->assertNotEmpty( array_filter( $gate['reasons'], fn( $r ) => str_contains( $r, 'pendiente' ) ) );
+	}
+
+	/** @test */
+	public function test_not_ready_when_program_enrollments_count_query_fails(): void {
+		$fake = $this->swap_wpdb();
+		$fake->get_var_queue = array(
+			0,
+			5, 5,
+			'wp_atora_courses', 5,
+			'wp_atora_lessons', 5,
+			'wp_atora_enrollments', 5,
+			'wp_atora_program_enrollments', null, // existe, pero COUNT(*) falló
+		);
+		update_option( 'atora_lms_dualwrite', true );
+		update_option( 'atora_lms_reconcile_result', array( 'total' => 0, 'checked_at' => gmdate( 'Y-m-d H:i:s' ) ) );
+
+		$gate = \ATORA\LMS\LMS_Parity::cutover_ready();
+
+		$this->assertFalse( $gate['ready'] );
+		$this->assertNotEmpty( array_filter( $gate['reasons'], fn( $r ) => str_contains( $r, 'No se pudo contar filas' ) ) );
+	}
+
+	/** @test */
 	public function test_not_ready_when_core_table_empty(): void {
 		$fake = $this->swap_wpdb();
 		$fake->get_var_queue = array(
