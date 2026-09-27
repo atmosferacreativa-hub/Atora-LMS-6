@@ -160,6 +160,26 @@ class CutoverReadyGateTest extends WpdbSwapTestCase {
 	}
 
 	/** @test */
+	public function test_not_ready_when_program_enrollments_count_query_fails(): void {
+		$fake = $this->swap_wpdb();
+		$fake->get_var_queue = array(
+			0,
+			5, 5,
+			'wp_atora_courses', 5,
+			'wp_atora_lessons', 5,
+			'wp_atora_enrollments', 5,
+			'wp_atora_program_enrollments', null, // existe, pero COUNT(*) falló
+		);
+		update_option( 'atora_lms_dualwrite', true );
+		update_option( 'atora_lms_reconcile_result', array( 'total' => 0, 'checked_at' => gmdate( 'Y-m-d H:i:s' ) ) );
+
+		$gate = \ATORA\LMS\LMS_Parity::cutover_ready();
+
+		$this->assertFalse( $gate['ready'] );
+		$this->assertNotEmpty( array_filter( $gate['reasons'], fn( $r ) => str_contains( $r, 'No se pudo contar filas' ) ) );
+	}
+
+	/** @test */
 	public function test_not_ready_when_core_table_empty(): void {
 		$fake = $this->swap_wpdb();
 		$fake->get_var_queue = array(

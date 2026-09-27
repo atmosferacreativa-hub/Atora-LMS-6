@@ -568,13 +568,24 @@ class LMS_Parity {
 			}
 
 			if ( str_ends_with( $table, 'atora_program_enrollments' ) ) {
-				if ( $count < 0 ) {
+				if ( -1 === $count ) {
 					$reasons[] = sprintf( 'La tabla %s no existe.', $table );
+				} elseif ( -2 === $count ) {
+					$reasons[] = sprintf( 'No se pudo contar filas en la tabla %s.', $table );
 				} elseif ( 0 === $count && $reconcile_clean_and_recent ) {
 					continue;
 				} else {
 					$reasons[] = sprintf( 'La tabla %s no tiene filas.', $table );
 				}
+				continue;
+			}
+
+			if ( -1 === $count ) {
+				$reasons[] = sprintf( 'La tabla %s no existe.', $table );
+				continue;
+			}
+			if ( -2 === $count ) {
+				$reasons[] = sprintf( 'No se pudo contar filas en la tabla %s.', $table );
 				continue;
 			}
 
@@ -588,7 +599,8 @@ class LMS_Parity {
 	}
 
 	/**
-	 * Conteo de filas de las tablas núcleo (prefijadas), -1 si la tabla no existe.
+	 * Conteo de filas de las tablas núcleo (prefijadas).
+	 * -1 si la tabla no existe, -2 si el COUNT(*) falla.
 	 *
 	 * @return array<string,int>  nombre de tabla (con prefijo) => filas.
 	 */
@@ -598,7 +610,17 @@ class LMS_Parity {
 		foreach ( self::CORE_TABLES as $name ) {
 			$table  = $wpdb->prefix . $name;
 			$exists = (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) === $table; // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-			$counts[ $table ] = $exists ? (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table}" ) : -1; // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			if ( ! $exists ) {
+				$counts[ $table ] = -1;
+				continue;
+			}
+
+			$raw = $wpdb->get_var( "SELECT COUNT(*) FROM {$table}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			if ( null === $raw || false === $raw || '' === $raw ) {
+				$counts[ $table ] = -2;
+				continue;
+			}
+			$counts[ $table ] = (int) $raw;
 		}
 		return $counts;
 	}
