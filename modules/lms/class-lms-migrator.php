@@ -380,9 +380,9 @@ class LMS_Migrator {
 			SELECT post_id, CAST(MIN(meta_value) AS UNSIGNED) AS wp_course_id
 			FROM {$postmeta}
 			WHERE meta_key = '_clms_course_id'
-			  AND meta_value REGEXP '^[0-9]+$'
 			GROUP BY post_id
 			HAVING COUNT(DISTINCT meta_value) = 1
+			   AND SUM(meta_value REGEXP '^[0-9]+$') = COUNT(*)
 		)";
 
 		$rows = (array) $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching

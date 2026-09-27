@@ -67,6 +67,7 @@ namespace ATORA\Tests\LMS {
 				public int $updates = 0;
 				public bool $course_link_is_valid = true;
 				public bool $malformed_meta = false;
+				public bool $mixed_meta = false;
 				public bool $conflicting_meta = false;
 				public bool $duplicate_meta_rows = false;
 
@@ -93,7 +94,10 @@ namespace ATORA\Tests\LMS {
 						if ( $has_course_validity_join && ! $this->course_link_is_valid ) {
 							return array();
 						}
-						if ( $this->malformed_meta && false !== strpos( $sql, "meta_value REGEXP '^[0-9]+$'" ) ) {
+						if ( $this->malformed_meta && false !== strpos( $sql, "SUM(meta_value REGEXP '^[0-9]+$') = COUNT(*)" ) ) {
+							return array();
+						}
+						if ( $this->mixed_meta && false !== strpos( $sql, "SUM(meta_value REGEXP '^[0-9]+$') = COUNT(*)" ) ) {
 							return array();
 						}
 						if ( $this->conflicting_meta && false !== strpos( $sql, 'HAVING COUNT(DISTINCT meta_value) = 1' ) ) {
@@ -247,7 +251,18 @@ namespace ATORA\Tests\LMS {
 			\ATORA\LMS\LMS_Migrator::migrate_all( 10 );
 
 			$this->assertSame( 0, count( $wpdb->inserted_lessons ) );
-			$this->assertNotEmpty( array_filter( $wpdb->queries, fn( $q ) => false !== strpos( (string) $q, "meta_value REGEXP '^[0-9]+$'" ) ) );
+			$this->assertNotEmpty( array_filter( $wpdb->queries, fn( $q ) => false !== strpos( (string) $q, "SUM(meta_value REGEXP '^[0-9]+$') = COUNT(*)" ) ) );
+		}
+
+		/** @test */
+		public function test_retry_skips_mixed_numeric_and_garbage_course_id_meta(): void {
+			global $wpdb;
+			$wpdb->mixed_meta = true;
+
+			\ATORA\LMS\LMS_Migrator::migrate_all( 10 );
+
+			$this->assertSame( 0, count( $wpdb->inserted_lessons ), 'si hay 428 + 428basura, no debe aceptar el ID numérico' );
+			$this->assertNotEmpty( array_filter( $wpdb->queries, fn( $q ) => false !== strpos( (string) $q, "SUM(meta_value REGEXP '^[0-9]+$') = COUNT(*)" ) ) );
 		}
 
 		/** @test */
