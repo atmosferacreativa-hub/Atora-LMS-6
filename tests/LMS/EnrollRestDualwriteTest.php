@@ -25,6 +25,8 @@ final class EnrollRestDualwriteTest extends TestCase {
 		atora_test_reset_user_meta();
 		atora_test_reset_post_meta();
 		atora_test_reset_user_caps();
+		atora_test_reset_users();
+		atora_test_reset_missing_users();
 		$GLOBALS['__atora_test_current_user_id'] = 0;
 	}
 
@@ -37,6 +39,7 @@ final class EnrollRestDualwriteTest extends TestCase {
 	}
 
 	private function as_admin( int $user_id ): void {
+		atora_test_set_user( $user_id );
 		$GLOBALS['__atora_test_current_user_id'] = $user_id;
 		atora_test_set_user_cap( $user_id, 'manage_options' );
 	}
@@ -120,6 +123,7 @@ final class EnrollRestDualwriteTest extends TestCase {
 	/** @test */
 	public function test_enroll_dualwrite_true_mirrors_to_legacy_and_is_idempotent(): void {
 		$this->as_admin( 10 );
+		atora_test_set_user( 999, array( 'user_email' => 'student@example.test', 'display_name' => 'Student' ) );
 		$this->install_wpdb_fixture( array( 55 => 777 ) );
 		update_option( 'atora_lms_dualwrite', true );
 
@@ -151,6 +155,7 @@ final class EnrollRestDualwriteTest extends TestCase {
 	/** @test */
 	public function test_enroll_dualwrite_false_does_not_mirror_to_legacy(): void {
 		$this->as_admin( 10 );
+		atora_test_set_user( 999, array( 'user_email' => 'student@example.test', 'display_name' => 'Student' ) );
 		$this->install_wpdb_fixture( array( 55 => 777 ) );
 		update_option( 'atora_lms_dualwrite', false );
 
@@ -165,5 +170,25 @@ final class EnrollRestDualwriteTest extends TestCase {
 		$enroll_row = array_values( $wpdb->enrollments )[0];
 		$this->assertSame( 55, (int) ( $enroll_row['order_id'] ?? 0 ) );
 		$this->assertSame( '', get_user_meta( 999, '_clms_enrolled_courses', true ) );
+	}
+
+	/** @test */
+	public function test_enroll_rejects_missing_user_id_and_does_not_write(): void {
+		$this->as_admin( 10 );
+		$this->install_wpdb_fixture( array( 55 => 777 ) );
+		update_option( 'atora_lms_dualwrite', true );
+		atora_test_mark_user_missing( 999 );
+
+		$request = new \WP_REST_Request( array( 'user_id' => 999, 'order_id' => 1234 ) );
+		$request->set_param( 'course_id', 55 );
+
+		$response = \ATORA\LMS\LMS_REST_Controller::enroll( $request );
+		$this->assertSame( 400, $response->get_status() );
+		$data = (array) $response->get_data();
+		$this->assertFalse( (bool) ( $data['success'] ?? true ) );
+
+		global $wpdb;
+		$this->assertCount( 0, $wpdb->enrollments, 'No debe insertar matrícula si user_id no existe' );
+		$this->assertSame( '', get_user_meta( 999, '_clms_enrolled_courses', true ), 'No debe tocar usermeta legacy si user_id no existe' );
 	}
 }

@@ -267,7 +267,34 @@ if ( ! function_exists( 'atora_test_reset_user_meta' ) ) {
 	function atora_test_reset_user_meta(): void { $GLOBALS['__atora_test_user_meta'] = array(); }
 }
 if ( ! function_exists( 'get_userdata' ) ) {
+	$GLOBALS['__atora_test_missing_users'] = array();
+	if ( ! function_exists( 'atora_test_mark_user_missing' ) ) {
+		function atora_test_mark_user_missing( int $id, bool $missing = true ): void {
+			if ( $missing ) {
+				$GLOBALS['__atora_test_missing_users'][ $id ] = true;
+				return;
+			}
+			unset( $GLOBALS['__atora_test_missing_users'][ $id ] );
+		}
+	}
+	if ( ! function_exists( 'atora_test_reset_missing_users' ) ) {
+		function atora_test_reset_missing_users(): void { $GLOBALS['__atora_test_missing_users'] = array(); }
+	}
+
 	function get_userdata( int $id ) {
+		if ( ! empty( $GLOBALS['__atora_test_missing_users'][ $id ] ) ) {
+			return false;
+		}
+
+		if ( isset( $GLOBALS['__atora_test_users'][ $id ] ) ) {
+			$user = $GLOBALS['__atora_test_users'][ $id ];
+			return (object) array(
+				'ID'           => $id,
+				'display_name' => (string) ( $user->display_name ?? '' ),
+				'user_email'   => (string) ( $user->user_email ?? '' ),
+			);
+		}
+
 		return (object) array( 'ID' => $id, 'display_name' => 'Test User ' . $id, 'user_email' => 'user' . $id . '@example.test' );
 	}
 }

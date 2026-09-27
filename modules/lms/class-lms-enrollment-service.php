@@ -24,6 +24,23 @@ class LMS_Enrollment_Service {
 	 * Idempotente: si ya existe la reactiva en lugar de duplicar.
 	 */
 	public static function enroll( int $user_id, int $course_id, int $order_id = 0 ): int {
+		if ( ! $user_id ) {
+			return 0;
+		}
+		if ( function_exists( 'get_user_by' ) ) {
+			$user = get_user_by( 'id', $user_id );
+			if ( ! $user || empty( $user->ID ) ) {
+				return 0;
+			}
+		} elseif ( function_exists( 'get_userdata' ) ) {
+			$data = get_userdata( $user_id );
+			if ( ! $data || empty( $data->ID ) ) {
+				return 0;
+			}
+		} else {
+			return 0;
+		}
+
 		global $wpdb;
 
 		$table   = $wpdb->prefix . 'atora_enrollments';
