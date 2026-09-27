@@ -218,5 +218,27 @@ namespace ATORA\Tests\LMS {
 			$this->assertSame( 1, $r['enrollments_blocked_by_missing_course_id'] );
 			$this->assertSame( 0, $r['enrollments_missing_in_usermeta'] );
 		}
+
+		/** @test */
+		public function test_reconcile_counts_table_enrollment_missing_in_legacy_then_clears_when_legacy_mirror_is_added(): void {
+			global $wpdb;
+			$wpdb->valid_wp_course_ids = array( 123 );
+			$wpdb->atora_courses_rows = array(
+				array( 'id' => 10, 'wp_post_id' => 123 ),
+			);
+			$wpdb->atora_enrollments_rows = array(
+				array( 'user_id' => 1, 'course_id' => 10 ),
+			);
+
+			$r = \ATORA\LMS\LMS_Migrator::reconcile();
+			$this->assertSame( 1, $r['enrollments_missing_in_usermeta'] );
+
+			$wpdb->enrolled_courses_usermeta_rows = array(
+				array( 'user_id' => 1, 'meta_value' => serialize( array( 123 ) ) ),
+			);
+
+			$r = \ATORA\LMS\LMS_Migrator::reconcile();
+			$this->assertSame( 0, $r['enrollments_missing_in_usermeta'] );
+		}
 	}
 }
