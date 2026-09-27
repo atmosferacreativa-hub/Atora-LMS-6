@@ -296,5 +296,32 @@ namespace ATORA\Tests\LMS {
 			$this->assertSame( 1, $r['enrollments_missing_in_usermeta'] );
 			$this->assertSame( 0, $r['enrollments_blocked_by_missing_user'] );
 		}
+
+		/** @test */
+		public function test_reconcile_dedupes_duplicate_table_rows_and_excludes_missing_user_pairs_from_other_comparisons(): void {
+			global $wpdb;
+			$wpdb->valid_wp_course_ids = array( 123 );
+			$wpdb->atora_courses_rows = array(
+				array( 'id' => 10, 'wp_post_id' => 123 ),
+			);
+			$wpdb->atora_enrollments_rows = array(
+				array( 'user_id' => 999, 'course_id' => 10 ),
+				array( 'user_id' => 999, 'course_id' => 10 ),
+			);
+			$wpdb->existing_user_ids = array( 1 => true );
+			$wpdb->enrolled_courses_usermeta_rows = array(
+				array( 'user_id' => 999, 'meta_value' => serialize( array( 123 ) ) ),
+			);
+
+			$r = \ATORA\LMS\LMS_Migrator::reconcile();
+			$this->assertSame( 1, $r['enrollments_blocked_by_missing_user'] );
+			$this->assertSame( 0, $r['enrollments_missing_in_table'] );
+			$this->assertSame( 0, $r['enrollments_missing_in_usermeta'] );
+			$this->assertSame(
+				1,
+				$r['enrollments_blocked_by_missing_user'] + $r['enrollments_missing_in_table'] + $r['enrollments_missing_in_usermeta'],
+				'total pairs must still sum to 1'
+			);
+		}
 	}
 }

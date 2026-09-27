@@ -1552,12 +1552,18 @@ class LMS_Migrator {
 			}
 		}
 
-		$missing_in_table_pairs   = array_diff_key( $expected_pairs, $actual_pairs );
-		$missing_in_usermeta_pairs = array_diff_key( $actual_pairs, $expected_pairs );
+		$enrollments_blocked_by_missing_user = count( $actual_pairs_missing_user );
 
-		$enrollments_missing_in_table = count( $missing_in_table_pairs );
-		$enrollments_blocked_by_missing_user = count( array_intersect_key( $missing_in_usermeta_pairs, $actual_pairs_missing_user ) );
-		$enrollments_missing_in_usermeta = count( $missing_in_usermeta_pairs ) - $enrollments_blocked_by_missing_user;
+		// Las matrículas cuyo usuario WP no existe deben reportarse como bloqueadas
+		// (datos), pero no deben contaminar las comparaciones tabla↔usermeta.
+		$expected_pairs_cmp = array_diff_key( $expected_pairs, $actual_pairs_missing_user );
+		$actual_pairs_cmp   = array_diff_key( $actual_pairs, $actual_pairs_missing_user );
+
+		$missing_in_table_pairs    = array_diff_key( $expected_pairs_cmp, $actual_pairs_cmp );
+		$missing_in_usermeta_pairs = array_diff_key( $actual_pairs_cmp, $expected_pairs_cmp );
+
+		$enrollments_missing_in_table    = count( $missing_in_table_pairs );
+		$enrollments_missing_in_usermeta = count( $missing_in_usermeta_pairs );
 
 		// 4) Progreso: usuarios con «_clms_completed_lessons» no vacío y 0 filas en atora_lesson_progress.
 		$users_with_legacy_progress = array();
