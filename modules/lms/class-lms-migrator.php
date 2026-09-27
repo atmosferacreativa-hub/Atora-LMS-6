@@ -1514,7 +1514,18 @@ class LMS_Migrator {
 			}
 		}
 
+		$missing_user_ids = array(); // user_id => true (usuarios ausentes en wp_users)
+		foreach ( (array) $wpdb->get_col( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			"SELECT DISTINCT e.user_id
+			 FROM {$enroll_table} e
+			 LEFT JOIN {$wpdb->users} u ON u.ID = e.user_id
+			 WHERE u.ID IS NULL"
+		) as $uid ) {
+			$missing_user_ids[ (int) $uid ] = true;
+		}
+
 		$actual_pairs = array(); // "user_id:course_id" presentes en atora_enrollments.
+		$actual_pairs_missing_user = array(); // subset de $actual_pairs con user_id ausente.
 		$enrollments_blocked_by_missing_course_id = 0; // filas en atora_enrollments cuyo course_id no existe.
 		foreach ( $wpdb->get_results( "SELECT user_id, course_id FROM {$enroll_table}" ) as $row ) { // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$course_id = (int) $row->course_id;
@@ -1534,11 +1545,19 @@ class LMS_Migrator {
 				continue;
 			}
 
-			$actual_pairs[ (int) $row->user_id . ':' . $course_id ] = true;
+			$key = (int) $row->user_id . ':' . $course_id;
+			$actual_pairs[ $key ] = true;
+			if ( isset( $missing_user_ids[ (int) $row->user_id ] ) ) {
+				$actual_pairs_missing_user[ $key ] = true;
+			}
 		}
 
-		$enrollments_missing_in_table    = count( array_diff_key( $expected_pairs, $actual_pairs ) );
-		$enrollments_missing_in_usermeta = count( array_diff_key( $actual_pairs, $expected_pairs ) );
+		$missing_in_table_pairs   = array_diff_key( $expected_pairs, $actual_pairs );
+		$missing_in_usermeta_pairs = array_diff_key( $actual_pairs, $expected_pairs );
+
+		$enrollments_missing_in_table = count( $missing_in_table_pairs );
+		$enrollments_blocked_by_missing_user = count( array_intersect_key( $missing_in_usermeta_pairs, $actual_pairs_missing_user ) );
+		$enrollments_missing_in_usermeta = count( $missing_in_usermeta_pairs ) - $enrollments_blocked_by_missing_user;
 
 		// 4) Progreso: usuarios con «_clms_completed_lessons» no vacío y 0 filas en atora_lesson_progress.
 		$users_with_legacy_progress = array();
@@ -1642,6 +1661,7 @@ class LMS_Migrator {
 			'orphan_lessons_table_to_legacy'   => $orphan_lessons_table,
 			'enrollments_missing_in_table'     => $enrollments_missing_in_table,
 			'enrollments_missing_in_usermeta'  => $enrollments_missing_in_usermeta,
+			'enrollments_blocked_by_missing_user' => $enrollments_blocked_by_missing_user,
 			'enrollments_blocked_by_course'    => $enrollments_blocked_by_course,
 			'enrollments_blocked_by_broken_wp_link' => $enrollments_blocked_by_broken_wp_link,
 			'enrollments_blocked_by_missing_course_id' => $enrollments_blocked_by_missing_course_id,
