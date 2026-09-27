@@ -385,19 +385,23 @@ class LMS_Parity {
 	public static function get_volume_stats(): array {
 		global $wpdb;
 		$reads = $wpdb->prefix . self::TABLE_READS;
+		$enroll_table = $wpdb->prefix . 'atora_enrollments';
 		$since = gmdate( 'Y-m-d', strtotime( '-14 days' ) );
 
-		// Alumnos observados (union de todos los readers en 14 días).
+		// Alumnos observados = alumnos activos que además tienen al menos una lectura
+		// en la tabla de paridad dentro de la ventana actual.
 		$observed = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			$wpdb->prepare(
-				"SELECT COUNT(DISTINCT user_id) FROM {$reads} WHERE logged_date >= %s",
+				"SELECT COUNT(DISTINCT e.user_id)
+				 FROM {$enroll_table} e
+				 INNER JOIN {$reads} r ON r.user_id = e.user_id
+				 WHERE e.status IN ('active','completed') AND r.logged_date >= %s",
 				$since
 			)
 		);
 
 		// Alumnos activos en tablas.
-		$enroll_table = $wpdb->prefix . 'atora_enrollments';
-		$active       = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$active = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			"SELECT COUNT(DISTINCT user_id) FROM {$enroll_table} WHERE status IN ('active','completed')"
 		);
 
