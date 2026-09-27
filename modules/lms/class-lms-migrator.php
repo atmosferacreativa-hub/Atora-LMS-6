@@ -44,6 +44,7 @@ class LMS_Migrator {
 
 		// Cursos y lecciones (NOT EXISTS, sin cursor)
 		$courses_result = self::migrate_courses( $batch );
+		$lessons_retried = self::retry_missing_lessons_for_migrated_courses( $batch );
 
 		// Taxonomías de curso D-003=B (paginado)
 		$terms_limit  = $batch * 4;
@@ -87,6 +88,7 @@ class LMS_Migrator {
 		self::save_migration_cursors( $cursors );
 
 		$results = array(
+			'lessons_retried'     => $lessons_retried,
 			'courses'             => $courses_result,
 			'course_terms'        => $terms_result,
 			'programs'            => $programs_result,
@@ -353,6 +355,154 @@ class LMS_Migrator {
 		}
 
 		return $count;
+	}
+
+	/**
+	 * Reintenta migrar lecciones faltantes para cursos CPT ya vinculados a atora_courses.
+	 *
+	 * Bugfix: migrate_all() migra lecciones al crear el curso, pero no reintenta
+	 * lecciones agregadas/desfasadas cuando el curso ya tiene fila en tabla.
+	 *
+	 * Solo considera lecciones lm_lesson en publish/draft con _clms_course_id
+	 * apuntando a un lm_course existente y ya migrado (atora_courses.wp_post_id).
+	 * No actualiza lecciones que ya tengan fila (solo backfill NOT EXISTS).
+	 */
+	private static function retry_missing_lessons_for_migrated_courses( int $limit = 50 ): int {
+		global $wpdb;
+		$limit = max( 1, absint( $limit ) );
+
+		$posts    = isset( $wpdb->posts ) ? $wpdb->posts : ( $wpdb->prefix . 'posts' );
+		$postmeta = isset( $wpdb->postmeta ) ? $wpdb->postmeta : ( $wpdb->prefix . 'postmeta' );
+		$courses_table = $wpdb->prefix . 'atora_courses';
+		$lessons_table = $wpdb->prefix . 'atora_lessons';
+
+		$unambiguous_lesson_course = "(
+			SELECT post_id, CAST(MIN(meta_value) AS UNSIGNED) AS wp_course_id
+			FROM {$postmeta}
+			WHERE meta_key = '_clms_course_id'
+			GROUP BY post_id
+			HAVING COUNT(DISTINCT meta_value) = 1
+			   AND SUM(meta_value REGEXP '^[0-9]+$') = COUNT(*)
+		)";
+
+		$rows = (array) $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$wpdb->prepare(
+				"SELECT l.ID AS lesson_wp_id, pm.wp_course_id, c.id AS atora_course_id
+				 FROM {$posts} l
+				 INNER JOIN {$unambiguous_lesson_course} pm
+				         ON pm.post_id = l.ID
+				 INNER JOIN {$courses_table} c
+				         ON c.wp_post_id = pm.wp_course_id
+				 INNER JOIN {$posts} p
+				         ON p.ID = c.wp_post_id
+				        AND p.post_type = 'lm_course'
+				        AND p.post_status IN ('publish','draft','private')
+				 LEFT JOIN {$lessons_table} al
+				        ON al.wp_post_id = l.ID
+				 WHERE l.post_type = 'lm_lesson'
+				   AND l.post_status IN ('publish','draft')
+				   AND al.id IS NULL
+				 ORDER BY l.ID ASC
+				 LIMIT %d",
+				$limit
+			),
+			ARRAY_A
+		);
+
+		$orders_by_course = array();
+
+		$inserted = 0;
+		foreach ( $rows as $row ) {
+			$lesson_wp_id   = absint( $row['lesson_wp_id'] ?? 0 );
+			$wp_course_id    = absint( $row['wp_course_id'] ?? 0 );
+			$atora_course_id = absint( $row['atora_course_id'] ?? 0 );
+			if ( ! $lesson_wp_id || ! $atora_course_id || ! $wp_course_id ) {
+				continue;
+			}
+
+			// Doble guard: nunca actualizar una lección ya presente.
+			$existing = (int) $wpdb->get_var(
+				$wpdb->prepare( "SELECT id FROM {$lessons_table} WHERE wp_post_id = %d LIMIT 1", $lesson_wp_id )
+			);
+			if ( $existing ) {
+				continue;
+			}
+
+			$post = get_post( $lesson_wp_id );
+			if ( ! $post ) {
+				continue;
+			}
+
+			if ( ! isset( $orders_by_course[ $wp_course_id ] ) ) {
+				$lesson_rows = (array) $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+					$wpdb->prepare(
+						"SELECT l.ID, l.menu_order
+						 FROM {$posts} l
+						 INNER JOIN {$unambiguous_lesson_course} pm
+						         ON pm.post_id = l.ID AND pm.wp_course_id = %d
+						 WHERE l.post_type = 'lm_lesson'
+						   AND l.post_status IN ('publish','draft')
+						 ORDER BY l.menu_order ASC, l.ID ASC",
+						$wp_course_id
+					),
+					ARRAY_A
+				);
+				$map = array();
+				$i   = 0;
+				foreach ( $lesson_rows as $lr ) {
+					$lid = absint( $lr['ID'] ?? 0 );
+					if ( ! $lid ) {
+						continue;
+					}
+					$i++;
+					$menu_order = absint( $lr['menu_order'] ?? 0 );
+					$map[ $lid ] = $menu_order > 0 ? $menu_order : $i;
+				}
+				$orders_by_course[ $wp_course_id ] = $map;
+			}
+
+			$section = sanitize_text_field( (string) get_post_meta( $lesson_wp_id, '_clms_section', true ) );
+			$type    = sanitize_key( (string) ( get_post_meta( $lesson_wp_id, '_clms_lesson_type', true ) ?: 'text' ) );
+			$video        = '';
+			$extra_videos = get_post_meta( $lesson_wp_id, '_clms_lesson_extra_videos', true );
+			if ( is_array( $extra_videos ) ) {
+				foreach ( $extra_videos as $extra_video ) {
+					$candidate = is_array( $extra_video ) ? esc_url_raw( (string) ( $extra_video['url'] ?? '' ) ) : '';
+					if ( '' !== $candidate ) {
+						$video = $candidate;
+						break;
+					}
+				}
+			}
+			if ( '' === $video ) {
+				$video = esc_url_raw( (string) get_post_meta( $lesson_wp_id, '_clms_lesson_video_url', true ) );
+			}
+			if ( '' === $video ) {
+				$video = esc_url_raw( (string) get_post_meta( $lesson_wp_id, '_clms_video_url', true ) );
+			}
+
+			$data = array(
+				'wp_post_id'      => $lesson_wp_id,
+				'course_id'       => $atora_course_id,
+				'title'           => $post->post_title,
+				'slug'            => $post->post_name,
+				'content'         => $post->post_content,
+				'lesson_order'    => absint( $orders_by_course[ $wp_course_id ][ $lesson_wp_id ] ?? 1 ),
+				'section'         => $section,
+				'section_order'   => absint( get_post_meta( $lesson_wp_id, '_clms_section_order', true ) ?: 0 ),
+				'type'            => $type,
+				'duration_min'    => absint( get_post_meta( $lesson_wp_id, '_clms_duration', true ) ),
+				'is_free_preview' => (bool) get_post_meta( $lesson_wp_id, '_clms_free_preview', true ),
+				'video_url'       => $video,
+				'status'          => 'publish' === $post->post_status ? 'published' : 'draft',
+			);
+
+			if ( LMS_Course_Service::upsert_lesson( $data ) ) {
+				$inserted++;
+			}
+		}
+
+		return $inserted;
 	}
 
 	// ── Taxonomías de curso / atora_course_terms (D-003 = B) ────────────────
