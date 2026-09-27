@@ -1319,13 +1319,23 @@ class LMS_Migrator {
 		);
 
 		// 3) Matrículas: usermeta «_clms_enrolled_courses» vs atora_enrollments.
-		$course_map = array(); // wp_post_id (curso) => atora_courses.id
-		foreach ( $wpdb->get_results( "SELECT id, wp_post_id FROM {$courses_table} WHERE wp_post_id > 0" ) as $row ) { // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$course_map[ (int) $row->wp_post_id ] = (int) $row->id;
+		$valid_wp_courses = array(); // wp_post_id => true (solo lm_course publish/draft/private).
+		foreach ( (array) $wpdb->get_col( "SELECT ID FROM {$wpdb->posts} WHERE post_type = 'lm_course' AND post_status IN ({$statuses})" ) as $id ) { // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$valid_wp_courses[ (int) $id ] = true;
+		}
+
+		$course_map   = array(); // wp_post_id (curso) => atora_courses.id
+		$courses_by_id = array(); // atora_courses.id => wp_post_id
+		foreach ( (array) $wpdb->get_results( "SELECT id, wp_post_id FROM {$courses_table}" ) as $row ) { // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$courses_by_id[ (int) $row->id ] = (int) $row->wp_post_id;
+			if ( (int) $row->wp_post_id > 0 ) {
+				$course_map[ (int) $row->wp_post_id ] = (int) $row->id;
+			}
 		}
 
 		$expected_pairs              = array(); // "user_id:atora_course_id" esperados según usermeta.
 		$enrollments_blocked_by_course = 0;     // matrículas legacy cuyo curso aún no está migrado.
+		$enrollments_blocked_by_broken_wp_link = 0; // IDs WP inexistentes/no-migrables o vínculo tabla→WP roto.
 
 		$enrolled_rows = $wpdb->get_results( "SELECT user_id, meta_value FROM {$wpdb->usermeta} WHERE meta_key = '_clms_enrolled_courses'" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		foreach ( $enrolled_rows as $row ) {
@@ -1340,6 +1350,11 @@ class LMS_Migrator {
 					continue;
 				}
 
+				if ( ! isset( $valid_wp_courses[ $wp_course_id ] ) ) {
+					$enrollments_blocked_by_broken_wp_link++;
+					continue;
+				}
+
 				if ( ! isset( $course_map[ $wp_course_id ] ) ) {
 					$enrollments_blocked_by_course++;
 					continue;
@@ -1350,8 +1365,26 @@ class LMS_Migrator {
 		}
 
 		$actual_pairs = array(); // "user_id:course_id" presentes en atora_enrollments.
+		$enrollments_blocked_by_missing_course_id = 0; // filas en atora_enrollments cuyo course_id no existe.
 		foreach ( $wpdb->get_results( "SELECT user_id, course_id FROM {$enroll_table}" ) as $row ) { // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$actual_pairs[ (int) $row->user_id . ':' . (int) $row->course_id ] = true;
+			$course_id = (int) $row->course_id;
+			if ( ! isset( $courses_by_id[ $course_id ] ) ) {
+				$enrollments_blocked_by_missing_course_id++;
+				continue;
+			}
+
+			$wp_post_id = (int) $courses_by_id[ $course_id ];
+			// Cursos nativos (sin vínculo WP) no se comparan contra usermeta.
+			if ( $wp_post_id <= 0 ) {
+				continue;
+			}
+
+			if ( ! isset( $valid_wp_courses[ $wp_post_id ] ) ) {
+				$enrollments_blocked_by_broken_wp_link++;
+				continue;
+			}
+
+			$actual_pairs[ (int) $row->user_id . ':' . $course_id ] = true;
 		}
 
 		$enrollments_missing_in_table    = count( array_diff_key( $expected_pairs, $actual_pairs ) );
@@ -1460,6 +1493,8 @@ class LMS_Migrator {
 			'enrollments_missing_in_table'     => $enrollments_missing_in_table,
 			'enrollments_missing_in_usermeta'  => $enrollments_missing_in_usermeta,
 			'enrollments_blocked_by_course'    => $enrollments_blocked_by_course,
+			'enrollments_blocked_by_broken_wp_link' => $enrollments_blocked_by_broken_wp_link,
+			'enrollments_blocked_by_missing_course_id' => $enrollments_blocked_by_missing_course_id,
 			'users_progress_not_migrated'      => $users_progress_not_migrated,
 			'orphan_programs_legacy'           => $orphan_programs_legacy,
 			'program_enrollments_missing'      => $program_enrollments_missing,
