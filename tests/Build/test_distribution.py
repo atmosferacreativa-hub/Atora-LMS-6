@@ -70,9 +70,33 @@ class DistributionTest(unittest.TestCase):
                 self.assertNotEqual(0, self.inspect(missing=("atora-lms/" + name,)).returncode)
 
     def test_development_files_are_rejected(self):
-        for name in ("tests/example.php", ".git/config", "composer.lock", "vendor/autoload.php"):
+        for name in ("tests/example.php", ".git/config", "composer.lock", "vendor/autoload.php", ".atora-baseline/db.sql", ".tmp/junit.xml", ".phpunit.result.cache"):
             with self.subTest(name=name):
                 self.assertNotEqual(0, self.inspect(extra={"atora-lms/" + name: ""}).returncode)
+
+    @unittest.skipUnless(shutil.which("rsync") and shutil.which("zip"), "Distribution tools unavailable")
+    def test_build_excludes_local_artifacts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory)
+            (target / "scripts").mkdir()
+            for path in (".distignore", "scripts/build-dist.sh", "scripts/build-info.sh"):
+                destination = target / path
+                destination.write_bytes((ROOT / path).read_bytes())
+                if destination.suffix == ".sh":
+                    destination.chmod(0o755)
+            (target / "atora_lms.php").write_text("<?php\n/**\n * Version: " + VERSION + "\n */\n")
+            (target / "readme.txt").write_text("Stable tag: " + VERSION + "\n")
+            (target / "safe.php").write_text("<?php // Included plugin file.\n")
+            for path in (".atora-baseline/db.sql", ".tmp/junit.xml", ".phpunit.result.cache"):
+                artifact = target / path
+                artifact.parent.mkdir(parents=True, exist_ok=True)
+                artifact.write_text("local-only artifact\n")
+            subprocess.run(["bash", "scripts/build-dist.sh", VERSION], cwd=target, check=True, capture_output=True, text=True)
+            with zipfile.ZipFile(target / "dist" / f"atora-lms-{VERSION}.zip") as archive:
+                names = archive.namelist()
+            self.assertIn("atora-lms/safe.php", names)
+            for forbidden in (".atora-baseline", ".tmp", ".phpunit.result.cache"):
+                self.assertFalse(any(forbidden in Path(name).parts for name in names), forbidden)
 
     def test_unsafe_paths_are_rejected(self):
         for name in ("../outside.php", "/absolute.php", "atora-lms/../outside.php", "another-plugin/file.php"):

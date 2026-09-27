@@ -27,3 +27,6 @@ FEATURE-REPORT-*.md
 .env
 .env.*
 backups
+.atora-baseline/
+.tmp/
+.phpunit.result.cache
