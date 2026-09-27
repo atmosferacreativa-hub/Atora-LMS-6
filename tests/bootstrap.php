@@ -762,6 +762,7 @@ $lms_dir = __DIR__ . '/../modules/lms/';
 foreach ( array(
 	'class-lms-course-service.php',
 	'class-lms-enrollment-service.php',
+	'class-lms-write-facade.php',
 	'class-lms-read-router.php',
 	'class-lms-parity.php',
 	'class-lms-rest-controller.php',

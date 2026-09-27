@@ -325,7 +325,7 @@ class LMS_REST_Controller {
 		if ( ! $user_id ) {
 			return new \WP_REST_Response( array( 'success' => false, 'message' => __( 'Se requiere user_id.', 'atora-lms' ) ), 400 );
 		}
-		$id = LMS_Enrollment_Service::enroll( $user_id, $course_id, $order_id );
+		$id = LMS_Write_Facade::enroll( $user_id, $course_id, $order_id );
 		return $id
 			? new \WP_REST_Response( array( 'success' => true, 'enrollment_id' => $id ), 200 )
 			: new \WP_REST_Response( array( 'success' => false, 'message' => __( 'No se pudo matricular.', 'atora-lms' ) ), 400 );
