@@ -1601,7 +1601,7 @@ class LMS_Migrator {
 		$actual_pairs_any_cmp    = array_diff_key( $actual_pairs, $actual_pairs_missing_user );
 		$actual_pairs_access_cmp = array_diff_key( $actual_pairs_access, $actual_pairs_missing_user );
 
-		$missing_in_table_pairs    = array_diff_key( $expected_pairs_cmp, $actual_pairs_any_cmp );
+		$missing_in_table_pairs    = array_diff_key( $expected_pairs_cmp, $actual_pairs_access_cmp );
 		$missing_in_usermeta_pairs = array_diff_key( $actual_pairs_access_cmp, $expected_pairs_cmp );
 
 		$enrollments_missing_in_table    = count( $missing_in_table_pairs );
