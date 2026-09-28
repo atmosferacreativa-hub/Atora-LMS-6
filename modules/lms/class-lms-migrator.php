@@ -1483,7 +1483,32 @@ class LMS_Migrator {
 			}
 		}
 
-		$expected_pairs              = array(); // "user_id:atora_course_id" esperados según usermeta.
+		$now_mysql      = (string) current_time( 'mysql', true );
+		$now_timestamp  = (int) current_time( 'timestamp', true );
+		$legacy_expiry  = array(); // user_id => [wp_course_id => expires_at]
+		$expiry_rows = $wpdb->get_results( "SELECT user_id, meta_value FROM {$wpdb->usermeta} WHERE meta_key = '_clms_course_access_expiry'" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		foreach ( (array) $expiry_rows as $row ) {
+			$exp = maybe_unserialize( $row->meta_value );
+			$legacy_expiry[ (int) $row->user_id ] = is_array( $exp ) ? $exp : array();
+		}
+
+		$is_legacy_expired = static function( string $datetime ) use ( $now_timestamp ): bool {
+			$datetime = sanitize_text_field( $datetime );
+			if ( '' === $datetime ) {
+				return false;
+			}
+			$timestamp = strtotime( $datetime . ' UTC' );
+			if ( ! $timestamp ) {
+				$timestamp = strtotime( $datetime );
+			}
+			if ( ! $timestamp ) {
+				return false;
+			}
+			return $timestamp < $now_timestamp;
+		};
+
+		$expected_pairs              = array(); // "user_id:atora_course_id" esperados según el universo legacy.
+		$expected_pairs_access       = array(); // subset filtrado por reglas de acceso (estado/caducidad).
 		$enrollments_blocked_by_course = 0;     // matrículas legacy cuyo curso aún no está migrado.
 		$enrollments_blocked_by_broken_wp_link = 0; // IDs WP inexistentes/no-migrables o vínculo tabla→WP roto.
 
@@ -1510,7 +1535,12 @@ class LMS_Migrator {
 					continue;
 				}
 
-				$expected_pairs[ (int) $row->user_id . ':' . $course_map[ $wp_course_id ] ] = true;
+				$key = (int) $row->user_id . ':' . $course_map[ $wp_course_id ];
+				$expected_pairs[ $key ] = true;
+				$expires_at = (string) ( $legacy_expiry[ (int) $row->user_id ][ $wp_course_id ] ?? '' );
+				if ( ! $is_legacy_expired( $expires_at ) ) {
+					$expected_pairs_access[ $key ] = true;
+				}
 			}
 		}
 
@@ -1525,9 +1555,10 @@ class LMS_Migrator {
 		}
 
 		$actual_pairs = array(); // "user_id:course_id" presentes en atora_enrollments.
+		$actual_pairs_access = array(); // subset filtrado por reglas de acceso (estado/caducidad).
 		$actual_pairs_missing_user = array(); // subset de $actual_pairs con user_id ausente.
 		$enrollments_blocked_by_missing_course_id = 0; // filas en atora_enrollments cuyo course_id no existe.
-		foreach ( $wpdb->get_results( "SELECT user_id, course_id FROM {$enroll_table}" ) as $row ) { // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		foreach ( $wpdb->get_results( "SELECT user_id, course_id, status, expires_at FROM {$enroll_table}" ) as $row ) { // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$course_id = (int) $row->course_id;
 			if ( ! isset( $courses_by_id[ $course_id ] ) ) {
 				$enrollments_blocked_by_missing_course_id++;
@@ -1550,17 +1581,28 @@ class LMS_Migrator {
 			if ( isset( $missing_user_ids[ (int) $row->user_id ] ) ) {
 				$actual_pairs_missing_user[ $key ] = true;
 			}
+
+			$status = sanitize_key( (string) ( $row->status ?? '' ) );
+			if ( ! in_array( $status, array( 'active', 'completed' ), true ) ) {
+				continue;
+			}
+			$expires_at = sanitize_text_field( (string) ( $row->expires_at ?? '' ) );
+			if ( '' !== $expires_at && $expires_at < $now_mysql ) {
+				continue;
+			}
+			$actual_pairs_access[ $key ] = true;
 		}
 
 		$enrollments_blocked_by_missing_user = count( $actual_pairs_missing_user );
 
 		// Las matrículas cuyo usuario WP no existe deben reportarse como bloqueadas
 		// (datos), pero no deben contaminar las comparaciones tabla↔usermeta.
-		$expected_pairs_cmp = array_diff_key( $expected_pairs, $actual_pairs_missing_user );
-		$actual_pairs_cmp   = array_diff_key( $actual_pairs, $actual_pairs_missing_user );
+		$expected_pairs_cmp      = array_diff_key( $expected_pairs_access, $actual_pairs_missing_user );
+		$actual_pairs_any_cmp    = array_diff_key( $actual_pairs, $actual_pairs_missing_user );
+		$actual_pairs_access_cmp = array_diff_key( $actual_pairs_access, $actual_pairs_missing_user );
 
-		$missing_in_table_pairs    = array_diff_key( $expected_pairs_cmp, $actual_pairs_cmp );
-		$missing_in_usermeta_pairs = array_diff_key( $actual_pairs_cmp, $expected_pairs_cmp );
+		$missing_in_table_pairs    = array_diff_key( $expected_pairs_cmp, $actual_pairs_access_cmp );
+		$missing_in_usermeta_pairs = array_diff_key( $actual_pairs_access_cmp, $expected_pairs_cmp );
 
 		$enrollments_missing_in_table    = count( $missing_in_table_pairs );
 		$enrollments_missing_in_usermeta = count( $missing_in_usermeta_pairs );

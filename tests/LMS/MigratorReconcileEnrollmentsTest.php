@@ -66,6 +66,8 @@ namespace ATORA\Tests\LMS {
 				public array $atora_courses_rows = array();
 				/** @var array<int,array{user_id:int,meta_value:mixed}> */
 				public array $enrolled_courses_usermeta_rows = array();
+				/** @var array<int,array{user_id:int,meta_value:mixed}> */
+				public array $course_access_expiry_usermeta_rows = array();
 				/** @var array<int,array{user_id:int,course_id:int}> */
 				public array $atora_enrollments_rows = array();
 				/** @var array<int,true> */
@@ -119,11 +121,22 @@ namespace ATORA\Tests\LMS {
 						}, $this->enrolled_courses_usermeta_rows );
 					}
 
-					if ( false !== strpos( $sql, 'SELECT user_id, course_id FROM wp_atora_enrollments' ) ) {
+					if ( false !== strpos( $sql, "FROM wp_usermeta WHERE meta_key = '_clms_course_access_expiry'" ) ) {
+						return array_map( static function( array $row ) {
+							return (object) array(
+								'user_id'    => $row['user_id'],
+								'meta_value' => $row['meta_value'],
+							);
+						}, $this->course_access_expiry_usermeta_rows );
+					}
+
+					if ( false !== strpos( $sql, 'SELECT user_id, course_id, status, expires_at FROM wp_atora_enrollments' ) ) {
 						return array_map( static function( array $row ) {
 							return (object) array(
 								'user_id'   => $row['user_id'],
 								'course_id' => $row['course_id'],
+								'status'    => $row['status'] ?? 'active',
+								'expires_at' => $row['expires_at'] ?? '',
 							);
 						}, $this->atora_enrollments_rows );
 					}
@@ -322,6 +335,151 @@ namespace ATORA\Tests\LMS {
 				$r['enrollments_blocked_by_missing_user'] + $r['enrollments_missing_in_table'] + $r['enrollments_missing_in_usermeta'],
 				'total pairs must still sum to 1'
 			);
+		}
+
+		/** @test */
+		public function test_reconcile_does_not_count_expired_active_enrollment_missing_legacy_mirror(): void {
+			global $wpdb;
+			$wpdb->valid_wp_course_ids = array( 123 );
+			$wpdb->atora_courses_rows = array(
+				array( 'id' => 10, 'wp_post_id' => 123 ),
+			);
+			$wpdb->atora_enrollments_rows = array(
+				array( 'user_id' => 77, 'course_id' => 10, 'status' => 'active', 'expires_at' => '2000-01-01 00:00:00' ),
+			);
+			$wpdb->existing_user_ids = array( 77 => true );
+
+			$r = \ATORA\LMS\LMS_Migrator::reconcile();
+			$this->assertSame( 0, $r['enrollments_missing_in_usermeta'] );
+			$this->assertSame( 0, $r['enrollments_missing_in_table'] );
+			$this->assertSame( 0, $r['enrollments_blocked_by_missing_user'] );
+		}
+
+		/** @test */
+		public function test_reconcile_counts_unexpired_active_enrollment_missing_legacy_mirror(): void {
+			global $wpdb;
+			$wpdb->valid_wp_course_ids = array( 123 );
+			$wpdb->atora_courses_rows = array(
+				array( 'id' => 10, 'wp_post_id' => 123 ),
+			);
+			$wpdb->atora_enrollments_rows = array(
+				array( 'user_id' => 77, 'course_id' => 10, 'status' => 'active', 'expires_at' => '2999-01-01 00:00:00' ),
+			);
+			$wpdb->existing_user_ids = array( 77 => true );
+
+			$r = \ATORA\LMS\LMS_Migrator::reconcile();
+			$this->assertSame( 1, $r['enrollments_missing_in_usermeta'] );
+			$this->assertSame( 0, $r['enrollments_blocked_by_missing_user'] );
+		}
+
+		/** @test */
+		public function test_reconcile_counts_unexpired_completed_enrollment_missing_legacy_mirror(): void {
+			global $wpdb;
+			$wpdb->valid_wp_course_ids = array( 123 );
+			$wpdb->atora_courses_rows = array(
+				array( 'id' => 10, 'wp_post_id' => 123 ),
+			);
+			$wpdb->atora_enrollments_rows = array(
+				array( 'user_id' => 77, 'course_id' => 10, 'status' => 'completed', 'expires_at' => '' ),
+			);
+			$wpdb->existing_user_ids = array( 77 => true );
+
+			$r = \ATORA\LMS\LMS_Migrator::reconcile();
+			$this->assertSame( 1, $r['enrollments_missing_in_usermeta'] );
+			$this->assertSame( 0, $r['enrollments_blocked_by_missing_user'] );
+		}
+
+		/** @test */
+		public function test_reconcile_ignores_unenrolled_enrollment_missing_legacy_mirror(): void {
+			global $wpdb;
+			$wpdb->valid_wp_course_ids = array( 123 );
+			$wpdb->atora_courses_rows = array(
+				array( 'id' => 10, 'wp_post_id' => 123 ),
+			);
+			$wpdb->atora_enrollments_rows = array(
+				array( 'user_id' => 77, 'course_id' => 10, 'status' => 'unenrolled', 'expires_at' => '' ),
+			);
+			$wpdb->existing_user_ids = array( 77 => true );
+
+			$r = \ATORA\LMS\LMS_Migrator::reconcile();
+			$this->assertSame( 0, $r['enrollments_missing_in_usermeta'] );
+			$this->assertSame( 0, $r['enrollments_blocked_by_missing_user'] );
+		}
+
+		/** @test */
+		public function test_reconcile_ignores_expired_legacy_enrollment_when_comparing_against_table(): void {
+			global $wpdb;
+			$wpdb->valid_wp_course_ids = array( 123 );
+			$wpdb->atora_courses_rows = array(
+				array( 'id' => 10, 'wp_post_id' => 123 ),
+			);
+			$wpdb->enrolled_courses_usermeta_rows = array(
+				array( 'user_id' => 1, 'meta_value' => serialize( array( 123 ) ) ),
+			);
+			$wpdb->course_access_expiry_usermeta_rows = array(
+				array( 'user_id' => 1, 'meta_value' => serialize( array( 123 => '2000-01-01 00:00:00' ) ) ),
+			);
+
+			$r = \ATORA\LMS\LMS_Migrator::reconcile();
+			$this->assertSame( 0, $r['enrollments_missing_in_table'] );
+			$this->assertSame( 0, $r['enrollments_missing_in_usermeta'] );
+		}
+
+		/** @test */
+		public function test_reconcile_counts_unexpired_legacy_enrollment_missing_in_table(): void {
+			global $wpdb;
+			$wpdb->valid_wp_course_ids = array( 123 );
+			$wpdb->atora_courses_rows = array(
+				array( 'id' => 10, 'wp_post_id' => 123 ),
+			);
+			$wpdb->enrolled_courses_usermeta_rows = array(
+				array( 'user_id' => 1, 'meta_value' => serialize( array( 123 ) ) ),
+			);
+			$wpdb->course_access_expiry_usermeta_rows = array(
+				array( 'user_id' => 1, 'meta_value' => serialize( array( 123 => '2999-01-01 00:00:00' ) ) ),
+			);
+
+			$r = \ATORA\LMS\LMS_Migrator::reconcile();
+			$this->assertSame( 1, $r['enrollments_missing_in_table'] );
+			$this->assertSame( 0, $r['enrollments_missing_in_usermeta'] );
+		}
+
+		/** @test */
+		public function test_reconcile_counts_unexpired_legacy_enrollment_as_missing_in_table_when_table_row_is_unenrolled(): void {
+			global $wpdb;
+			$wpdb->valid_wp_course_ids = array( 123 );
+			$wpdb->atora_courses_rows = array(
+				array( 'id' => 10, 'wp_post_id' => 123 ),
+			);
+			$wpdb->enrolled_courses_usermeta_rows = array(
+				array( 'user_id' => 1, 'meta_value' => serialize( array( 123 ) ) ),
+			);
+			$wpdb->atora_enrollments_rows = array(
+				array( 'user_id' => 1, 'course_id' => 10, 'status' => 'unenrolled', 'expires_at' => '' ),
+			);
+
+			$r = \ATORA\LMS\LMS_Migrator::reconcile();
+			$this->assertSame( 1, $r['enrollments_missing_in_table'] );
+			$this->assertSame( 0, $r['enrollments_missing_in_usermeta'] );
+		}
+
+		/** @test */
+		public function test_reconcile_counts_unexpired_legacy_enrollment_as_missing_in_table_when_table_row_is_expired_active(): void {
+			global $wpdb;
+			$wpdb->valid_wp_course_ids = array( 123 );
+			$wpdb->atora_courses_rows = array(
+				array( 'id' => 10, 'wp_post_id' => 123 ),
+			);
+			$wpdb->enrolled_courses_usermeta_rows = array(
+				array( 'user_id' => 1, 'meta_value' => serialize( array( 123 ) ) ),
+			);
+			$wpdb->atora_enrollments_rows = array(
+				array( 'user_id' => 1, 'course_id' => 10, 'status' => 'active', 'expires_at' => '2000-01-01 00:00:00' ),
+			);
+
+			$r = \ATORA\LMS\LMS_Migrator::reconcile();
+			$this->assertSame( 1, $r['enrollments_missing_in_table'] );
+			$this->assertSame( 0, $r['enrollments_missing_in_usermeta'] );
 		}
 	}
 }
