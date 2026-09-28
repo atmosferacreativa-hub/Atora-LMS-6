@@ -224,6 +224,11 @@ namespace ATORA\Tests\Rest {
 			atora_test_set_post_meta( 5001, '_clms_gradebook_points', 100 );
 			atora_test_set_course_lessons( 428, array( 5001 ) );
 			atora_test_set_enrolled_students( 428, array( 10 ) );
+
+			$ref  = new \ReflectionClass( \ATORA_Mobile_REST_Controller::class );
+			$prop = $ref->getProperty( 'enrollment_index_cache' );
+			$prop->setAccessible( true );
+			$prop->setValue( null, array() );
 		}
 
 		public function test_denies_without_wp_identity_and_does_not_write_anything(): void {

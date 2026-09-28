@@ -148,9 +148,10 @@ namespace ATORA\Tests\Rest {
 		$p->setAccessible( true );
 		$p->setValue( null, array() );
 		atora_test_set_drip_available( true );
+		atora_test_reset_posts();
 		atora_test_reset_post_types();
-		atora_test_set_post_type( 5001, 'lm_lesson' );
-		atora_test_set_post_type( 428, 'lm_course' );
+		atora_test_set_post( 5001, array( 'post_type' => 'lm_lesson', 'post_status' => 'publish' ) );
+		atora_test_set_post( 428, array( 'post_type' => 'lm_course', 'post_status' => 'publish' ) );
 		atora_test_reset_transients();
 		atora_test_reset_options();
 		atora_test_reset_post_meta();

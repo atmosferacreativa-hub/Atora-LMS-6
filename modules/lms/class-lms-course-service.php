@@ -37,6 +37,29 @@ class LMS_Course_Service {
 		return $row ? self::format_course( $row ) : null;
 	}
 
+	/**
+	 * Valida si el vínculo `wp_post_id` apunta a un CPT `lm_course` publicado.
+	 *
+	 * Objetivo: evitar exponer cursos tabulares `published` cuyo puente legacy
+	 * (CPT) está en `trash` o ya no existe.
+	 *
+	 * Nota: esto es una validación de visibilidad/enrolabilidad para estudiantes;
+	 * NO debe usarse para ocultar el registro a administración.
+	 */
+	public static function legacy_wp_course_post_is_public( int $wp_post_id ): bool {
+		if ( $wp_post_id <= 0 || ! function_exists( 'get_post' ) ) {
+			return false;
+		}
+		$post = get_post( $wp_post_id );
+		if ( ! $post ) {
+			return false;
+		}
+		if ( 'lm_course' !== (string) ( $post->post_type ?? '' ) ) {
+			return false;
+		}
+		return 'publish' === (string) ( $post->post_status ?? '' );
+	}
+
 	public static function get_all( array $args = array() ): array {
 		global $wpdb;
 
@@ -46,36 +69,54 @@ class LMS_Course_Service {
 		$status   = sanitize_key( (string) ( $args['status'] ?? 'published' ) );
 		$search   = sanitize_text_field( (string) ( $args['search'] ?? '' ) );
 		$instr_id = absint( $args['instructor_id'] ?? 0 );
+		$only_public_legacy_wp_links = ! empty( $args['only_public_legacy_wp_links'] );
+
+		$posts_table = property_exists( $wpdb, 'posts' )
+			? (string) $wpdb->posts
+			: ( $wpdb->prefix . 'posts' );
+		$from  = "{$table} c";
+		$joins = '';
 
 		$where  = 'WHERE 1=1';
 		$params = array();
 
 		if ( '' !== $status && 'all' !== $status ) {
-			$where   .= ' AND status = %s';
+			$where   .= ' AND c.status = %s';
 			$params[] = $status;
 		}
 		if ( '' !== $search ) {
-			$where   .= ' AND (title LIKE %s OR description LIKE %s)';
+			$where   .= ' AND (c.title LIKE %s OR c.description LIKE %s)';
 			$like     = '%' . $wpdb->esc_like( $search ) . '%';
 			$params[] = $like;
 			$params[] = $like;
 		}
 		if ( $instr_id ) {
-			$where   .= ' AND instructor_id = %d';
+			$where   .= ' AND c.instructor_id = %d';
 			$params[] = $instr_id;
 		}
 
-		$params_c = $params;
-		$total    = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		// Opción explícita: al listar cursos para estudiantes, excluir
+		// cursos tabulares `published` cuyo wp_post_id apunta a un CPT
+		// inexistente o no público.
+		if ( $only_public_legacy_wp_links ) {
+			$joins    .= " LEFT JOIN {$posts_table} p ON p.ID = c.wp_post_id";
+			$where    .= ' AND (COALESCE(c.wp_post_id, 0) <= 0 OR (p.ID IS NOT NULL AND p.post_type = %s AND p.post_status = %s))';
+			$params[] = 'lm_course';
+			$params[] = 'publish';
+		}
+
+		$params_c  = $params;
+		$count_sql = "SELECT COUNT(*) FROM {$from} {$joins} {$where}";
+		$total     = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			! empty( $params_c )
-				? $wpdb->prepare( "SELECT COUNT(*) FROM {$table} {$where}", ...$params_c )
-				: "SELECT COUNT(*) FROM {$table} {$where}"
+				? $wpdb->prepare( $count_sql, ...$params_c )
+				: $count_sql
 		);
 
 		$params[] = $limit;
 		$params[] = $offset;
 		$rows = (array) $wpdb->get_results( // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-			$wpdb->prepare( "SELECT * FROM {$table} {$where} ORDER BY published_at DESC, id DESC LIMIT %d OFFSET %d", ...$params ),
+			$wpdb->prepare( "SELECT c.* FROM {$from} {$joins} {$where} ORDER BY c.published_at DESC, c.id DESC LIMIT %d OFFSET %d", ...$params ),
 			ARRAY_A
 		);
 

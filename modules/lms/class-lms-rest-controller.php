@@ -175,8 +175,12 @@ class LMS_REST_Controller {
 			'status'        => $status,
 			'search'        => sanitize_text_field( (string) ( $r->get_param( 'search' ) ?: '' ) ),
 			'instructor_id' => $instructor_id,
+			'only_public_legacy_wp_links' => ! self::can_diagnose_broken_legacy_links(),
 		);
-		return new \WP_REST_Response( array_merge( array( 'success' => true ), LMS_Course_Service::get_all( $args ) ), 200 );
+
+		$out = LMS_Course_Service::get_all( $args );
+
+		return new \WP_REST_Response( array_merge( array( 'success' => true ), $out ), 200 );
 	}
 
 	public static function get_course( \WP_REST_Request $r ): \WP_REST_Response {
@@ -216,7 +220,18 @@ class LMS_REST_Controller {
 
 		$status = (string) ( $course['status'] ?? '' );
 		if ( 'published' === $status ) {
-			return is_user_logged_in();
+			if ( ! is_user_logged_in() ) {
+				return false;
+			}
+			$wp_course_id = absint( $course['wp_post_id'] ?? 0 );
+			if ( $wp_course_id <= 0 ) {
+				return true;
+			}
+			// Si el usuario puede diagnosticar, no ocultar el registro.
+			if ( self::can_diagnose_broken_legacy_links() ) {
+				return true;
+			}
+			return LMS_Course_Service::legacy_wp_course_post_is_public( $wp_course_id );
 		}
 
 		if ( (int) ( $course['instructor_id'] ?? 0 ) === get_current_user_id() && get_current_user_id() > 0 ) {
@@ -228,6 +243,12 @@ class LMS_REST_Controller {
 		}
 
 		return false;
+	}
+
+	private static function can_diagnose_broken_legacy_links(): bool {
+		return current_user_can( 'manage_options' )
+			|| current_user_can( 'edit_others_lm_courses' )
+			|| current_user_can( 'clms_manage_courses' );
 	}
 
 	public static function create_course( \WP_REST_Request $r ): \WP_REST_Response {
@@ -319,6 +340,18 @@ class LMS_REST_Controller {
 		if ( ! self::can_manage_this_course( $course_id ) ) {
 			return self::forbidden_course_response();
 		}
+
+		// Evitar crear/espejar matrículas en cursos tabulares publicados cuyo
+		// wp_post_id apunta a un CPT en trash o ausente.
+		$course = LMS_Course_Service::get( $course_id );
+		if ( ! $course ) {
+			return new \WP_REST_Response( array( 'success' => false, 'message' => __( 'Curso no encontrado.', 'atora-lms' ) ), 404 );
+		}
+		$wp_course_id = absint( $course['wp_post_id'] ?? 0 );
+		if ( $wp_course_id > 0 && ! LMS_Course_Service::legacy_wp_course_post_is_public( $wp_course_id ) ) {
+			return new \WP_REST_Response( array( 'success' => false, 'message' => __( 'El curso no está disponible para matrícula (vínculo WordPress inválido).', 'atora-lms' ) ), 409 );
+		}
+
 		$user_id   = absint( $b['user_id'] ?? get_current_user_id() );
 		$order_id  = absint( $b['order_id'] ?? 0 );
 

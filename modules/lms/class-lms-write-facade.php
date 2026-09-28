@@ -92,7 +92,9 @@ class LMS_Write_Facade {
 
 		if ( $enroll_id && self::dualwrite_enabled() ) {
 			$wp_id = self::wp_course_id( $atora_course_id );
-			if ( $wp_id ) { self::mirror_enroll_to_legacy( $user_id, $wp_id ); }
+			if ( $wp_id && LMS_Course_Service::legacy_wp_course_post_is_public( $wp_id ) ) {
+				self::mirror_enroll_to_legacy( $user_id, $wp_id );
+			}
 		}
 		return $enroll_id;
 	}
