@@ -175,19 +175,10 @@ class LMS_REST_Controller {
 			'status'        => $status,
 			'search'        => sanitize_text_field( (string) ( $r->get_param( 'search' ) ?: '' ) ),
 			'instructor_id' => $instructor_id,
+			'only_public_legacy_wp_links' => ! self::can_diagnose_broken_legacy_links(),
 		);
 
 		$out = LMS_Course_Service::get_all( $args );
-		if ( ! self::can_diagnose_broken_legacy_links() ) {
-			$items = (array) ( $out['items'] ?? array() );
-			$items = array_values( array_filter( $items, static function( $course ) {
-				if ( ! is_array( $course ) ) { return false; }
-				$wp_course_id = absint( $course['wp_post_id'] ?? 0 );
-				return $wp_course_id <= 0 || LMS_Course_Service::legacy_wp_course_post_is_public( $wp_course_id );
-			} ) );
-			$out['items'] = $items;
-			$out['total'] = count( $items );
-		}
 
 		return new \WP_REST_Response( array_merge( array( 'success' => true ), $out ), 200 );
 	}
