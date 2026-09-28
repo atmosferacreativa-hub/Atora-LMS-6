@@ -37,6 +37,29 @@ class LMS_Course_Service {
 		return $row ? self::format_course( $row ) : null;
 	}
 
+	/**
+	 * Valida si el vínculo `wp_post_id` apunta a un CPT `lm_course` publicado.
+	 *
+	 * Objetivo: evitar exponer cursos tabulares `published` cuyo puente legacy
+	 * (CPT) está en `trash` o ya no existe.
+	 *
+	 * Nota: esto es una validación de visibilidad/enrolabilidad para estudiantes;
+	 * NO debe usarse para ocultar el registro a administración.
+	 */
+	public static function legacy_wp_course_post_is_public( int $wp_post_id ): bool {
+		if ( $wp_post_id <= 0 || ! function_exists( 'get_post' ) ) {
+			return false;
+		}
+		$post = get_post( $wp_post_id );
+		if ( ! $post ) {
+			return false;
+		}
+		if ( 'lm_course' !== (string) ( $post->post_type ?? '' ) ) {
+			return false;
+		}
+		return 'publish' === (string) ( $post->post_status ?? '' );
+	}
+
 	public static function get_all( array $args = array() ): array {
 		global $wpdb;
 

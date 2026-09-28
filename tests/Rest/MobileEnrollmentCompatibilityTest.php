@@ -12,47 +12,23 @@ declare( strict_types = 1 );
  */
 
 namespace {
-	if ( ! class_exists( 'CLMS_Helper' ) ) {
-		class CLMS_Helper {
-			public static array $enrolled  = array(); // [user_id] => wp_course_ids
-			public static array $completed = array(); // [user_id] => wp_course_ids
-
-			public static function get_user_enrolled_courses( $user_id ) {
-				$user_id = (int) $user_id;
-				return (array) ( self::$enrolled[ $user_id ] ?? array() );
-			}
-
-			public static function user_is_enrolled_in_course( $user_id, $course_id ): bool {
-				$user_id   = (int) $user_id;
-				$course_id = (int) $course_id;
-				return in_array( $course_id, (array) ( self::$enrolled[ $user_id ] ?? array() ), true );
-			}
-
-				public static function is_course_completed( $user_id, $course_id ): bool {
-					$user_id   = (int) $user_id;
-					$course_id = (int) $course_id;
-					return in_array( $course_id, (array) ( self::$completed[ $user_id ] ?? array() ), true );
-				}
-
-				public static function get_post_meta_first( $post_id, $key, $default = '' ) {
-					$post_id = (int) $post_id;
-					if ( is_array( $key ) ) {
-						foreach ( $key as $candidate ) {
-							$candidate = (string) $candidate;
-							$value     = get_post_meta( $post_id, $candidate, true );
-							if ( '' !== (string) $value ) {
-								return $value;
-							}
-						}
-						return $default;
-					}
-					$key   = (string) $key;
-					$value = get_post_meta( $post_id, $key, true );
-					return '' !== (string) $value ? $value : $default;
-				}
-			}
+	require_once __DIR__ . '/../stubs/class-clms-helper-stub.php';
+	if ( ! function_exists( 'wp_get_current_user' ) ) {
+		function wp_get_current_user() {
+			return (object) array(
+				'ID'           => get_current_user_id(),
+				'user_email'   => 'student@example.test',
+				'display_name' => 'Student',
+			);
 		}
 	}
+	if ( ! function_exists( 'get_avatar_url' ) ) {
+		function get_avatar_url( $id_or_email = null, $args = null ): string {
+			unset( $id_or_email, $args );
+			return '';
+		}
+	}
+}
 
 namespace ATORA\Tests\Rest {
 
@@ -62,6 +38,7 @@ namespace ATORA\Tests\Rest {
 
 	final class MobileTestWpdb {
 		public string $prefix = 'wp_';
+		public array $insert_calls = array();
 
 		public function prepare( string $sql, ...$args ): string {
 			$i = 0;
@@ -155,13 +132,22 @@ namespace ATORA\Tests\Rest {
 
 			return array();
 		}
+
+		public function insert( $table, $data, $format = null ): int {
+			$this->insert_calls[] = array( 'table' => $table, 'data' => $data );
+			return 1;
+		}
+		public function update( $table, $data, $where, $format = null, $where_format = null ) { return 1; }
 	}
 
 	final class MobileEnrollmentCompatibilityTest extends TestCase {
 		protected function setUp(): void {
 			parent::setUp();
+			atora_test_reset_posts();
+			atora_test_reset_post_types();
 
 			$GLOBALS['__atora_test_current_user_id'] = 10;
+			atora_test_reset_transients();
 			$GLOBALS['__atora_mobile_test_db']       = array(
 				'enrollments'   => array(),
 				'courses'       => array(),
@@ -174,7 +160,7 @@ namespace ATORA\Tests\Rest {
 
 			global $wpdb;
 			$wpdb = new MobileTestWpdb();
-
+			atora_test_reset_clms_helper_stub();
 			\CLMS_Helper::$enrolled  = array();
 			\CLMS_Helper::$completed = array();
 
@@ -280,6 +266,9 @@ namespace ATORA\Tests\Rest {
 		}
 
 		public function test_course_allows_via_legacy_fallback_even_if_index_is_empty(): void {
+			// El fallback legacy solo debe aplicar si el CPT existe y está publicado.
+			atora_test_set_post( 123, array( 'post_type' => 'lm_course', 'post_status' => 'publish' ) );
+
 			$GLOBALS['__atora_mobile_test_db']['courses'][77] = array(
 				'id'            => 77,
 				'status'        => 'published',
@@ -299,6 +288,188 @@ namespace ATORA\Tests\Rest {
 			$result = \ATORA_Mobile_REST_Controller::course( new \WP_REST_Request( array( 'course_id' => 77 ) ) );
 			$this->assertFalse( is_wp_error( $result ) );
 			$this->assertSame( 200, $result->get_status() );
+		}
+
+		public function test_tables_course_with_broken_wp_link_is_hidden_and_inaccessible(): void {
+			// course_id=1 → wp_post_id=123 en trash; course_id=2 → wp_post_id=999 ausente.
+			// course_id=5 → wp_post_id=124 draft; course_id=6 → wp_post_id=125 private.
+			atora_test_set_post( 123, array( 'post_type' => 'lm_course', 'post_status' => 'trash' ) );
+			atora_test_set_post( 124, array( 'post_type' => 'lm_course', 'post_status' => 'draft' ) );
+			atora_test_set_post( 125, array( 'post_type' => 'lm_course', 'post_status' => 'private' ) );
+			atora_test_set_post( 555, array( 'post_type' => 'lm_course', 'post_status' => 'publish' ) );
+
+			$GLOBALS['__atora_mobile_test_db']['enrollments'][10]['active'] = array(
+				array( 'id' => 501, 'user_id' => 10, 'course_id' => 1, 'status' => 'active', 'last_activity' => '2026-01-01 00:00:00' ),
+				array( 'id' => 502, 'user_id' => 10, 'course_id' => 2, 'status' => 'active', 'last_activity' => '2026-01-02 00:00:00' ),
+				array( 'id' => 503, 'user_id' => 10, 'course_id' => 3, 'status' => 'active', 'last_activity' => '2026-01-03 00:00:00' ),
+				array( 'id' => 504, 'user_id' => 10, 'course_id' => 4, 'status' => 'active', 'last_activity' => '2026-01-04 00:00:00' ),
+				array( 'id' => 505, 'user_id' => 10, 'course_id' => 5, 'status' => 'active', 'last_activity' => '2026-01-05 00:00:00' ),
+				array( 'id' => 506, 'user_id' => 10, 'course_id' => 6, 'status' => 'active', 'last_activity' => '2026-01-06 00:00:00' ),
+			);
+
+			$GLOBALS['__atora_mobile_test_db']['courses'][1] = array(
+				'id'            => 1,
+				'status'        => 'published',
+				'title'         => 'Curso roto (trash)',
+				'excerpt'       => '',
+				'thumbnail_url' => '',
+				'duration_hours'=> 0,
+				'level'         => '',
+				'language'      => 'es',
+				'wp_post_id'    => 123,
+			);
+			$GLOBALS['__atora_mobile_test_db']['courses'][2] = array(
+				'id'            => 2,
+				'status'        => 'published',
+				'title'         => 'Curso roto (missing)',
+				'excerpt'       => '',
+				'thumbnail_url' => '',
+				'duration_hours'=> 0,
+				'level'         => '',
+				'language'      => 'es',
+				'wp_post_id'    => 999,
+			);
+			$GLOBALS['__atora_mobile_test_db']['courses'][3] = array(
+				'id'            => 3,
+				'status'        => 'published',
+				'title'         => 'Curso válido (publicado en WP)',
+				'excerpt'       => '',
+				'thumbnail_url' => '',
+				'duration_hours'=> 0,
+				'level'         => '',
+				'language'      => 'es',
+				'wp_post_id'    => 555,
+			);
+			$GLOBALS['__atora_mobile_test_db']['courses'][4] = array(
+				'id'            => 4,
+				'status'        => 'published',
+				'title'         => 'Curso válido (nativo tablas)',
+				'excerpt'       => '',
+				'thumbnail_url' => '',
+				'duration_hours'=> 0,
+				'level'         => '',
+				'language'      => 'es',
+				'wp_post_id'    => 0,
+			);
+			$GLOBALS['__atora_mobile_test_db']['courses'][5] = array(
+				'id'            => 5,
+				'status'        => 'published',
+				'title'         => 'Curso roto (draft)',
+				'excerpt'       => '',
+				'thumbnail_url' => '',
+				'duration_hours'=> 0,
+				'level'         => '',
+				'language'      => 'es',
+				'wp_post_id'    => 124,
+			);
+			$GLOBALS['__atora_mobile_test_db']['courses'][6] = array(
+				'id'            => 6,
+				'status'        => 'published',
+				'title'         => 'Curso roto (private)',
+				'excerpt'       => '',
+				'thumbnail_url' => '',
+				'duration_hours'=> 0,
+				'level'         => '',
+				'language'      => 'es',
+				'wp_post_id'    => 125,
+			);
+
+			foreach ( array( 1, 2, 3, 4, 5, 6 ) as $course_id ) {
+				$GLOBALS['__atora_mobile_test_db']['total_lessons'][ $course_id ] = 0;
+				$GLOBALS['__atora_mobile_test_db']['progress'][10][ $course_id ] = array( 'completed_lessons' => 0 );
+			}
+
+			$GLOBALS['__atora_mobile_test_db']['lessons'][501] = array(
+				'id'         => 501,
+				'course_id'  => 1,
+				'status'     => 'published',
+				'wp_post_id' => 0,
+				'title'      => 'Lección en curso roto',
+				'type'       => 'text',
+			);
+
+			$response = \ATORA_Mobile_REST_Controller::courses();
+			$this->assertSame( 200, $response->get_status() );
+			$data  = (array) $response->get_data();
+			$items = (array) ( $data['items'] ?? array() );
+			$this->assertSame( array( 3, 4 ), array_map( static fn( $i ) => (int) ( $i['id'] ?? 0 ), $items ) );
+
+			$course_1 = \ATORA_Mobile_REST_Controller::course( new \WP_REST_Request( array( 'course_id' => 1 ) ) );
+			$this->assertTrue( is_wp_error( $course_1 ) );
+			$this->assertSame( 'atora_mobile_course_forbidden', $course_1->get_error_code() );
+
+			$course_2 = \ATORA_Mobile_REST_Controller::course( new \WP_REST_Request( array( 'course_id' => 2 ) ) );
+			$this->assertTrue( is_wp_error( $course_2 ) );
+			$this->assertSame( 'atora_mobile_course_forbidden', $course_2->get_error_code() );
+
+			$course_5 = \ATORA_Mobile_REST_Controller::course( new \WP_REST_Request( array( 'course_id' => 5 ) ) );
+			$this->assertTrue( is_wp_error( $course_5 ) );
+			$this->assertSame( 'atora_mobile_course_forbidden', $course_5->get_error_code() );
+
+			$course_6 = \ATORA_Mobile_REST_Controller::course( new \WP_REST_Request( array( 'course_id' => 6 ) ) );
+			$this->assertTrue( is_wp_error( $course_6 ) );
+			$this->assertSame( 'atora_mobile_course_forbidden', $course_6->get_error_code() );
+
+			$lesson = \ATORA_Mobile_REST_Controller::lesson( new \WP_REST_Request( array( 'lesson_id' => 501 ) ) );
+			$this->assertTrue( is_wp_error( $lesson ) );
+			$this->assertSame( 'atora_mobile_course_forbidden', $lesson->get_error_code() );
+
+			$quiz = \ATORA_Mobile_REST_Controller::quiz( new \WP_REST_Request( array( 'lesson_id' => 501 ) ) );
+			$this->assertTrue( is_wp_error( $quiz ) );
+			$this->assertSame( 'atora_mobile_course_forbidden', $quiz->get_error_code() );
+
+			$submit = \ATORA_Mobile_REST_Controller::submit_quiz( new \WP_REST_Request( array( 'lesson_id' => 501, 'answers' => array(), 'token' => 'x' ) ) );
+			$this->assertTrue( is_wp_error( $submit ) );
+			$this->assertSame( 'atora_mobile_course_forbidden', $submit->get_error_code() );
+
+			$this->assertSame( array(), $GLOBALS['__atora_test_transients'] ?? array(), 'No debe emitir token ni escribir transients si el curso está bloqueado' );
+			global $wpdb;
+			$this->assertSame( array(), $wpdb->insert_calls, 'No debe escribir en DB si el curso está bloqueado' );
+		}
+
+		public function test_dashboard_hides_broken_wp_links_and_counts_pending_only_for_visible_courses(): void {
+			atora_test_set_post( 123, array( 'post_type' => 'lm_course', 'post_status' => 'trash' ) );
+			atora_test_set_post( 124, array( 'post_type' => 'lm_course', 'post_status' => 'draft' ) );
+			atora_test_set_post( 125, array( 'post_type' => 'lm_course', 'post_status' => 'private' ) );
+			atora_test_set_post( 555, array( 'post_type' => 'lm_course', 'post_status' => 'publish' ) );
+
+			$GLOBALS['__atora_mobile_test_db']['enrollments'][10]['active'] = array(
+				array( 'id' => 501, 'user_id' => 10, 'course_id' => 1, 'status' => 'active', 'last_activity' => '2026-01-01 00:00:00' ),
+				array( 'id' => 502, 'user_id' => 10, 'course_id' => 2, 'status' => 'active', 'last_activity' => '2026-01-02 00:00:00' ),
+				array( 'id' => 503, 'user_id' => 10, 'course_id' => 3, 'status' => 'active', 'last_activity' => '2026-01-03 00:00:00' ),
+				array( 'id' => 504, 'user_id' => 10, 'course_id' => 4, 'status' => 'active', 'last_activity' => '2026-01-04 00:00:00' ),
+				array( 'id' => 505, 'user_id' => 10, 'course_id' => 5, 'status' => 'active', 'last_activity' => '2026-01-05 00:00:00' ),
+				array( 'id' => 506, 'user_id' => 10, 'course_id' => 6, 'status' => 'active', 'last_activity' => '2026-01-06 00:00:00' ),
+			);
+
+			$GLOBALS['__atora_mobile_test_db']['courses'][1] = array( 'id' => 1, 'status' => 'published', 'title' => 'Trash', 'excerpt' => '', 'thumbnail_url' => '', 'duration_hours' => 0, 'level' => '', 'language' => 'es', 'wp_post_id' => 123 );
+			$GLOBALS['__atora_mobile_test_db']['courses'][2] = array( 'id' => 2, 'status' => 'published', 'title' => 'Missing', 'excerpt' => '', 'thumbnail_url' => '', 'duration_hours' => 0, 'level' => '', 'language' => 'es', 'wp_post_id' => 999 );
+			$GLOBALS['__atora_mobile_test_db']['courses'][3] = array( 'id' => 3, 'status' => 'published', 'title' => 'Published', 'excerpt' => '', 'thumbnail_url' => '', 'duration_hours' => 0, 'level' => '', 'language' => 'es', 'wp_post_id' => 555 );
+			$GLOBALS['__atora_mobile_test_db']['courses'][4] = array( 'id' => 4, 'status' => 'published', 'title' => 'Native', 'excerpt' => '', 'thumbnail_url' => '', 'duration_hours' => 0, 'level' => '', 'language' => 'es', 'wp_post_id' => 0 );
+			$GLOBALS['__atora_mobile_test_db']['courses'][5] = array( 'id' => 5, 'status' => 'published', 'title' => 'Draft', 'excerpt' => '', 'thumbnail_url' => '', 'duration_hours' => 0, 'level' => '', 'language' => 'es', 'wp_post_id' => 124 );
+			$GLOBALS['__atora_mobile_test_db']['courses'][6] = array( 'id' => 6, 'status' => 'published', 'title' => 'Private', 'excerpt' => '', 'thumbnail_url' => '', 'duration_hours' => 0, 'level' => '', 'language' => 'es', 'wp_post_id' => 125 );
+
+			// Inflar pendientes en cursos NO visibles, no deben contarse.
+			$GLOBALS['__atora_mobile_test_db']['total_lessons'][1] = 10;
+			$GLOBALS['__atora_mobile_test_db']['total_lessons'][2] = 10;
+			$GLOBALS['__atora_mobile_test_db']['total_lessons'][5] = 10;
+			$GLOBALS['__atora_mobile_test_db']['total_lessons'][6] = 10;
+			$GLOBALS['__atora_mobile_test_db']['progress'][10][1] = array( 'completed_lessons' => 0 );
+			$GLOBALS['__atora_mobile_test_db']['progress'][10][2] = array( 'completed_lessons' => 0 );
+			$GLOBALS['__atora_mobile_test_db']['progress'][10][5] = array( 'completed_lessons' => 0 );
+			$GLOBALS['__atora_mobile_test_db']['progress'][10][6] = array( 'completed_lessons' => 0 );
+
+			$GLOBALS['__atora_mobile_test_db']['total_lessons'][3] = 3;
+			$GLOBALS['__atora_mobile_test_db']['total_lessons'][4] = 2;
+			$GLOBALS['__atora_mobile_test_db']['progress'][10][3] = array( 'completed_lessons' => 1 );
+			$GLOBALS['__atora_mobile_test_db']['progress'][10][4] = array( 'completed_lessons' => 0 );
+
+			$resp = \ATORA_Mobile_REST_Controller::dashboard();
+			$this->assertSame( 200, $resp->get_status() );
+			$data = (array) $resp->get_data();
+			$courses = (array) ( $data['courses'] ?? array() );
+			$this->assertSame( array( 3, 4 ), array_map( static fn( $c ) => (int) ( $c['id'] ?? 0 ), $courses ) );
+			$this->assertSame( (3 - 1) + (2 - 0), (int) ( $data['pending_activities'] ?? -1 ) );
 		}
 
 		public function test_lesson_denies_when_user_not_enrolled_in_parent_course(): void {

@@ -24,6 +24,8 @@ final class EnrollRestDualwriteTest extends TestCase {
 		atora_test_reset_options();
 		atora_test_reset_user_meta();
 		atora_test_reset_post_meta();
+		atora_test_reset_posts();
+		atora_test_reset_post_types();
 		atora_test_reset_user_caps();
 		atora_test_reset_users();
 		atora_test_reset_missing_users();
@@ -74,6 +76,21 @@ final class EnrollRestDualwriteTest extends TestCase {
 			}
 
 			public function get_row( $sql, $output = 'ARRAY_A' ) {
+				if ( false !== strpos( (string) $sql, 'FROM wp_atora_courses WHERE id =' ) && preg_match( '/id = (\d+)/', (string) $sql, $m ) ) {
+					$course_id = (int) $m[1];
+					return array(
+						'id'            => $course_id,
+						'wp_post_id'    => (int) ( $this->course_wp_ids[ $course_id ] ?? 0 ),
+						'status'        => 'published',
+						'instructor_id' => 0,
+						'title'         => 'Curso',
+						'excerpt'       => '',
+						'thumbnail_url' => '',
+						'duration_hours'=> 0,
+						'level'         => '',
+						'language'      => 'es',
+					);
+				}
 				if ( false !== strpos( (string) $sql, 'FROM wp_atora_enrollments' )
 					&& preg_match( '/user_id = (\d+) AND course_id = (\d+)/', (string) $sql, $m ) ) {
 					$key = $m[1] . ':' . $m[2];
@@ -124,6 +141,7 @@ final class EnrollRestDualwriteTest extends TestCase {
 	public function test_enroll_dualwrite_true_mirrors_to_legacy_and_is_idempotent(): void {
 		$this->as_admin( 10 );
 		atora_test_set_user( 999, array( 'user_email' => 'student@example.test', 'display_name' => 'Student' ) );
+		atora_test_set_post( 777, array( 'post_type' => 'lm_course', 'post_status' => 'publish' ) );
 		$this->install_wpdb_fixture( array( 55 => 777 ) );
 		update_option( 'atora_lms_dualwrite', true );
 
@@ -156,6 +174,7 @@ final class EnrollRestDualwriteTest extends TestCase {
 	public function test_enroll_dualwrite_false_does_not_mirror_to_legacy(): void {
 		$this->as_admin( 10 );
 		atora_test_set_user( 999, array( 'user_email' => 'student@example.test', 'display_name' => 'Student' ) );
+		atora_test_set_post( 777, array( 'post_type' => 'lm_course', 'post_status' => 'publish' ) );
 		$this->install_wpdb_fixture( array( 55 => 777 ) );
 		update_option( 'atora_lms_dualwrite', false );
 
@@ -173,8 +192,31 @@ final class EnrollRestDualwriteTest extends TestCase {
 	}
 
 	/** @test */
+	public function test_enroll_table_native_course_allows_enroll_but_never_mirrors_even_if_dualwrite_true(): void {
+		$this->as_admin( 10 );
+		atora_test_set_user( 999, array( 'user_email' => 'student@example.test', 'display_name' => 'Student' ) );
+		$this->install_wpdb_fixture( array( 55 => 0 ) );
+		update_option( 'atora_lms_dualwrite', true );
+
+		$request = new \WP_REST_Request( array( 'user_id' => 999, 'order_id' => 88 ) );
+		$request->set_param( 'course_id', 55 );
+
+		$response = \ATORA\LMS\LMS_REST_Controller::enroll( $request );
+		$this->assertSame( 200, $response->get_status() );
+		$data = (array) $response->get_data();
+		$this->assertTrue( (bool) ( $data['success'] ?? false ) );
+
+		global $wpdb;
+		$this->assertCount( 1, $wpdb->enrollments );
+		$enroll_row = array_values( $wpdb->enrollments )[0];
+		$this->assertSame( 88, (int) ( $enroll_row['order_id'] ?? 0 ) );
+		$this->assertSame( '', get_user_meta( 999, '_clms_enrolled_courses', true ), 'Curso sin wp_post_id no debe espejarse a legacy' );
+	}
+
+	/** @test */
 	public function test_enroll_rejects_missing_user_id_and_does_not_write(): void {
 		$this->as_admin( 10 );
+		atora_test_set_post( 777, array( 'post_type' => 'lm_course', 'post_status' => 'publish' ) );
 		$this->install_wpdb_fixture( array( 55 => 777 ) );
 		update_option( 'atora_lms_dualwrite', true );
 		atora_test_mark_user_missing( 999 );
@@ -190,5 +232,36 @@ final class EnrollRestDualwriteTest extends TestCase {
 		global $wpdb;
 		$this->assertCount( 0, $wpdb->enrollments, 'No debe insertar matrícula si user_id no existe' );
 		$this->assertSame( '', get_user_meta( 999, '_clms_enrolled_courses', true ), 'No debe tocar usermeta legacy si user_id no existe' );
+	}
+
+	/** @test */
+	public function test_enroll_rejects_course_with_missing_or_trashed_wp_post_and_does_not_write_or_mirror(): void {
+		$this->as_admin( 10 );
+		atora_test_set_user( 999, array( 'user_email' => 'student@example.test', 'display_name' => 'Student' ) );
+		$this->install_wpdb_fixture( array( 55 => 777 ) );
+
+		$request = new \WP_REST_Request( array( 'user_id' => 999, 'order_id' => 1234 ) );
+		$request->set_param( 'course_id', 55 );
+
+		// Caso 1: post ausente (dualwrite ON/OFF no debe escribir nada).
+		foreach ( array( true, false ) as $dualwrite ) {
+			update_option( 'atora_lms_dualwrite', $dualwrite );
+			$response = \ATORA\LMS\LMS_REST_Controller::enroll( $request );
+			$this->assertSame( 409, $response->get_status() );
+			global $wpdb;
+			$this->assertCount( 0, $wpdb->enrollments, 'No debe insertar matrícula si el vínculo WP está roto' );
+			$this->assertSame( '', get_user_meta( 999, '_clms_enrolled_courses', true ), 'No debe espejar a legacy si el vínculo WP está roto' );
+		}
+
+		// Caso 2: post existe pero está en trash (dualwrite ON/OFF no debe escribir nada).
+		atora_test_set_post( 777, array( 'post_type' => 'lm_course', 'post_status' => 'trash' ) );
+		foreach ( array( true, false ) as $dualwrite ) {
+			update_option( 'atora_lms_dualwrite', $dualwrite );
+			$response2 = \ATORA\LMS\LMS_REST_Controller::enroll( $request );
+			$this->assertSame( 409, $response2->get_status() );
+			global $wpdb;
+			$this->assertCount( 0, $wpdb->enrollments, 'No debe insertar matrícula si el CPT está trash' );
+			$this->assertSame( '', get_user_meta( 999, '_clms_enrolled_courses', true ), 'No debe espejar a legacy si el CPT está trash' );
+		}
 	}
 }

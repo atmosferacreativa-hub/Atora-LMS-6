@@ -514,7 +514,7 @@ final class ATORA_Mobile_REST_Controller {
 		if ( $has_table_quiz ) {
 			$course = \ATORA\LMS\LMS_Course_Service::get( $course_id );
 			$wp_course_id = absint( is_array( $course ) ? ( $course['wp_post_id'] ?? 0 ) : 0 );
-			if ( ! $wp_course_id || 'lm_course' !== get_post_type( $wp_course_id ) ) {
+			if ( ! $wp_course_id || ! \ATORA\LMS\LMS_Course_Service::legacy_wp_course_post_is_public( $wp_course_id ) ) {
 				return new WP_Error(
 					'atora_mobile_quiz_requires_wp_course_identity',
 					__( 'Esta evaluación requiere identidad WordPress (curso) para registrarse correctamente.', 'atora-lms' ),
@@ -1004,7 +1004,7 @@ final class ATORA_Mobile_REST_Controller {
 		foreach ( $rows as $row ) {
 			$course_id = absint( $row['course_id'] ?? 0 );
 			$course    = \ATORA\LMS\LMS_Course_Service::get( $course_id );
-			if ( ! $course || 'published' !== (string) ( $course['status'] ?? '' ) ) {
+			if ( ! $course || ! self::course_is_student_visible( $course ) ) {
 				continue;
 			}
 			$progress = \ATORA\LMS\LMS_Enrollment_Service::get_progress( $user_id, $course_id );
@@ -1218,23 +1218,50 @@ final class ATORA_Mobile_REST_Controller {
 		$index = self::enrollment_index( $user_id );
 		foreach ( $index as $row ) {
 			if ( absint( $row['course_id'] ?? 0 ) === $course_id ) {
+				$course = \ATORA\LMS\LMS_Course_Service::get( $course_id );
+				if ( ! $course || ! self::course_is_student_visible( $course ) ) {
+					return new WP_Error( 'atora_mobile_course_forbidden', __( 'No tienes acceso a este curso.', 'atora-lms' ), array( 'status' => 403 ) );
+				}
 				return true;
 			}
 		}
 
-		// Fallback defensivo: si el curso tiene wp_post_id válido, confirmar matrícula legacy del mismo usuario.
+		// Fallback defensivo: si el curso tiene wp_post_id válido y PUBLICADO, confirmar matrícula legacy del mismo usuario.
 		if ( class_exists( '\\ATORA\\LMS\\LMS_Course_Service' )
 			&& method_exists( '\\ATORA\\LMS\\LMS_Course_Service', 'get' )
 			&& class_exists( 'CLMS_Helper' )
 			&& method_exists( 'CLMS_Helper', 'user_is_enrolled_in_course' ) ) {
 			$course = \ATORA\LMS\LMS_Course_Service::get( $course_id );
 			$wp_course_id = absint( is_array( $course ) ? ( $course['wp_post_id'] ?? 0 ) : 0 );
-			if ( $wp_course_id > 0 && \CLMS_Helper::user_is_enrolled_in_course( $user_id, $wp_course_id ) ) {
+			if ( $wp_course_id > 0
+				&& \ATORA\LMS\LMS_Course_Service::legacy_wp_course_post_is_public( $wp_course_id )
+				&& \CLMS_Helper::user_is_enrolled_in_course( $user_id, $wp_course_id ) ) {
 				return true;
 			}
 		}
 
 		return new WP_Error( 'atora_mobile_course_forbidden', __( 'No tienes acceso a este curso.', 'atora-lms' ), array( 'status' => 403 ) );
+	}
+
+	/**
+	 * Visibilidad estudiantil del curso tabular.
+	 *
+	 * Regla: status='published' y, si `wp_post_id > 0`, el CPT debe existir y
+	 * estar publicado (no trash/draft/private/missing).
+	 */
+	private static function course_is_student_visible( array $course ): bool {
+		if ( 'published' !== (string) ( $course['status'] ?? '' ) ) {
+			return false;
+		}
+		$wp_course_id = absint( $course['wp_post_id'] ?? 0 );
+		if ( $wp_course_id <= 0 ) {
+			return true;
+		}
+		if ( ! class_exists( '\\ATORA\\LMS\\LMS_Course_Service' )
+			|| ! method_exists( '\\ATORA\\LMS\\LMS_Course_Service', 'legacy_wp_course_post_is_public' ) ) {
+			return false;
+		}
+		return \ATORA\LMS\LMS_Course_Service::legacy_wp_course_post_is_public( $wp_course_id );
 	}
 
 	private static function safe_course( array $course ): array {
