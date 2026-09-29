@@ -1,5 +1,12 @@
 # CHANGELOG — ATORA LMS
 
+## 6.26.71 (2026-09-28)
+
+### Hotfix — pilot online + empaquetado
+
+- **FIX — visibilidad de cursos en `trash`**: el curso deja de mostrarse a estudiantes; los administradores lo conservan para diagnóstico.
+- **FIX — matrícula bloqueada**: intentar matricularse a un curso en `trash` devuelve 409 y garantiza no escribir en legacy ni en tablas.
+
 ## 6.26.7 (2026-09-22)
 
 ### Hotfix Lab — estabilidad académica + QA

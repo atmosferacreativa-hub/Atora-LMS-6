@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 6.26.7
+Stable tag: 6.26.71
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,10 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.26.71 =
+* Hotfix: cursos en `trash` no se muestran a estudiantes; admin conserva visibilidad para diagnóstico.
+* Hotfix: matrícula a curso en `trash` se rechaza con 409 sin escrituras (idempotente).
+
 = 6.26.2 =
 * Mobile API: endpoints de programas (`/programs`) y fallback de evaluaciones desde tablas `atora_quizzes` con persistencia a `atora_quiz_submissions`.
 
