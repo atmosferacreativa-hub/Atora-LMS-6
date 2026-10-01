@@ -7,7 +7,7 @@ La versión del plugin se incrementa a 6.26.7 para consolidar los fixes del labo
 
 Base: main `5793f8458969614181aaba62c5bae65d3e838300`.
 Respaldo: `backup/pre-6.26.7-20260922-5793f84`.
-Dependencia: PR #16 (distribución), sin fusionar a main.
+Dependencia: PR #16 (distribución), ya fusionada a `main`.
 
 | Punto | Estado y evidencia | Pendiente de aceptación |
 | --- | --- | --- |
@@ -46,3 +46,15 @@ Dependencia: PR #16 (distribución), sin fusionar a main.
 
 No se ha accedido al Docker personal ni a las entregas reales 425/6726 desde este
 entorno. Sus verificaciones permanecen pendientes aunque los casos sintéticos pasen.
+
+## Snapshot Lab :8080 (solo lectura) — 2026-09-29
+
+Confirmación pedida para preparar migración de contenido (sin tocar DB en modo
+escritura y sin subir nada a demo):
+
+- `:8080` (container `atora-wordpress`) usa plugin `atora-lms` **6.26.71**
+  (`build-info.json`: commit **`ccb7eebffce0056bb1f1f5aa12e224e728708050`**).
+- Tema activo: **`atora-theme`** (`template=atora-theme`, `stylesheet=atora-theme`).
+- Flags LMS efectivos:
+  - `read_source = legacy` (flag **no definido**/sin flip aplicado en ese momento ⇒ default `legacy`).
+  - `dualwrite = 1` (opción `atora_lms_dualwrite=1`).
