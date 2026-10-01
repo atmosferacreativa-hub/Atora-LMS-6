@@ -775,9 +775,14 @@ class CLMS_REST_Extensions_Controller {
 	public function get_my_courses( WP_REST_Request $request ) {
 		unset( $request );
 		$user_id    = get_current_user_id();
-		$course_ids = class_exists( 'CLMS_Helper' )
-			? ( class_exists('\\ATORA\\LMS\\LMS_Enrollment_Service') ? array_column( (array) \ATORA\LMS\LMS_Enrollment_Service::get_user_enrollments( $user_id ), 'course_id' ) : \CLMS_Helper::get_user_enrolled_courses( $user_id ) )
-			: array();
+		$course_ids = array();
+		if ( class_exists( '\\ATORA\\LMS\\LMS_Enrollment_Service' )
+			&& method_exists( '\\ATORA\\LMS\\LMS_Enrollment_Service', 'get_enrolled_wp_course_ids' ) ) {
+			$course_ids = (array) \ATORA\LMS\LMS_Enrollment_Service::get_enrolled_wp_course_ids( $user_id );
+		} elseif ( class_exists( 'CLMS_Helper' ) && method_exists( 'CLMS_Helper', 'get_user_enrolled_courses' ) ) {
+			$course_ids = (array) \CLMS_Helper::get_user_enrolled_courses( $user_id );
+		}
+		$course_ids = array_values( array_unique( array_filter( array_map( 'absint', $course_ids ) ) ) );
 
 		if ( empty( $course_ids ) ) {
 			return rest_ensure_response( array( 'courses' => array(), 'total' => 0 ) );
