@@ -373,7 +373,7 @@ trait CLMS_Enrollment_Manager_Frontend_Trait {
 
 			$this->render_enrollment_page( 'login_required', array(
 				'course_title' => $course_title,
-				'login_url'    => wp_login_url( $return_url ),
+				'login_url'    => CLMS_Frontend_URLs::login_url( $return_url ),
 				'register_url' => wp_registration_url(),
 			) );
 			exit;

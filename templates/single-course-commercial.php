@@ -343,7 +343,7 @@ if ( $_cta_url || ! is_user_logged_in() ) :
 					<?php echo esc_html( $_cta_lbl ); ?>
 				</a>
 			<?php elseif ( ! is_user_logged_in() ) : ?>
-				<a class="cc-btn-primary" href="<?php echo esc_url( wp_login_url( $course_permalink ) ); ?>">
+				<a class="cc-btn-primary" href="<?php echo esc_url( CLMS_Frontend_URLs::login_url( $course_permalink ) ); ?>">
 					<?php esc_html_e( 'Iniciar sesión', 'atora-lms' ); ?>
 				</a>
 			<?php endif; ?>
