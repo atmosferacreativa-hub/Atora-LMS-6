@@ -204,17 +204,15 @@ trait CLMS_Frontend_Theme_Auth_Trait {
 			return ob_get_clean();
 		}
 
-		$redirect = '';
-		if ( $atts['redirect'] ) {
-			$redirect = esc_url_raw( $atts['redirect'] );
-		} else {
-			// Permite que links tipo /cuenta/?redirect_to=/dashboard/ conserven destino.
-			$redirect_qs = wp_validate_redirect(
-				(string) wp_unslash( $_GET['redirect_to'] ?? '' ), // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-				''
-			);
-			if ( '' !== $redirect_qs ) {
-				$redirect = $redirect_qs;
+		// Links tipo /cuenta/?redirect_to=/curso/ conservan destino: el query
+		// param manda sobre el atributo redirect, que queda como default.
+		$redirect = wp_validate_redirect(
+			(string) wp_unslash( $_GET['redirect_to'] ?? '' ), // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			''
+		);
+		if ( '' === $redirect ) {
+			if ( $atts['redirect'] ) {
+				$redirect = esc_url_raw( $atts['redirect'] );
 			} else {
 				$redirect = is_singular() ? get_permalink() : home_url( '/wp-admin/' );
 			}

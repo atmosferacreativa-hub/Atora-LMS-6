@@ -216,7 +216,7 @@ trait CLMS_Loader_Templates_Trait {
 		if ( $course_id ) {
 			$redirect = get_permalink( $course_id );
 		} elseif ( ! $user_id ) {
-			$redirect = wp_login_url( get_permalink( $lesson_id ) );
+			$redirect = CLMS_Frontend_URLs::login_url( get_permalink( $lesson_id ) );
 		} else {
 			$redirect = home_url( '/' );
 		}

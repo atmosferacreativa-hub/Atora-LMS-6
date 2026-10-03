@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 6.26.72
+Stable tag: 6.26.73
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,10 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.26.73 =
+* Login: los botones de "Iniciar sesión" de cursos, programas, lecciones, perfil, invitaciones y afiliados llevan a /cuenta/ (si existe) en lugar de wp-login.php.
+* Login: el formulario [clms_login_form] respeta ?redirect_to= por sobre su atributo redirect.
+
 = 6.26.72 =
 * Login/dashboard: los enlaces de cuenta prefieren las páginas /cuenta/ y /dashboard/ si existen, en lugar de wp-login.php.
 * Admin: gestión de matrículas en operaciones académicas.

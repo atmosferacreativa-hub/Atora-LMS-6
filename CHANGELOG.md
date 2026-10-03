@@ -1,5 +1,13 @@
 # CHANGELOG — ATORA LMS
 
+## 6.26.73 (2026-10-03)
+
+### Login frontend
+
+- **FIX — enlaces de login**: cursos (`single-course`, heros), programas (secciones comerciales y CTA móvil), lecciones bloqueadas, perfil, invitaciones/matrícula por enlace y panel de afiliados usan `CLMS_Frontend_URLs::login_url()` → `/cuenta/?redirect_to=…` cuando existe la página de cuenta. Correos, 2FA y Calendar siguen usando `wp-login.php`.
+- **FIX — `[clms_login_form]`**: `?redirect_to=` de la URL tiene prioridad sobre el atributo `redirect`; antes, entrar desde un curso terminaba en el panel en vez de volver al curso.
+- **TESTS**: `tests/Frontend/FrontendUrlsLoginTest.php`.
+
 ## 6.26.72 (2026-10-02)
 
 ### Demo — URLs frontend + matrículas
