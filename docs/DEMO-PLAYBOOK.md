@@ -14,14 +14,29 @@ Este repo es el plugin **`atora-lms`**. La portada, menús, CTAs y textos de hea
 Crear páginas frontend mínimas y registrar el mapeo en `clms_frontend_pages`:
 
 ```bash
+DRY_RUN=1 WP="wp --allow-root" ./scripts/bootstrap-demo-pages.sh   # revisar primero
 WP="wp --allow-root" ./scripts/bootstrap-demo-pages.sh
 ```
 
-Esto crea/actualiza:
+Reutiliza páginas existentes sin tocar su contenido y solo crea lo que falta:
 
-- `/cuenta/` con `[clms_login_form]`
-- `/dashboard/` con `[clms_dashboard]`
-- `/cursos/` con `[clms_my_courses]`
+- dashboard: `mi-panel` / `panel-estudiante` / `panel`, o crea `/dashboard/` con `[clms_dashboard]`
+- cuenta: `mi-perfil` / `perfil`, o crea `/cuenta/` con `[clms_login_form]` apuntando al dashboard real
+- mis cursos: crea `/mis-cursos/` con `[clms_my_courses]`
+
+No usa `/cursos/`: es el archivo público del CPT `lm_course` (catálogo).
+
+Nota: si no existe una página `/dashboard/`, WordPress redirige `/dashboard/` a `/wp-admin/` (comportamiento core).
+
+## Enlaces y textos del tema (fuera del plugin)
+
+En demo.atora.studio, todo lo siguiente sale de **ATORA Theme** (`meridian-*`) o del contenido de la portada, no del plugin:
+
+- Footer "Sistema de tema Meridian" y rail del header "…listo para WooCommerce".
+- Botón Carrito, enlaces Tienda/Carrito/Podcast, y `atoraTheme.accountUrl` → `wp-login.php`.
+- Mini-menú legal: `/privacy-policy/` y `/terms/` (en el sitio existe `/terminos-y-condiciones/`).
+- CTAs `href="#"` en la portada: "Solicitar una demo", "Hablemos", "Ver la academia de prueba" (destinos sugeridos: `/contacto/`, `/academia/`).
+- Ítem de menú "Programa de prueba" (`/programas/programa-de-prueba/`).
 
 ## Seed de datos de laboratorio (WP-CLI)
 
