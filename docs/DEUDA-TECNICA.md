@@ -1,5 +1,39 @@
 # Deuda técnica — Sprints 6.3.0 y 6.4.0
 
+## Estado a 6.27.0
+
+Revisión del 2026-10-03 sobre `main` (6.27.1). **Resuelto** solo cuando hay un archivo que lo prueba; el resto sigue **vigente** tal como se registró más abajo.
+
+| Punto | Estado | Prueba / nota |
+|---|---|---|
+| PT-3.4 (6.4.0) — Sin UI para asignar coordinador de sección | Resuelto | `includes/admin-menu/trait-admin-menu-section-coordinator.php` (pantalla y handler `atora_set_section_coordinator`); 6.26.4 además habilita al coordinador por membresía institucional. |
+| `modules/commerce/` vacío | Resuelto | La carpeta ya no existe en el repositorio. |
+| PT-1 — Gate de cutover AJAX / filtro de status en `get_access_expiry_by_wp_id()` | Resuelto | Ya marcado como resuelto en su sección. |
+| PT-6.3 — Tablas faltantes en uninstall.php | Resuelto | Ya marcado como resuelto en su sección. |
+| Rama de compatibilidad de verificación de teléfono | Resuelto | Retirada en 6.5.2 (ver su sección). |
+| PT-3.5 (6.4.0) — `improvement_plan_assigned` | Vigente | Solo existe en el catálogo del router (`modules/messaging/class-messaging-router.php`); nada lo dispara. |
+| PT-3.4 (6.4.0) — `at_risk_flagged` usa alertas de IA | Vigente | Sin evento propio. |
+| PT-2.2 (6.4.0) — Doble cooldown del recordatorio de inactividad | Vigente | Decisión deliberada. |
+| PT-2.3 (6.4.0) — Plantilla `atora_student_inactive` en Email Engine | Vigente | Solo referenciada por `class-student-inactivity-reminder-service.php` y el router. |
+| PT-3.4 — Vocabulario institucional con poca superficie | Vigente | Decisión de diseño. |
+| PT-4.4.3, PT-4.4, PT-4.3.2, PT-4.2 (historia), PT-3 (ambigüedad de la OT), PT-2 (slugs duplicados) | Vigente | Registros de decisión; no requieren acción. |
+| PT-4.2 — Métodos `render_atora_*_page()` huérfanos | Vigente | `includes/admin-menu/trait-admin-menu-hubs.php` sin limpiar. |
+| PT-3 — `atora_onboarding_step` con la numeración vieja | Vigente | `includes/onboarding/class-onboarding-wizard.php` sin cambios. |
+| PT-2 — Tres sistemas de carga de módulos | Vigente | `class-loader.php`, `modularity/class-module-registry.php`, `class-v5-modules.php`. |
+| Nomenclatura `clms_` / `atora_` | Vigente | |
+| `modules/crm/` vs `modules/crm-v2/` | Vigente | Ambos siguen en el repositorio. |
+| Catálogo público vs curriculum completo | Vigente | |
+| `wp_post_id` de lecciones sin exposición REST | Vigente | |
+| `wp_post_id NOT NULL` en `atora_quiz_submissions` | Vigente | Deliberado. |
+| `LMS_Migrator::migrate_programs()` confía en la fila existente | Vigente | Sigue saltando si existe el `wp_post_id` (`modules/lms/class-lms-migrator.php`). |
+| Contador de intentos duplicado WhatsApp/Telegram | Vigente | `class-messaging-preferences.php` y `class-telegram-bot.php`. |
+| `atora_telegram_chat_id` en usermeta | Vigente | Usado por `class-telegram-bot.php` y el instalador. |
+| Seguimiento (`recurrence_rule`, `INTENSIFY_DAYS`, excluidos sin UI, quincenal como `DAILY;INTERVAL=14`) | Vigente | |
+| CRM (cierre de período, urgencia compuesta, "Cuenta clave" sin deduplicar) | Vigente | |
+| Vista de coordinador (6.8.0) | Vigente | Sigue diferida. |
+| "Hoy" (antigüedad en digest, enlace de tarea sin contacto, sin ficha de estudiante/sección, asistente de 4 pasos fuera del retrofit) | Vigente | |
+| **Nuevo en 6.27.0** — Las entregas web sobrescriben su post y no escriben en `atora_assignment_submissions`; SpeedGrader muestra solo el intento más reciente | Vigente | Pendiente para la Fase 4 (ver `docs/CONTRATO-ENTREGAS-MOVIL.md`). |
+
 ## Resumen de cierre — 6.4.0 (Mensajería académica)
 
 22 commits, `atora_academic_routing_enabled` en `false` por defecto

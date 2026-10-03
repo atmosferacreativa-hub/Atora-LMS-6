@@ -303,7 +303,7 @@ def check_runtime_table_coverage():
     atora_email_sequence_enrollments specifically because of this
     limitation — both were, in fact, equally orphaned before PT-6's fix.
     The real closure evidence for all four is the manual, line-by-line
-    audit in SECURITY-REPORT-6.5.10.md section 8, not this heuristic
+    audit in docs/reportes/SECURITY-REPORT-6.5.10.md section 8, not this heuristic
     alone; this check remains useful as a coarse regression smoke test
     for entirely new orphaned tables going forward.
     """
