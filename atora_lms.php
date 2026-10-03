@@ -3,7 +3,7 @@
  * Plugin Name:       ATORA LMS
  * Plugin URI:        https://atora.studio
  * Description:       LMS modular para WordPress con IA, evaluaciones, certificados, CRM, mensajería multi-canal, afiliados, live streaming y más. Autor: Atora Studio.
- * Version:           6.26.71
+ * Version:           6.26.72
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Atora Studio
@@ -52,7 +52,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * - Limpieza automática de notificaciones >90 días
  */
 	if ( ! defined( 'ATORA_LMS_VERSION' ) ) {
-	define( 'ATORA_LMS_VERSION', '6.26.71' );
+		define( 'ATORA_LMS_VERSION', '6.26.72' );
 	}
 
 if ( ! defined( 'ATORA_LMS_FILE' ) ) {
@@ -187,7 +187,7 @@ add_filter( 'cron_schedules', static function ( array $schedules ): array {
 // una llamada directa a flush_rewrite_rules() por código nunca
 // dispara. Subir la versión acá fuerza un flush más, ahora
 // acompañado de una purga explícita de caché de página (ver abajo).
-define( 'ATORA_LMS_REWRITE_VERSION', '6.5.13-1' );
+define( 'ATORA_LMS_REWRITE_VERSION', '6.26.72' );
 
 add_action( 'wp_loaded', static function () {
 	$stored = (string) get_option( 'atora_lms_rewrite_version', '' );
@@ -904,6 +904,10 @@ add_action( 'init', static function () {
 
 	// 6.26.7: sello de versión (build-info.json / git).
 	require_once ATORA_LMS_DIR . 'includes/class-build-info.php';
+
+	// URLs frontend: si existen páginas tipo /cuenta/ y /dashboard/,
+	// preferirlas sobre wp-login.php crudo.
+	require_once ATORA_LMS_DIR . 'includes/frontend/class-frontend-urls.php';
 
 	// P10.1 (6.13.0): cifrado de tokens OAuth — bloqueante, debe cargar
 	// antes que Calendar_Sync y cualquier proveedor Google (Meet/Drive).

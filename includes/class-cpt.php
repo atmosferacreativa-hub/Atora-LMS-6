@@ -29,6 +29,25 @@ class CLMS_CPT {
 		$this->register_cohort_post_type();
 		$this->register_teacher_post_type();
 		$this->register_lesson_post_type();
+		$this->register_priority_rewrite_rules();
+	}
+
+	/**
+	 * Registra reglas de reescritura de alta prioridad para rutas públicas.
+	 *
+	 * Problema observado en la demo: cuando existe una página con slug `cursos`,
+	 * WordPress prioriza la resolución de subpáginas (`/cursos/<slug>/`) por
+	 * encima del CPT `lm_course`, causando 404 en las fichas.
+	 *
+	 * Solución: inyectar reglas `top` explícitas para las rutas de cursos y
+	 * programas, de modo que el CPT gane la carrera sin exigir cambios en la BD.
+	 *
+	 * @return void
+	 */
+	protected function register_priority_rewrite_rules(): void {
+		add_rewrite_rule( '^cursos/([^/]+)/?$', 'index.php?lm_course=$matches[1]', 'top' );
+		add_rewrite_rule( '^programas/?$', 'index.php?post_type=lm_program', 'top' );
+		add_rewrite_rule( '^programas/([^/]+)/?$', 'index.php?lm_program=$matches[1]', 'top' );
 	}
 
 	public function register_taxonomies() {

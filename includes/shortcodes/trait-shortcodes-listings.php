@@ -148,7 +148,8 @@ trait CLMS_Shortcodes_Listings_Trait {
 						$primary_cta   = '<a class="clms-course-card-btn clms-course-card-btn-primary" href="' . esc_url( $continue_url ) . '">Continuar</a>';
 						$secondary_cta = '<a class="clms-course-card-btn clms-course-card-btn-ghost" href="' . esc_url( $course_link ) . '">Ver curso</a>';
 					} elseif ( ! $logged_in ) {
-						$primary_cta   = '<a class="clms-course-card-btn clms-course-card-btn-primary" href="' . esc_url( wp_login_url( $course_link ) ) . '">Iniciar sesión</a>';
+						$login_url = class_exists( 'CLMS_Frontend_URLs' ) ? CLMS_Frontend_URLs::login_url( $course_link ) : wp_login_url( $course_link );
+						$primary_cta   = '<a class="clms-course-card-btn clms-course-card-btn-primary" href="' . esc_url( $login_url ) . '">Iniciar sesión</a>';
 						$secondary_cta = '<a class="clms-course-card-btn clms-course-card-btn-ghost" href="' . esc_url( $course_link ) . '">Ver detalles</a>';
 					} else {
 						$primary_cta   = $this->get_enroll_button_html( $course_id, $user_id, $course_link );
