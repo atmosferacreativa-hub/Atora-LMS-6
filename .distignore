@@ -30,3 +30,4 @@ backups
 .atora-baseline/
 .tmp/
 .phpunit.result.cache
+demo-audit*

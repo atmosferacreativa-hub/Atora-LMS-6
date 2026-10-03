@@ -1,5 +1,15 @@
 # CHANGELOG — ATORA LMS
 
+## 6.26.72 (2026-10-02)
+
+### Demo — URLs frontend + matrículas
+
+- **NEW — `Frontend_URLs`**: los enlaces de "Cuenta/Ingresar" y el redirect de `/dashboard/` prefieren `/cuenta/` y `/dashboard/` si existen, en lugar de `wp-login.php`.
+- **NEW — matrículas en operaciones académicas**: pantalla de administración con `atora-enrollments-admin.js`.
+- **FIX — permalinks**: `ATORA_LMS_REWRITE_VERSION` sube para forzar flush (cursos y programas individuales daban 404 en demo).
+- **TOOLING**: `scripts/bootstrap-demo-pages.sh`, `scripts/demo-audit.mjs` y `docs/DEMO-PLAYBOOK.md`.
+- **BUILD**: `build-dist.sh` detecta árbol sucio (`dirty`) en vez de forzar `false`; `.distignore` e `inspect-dist.py` excluyen reportes `demo-audit*`.
+
 ## 6.26.71 (2026-09-28)
 
 ### Hotfix — pilot online + empaquetado

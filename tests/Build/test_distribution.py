@@ -11,7 +11,7 @@ import zipfile
 
 
 ROOT = Path(__file__).resolve().parents[2]
-VERSION = "6.26.71"
+VERSION = "6.26.72"
 COMMIT = "5793f8458969614181aaba62c5bae65d3e838300"
 
 
@@ -70,7 +70,7 @@ class DistributionTest(unittest.TestCase):
                 self.assertNotEqual(0, self.inspect(missing=("atora-lms/" + name,)).returncode)
 
     def test_development_files_are_rejected(self):
-        for name in ("tests/example.php", ".git/config", "composer.lock", "vendor/autoload.php", ".atora-baseline/db.sql", ".tmp/junit.xml", ".phpunit.result.cache"):
+        for name in ("tests/example.php", ".git/config", "composer.lock", "vendor/autoload.php", ".atora-baseline/db.sql", ".tmp/junit.xml", ".phpunit.result.cache", "demo-audit.demo.example.md"):
             with self.subTest(name=name):
                 self.assertNotEqual(0, self.inspect(extra={"atora-lms/" + name: ""}).returncode)
 
@@ -87,7 +87,7 @@ class DistributionTest(unittest.TestCase):
             (target / "atora_lms.php").write_text("<?php\n/**\n * Version: " + VERSION + "\n */\n")
             (target / "readme.txt").write_text("Stable tag: " + VERSION + "\n")
             (target / "safe.php").write_text("<?php // Included plugin file.\n")
-            for path in (".atora-baseline/db.sql", ".tmp/junit.xml", ".phpunit.result.cache"):
+            for path in (".atora-baseline/db.sql", ".tmp/junit.xml", ".phpunit.result.cache", "demo-audit.demo.example.json"):
                 artifact = target / path
                 artifact.parent.mkdir(parents=True, exist_ok=True)
                 artifact.write_text("local-only artifact\n")
@@ -95,8 +95,32 @@ class DistributionTest(unittest.TestCase):
             with zipfile.ZipFile(target / "dist" / f"atora-lms-{VERSION}.zip") as archive:
                 names = archive.namelist()
             self.assertIn("atora-lms/safe.php", names)
-            for forbidden in (".atora-baseline", ".tmp", ".phpunit.result.cache"):
+            for forbidden in (".atora-baseline", ".tmp", ".phpunit.result.cache", "demo-audit.demo.example.json"):
                 self.assertFalse(any(forbidden in Path(name).parts for name in names), forbidden)
+
+    @unittest.skipUnless(shutil.which("git"), "git unavailable")
+    def test_build_info_detects_untracked_files(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory)
+            (target / "scripts").mkdir()
+            script = target / "scripts/build-info.sh"
+            script.write_bytes((ROOT / "scripts/build-info.sh").read_bytes())
+            (target / "atora_lms.php").write_text("<?php\n/**\n * Version: " + VERSION + "\n */\n")
+            git = ["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"]
+            subprocess.run(["git", "init", "-q"], cwd=target, check=True)
+            subprocess.run(git + ["add", "."], cwd=target, check=True)
+            subprocess.run(git + ["commit", "-qm", "init"], cwd=target, check=True)
+
+            def dirty():
+                out = target / "info.json"
+                subprocess.run(["bash", "scripts/build-info.sh", "--out", str(out)], cwd=target, check=True, capture_output=True)
+                data = json.loads(out.read_text())
+                out.unlink()
+                return data["dirty"]
+
+            self.assertFalse(dirty())
+            (target / "new-file.php").write_text("<?php\n")
+            self.assertTrue(dirty())
 
     def test_unsafe_paths_are_rejected(self):
         for name in ("../outside.php", "/absolute.php", "atora-lms/../outside.php", "another-plugin/file.php"):

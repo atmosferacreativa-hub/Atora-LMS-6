@@ -38,8 +38,12 @@ mkdir -p "$STAGE_DIR"
 rsync -a --exclude-from="$ROOT_DIR/.distignore" --exclude="dist" ./ "$STAGE_DIR/"
 
 # Generar build-info.json dentro del árbol a empaquetar (sin depender de gitignore).
-# En CI el árbol exportado debe estar limpio: dirty=false.
-./scripts/build-info.sh --out "$STAGE_DIR/build-info.json" --dirty false
+# dirty se detecta de verdad: si hay cambios sin commit, el ZIP no corresponde
+# al commit declarado y inspect-dist.py lo rechazará (en CI el árbol está limpio).
+./scripts/build-info.sh --out "$STAGE_DIR/build-info.json" --dirty auto
+if grep -q '"dirty": true' "$STAGE_DIR/build-info.json"; then
+	echo "AVISO: hay cambios sin commit; el ZIP queda marcado dirty=true." >&2
+fi
 
 ( cd "$DIST_DIR" && zip -rq "atora-lms-${VERSION}.zip" atora-lms )
 rm -rf "$STAGE_DIR"

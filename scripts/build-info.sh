@@ -36,7 +36,9 @@ if [ "${DIRTY_MODE}" = "true" ]; then
 elif [ "${DIRTY_MODE}" = "false" ]; then
   dirty=false
 else
-  if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+  # Incluye archivos sin seguimiento: un build con archivos nuevos sin commit
+  # tampoco corresponde al commit declarado.
+  if [ -n "$(git status --porcelain --untracked-files=normal 2>/dev/null || true)" ]; then
     dirty=true
   fi
 fi
