@@ -205,6 +205,12 @@ trait CLMS_Grading_SpeedGrade_Trait {
 						<div class="clms-sg-stat">
 							<div class="clms-sg-stat__label"><?php esc_html_e( 'Enviada', 'atora-lms' ); ?></div>
 							<div class="clms-sg-stat__value clms-sg-stat__value--sm"><?php echo esc_html( $context['submitted_at'] ); ?></div>
+							<?php if ( ! empty( $context['client_submitted_at'] ) ) : ?>
+								<div class="clms-sg-stat__hint"><?php echo esc_html( sprintf( __( 'Realizada sin conexión el %s', 'atora-lms' ), $context['client_submitted_at'] ) ); ?></div>
+							<?php endif; ?>
+							<?php if ( ! empty( $context['is_late'] ) ) : ?>
+								<div class="clms-sg-stat__hint"><?php esc_html_e( 'Recibida después de la fecha límite', 'atora-lms' ); ?></div>
+							<?php endif; ?>
 						</div>
 						<div class="clms-sg-stat">
 							<div class="clms-sg-stat__label"><?php esc_html_e( 'Archivos', 'atora-lms' ); ?></div>
@@ -1175,6 +1181,9 @@ trait CLMS_Grading_SpeedGrade_Trait {
 		$comment     = (string) get_post_meta( $submission_id, '_clms_submission_comment', true );
 		$lesson_comment = $this->get_student_lesson_feedback_comment( $student_id, $lesson_id, $submission_id );
 		$submitted   = (string) get_post_meta( $submission_id, '_clms_submission_submitted_at', true );
+		// 6.27.0: entrega desde la app. La fecha del dispositivo es informativa; la de recepción manda.
+		$client_submitted = (string) get_post_meta( $submission_id, '_clms_submission_client_submitted_at', true );
+		$is_late_mobile   = '1' === (string) get_post_meta( $submission_id, '_clms_submission_is_late', true );
 		$attachments = get_post_meta( $submission_id, '_clms_submission_attachments', true );
 		$assessment_engine = clms_core('CLMS_Assessment_Engine');
 		$assessment_record = ( $assessment_engine && method_exists( $assessment_engine, 'get_submission_grade_record' ) ) ? $assessment_engine->get_submission_grade_record( $submission_id ) : array();
@@ -1256,6 +1265,8 @@ trait CLMS_Grading_SpeedGrade_Trait {
 			'lesson_comment' => $lesson_comment,
 			'files'         => $files,
 			'submitted_at'  => $this->format_datetime( $submitted ),
+			'client_submitted_at' => '' !== $client_submitted ? $this->format_datetime( $client_submitted ) : '',
+			'is_late'       => $is_late_mobile,
 			'rubric_id'     => $rubric_id,
 			'rubric_title'  => $rubric_id ? get_the_title( $rubric_id ) : '',
 			'rubric_snapshot' => $rubric_snapshot,

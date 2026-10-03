@@ -56,6 +56,19 @@ class CLMS_Submission {
 	use CLMS_Submission_Files_Assets_Trait;
 
 	/**
+	 * Política de archivos de las entregas (la usa también la API móvil).
+	 *
+	 * @return array{allowed_mimes: array<string,string>, max_file_size: int, max_files: int}
+	 */
+	public function get_upload_policy() {
+		return array(
+			'allowed_mimes' => $this->allowed_mimes,
+			'max_file_size' => (int) $this->max_file_size,
+			'max_files'     => (int) $this->max_files,
+		);
+	}
+
+	/**
 	 * Inicializa hooks.
 	 */
 	public function __construct() {

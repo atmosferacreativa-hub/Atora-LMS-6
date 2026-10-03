@@ -1,5 +1,16 @@
 # CHANGELOG — ATORA LMS
 
+## 6.27.0 (2026-10-03)
+
+### Entregas de tareas por la API móvil
+
+- **NEW — rutas** `atora-mobile/v1`: `GET /assignments/{lesson_id}`, `POST /assignments/{lesson_id}/submissions`, `POST /uploads/sessions`, `PUT /uploads/{upload_token}` (`Content-Range`) y `POST /uploads/{upload_token}/complete`. `GET /lessons/{id}` informa `assignment_available`; `GET /discovery` declara `capabilities.assignments`.
+- **Reglas offline** (`docs/SINCRONIZACION-OFFLINE.md`): cada intento es una fila nueva en `atora_assignment_submissions`; idempotencia por `client_event_id` por usuario; `is_late` con `server_received_at` contra `due_at`, y `client_submitted_at` como dato informativo.
+- **SpeedGrader**: cada intento móvil actualiza también el post `clms_submission` (mismo código que la web, enlazado por `wp_post_id`), así el docente lo ve y lo califica. SpeedGrader muestra "Realizada sin conexión el …" y "Recibida después de la fecha límite". Un reenvío desde la web limpia esas marcas.
+- **Seguridad**: matrícula con `authorize_course_id` (403); `upload_token` de otro usuario → 404; tipos y tamaño de la lista web (`CLMS_Submission::get_upload_policy()`), con validación del tipo real al completar; fragmentos en orden; sesiones de 6 h con limpieza horaria (`atora_mobile_upload_cleanup`); fragmentos en `uploads/atora-private/mobile-uploads` con acceso web denegado (filtro `atora/mobile/upload_dir`); límite de frecuencia con `ATORA_Rate_Limiter`.
+- **Contrato**: `docs/CONTRATO-ENTREGAS-MOVIL.md` deja de ser "previsto"; la subida se ata a la lección (no a una entrega previa), se aceptan entregas vencidas marcadas como tardías, y las tareas grupales se rechazan en móvil (422).
+- **TESTS**: `tests/Security/MobileAssignmentServiceTest.php` (idempotencia, solo-añadir, token ajeno, `is_late`, tipo real, fragmentos fuera de orden, sesión caducada, puente fallido) y `tests/Rest/MobileAssignmentRoutesTest.php` (no matriculado, lección sin tarea, capacidad), ambos en la suite de seguridad del CI.
+
 ## 6.26.75 (2026-10-03)
 
 ### Login frontend (cierre)

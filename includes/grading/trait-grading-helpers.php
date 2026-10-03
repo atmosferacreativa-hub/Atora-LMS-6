@@ -449,6 +449,7 @@ trait CLMS_Grading_Helpers_Trait {
 		.clms-sg-stat__label{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#cbd5e1}
 		.clms-sg-stat__value{margin-top:8px;font-size:24px;font-weight:800;color:#fff}
 		.clms-sg-stat__value--sm{font-size:16px;line-height:1.45}
+		.clms-sg-stat__hint{margin-top:6px;font-size:12px;line-height:1.4;color:#64748b}
 		.clms-sg-meta-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
 		.clms-sg-meta-item{
 			background:#f8fafc;border:1px solid var(--sg-border);border-radius:18px;padding:16px;
