@@ -932,6 +932,16 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 			array( $this, 'render_section_coordinator_page' )
 		);
 
+		// ── Inscripciones (oculta) — guía centralizada + ciclo de vida ─────────
+		add_submenu_page(
+			'',
+			__( 'Inscripciones', 'atora-lms' ),
+			__( 'Inscripciones', 'atora-lms' ),
+			'clms_manage_enrollments',
+			'atora-enrollments',
+			array( $this, 'render_enrollments_page' )
+		);
+
 		// ── CRM (oculta) — si el módulo 'crm' está activo ─────────────────────
 		if ( ( current_user_can( 'clms_access_crm_view' ) || current_user_can( 'manage_options' ) )
 			&& ( ! class_exists( 'CLMS_Module_Registry' ) || CLMS_Module_Registry::is_active( 'crm' ) ) ) {

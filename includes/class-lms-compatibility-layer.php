@@ -27,6 +27,7 @@ class ATORA_LMS_Compatibility_Layer {
 		add_action( 'clms_course_completed',                       array( __CLASS__, 'sync_completion_to_table' ),    20, 2 );
 		add_action( 'clms_lesson_completed',                       array( __CLASS__, 'sync_lesson_progress' ),        20, 2 );
 		add_action( 'clms_user_course_access_expiration_updated',  array( __CLASS__, 'sync_access_expiry_to_table' ), 20, 3 );
+		add_action( 'clms_user_program_access_expiration_updated', array( __CLASS__, 'sync_program_access_expiry_to_table' ), 20, 3 );
 
 		// ── legacy → tablas (F2.1 — agujeros cerrados) ────────────────────────
 		add_action( 'clms_user_unenrolled',                        array( __CLASS__, 'sync_unenrollment_to_table' ),       20, 2 );
@@ -123,13 +124,74 @@ class ATORA_LMS_Compatibility_Layer {
 		if ( ! $atora_course_id ) { return; }
 
 		\ATORA\LMS\LMS_Write_Facade::$syncing = true;
-		$wpdb->update(
-			$wpdb->prefix . 'atora_enrollments',
-			array( 'expires_at' => $expires_at ),
-			array( 'user_id' => $user_id, 'course_id' => $atora_course_id ),
-			array( '%s' ),
-			array( '%d', '%d' )
-		);
+		if ( '' === trim( (string) $expires_at ) ) {
+			$wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+				$wpdb->prepare(
+					"UPDATE {$wpdb->prefix}atora_enrollments SET expires_at = NULL WHERE user_id = %d AND course_id = %d",
+					$user_id,
+					$atora_course_id
+				)
+			);
+		} else {
+			$wpdb->update(
+				$wpdb->prefix . 'atora_enrollments',
+				array( 'expires_at' => $expires_at ),
+				array( 'user_id' => $user_id, 'course_id' => $atora_course_id ),
+				array( '%s' ),
+				array( '%d', '%d' )
+			);
+		}
+		\ATORA\LMS\LMS_Write_Facade::$syncing = false;
+	}
+
+	public static function sync_program_access_expiry_to_table( int $user_id, int $wp_program_id, string $expires_at ): void {
+		if ( ! self::guard_ok() ) { return; }
+		if ( ! self::ensure_services() ) { return; }
+
+		global $wpdb;
+		$atora_program_id = self::resolve_atora_program( $wp_program_id );
+		if ( ! $atora_program_id && class_exists( '\\ATORA\\LMS\\LMS_Migrator' ) ) {
+			\ATORA\LMS\LMS_Migrator::migrate_programs( 1 );
+			$atora_program_id = self::resolve_atora_program( $wp_program_id );
+		}
+		if ( ! $atora_program_id ) { return; }
+
+		$exists = (int) $wpdb->get_var( $wpdb->prepare(
+			"SELECT id FROM {$wpdb->prefix}atora_program_enrollments WHERE user_id = %d AND program_id = %d LIMIT 1",
+			$user_id,
+			$atora_program_id
+		) );
+
+		\ATORA\LMS\LMS_Write_Facade::$syncing = true;
+		if ( ! $exists ) {
+			$wpdb->insert(
+				$wpdb->prefix . 'atora_program_enrollments',
+				array(
+					'user_id'       => $user_id,
+					'program_id'    => $atora_program_id,
+					'wp_program_id' => $wp_program_id,
+					'status'        => 'active',
+					'enrolled_at'   => current_time( 'mysql', true ),
+					'expires_at'    => '' === trim( (string) $expires_at ) ? null : $expires_at,
+				)
+			);
+		} elseif ( '' === trim( (string) $expires_at ) ) {
+			$wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+				$wpdb->prepare(
+					"UPDATE {$wpdb->prefix}atora_program_enrollments SET expires_at = NULL WHERE user_id = %d AND program_id = %d",
+					$user_id,
+					$atora_program_id
+				)
+			);
+		} else {
+			$wpdb->update(
+				$wpdb->prefix . 'atora_program_enrollments',
+				array( 'expires_at' => $expires_at ),
+				array( 'user_id' => $user_id, 'program_id' => $atora_program_id ),
+				array( '%s' ),
+				array( '%d', '%d' )
+			);
+		}
 		\ATORA\LMS\LMS_Write_Facade::$syncing = false;
 	}
 

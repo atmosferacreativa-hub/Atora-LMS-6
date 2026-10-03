@@ -13,3 +13,7 @@ build-info.json
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# Reportes generados por scripts/demo-audit.mjs
+demo-audit*.json
+demo-audit*.md

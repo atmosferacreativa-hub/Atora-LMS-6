@@ -19,7 +19,7 @@ def inspect(archive_path, version, commit):
             path = PurePosixPath(name)
             if path.is_absolute() or ".." in path.parts or "\\" in name or not path.parts or path.parts[0] != "atora-lms":
                 raise ValueError("Unexpected ZIP path: " + name)
-            if forbidden.intersection(path.parts):
+            if forbidden.intersection(path.parts) or any(part.startswith("demo-audit") for part in path.parts):
                 raise ValueError("Development file in ZIP: " + name)
         corrupt = archive.testzip()
         if corrupt:

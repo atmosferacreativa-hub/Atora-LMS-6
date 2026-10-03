@@ -786,12 +786,16 @@ trait CLMS_Helper_Academic_Trait {
 		$course_id  = absint( $course_id );
 		$expires_at = sanitize_text_field( (string) $expires_at );
 
-		if ( ! $user_id || ! $course_id || ! $expires_at ) {
+		if ( ! $user_id || ! $course_id ) {
 			return false;
 		}
 
 		$expirations              = self::get_user_course_access_expirations( $user_id );
-		$expirations[ $course_id ] = $expires_at;
+		if ( '' === $expires_at ) {
+			unset( $expirations[ $course_id ] );
+		} else {
+			$expirations[ $course_id ] = $expires_at;
+		}
 
 		$saved = (bool) update_user_meta( $user_id, self::USER_COURSE_ACCESS_EXPIRY_META, $expirations );
 
@@ -815,14 +819,22 @@ trait CLMS_Helper_Academic_Trait {
 		$program_id = absint( $program_id );
 		$expires_at = sanitize_text_field( (string) $expires_at );
 
-		if ( ! $user_id || ! $program_id || ! $expires_at ) {
+		if ( ! $user_id || ! $program_id ) {
 			return false;
 		}
 
 		$expirations               = self::get_user_program_access_expirations( $user_id );
-		$expirations[ $program_id ] = $expires_at;
+		if ( '' === $expires_at ) {
+			unset( $expirations[ $program_id ] );
+		} else {
+			$expirations[ $program_id ] = $expires_at;
+		}
 
-		return (bool) update_user_meta( $user_id, self::USER_PROGRAM_ACCESS_EXPIRY_META, $expirations );
+		$saved = (bool) update_user_meta( $user_id, self::USER_PROGRAM_ACCESS_EXPIRY_META, $expirations );
+		if ( $saved ) {
+			do_action( 'clms_user_program_access_expiration_updated', $user_id, $program_id, $expires_at );
+		}
+		return $saved;
 	}
 
 	/**
@@ -873,6 +885,17 @@ trait CLMS_Helper_Academic_Trait {
 
 		if ( ! $user_id || ! $program_id ) {
 			return '';
+		}
+
+		// F4.1 — tables is canonical source.
+		if ( class_exists( '\\ATORA\\LMS\\LMS_Read_Router' ) && \ATORA\LMS\LMS_Read_Router::is_tables()
+			&& class_exists( '\\ATORA\\LMS\\LMS_Enrollment_Service' )
+			&& method_exists( '\\ATORA\\LMS\\LMS_Enrollment_Service', 'get_program_access_expiry_by_wp_id' ) ) {
+			$result = \ATORA\LMS\LMS_Enrollment_Service::get_program_access_expiry_by_wp_id( $user_id, $program_id );
+			if ( class_exists( '\\ATORA\\LMS\\LMS_Parity' ) && method_exists( '\\ATORA\\LMS\\LMS_Parity', 'shadow_program_access_expiry_pc' ) ) {
+				try { \ATORA\LMS\LMS_Parity::shadow_program_access_expiry_pc( $user_id, $program_id, $result ); } catch ( \Throwable $e ) {}
+			}
+			return $result;
 		}
 
 		$expirations = self::get_user_program_access_expirations( $user_id );

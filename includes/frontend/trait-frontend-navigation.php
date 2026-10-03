@@ -19,7 +19,13 @@ trait CLMS_Frontend_Navigation_Trait {
 
 		$role         = $this->get_frontend_role_context();
 		$courses_url  = esc_url( $atts['courses_url'] );
-		$login_url    = $atts['login_url'] ? esc_url( $atts['login_url'] ) : wp_login_url( get_permalink() );
+		if ( $atts['login_url'] ) {
+			$login_url = esc_url( $atts['login_url'] );
+		} elseif ( class_exists( 'CLMS_Frontend_URLs' ) ) {
+			$login_url = esc_url( CLMS_Frontend_URLs::login_url( is_singular() ? (string) get_permalink() : '' ) );
+		} else {
+			$login_url = wp_login_url( get_permalink() );
+		}
 		$register_url = $atts['register_url'] ? esc_url( $atts['register_url'] ) : wp_registration_url();
 		$extra_class  = sanitize_html_class( $atts['class'] );
 		$nav_class    = trim( 'clms-user-nav clms-role-' . $role . ( $extra_class ? ' ' . $extra_class : '' ) );

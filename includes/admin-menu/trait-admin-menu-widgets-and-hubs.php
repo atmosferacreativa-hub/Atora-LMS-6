@@ -1185,6 +1185,9 @@ trait CLMS_Admin_Menu_Widgets_And_Hubs_Trait {
 			$this->build_nav_item( __( 'Estudiantes', 'atora-lms' ), __( 'Usuarios con rol Estudiante.', 'atora-lms' ), admin_url( 'users.php?role=lms_student' ) ),
 			$this->build_nav_item( __( 'Migración LMS', 'atora-lms' ), __( 'Estado de matrícula y progreso en tablas propias.', 'atora-lms' ), admin_url( 'admin.php?page=atora-lms-migration' ) ),
 		);
+		if ( class_exists( 'CLMS_Access' ) && CLMS_Access::can_manage_enrollments() ) {
+			array_unshift( $links, $this->build_nav_item( __( 'Inscripciones', 'atora-lms' ), __( 'Manual/CSV, invitaciones, enlaces de acceso y ciclo de vida.', 'atora-lms' ), admin_url( 'admin.php?page=atora-enrollments' ) ) );
+		}
 		$this->render_simple_hub_page(
 			__( 'Estudiantes', 'atora-lms' ),
 			__( 'Estudiantes', 'atora-lms' ),

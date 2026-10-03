@@ -348,6 +348,23 @@ class LMS_Enrollment_Service {
 	}
 
 	/**
+	 * Caducidad de acceso de programa desde tabla.
+	 * Equivalente tabular de CLMS_Helper::get_user_program_access_expiration().
+	 */
+	public static function get_program_access_expiry_by_wp_id( int $user_id, int $wp_program_id ): string {
+		global $wpdb;
+		$expires_at = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT expires_at FROM {$wpdb->prefix}atora_program_enrollments
+				 WHERE user_id = %d AND wp_program_id = %d AND status IN ('active', 'completed') LIMIT 1",
+				$user_id,
+				$wp_program_id
+			)
+		);
+		return $expires_at ? (string) $expires_at : '';
+	}
+
+	/**
 	 * Completación de curso desde tabla (status = 'completed' en atora_enrollments).
 	 * Equivalente tabular de CLMS_Helper::is_course_completed().
 	 *

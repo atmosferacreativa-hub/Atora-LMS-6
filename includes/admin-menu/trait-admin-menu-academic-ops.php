@@ -5,6 +5,268 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 trait CLMS_Admin_Menu_Academic_Ops_Trait {
+	public function render_enrollments_page(): void {
+		if ( ! CLMS_Access::can_manage_enrollments() ) {
+			wp_die( esc_html__( 'No tienes permisos.', 'atora-lms' ) );
+		}
+
+		$this->render_admin_styles();
+
+		if ( defined( 'ATORA_LMS_URL' ) ) {
+			wp_enqueue_script(
+				'atora-enrollments-admin',
+				ATORA_LMS_URL . 'assets/js/atora-enrollments-admin.js',
+				array( 'jquery' ),
+				defined( 'ATORA_LMS_VERSION' ) ? ATORA_LMS_VERSION : '1.0.0',
+				true
+			);
+			wp_localize_script(
+				'atora-enrollments-admin',
+				'atoraEnrollmentsAdmin',
+				array(
+					'ajax_url' => admin_url( 'admin-ajax.php' ),
+					'nonce'    => wp_create_nonce( 'atora_enrollments_admin' ),
+				)
+			);
+		}
+
+		$notice_type = isset( $_GET['clms_notice_type'] ) ? sanitize_key( wp_unslash( $_GET['clms_notice_type'] ) ) : '';
+		$notice_text = isset( $_GET['clms_notice'] ) ? sanitize_text_field( wp_unslash( $_GET['clms_notice'] ) ) : '';
+		$notice_type = in_array( $notice_type, array( 'success', 'error' ), true ) ? $notice_type : '';
+		$programs_url = admin_url( 'edit.php?post_type=lm_program' );
+		$courses_url  = admin_url( 'edit.php?post_type=lm_course' );
+
+		echo '<div class="wrap clms-admin-wrap">';
+		echo '<h1>' . esc_html__( 'Inscripciones', 'atora-lms' ) . '</h1>';
+		echo '<p class="clms-admin-note">' . esc_html__( 'Centraliza las rutas de matrícula (manual/CSV, invitaciones, enlaces) y gestiona el ciclo de vida del acceso (paid_until).', 'atora-lms' ) . '</p>';
+
+		if ( $notice_text && $notice_type ) {
+			echo '<div class="notice notice-' . esc_attr( $notice_type ) . ' is-dismissible"><p>' . esc_html( $notice_text ) . '</p></div>';
+		}
+
+		echo '<div class="clms-admin-card">';
+		echo '<div class="clms-admin-section-head">';
+		echo '<div>';
+		echo '<span class="clms-admin-kicker">' . esc_html__( 'Métodos', 'atora-lms' ) . '</span>';
+		echo '<h2 style="margin:0">' . esc_html__( 'Cómo inscribir estudiantes', 'atora-lms' ) . '</h2>';
+		echo '</div>';
+		echo '</div>';
+		echo '<div class="clms-admin-nav-grid">';
+		echo '<a class="clms-admin-nav-card" href="' . esc_url( $programs_url ) . '"><strong>' . esc_html__( 'Programas: Manual / CSV', 'atora-lms' ) . '</strong><span>' . esc_html__( 'Abre un programa y usa la caja “Matriculados / Manual / CSV masivo”.', 'atora-lms' ) . '</span></a>';
+		echo '<a class="clms-admin-nav-card" href="' . esc_url( $programs_url ) . '"><strong>' . esc_html__( 'Programas: Invitaciones', 'atora-lms' ) . '</strong><span>' . esc_html__( 'Genera tokens nominales por email desde el metabox del programa.', 'atora-lms' ) . '</span></a>';
+		echo '<a class="clms-admin-nav-card" href="' . esc_url( $courses_url ) . '"><strong>' . esc_html__( 'Cursos: Invitaciones + Enlace de acceso', 'atora-lms' ) . '</strong><span>' . esc_html__( 'Invita por email o crea un enlace (free/password/register) desde el metabox del curso.', 'atora-lms' ) . '</span></a>';
+		echo '</div>';
+		echo '</div>';
+
+		echo '<div class="clms-admin-card">';
+		echo '<span class="clms-admin-kicker">' . esc_html__( 'Ciclo de vida', 'atora-lms' ) . '</span>';
+		echo '<h2 style="margin-top:0">' . esc_html__( 'Caducidad de acceso (paid_until)', 'atora-lms' ) . '</h2>';
+		echo '<p class="clms-admin-note">' . esc_html__( 'Define hasta cuándo un estudiante puede ver un programa o curso. Útil para instituciones (pagos externos, renovaciones manuales) y para pruebas controladas.', 'atora-lms' ) . '</p>';
+
+		$action_url = admin_url( 'admin-post.php' );
+
+		echo '<style>.atora-enroll-suggest{display:grid;gap:6px}.atora-enroll-suggest button{justify-content:flex-start;text-align:left}</style>';
+		echo '<div class="clms-admin-profile-grid" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr));align-items:end">';
+		echo '<form method="post" action="' . esc_url( $action_url ) . '" class="clms-admin-profile-form" style="margin:0">';
+		wp_nonce_field( 'atora_enrollments_set_access' );
+		echo '<input type="hidden" name="action" value="atora_enrollments_set_access">';
+		echo '<input type="hidden" name="target_type" value="program">';
+		echo '<label>' . esc_html__( 'Estudiante (email/usuario/ID)', 'atora-lms' ) . '<input name="student" type="text" placeholder="email@dominio.com" data-atora-enroll-search="user" data-atora-enroll-results="#atora-enroll-user-results-program"></label>';
+		echo '<div id="atora-enroll-user-results-program" class="atora-enroll-suggest" aria-live="polite"></div>';
+		echo '<label>' . esc_html__( 'Buscar programa (título)', 'atora-lms' ) . '<input type="text" placeholder="Diplomado…" data-atora-enroll-search="program" data-atora-enroll-target="#atora-enroll-target-program" data-atora-enroll-results="#atora-enroll-program-results"></label>';
+		echo '<div id="atora-enroll-program-results" class="atora-enroll-suggest" aria-live="polite"></div>';
+		echo '<label>' . esc_html__( 'Programa (ID)', 'atora-lms' ) . '<input id="atora-enroll-target-program" name="target_id" type="number" min="1" placeholder="123"></label>';
+		echo '<label>' . esc_html__( 'Caduca (hora local)', 'atora-lms' ) . '<input name="expires_at" type="datetime-local"></label>';
+		echo '<label style="display:flex;gap:8px;align-items:center;font-weight:600;color:#475569"><input type="checkbox" name="perpetual" value="1"> ' . esc_html__( 'Acceso perpetuo', 'atora-lms' ) . '</label>';
+		echo '<label style="display:flex;gap:8px;align-items:center;font-weight:600;color:#475569"><input type="checkbox" name="create_if_missing" value="1"> ' . esc_html__( 'Crear matrícula si no existe', 'atora-lms' ) . '</label>';
+		echo '<button type="submit" class="button button-primary">' . esc_html__( 'Guardar programa', 'atora-lms' ) . '</button>';
+		echo '</form>';
+
+		echo '<form method="post" action="' . esc_url( $action_url ) . '" class="clms-admin-profile-form" style="margin:0">';
+		wp_nonce_field( 'atora_enrollments_set_access' );
+		echo '<input type="hidden" name="action" value="atora_enrollments_set_access">';
+		echo '<input type="hidden" name="target_type" value="course">';
+		echo '<label>' . esc_html__( 'Estudiante (email/usuario/ID)', 'atora-lms' ) . '<input name="student" type="text" placeholder="email@dominio.com" data-atora-enroll-search="user" data-atora-enroll-results="#atora-enroll-user-results-course"></label>';
+		echo '<div id="atora-enroll-user-results-course" class="atora-enroll-suggest" aria-live="polite"></div>';
+		echo '<label>' . esc_html__( 'Buscar curso (título)', 'atora-lms' ) . '<input type="text" placeholder="Fotografía…" data-atora-enroll-search="course" data-atora-enroll-target="#atora-enroll-target-course" data-atora-enroll-results="#atora-enroll-course-results"></label>';
+		echo '<div id="atora-enroll-course-results" class="atora-enroll-suggest" aria-live="polite"></div>';
+		echo '<label>' . esc_html__( 'Curso (ID)', 'atora-lms' ) . '<input id="atora-enroll-target-course" name="target_id" type="number" min="1" placeholder="456"></label>';
+		echo '<label>' . esc_html__( 'Caduca (hora local)', 'atora-lms' ) . '<input name="expires_at" type="datetime-local"></label>';
+		echo '<label style="display:flex;gap:8px;align-items:center;font-weight:600;color:#475569"><input type="checkbox" name="perpetual" value="1"> ' . esc_html__( 'Acceso perpetuo', 'atora-lms' ) . '</label>';
+		echo '<label style="display:flex;gap:8px;align-items:center;font-weight:600;color:#475569"><input type="checkbox" name="create_if_missing" value="1"> ' . esc_html__( 'Crear matrícula si no existe', 'atora-lms' ) . '</label>';
+		echo '<button type="submit" class="button button-primary">' . esc_html__( 'Guardar curso', 'atora-lms' ) . '</button>';
+		echo '</form>';
+		echo '</div>';
+
+		echo '<details class="clms-admin-details" style="margin-top:12px">';
+		echo '<summary>' . esc_html__( 'Notas rápidas', 'atora-lms' ) . '</summary>';
+		echo '<div style="padding-top:10px">';
+		echo '<p class="clms-admin-note" style="margin:0">' . esc_html__( 'Tip: los IDs se ven en la URL al editar un curso/programa (post=123). “Acceso perpetuo” guarda caducidad NULL (sin vencimiento).', 'atora-lms' ) . '</p>';
+		echo '</div>';
+		echo '</details>';
+
+		echo '</div>';
+		echo '</div>';
+	}
+
+	public function handle_enrollments_set_access(): void {
+		if ( ! CLMS_Access::can_manage_enrollments() ) {
+			wp_die( esc_html__( 'No tienes permisos.', 'atora-lms' ) );
+		}
+
+		check_admin_referer( 'atora_enrollments_set_access' );
+
+		$target_type      = isset( $_POST['target_type'] ) ? sanitize_key( wp_unslash( $_POST['target_type'] ) ) : '';
+		$student_raw      = isset( $_POST['student'] ) ? sanitize_text_field( wp_unslash( $_POST['student'] ) ) : '';
+		$target_id        = isset( $_POST['target_id'] ) ? absint( wp_unslash( $_POST['target_id'] ) ) : 0;
+		$expires_at_raw   = isset( $_POST['expires_at'] ) ? sanitize_text_field( wp_unslash( $_POST['expires_at'] ) ) : '';
+		$perpetual        = ! empty( $_POST['perpetual'] );
+		$create_if_missing = ! empty( $_POST['create_if_missing'] );
+
+		$user_id = $this->resolve_user_id_from_identifier( $student_raw );
+		if ( ! $user_id ) {
+			$this->redirect_enrollments_notice( 'error', __( 'No se encontró el estudiante.', 'atora-lms' ) );
+		}
+
+		if ( ! $target_id || ! in_array( $target_type, array( 'program', 'course' ), true ) ) {
+			$this->redirect_enrollments_notice( 'error', __( 'Destino inválido.', 'atora-lms' ) );
+		}
+
+		$post_type = get_post_type( $target_id );
+		if ( 'program' === $target_type && 'lm_program' !== $post_type ) {
+			$this->redirect_enrollments_notice( 'error', __( 'El ID no corresponde a un programa.', 'atora-lms' ) );
+		}
+		if ( 'course' === $target_type && 'lm_course' !== $post_type ) {
+			$this->redirect_enrollments_notice( 'error', __( 'El ID no corresponde a un curso.', 'atora-lms' ) );
+		}
+
+		if ( ! class_exists( 'CLMS_Helper' ) ) {
+			$this->redirect_enrollments_notice( 'error', __( 'CLMS_Helper no está disponible.', 'atora-lms' ) );
+		}
+
+		$expires_at_utc = '';
+		if ( ! $perpetual && $expires_at_raw ) {
+			$expires_at_local = str_replace( 'T', ' ', $expires_at_raw );
+			if ( 16 === strlen( $expires_at_local ) ) { // Y-m-d H:i
+				$expires_at_local .= ':00';
+			}
+			$expires_at_utc = get_gmt_from_date( $expires_at_local );
+		}
+
+		if ( 'program' === $target_type ) {
+			if ( $create_if_missing && ! CLMS_Helper::user_is_enrolled_in_program( $user_id, $target_id ) ) {
+				CLMS_Helper::enroll_user_in_program( $user_id, $target_id );
+			}
+			$ok = CLMS_Helper::set_user_program_access_expiration( $user_id, $target_id, $expires_at_utc );
+			if ( ! $ok ) {
+				$this->redirect_enrollments_notice( 'error', __( 'No se pudo guardar el acceso del programa.', 'atora-lms' ) );
+			}
+			$this->redirect_enrollments_notice( 'success', __( 'Acceso del programa actualizado.', 'atora-lms' ) );
+		}
+
+		if ( $create_if_missing && ! CLMS_Helper::user_is_enrolled_in_course( $user_id, $target_id ) ) {
+			CLMS_Helper::enroll_user_in_course( $user_id, $target_id );
+		}
+		$ok = CLMS_Helper::set_user_course_access_expiration( $user_id, $target_id, $expires_at_utc );
+		if ( ! $ok ) {
+			$this->redirect_enrollments_notice( 'error', __( 'No se pudo guardar el acceso del curso.', 'atora-lms' ) );
+		}
+		$this->redirect_enrollments_notice( 'success', __( 'Acceso del curso actualizado.', 'atora-lms' ) );
+	}
+
+	protected function resolve_user_id_from_identifier( string $identifier ): int {
+		$identifier = trim( (string) $identifier );
+		if ( '' === $identifier ) { return 0; }
+
+		if ( is_numeric( $identifier ) ) {
+			$u = get_userdata( absint( $identifier ) );
+			return $u ? (int) $u->ID : 0;
+		}
+		if ( is_email( $identifier ) ) {
+			$u = get_user_by( 'email', $identifier );
+			return $u ? (int) $u->ID : 0;
+		}
+
+		$u = get_user_by( 'login', $identifier );
+		return $u ? (int) $u->ID : 0;
+	}
+
+	protected function redirect_enrollments_notice( string $type, string $message ): void {
+		$url = add_query_arg(
+			array(
+				'page'            => 'atora-enrollments',
+				'clms_notice_type' => $type,
+				'clms_notice'      => $message,
+			),
+			admin_url( 'admin.php' )
+		);
+		wp_safe_redirect( $url );
+		exit;
+	}
+
+	public function ajax_enrollments_search(): void {
+		check_ajax_referer( 'atora_enrollments_admin' );
+		if ( ! CLMS_Access::can_manage_enrollments() ) {
+			wp_send_json_error( array( 'message' => 'forbidden' ), 403 );
+		}
+
+		$type = isset( $_POST['type'] ) ? sanitize_key( wp_unslash( $_POST['type'] ) ) : '';
+		$q    = isset( $_POST['q'] ) ? sanitize_text_field( wp_unslash( $_POST['q'] ) ) : '';
+		$q    = trim( (string) $q );
+
+		if ( strlen( $q ) < 2 ) {
+			wp_send_json_success( array() );
+		}
+
+		if ( 'user' === $type ) {
+			$query = new WP_User_Query(
+				array(
+					'number'         => 10,
+					'orderby'        => 'registered',
+					'order'          => 'DESC',
+					'fields'         => array( 'ID', 'user_email', 'user_login', 'display_name' ),
+					'search'         => '*' . $q . '*',
+					'search_columns' => array( 'user_login', 'user_email', 'display_name' ),
+				)
+			);
+			$users = array();
+			foreach ( (array) $query->get_results() as $u ) {
+				$users[] = array(
+					'id'           => (int) $u->ID,
+					'email'        => (string) $u->user_email,
+					'login'        => (string) $u->user_login,
+					'display_name' => (string) $u->display_name,
+				);
+			}
+			wp_send_json_success( $users );
+		}
+
+		if ( in_array( $type, array( 'program', 'course' ), true ) ) {
+			$post_type = 'program' === $type ? 'lm_program' : 'lm_course';
+			$posts = get_posts(
+				array(
+					'post_type'      => $post_type,
+					'post_status'    => array( 'publish', 'draft', 'private' ),
+					's'              => $q,
+					'posts_per_page' => 10,
+					'orderby'        => 'ID',
+					'order'          => 'DESC',
+				)
+			);
+			$out = array();
+			foreach ( (array) $posts as $p ) {
+				$out[] = array(
+					'id'     => (int) $p->ID,
+					'title'  => (string) $p->post_title,
+					'status' => (string) $p->post_status,
+				);
+			}
+			wp_send_json_success( $out );
+		}
+
+		wp_send_json_success( array() );
+	}
+
 	public function render_speedgrader_page() {
 		if ( ! CLMS_Access::can_grade_submissions() ) {
 			wp_die( esc_html__( 'No tienes permisos.', 'atora-lms' ) );

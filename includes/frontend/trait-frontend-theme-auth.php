@@ -6,12 +6,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 trait CLMS_Frontend_Theme_Auth_Trait {
 	public function enqueue_frontend_styles() {
-		$css_url = defined( 'ATORA_LMS_URL' )
-			? ATORA_LMS_URL . 'assets/css/frontend.css'
-			: ATORA_LMS_URL;
-		// Resolve URL from constant path
-		if ( defined( 'ATORA_LMS_URL' ) ) {
-			$css_url = ATORA_LMS_URL;
+		$css_url = defined( 'ATORA_LMS_URL' ) ? ATORA_LMS_URL : '';
+		if ( '' === $css_url ) {
+			return;
 		}
 		wp_enqueue_style(
 			'atora-frontend',
@@ -164,11 +161,19 @@ trait CLMS_Frontend_Theme_Auth_Trait {
 	 * @return string
 	 */
 	public function shortcode_login_form( $atts ) {
+		$dashboard_url_default = '';
+		if ( class_exists( 'CLMS_Frontend_URLs' ) ) {
+			$dashboard_url_default = CLMS_Frontend_URLs::resolve_frontend_page_url( 'dashboard' );
+		}
+		if ( '' === $dashboard_url_default ) {
+			$dashboard_url_default = home_url( '/dashboard/' );
+		}
+
 		$atts = shortcode_atts(
 			array(
 				'redirect'        => '',
 				'logged_in_msg'   => __( 'Hola, {name}. Ya tienes sesión iniciada.', 'atora-lms' ),
-				'dashboard_url'   => admin_url( 'admin.php?page=clms-dashboard' ),
+				'dashboard_url'   => $dashboard_url_default,
 				'dashboard_label' => __( 'Ir a mi panel', 'atora-lms' ),
 				'logout_label'    => __( 'Cerrar sesión', 'atora-lms' ),
 			),
@@ -199,7 +204,21 @@ trait CLMS_Frontend_Theme_Auth_Trait {
 			return ob_get_clean();
 		}
 
-		$redirect = $atts['redirect'] ? esc_url_raw( $atts['redirect'] ) : ( is_singular() ? get_permalink() : home_url( '/wp-admin/' ) );
+		$redirect = '';
+		if ( $atts['redirect'] ) {
+			$redirect = esc_url_raw( $atts['redirect'] );
+		} else {
+			// Permite que links tipo /cuenta/?redirect_to=/dashboard/ conserven destino.
+			$redirect_qs = wp_validate_redirect(
+				(string) wp_unslash( $_GET['redirect_to'] ?? '' ), // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+				''
+			);
+			if ( '' !== $redirect_qs ) {
+				$redirect = $redirect_qs;
+			} else {
+				$redirect = is_singular() ? get_permalink() : home_url( '/wp-admin/' );
+			}
+		}
 
 		ob_start();
 		// Render any WP login error as an accessible alert above the form
@@ -341,7 +360,13 @@ CSS;
 			$url      = wp_logout_url( $redirect );
 			$label    = sanitize_text_field( (string) $atts['logout_label'] );
 		} else {
-			$url   = $atts['login_url'] ? esc_url_raw( $atts['login_url'] ) : wp_login_url( get_permalink() );
+			if ( $atts['login_url'] ) {
+				$url = esc_url_raw( $atts['login_url'] );
+			} elseif ( class_exists( 'CLMS_Frontend_URLs' ) ) {
+				$url = CLMS_Frontend_URLs::login_url( is_singular() ? (string) get_permalink() : '' );
+			} else {
+				$url = wp_login_url( get_permalink() );
+			}
 			$label = sanitize_text_field( (string) $atts['login_label'] );
 		}
 
