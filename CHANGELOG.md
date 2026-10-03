@@ -1,5 +1,14 @@
 # CHANGELOG — ATORA LMS
 
+## 6.27.1 (2026-10-03)
+
+### Miniaturas de video en la API móvil
+
+- **NEW** — `video_thumbnail_url` en `GET /lessons/{id}` y en cada lección del currículo de `GET /courses/{id}` (que además informa `has_video`).
+- **Resolución** en un único método, `ATORA_Video_Thumbnail_Resolver::resolve()`: miniatura manual del editor de la lección → YouTube (imagen pública por identificador) → Vimeo (oEmbed consultado una vez en segundo plano y guardado 30 días; los fallos, 1 día) → imagen destacada de la lección → portada del curso. Google Drive y MP4 directo caen a los dos últimos. Sin llamadas externas durante la petición; nunca vacío si el curso tiene portada.
+- **Refactor**: la elección del video principal de la lección pasa a `resolve_lesson_video_url()` y la usan las dos rutas.
+- **TESTS**: `tests/Media/VideoThumbnailResolverTest.php` (orden de resolución, caché de Vimeo, fallos, Drive/MP4, portada).
+
 ## 6.27.0 (2026-10-03)
 
 ### Entregas de tareas por la API móvil
