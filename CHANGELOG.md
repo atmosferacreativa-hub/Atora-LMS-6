@@ -1,5 +1,12 @@
 # CHANGELOG — ATORA LMS
 
+## 6.26.74 (2026-10-03)
+
+### Hotfix — 404 de cursos tras subir el ZIP
+
+- **FIX — activación**: `atora_lms_activate()` hacía `flush_rewrite_rules()` cuando los CPT aún no estaban registrados (la activación corre después de `init`), guardando reglas sin `/cursos/` ni `/programas/`, y marcaba `atora_lms_rewrite_version` como aplicada. Ahora borra esa opción y el flush ocurre en `wp_loaded` del siguiente request, con todo registrado.
+- **REWRITE**: `ATORA_LMS_REWRITE_VERSION` → `6.26.74` para que los sitios ya afectados se reparen solos al actualizar.
+
 ## 6.26.73 (2026-10-03)
 
 ### Login frontend
