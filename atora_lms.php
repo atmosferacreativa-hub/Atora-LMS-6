@@ -3,7 +3,7 @@
  * Plugin Name:       ATORA LMS
  * Plugin URI:        https://atora.studio
  * Description:       LMS modular para WordPress con IA, evaluaciones, certificados, CRM, mensajería multi-canal, afiliados, live streaming y más. Autor: Atora Studio.
- * Version:           6.27.0
+ * Version:           6.27.1
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Atora Studio
@@ -52,7 +52,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * - Limpieza automática de notificaciones >90 días
  */
 	if ( ! defined( 'ATORA_LMS_VERSION' ) ) {
-		define( 'ATORA_LMS_VERSION', '6.27.0' );
+		define( 'ATORA_LMS_VERSION', '6.27.1' );
 	}
 
 if ( ! defined( 'ATORA_LMS_FILE' ) ) {
@@ -1233,6 +1233,10 @@ add_action( 'init', static function () {
 
 	// ── Mobile API v1: tokens opacos y experiencia estudiantil ───────────────
 	atora_lms_require_module( 'includes/mobile/class-mobile-token-service.php' );
+	atora_lms_require_module( 'includes/media/class-video-thumbnail-resolver.php' );
+	if ( class_exists( 'ATORA_Video_Thumbnail_Resolver' ) ) {
+		add_action( ATORA_Video_Thumbnail_Resolver::VIMEO_FETCH_HOOK, array( 'ATORA_Video_Thumbnail_Resolver', 'fetch_vimeo_thumbnail' ) );
+	}
 	atora_lms_require_module( 'includes/mobile/class-mobile-assignment-store.php' );
 	atora_lms_require_module( 'includes/mobile/class-mobile-assignment-service.php' );
 	atora_lms_require_module( 'includes/mobile/class-mobile-rest-controller.php' );

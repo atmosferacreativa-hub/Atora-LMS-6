@@ -337,8 +337,16 @@ final class ATORA_Mobile_REST_Controller {
 		}
 		$lessons   = \ATORA\LMS\LMS_Course_Service::get_lessons( $course_id );
 		$completed = self::completed_lesson_ids( $user_id, $course_id );
+		$cover     = esc_url_raw( (string) ( $course['thumbnail_url'] ?? '' ) );
 		foreach ( $lessons as &$lesson ) {
 			$lesson['completed'] = in_array( (int) $lesson['id'], $completed, true );
+			$wp_lesson_id        = absint( $lesson['wp_post_id'] ?? 0 );
+			$video_url           = self::resolve_lesson_video_url( $lesson, $wp_lesson_id );
+			$lesson['has_video'] = '' !== $video_url;
+			// 6.27.1: miniatura para el currículo (nunca vacía si el curso tiene portada).
+			$lesson['video_thumbnail_url'] = class_exists( 'ATORA_Video_Thumbnail_Resolver' )
+				? ATORA_Video_Thumbnail_Resolver::resolve( $wp_lesson_id, $video_url, $cover, absint( $course['wp_post_id'] ?? 0 ) )
+				: $cover;
 			unset( $lesson['video_url'] );
 		}
 		unset( $lesson );
@@ -363,38 +371,7 @@ final class ATORA_Mobile_REST_Controller {
 		$wp_post_id   = absint( $lesson['wp_post_id'] ?? 0 );
 		$raw_content  = $wp_post_id ? (string) get_post_field( 'post_content', $wp_post_id ) : '';
 		$content_html = wp_kses_post( apply_filters( 'the_content', $raw_content ) );
-		$video_url    = esc_url_raw( (string) ( $lesson['video_url'] ?? '' ) );
-
-			// Compatibilidad con las claves usadas por el editor de lecciones.
-			if ( $wp_post_id > 0 && '' === $video_url ) {
-				$extra_videos = get_post_meta( $wp_post_id, '_clms_lesson_extra_videos', true );
-				if ( is_string( $extra_videos ) && '' !== trim( $extra_videos ) ) {
-					$decoded = json_decode( $extra_videos, true );
-					if ( is_array( $decoded ) ) {
-						$extra_videos = $decoded;
-					} elseif ( function_exists( 'maybe_unserialize' ) ) {
-						$extra_videos = maybe_unserialize( $extra_videos );
-					}
-				}
-				if ( is_array( $extra_videos ) ) {
-					foreach ( $extra_videos as $extra_video ) {
-						$candidate = '';
-						if ( is_array( $extra_video ) ) {
-							$candidate = (string) ( $extra_video['url'] ?? $extra_video['src'] ?? '' );
-						} elseif ( is_string( $extra_video ) ) {
-							$candidate = $extra_video;
-						}
-						$candidate = esc_url_raw( trim( $candidate ) );
-						if ( '' !== $candidate ) {
-							$video_url = $candidate;
-							break;
-						}
-					}
-				}
-			if ( '' === $video_url ) {
-				$video_url = esc_url_raw( (string) get_post_meta( $wp_post_id, '_clms_lesson_video_url', true ) );
-			}
-		}
+		$video_url    = self::resolve_lesson_video_url( $lesson, $wp_post_id );
 
 		$video_embed = self::google_drive_embed_url( $video_url, $raw_content );
 		$resources   = $wp_post_id ? self::normalize_lesson_resources( $wp_post_id ) : array();
@@ -411,6 +388,7 @@ final class ATORA_Mobile_REST_Controller {
 				'duration_min' => absint( $lesson['duration_min'] ?? 0 ),
 				'video_url'       => $video_url,
 				'video_embed_url' => $video_embed,
+				'video_thumbnail_url' => self::video_thumbnail( $wp_post_id, $video_url, $course_id ),
 				'video_provider'  => '' !== $video_embed ? 'google_drive' : ( '' !== $video_url ? 'direct' : '' ),
 				'content_html'    => $content_html,
 				'content_text' => sanitize_textarea_field( wp_strip_all_tags( $content_html ) ),
@@ -420,6 +398,60 @@ final class ATORA_Mobile_REST_Controller {
 				'resources'      => $resources,
 			),
 		), 200 );
+	}
+
+	/**
+	 * Video principal de la lección: el de la tabla y, si falta, el primero del
+	 * editor (`_clms_lesson_extra_videos`) o `_clms_lesson_video_url`.
+	 */
+	private static function resolve_lesson_video_url( array $lesson, int $wp_post_id ): string {
+		$video_url = esc_url_raw( (string) ( $lesson['video_url'] ?? '' ) );
+
+		// Compatibilidad con las claves usadas por el editor de lecciones.
+		if ( $wp_post_id > 0 && '' === $video_url ) {
+			$extra_videos = get_post_meta( $wp_post_id, '_clms_lesson_extra_videos', true );
+			if ( is_string( $extra_videos ) && '' !== trim( $extra_videos ) ) {
+				$decoded = json_decode( $extra_videos, true );
+				if ( is_array( $decoded ) ) {
+					$extra_videos = $decoded;
+				} elseif ( function_exists( 'maybe_unserialize' ) ) {
+					$extra_videos = maybe_unserialize( $extra_videos );
+				}
+			}
+			if ( is_array( $extra_videos ) ) {
+				foreach ( $extra_videos as $extra_video ) {
+					$candidate = '';
+					if ( is_array( $extra_video ) ) {
+						$candidate = (string) ( $extra_video['url'] ?? $extra_video['src'] ?? '' );
+					} elseif ( is_string( $extra_video ) ) {
+						$candidate = $extra_video;
+					}
+					$candidate = esc_url_raw( trim( $candidate ) );
+					if ( '' !== $candidate ) {
+						$video_url = $candidate;
+						break;
+					}
+				}
+			}
+			if ( '' === $video_url ) {
+				$video_url = esc_url_raw( (string) get_post_meta( $wp_post_id, '_clms_lesson_video_url', true ) );
+			}
+		}
+
+		return $video_url;
+	}
+
+	private static function video_thumbnail( int $wp_post_id, string $video_url, int $course_id ): string {
+		if ( ! class_exists( 'ATORA_Video_Thumbnail_Resolver' ) ) {
+			return '';
+		}
+		$course = \ATORA\LMS\LMS_Course_Service::get( $course_id );
+		return ATORA_Video_Thumbnail_Resolver::resolve(
+			$wp_post_id,
+			$video_url,
+			esc_url_raw( (string) ( is_array( $course ) ? ( $course['thumbnail_url'] ?? '' ) : '' ) ),
+			absint( is_array( $course ) ? ( $course['wp_post_id'] ?? 0 ) : 0 )
+		);
 	}
 
 	public static function quiz( WP_REST_Request $request ) {
