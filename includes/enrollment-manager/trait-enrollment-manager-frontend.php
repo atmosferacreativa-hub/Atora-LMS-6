@@ -68,7 +68,7 @@ trait CLMS_Enrollment_Manager_Frontend_Trait {
 							'resource_label' => $resource_label,
 							'token'          => $token,
 							'message'        => $signup->get_error_message(),
-							'login_url'      => wp_login_url( $return_url ),
+							'login_url'      => CLMS_Frontend_URLs::login_url( $return_url ),
 							'form_values'    => $this->get_invitation_registration_form_values_from_request( $invite_email ),
 							'invite_email'   => $invite_email,
 						)
@@ -123,7 +123,7 @@ trait CLMS_Enrollment_Manager_Frontend_Trait {
 					'course_title'   => $resource_title,
 					'resource_label' => $resource_label,
 					'token'          => $token,
-					'login_url'      => wp_login_url( $return_url ),
+					'login_url'      => CLMS_Frontend_URLs::login_url( $return_url ),
 					'form_values'    => $this->get_invitation_registration_form_values_from_request( $invite_email ),
 					'invite_email'   => $invite_email,
 				)
@@ -343,7 +343,7 @@ trait CLMS_Enrollment_Manager_Frontend_Trait {
 			$this->render_enrollment_page( 'register_required', array(
 				'course_title' => $course_title,
 				'register_url' => $register_url,
-				'login_url'    => wp_login_url( $return_url ),
+				'login_url'    => CLMS_Frontend_URLs::login_url( $return_url ),
 			) );
 			exit;
 		}
@@ -385,7 +385,7 @@ trait CLMS_Enrollment_Manager_Frontend_Trait {
 				'course_title' => $course_title,
 				'token'        => $token,
 				'logged_in'    => is_user_logged_in(),
-				'login_url'    => wp_login_url( add_query_arg( 'clms_access', rawurlencode( $token ), home_url( '/' ) ) ),
+				'login_url'    => CLMS_Frontend_URLs::login_url( add_query_arg( 'clms_access', rawurlencode( $token ), home_url( '/' ) ) ),
 			) );
 			exit;
 		}
@@ -398,7 +398,7 @@ trait CLMS_Enrollment_Manager_Frontend_Trait {
 		$course_title   = ! empty( $data['course_title'] ) ? esc_html( $data['course_title'] ) : '';
 		$message        = ! empty( $data['message'] ) ? esc_html( $data['message'] ) : '';
 		$course_url     = ! empty( $data['course_url'] ) ? esc_url( $data['course_url'] ) : '';
-		$login_url      = ! empty( $data['login_url'] ) ? esc_url( $data['login_url'] ) : wp_login_url();
+		$login_url      = ! empty( $data['login_url'] ) ? esc_url( $data['login_url'] ) : CLMS_Frontend_URLs::login_url();
 		$register_url   = ! empty( $data['register_url'] ) ? esc_url( $data['register_url'] ) : wp_registration_url();
 		$token          = ! empty( $data['token'] ) ? esc_attr( $data['token'] ) : '';
 		$resource_label = ! empty( $data['resource_label'] ) ? esc_html( (string) $data['resource_label'] ) : esc_html__( 'curso', 'atora-lms' );

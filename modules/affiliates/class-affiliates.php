@@ -136,7 +136,7 @@ class Affiliates {
 	public static function render_dashboard_shortcode(): string {
 		if ( ! is_user_logged_in() ) {
 			return '<p>' . esc_html__( 'Debes iniciar sesión para ver tu panel de afiliado.', 'atora-lms' )
-			       . ' <a href="' . esc_url( wp_login_url( get_permalink() ) ) . '">'
+			       . ' <a href="' . esc_url( CLMS_Frontend_URLs::login_url( get_permalink() ) ) . '">'
 			       . esc_html__( 'Iniciar sesión', 'atora-lms' ) . '</a></p>';
 		}
 

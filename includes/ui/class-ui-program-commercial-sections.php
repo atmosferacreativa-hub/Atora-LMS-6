@@ -361,7 +361,7 @@ class CLMS_UI_Program_Commercial_Sections {
 						<?php if ( '' !== trim( $cta_url ) ) : ?>
 							<a class="apl-btn" href="<?php echo esc_url( $cta_url ); ?>"><?php echo esc_html( $cta_label ); ?></a>
 						<?php elseif ( ! is_user_logged_in() ) : ?>
-							<a class="apl-btn" href="<?php echo esc_url( wp_login_url( $program_permalink ) ); ?>"><?php esc_html_e( 'Iniciar sesión', 'atora-lms' ); ?></a>
+							<a class="apl-btn" href="<?php echo esc_url( CLMS_Frontend_URLs::login_url( $program_permalink ) ); ?>"><?php esc_html_e( 'Iniciar sesión', 'atora-lms' ); ?></a>
 						<?php endif; ?>
 					<?php elseif ( ! $user_id ) : ?>
 						<p class="apl-price-copy"><?php esc_html_e( 'Accede para guardar tu progreso o inscríbete desde la oferta comercial.', 'atora-lms' ); ?></p>
@@ -369,7 +369,7 @@ class CLMS_UI_Program_Commercial_Sections {
 							<a class="apl-btn" href="<?php echo esc_url( $cta_url ); ?>"><?php echo esc_html( $cta_label ); ?></a>
 						<?php endif; ?>
 						<div class="apl-hero-links">
-							<a href="<?php echo esc_url( wp_login_url( $program_permalink ) ); ?>"><?php esc_html_e( 'Iniciar sesión', 'atora-lms' ); ?></a>
+							<a href="<?php echo esc_url( CLMS_Frontend_URLs::login_url( $program_permalink ) ); ?>"><?php esc_html_e( 'Iniciar sesión', 'atora-lms' ); ?></a>
 						</div>
 					<?php elseif ( ! $is_enrolled ) : ?>
 						<p class="apl-price-copy"><?php esc_html_e( 'Debes estar inscrito para habilitar el itinerario privado del programa.', 'atora-lms' ); ?></p>
@@ -773,7 +773,7 @@ class CLMS_UI_Program_Commercial_Sections {
 			<?php endif; ?>
 
 			<?php if ( ! $user_id ) : ?>
-				<a class="apl-btn apl-btn-inline" href="<?php echo esc_url( wp_login_url( $program_permalink ) ); ?>">
+				<a class="apl-btn apl-btn-inline" href="<?php echo esc_url( CLMS_Frontend_URLs::login_url( $program_permalink ) ); ?>">
 					<?php esc_html_e( 'Iniciar sesión', 'atora-lms' ); ?>
 				</a>
 			<?php elseif ( '' !== trim( $cta_url ) ) : ?>

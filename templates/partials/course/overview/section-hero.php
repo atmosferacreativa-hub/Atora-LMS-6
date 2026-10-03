@@ -46,7 +46,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 		<?php endif; ?>
 
 		<?php if ( ! $user_id ) : ?>
-			<a class="cov-btn cov-btn-primary" href="<?php echo esc_url( wp_login_url( get_permalink( $course_id ) ) ); ?>">
+			<a class="cov-btn cov-btn-primary" href="<?php echo esc_url( CLMS_Frontend_URLs::login_url( get_permalink( $course_id ) ) ); ?>">
 				<?php esc_html_e( 'Iniciar sesión para acceder', 'atora-lms' ); ?>
 			</a>
 		<?php elseif ( ! $is_enrolled ) : ?>

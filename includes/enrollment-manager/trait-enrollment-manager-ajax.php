@@ -278,7 +278,7 @@ trait CLMS_Enrollment_Manager_Ajax_Trait {
 			// Guardar token en sesión para después del login.
 			wp_send_json_error( array(
 				'message'   => __( 'Debes iniciar sesión primero.', 'atora-lms' ),
-				'login_url' => wp_login_url( add_query_arg( 'clms_access', rawurlencode( $token ), home_url( '/' ) ) ),
+				'login_url' => CLMS_Frontend_URLs::login_url( add_query_arg( 'clms_access', rawurlencode( $token ), home_url( '/' ) ) ),
 			) );
 		}
 
