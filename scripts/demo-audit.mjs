@@ -62,6 +62,15 @@ function isProbablyHtml(response) {
   return ct.includes("text/html");
 }
 
+function visibleText(html) {
+  const attrs = [...html.matchAll(/\s(?:title|alt|aria-label|placeholder)="([^"]*)"/gi)].map((m) => m[1]);
+  const body = html
+    .replace(/<(script|style|noscript|template)\b[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<!--[\s\S]*?-->/g, " ")
+    .replace(/<[^>]+>/g, " ");
+  return `${body} ${attrs.join(" ")}`.replace(/&nbsp;|&#160;/g, " ").replace(/\s+/g, " ");
+}
+
 async function fetchWithTimeout(url, init = {}) {
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), timeoutMs);
@@ -150,11 +159,13 @@ async function auditPath(path) {
   if (!isProbablyHtml(response)) return res;
   const html = await response.text();
 
-  // Forbidden strings
+  // Forbidden strings: only what a visitor can read (text + title/alt/
+  // aria-label), not class names like "meridian-header" or inline scripts.
+  const text = visibleText(html);
   for (const s of forbidList) {
     if (!s) continue;
     const re = new RegExp(s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
-    if (re.test(html)) res.forbidden_hits.push(s);
+    if (re.test(text)) res.forbidden_hits.push(s);
   }
 
   const hrefs = extractHrefs(html);
