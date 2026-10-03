@@ -3,7 +3,7 @@
  * Plugin Name:       ATORA LMS
  * Plugin URI:        https://atora.studio
  * Description:       LMS modular para WordPress con IA, evaluaciones, certificados, CRM, mensajería multi-canal, afiliados, live streaming y más. Autor: Atora Studio.
- * Version:           6.26.75
+ * Version:           6.27.0
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Atora Studio
@@ -52,7 +52,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * - Limpieza automática de notificaciones >90 días
  */
 	if ( ! defined( 'ATORA_LMS_VERSION' ) ) {
-		define( 'ATORA_LMS_VERSION', '6.26.75' );
+		define( 'ATORA_LMS_VERSION', '6.27.0' );
 	}
 
 if ( ! defined( 'ATORA_LMS_FILE' ) ) {
@@ -1233,9 +1233,20 @@ add_action( 'init', static function () {
 
 	// ── Mobile API v1: tokens opacos y experiencia estudiantil ───────────────
 	atora_lms_require_module( 'includes/mobile/class-mobile-token-service.php' );
+	atora_lms_require_module( 'includes/mobile/class-mobile-assignment-store.php' );
+	atora_lms_require_module( 'includes/mobile/class-mobile-assignment-service.php' );
 	atora_lms_require_module( 'includes/mobile/class-mobile-rest-controller.php' );
 	if ( class_exists( 'ATORA_Mobile_REST_Controller' ) ) {
 		add_action( 'rest_api_init', array( 'ATORA_Mobile_REST_Controller', 'register_routes' ) );
+	}
+	// 6.27.0: limpieza de subidas móviles vencidas (fragmentos parciales).
+	if ( class_exists( 'ATORA_Mobile_Assignment_Service' ) ) {
+		add_action( ATORA_Mobile_Assignment_Service::CLEANUP_HOOK, static function () {
+			ATORA_Mobile_Assignment_Service::instance()->cleanup_expired();
+		} );
+		if ( ! wp_next_scheduled( ATORA_Mobile_Assignment_Service::CLEANUP_HOOK ) ) {
+			wp_schedule_event( time() + HOUR_IN_SECONDS, 'hourly', ATORA_Mobile_Assignment_Service::CLEANUP_HOOK );
+		}
 	}
 	// Sincronizar CPT con tablas propias al publicar/actualizar
 	add_action( 'save_post_lm_course', function( int $post_id ) {
@@ -1404,6 +1415,7 @@ register_activation_hook( ATORA_LMS_FILE, 'atora_lms_activate' );
  */
 function atora_lms_deactivate(): void {
 	flush_rewrite_rules( false );
+	wp_clear_scheduled_hook( 'atora_mobile_upload_cleanup' );
 }
 
 register_deactivation_hook( ATORA_LMS_FILE, 'atora_lms_deactivate' );

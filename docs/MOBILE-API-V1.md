@@ -26,7 +26,18 @@ Namespace: `/wp-json/atora-mobile/v1`
 | GET | `/dashboard` | Bearer | Resumen y cursos del estudiante |
 | GET | `/courses` | Bearer | Matrículas del estudiante |
 | GET | `/courses/{id}` | Bearer + matrícula | Curso, progreso y currículo |
+| GET | `/programs` | Bearer | Programas del estudiante |
+| GET | `/programs/{id}` | Bearer + matrícula | Programa y sus cursos |
+| GET | `/lessons/{id}` | Bearer + matrícula | Contenido de la lección (`quiz_available`, `assignment_available`) |
+| GET, POST | `/lessons/{id}/quiz` | Bearer + matrícula | Consultar y responder la evaluación |
 | POST | `/lessons/{id}/complete` | Bearer + matrícula | Completar lección |
+| GET | `/assignments/{lesson_id}` | Bearer + matrícula | Consigna, límites y entregas propias (6.27.0) |
+| POST | `/assignments/{lesson_id}/submissions` | Bearer + matrícula | Crear intento de entrega (6.27.0) |
+| POST | `/uploads/sessions` | Bearer + matrícula | Iniciar subida reanudable (6.27.0) |
+| PUT | `/uploads/{upload_token}` | Bearer, dueño del token | Subir fragmento con `Content-Range` (6.27.0) |
+| POST | `/uploads/{upload_token}/complete` | Bearer, dueño del token | Cerrar subida y validar tipo real (6.27.0) |
+
+Entregas: contrato completo en `docs/CONTRATO-ENTREGAS-MOVIL.md`; reglas de sincronización en `docs/SINCRONIZACION-OFFLINE.md`. `GET /discovery` declara `capabilities.assignments: true` desde 6.27.0.
 
 ## Login
 
