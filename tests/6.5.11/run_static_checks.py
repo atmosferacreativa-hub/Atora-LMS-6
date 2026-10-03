@@ -179,7 +179,12 @@ def check_rewrite_flush_lifecycle():
         log_fail('07-rewrite-flush-lifecycle', f"flush_rewrite_rules() call(s) at line(s) {classified['unclassified']} could not be classified as activation/deactivation/versioned-migration — verify manually, this may be an unconditional runtime flush")
         return
 
-    if classified['activation'] < 1 or classified['deactivation'] < 1:
+    # 6.26.74: activation may defer the flush to the versioned migration
+    # (deleting atora_lms_rewrite_version) instead of flushing before CPTs
+    # are registered.
+    bootstrap_text = '\n'.join(lines)
+    activation_defers = re.search(r"function atora_lms_activate\(.*?delete_option\(\s*'atora_lms_rewrite_version'\s*\)", bootstrap_text, re.S) is not None
+    if ( classified['activation'] < 1 and not activation_defers ) or classified['deactivation'] < 1:
         log_fail('07-rewrite-flush-lifecycle', f"expected at least one activation and one deactivation flush, found: {classified}")
         return
 

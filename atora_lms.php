@@ -3,7 +3,7 @@
  * Plugin Name:       ATORA LMS
  * Plugin URI:        https://atora.studio
  * Description:       LMS modular para WordPress con IA, evaluaciones, certificados, CRM, mensajería multi-canal, afiliados, live streaming y más. Autor: Atora Studio.
- * Version:           6.26.73
+ * Version:           6.26.74
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Atora Studio
@@ -52,7 +52,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * - Limpieza automática de notificaciones >90 días
  */
 	if ( ! defined( 'ATORA_LMS_VERSION' ) ) {
-		define( 'ATORA_LMS_VERSION', '6.26.73' );
+		define( 'ATORA_LMS_VERSION', '6.26.74' );
 	}
 
 if ( ! defined( 'ATORA_LMS_FILE' ) ) {
@@ -187,7 +187,7 @@ add_filter( 'cron_schedules', static function ( array $schedules ): array {
 // una llamada directa a flush_rewrite_rules() por código nunca
 // dispara. Subir la versión acá fuerza un flush más, ahora
 // acompañado de una purga explícita de caché de página (ver abajo).
-define( 'ATORA_LMS_REWRITE_VERSION', '6.26.72' );
+define( 'ATORA_LMS_REWRITE_VERSION', '6.26.74' );
 
 add_action( 'wp_loaded', static function () {
 	$stored = (string) get_option( 'atora_lms_rewrite_version', '' );
@@ -1386,15 +1386,15 @@ function atora_lms_activate(): void {
 		error_log( '[ATORA LMS] Activación completada con módulos faltantes: ' . implode( ', ', array_unique( $GLOBALS['atora_lms_missing_modules'] ) ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
 	}
 
-	flush_rewrite_rules( false );
 	update_option( 'atora_lms_activated', current_time( 'mysql' ) );
-	// PT-3 (6.5.11): la activación ya hizo su propio flush arriba —
-	// marcar la versión de reescritura acá para que el chequeo de
-	// 'wp_loaded' no repita un segundo flush innecesario en el
-	// siguiente request tras una activación fresca.
-	if ( defined( 'ATORA_LMS_REWRITE_VERSION' ) ) {
-		update_option( 'atora_lms_rewrite_version', ATORA_LMS_REWRITE_VERSION, false );
-	}
+	// 6.26.74: NO hacer flush acá. La activación corre después de 'init',
+	// así que los CPT (hookeados a 'init') no están registrados y el flush
+	// guardaba reglas sin /cursos/ ni /programas/ → 404 tras subir un ZIP
+	// (WordPress reactiva el plugin). Además marcaba la versión como
+	// aplicada, así que nada lo corregía. Borrar la versión hace que el
+	// chequeo de 'wp_loaded' del siguiente request haga el flush con todo
+	// registrado.
+	delete_option( 'atora_lms_rewrite_version' );
 }
 
 register_activation_hook( ATORA_LMS_FILE, 'atora_lms_activate' );
