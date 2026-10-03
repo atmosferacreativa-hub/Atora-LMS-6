@@ -72,7 +72,7 @@ and confirming the file list contains no `modules/security/`,
 authentication file, plus a targeted grep for
 `permission_callback|current_user_can|check_ajax_referer|check_admin_referer|wp_verify_nonce`
 across the added/removed diff lines (zero matches). See
-`RUNTIME-REPORT-6.5.11.md` for the full accounting.
+`docs/reportes/RUNTIME-REPORT-6.5.11.md` for the full accounting.
 
 ## 14 — upgrade 6.5.10 → 6.5.11
 
@@ -81,4 +81,4 @@ existing 6.5.10 database (including its own `atora_v5_schema_version`/
 `atora_crm_v2_schema_version` state from the 6.5.10 sprint) and a
 populated `rewrite_rules` option to actually demonstrate stale-cache
 recovery. Manually traced instead — see
-`RUNTIME-REPORT-6.5.11.md` section 14.
+`docs/reportes/RUNTIME-REPORT-6.5.11.md` section 14.
