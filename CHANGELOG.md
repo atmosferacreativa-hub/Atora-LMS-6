@@ -1,5 +1,12 @@
 # CHANGELOG — ATORA LMS
 
+## 6.26.75 (2026-10-03)
+
+### Login frontend (cierre)
+
+- **FIX — enlaces de login restantes**: `single-course-commercial`, `partials/course/section-hero`, `section-hero--centered`, `section-cta`, `single-program` (CTA móvil), `single-lesson` y matrícula por enlace libre usan `CLMS_Frontend_URLs::login_url()`. 6.26.73 había dejado estos fuera.
+- **TESTS**: `TemplatesLoginLinksTest` falla si una plantilla vuelve a llamar `wp_login_url()` directamente.
+
 ## 6.26.74 (2026-10-03)
 
 ### Hotfix — 404 de cursos tras subir el ZIP

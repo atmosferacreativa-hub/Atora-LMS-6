@@ -42,7 +42,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 				<?php echo esc_html( $cta_label ); ?>
 			</a>
 		<?php elseif ( ! is_user_logged_in() ) : ?>
-			<a class="cc-btn-primary cc-btn-centered" href="<?php echo esc_url( wp_login_url( $course_permalink ) ); ?>">
+			<a class="cc-btn-primary cc-btn-centered" href="<?php echo esc_url( CLMS_Frontend_URLs::login_url( $course_permalink ) ); ?>">
 				<?php esc_html_e( 'Iniciar sesión', 'atora-lms' ); ?>
 			</a>
 		<?php endif; ?>
