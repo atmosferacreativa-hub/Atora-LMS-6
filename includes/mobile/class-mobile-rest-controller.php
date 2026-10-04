@@ -337,7 +337,7 @@ final class ATORA_Mobile_REST_Controller {
 		}
 		$lessons   = \ATORA\LMS\LMS_Course_Service::get_lessons( $course_id );
 		$completed = self::completed_lesson_ids( $user_id, $course_id );
-		$cover     = esc_url_raw( (string) ( $course['thumbnail_url'] ?? '' ) );
+		$cover     = self::course_cover( $course );
 		foreach ( $lessons as &$lesson ) {
 			$lesson['completed'] = in_array( (int) $lesson['id'], $completed, true );
 			$wp_lesson_id        = absint( $lesson['wp_post_id'] ?? 0 );
@@ -449,7 +449,7 @@ final class ATORA_Mobile_REST_Controller {
 		return ATORA_Video_Thumbnail_Resolver::resolve(
 			$wp_post_id,
 			$video_url,
-			esc_url_raw( (string) ( is_array( $course ) ? ( $course['thumbnail_url'] ?? '' ) : '' ) ),
+			is_array( $course ) ? self::course_cover( $course ) : '',
 			absint( is_array( $course ) ? ( $course['wp_post_id'] ?? 0 ) : 0 )
 		);
 	}
@@ -1486,13 +1486,20 @@ final class ATORA_Mobile_REST_Controller {
 		return \ATORA\LMS\LMS_Course_Service::legacy_wp_course_post_is_public( $wp_course_id );
 	}
 
+	/** 6.27.3: imagen destacada en vivo; la columna de la tabla solo como respaldo. */
+	private static function course_cover( array $course ): string {
+		return class_exists( 'ATORA_Course_Cover_Resolver' )
+			? ATORA_Course_Cover_Resolver::resolve( $course )
+			: esc_url_raw( (string) ( $course['thumbnail_url'] ?? '' ) );
+	}
+
 	private static function safe_course( array $course ): array {
 		return array(
 			'id'             => absint( $course['id'] ?? 0 ),
 			'revision'       => absint( $course['revision'] ?? 1 ),
 			'title'          => sanitize_text_field( (string) ( $course['title'] ?? '' ) ),
 			'excerpt'        => sanitize_textarea_field( (string) ( $course['excerpt'] ?? '' ) ),
-			'thumbnail_url'  => esc_url_raw( (string) ( $course['thumbnail_url'] ?? '' ) ),
+			'thumbnail_url'  => self::course_cover( $course ),
 			'duration_hours' => (float) ( $course['duration_hours'] ?? 0 ),
 			'level'          => sanitize_key( (string) ( $course['level'] ?? '' ) ),
 			'language'       => sanitize_key( (string) ( $course['language'] ?? 'es' ) ),

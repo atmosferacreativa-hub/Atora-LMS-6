@@ -7,7 +7,7 @@
  * 2. YouTube: imagen pública por identificador del video;
  * 3. Vimeo: miniatura obtenida una vez (en segundo plano) y guardada en caché;
  * 4. imagen destacada de la lección;
- * 5. portada del curso.
+ * 5. portada del curso (ATORA_Course_Cover_Resolver, 6.27.3).
  *
  * Google Drive y MP4 directo no tienen miniatura fiable desde el servidor: caen a 4 y 5.
  * Nunca hay llamadas externas durante la petición.
@@ -56,8 +56,8 @@ final class ATORA_Video_Thumbnail_Resolver {
 		if ( '' !== $course_cover_url ) {
 			return esc_url_raw( $course_cover_url );
 		}
-		if ( $wp_course_id > 0 ) {
-			return esc_url_raw( (string) get_the_post_thumbnail_url( $wp_course_id, 'large' ) );
+		if ( $wp_course_id > 0 && class_exists( 'ATORA_Course_Cover_Resolver' ) ) {
+			return ATORA_Course_Cover_Resolver::for_wp_post( $wp_course_id );
 		}
 		return '';
 	}
