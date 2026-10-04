@@ -23,6 +23,8 @@ class LMS_Editor_Sync {
 	const DELETED       = 'deleted';
 	const REPAIR_OPTION = 'atora_lms_editor_sync_repaired';
 	const REPAIR_HOOK   = 'atora_lms_editor_sync_repair';
+	/** Versión del recorrido: si la guardada es menor, se repite una vez (6.28.0 suma la huella). */
+	const REPAIR_VERSION = '6.28.0';
 
 	/** Estados de post que el recorrido de reparación revisa. */
 	const POST_STATUSES = array( 'publish', 'draft', 'pending', 'private', 'future', 'trash' );
@@ -30,7 +32,7 @@ class LMS_Editor_Sync {
 	/** Columnas de curso que sigue el editor (instructor, precio, etc. quedan fuera: los gestiona su propio flujo). */
 	const COURSE_FIELDS = array( 'title', 'slug', 'description', 'excerpt', 'status', 'thumbnail_url', 'published_at' );
 
-	const LESSON_FIELDS = array( 'course_id', 'title', 'slug', 'content', 'lesson_order', 'section', 'section_order', 'type', 'duration_min', 'is_free_preview', 'video_url', 'status' );
+	const LESSON_FIELDS = array( 'course_id', 'title', 'slug', 'content', 'lesson_order', 'section', 'section_order', 'type', 'duration_min', 'is_free_preview', 'video_url', 'status', 'content_hash' );
 
 	public static function init(): void {
 		// Prioridad tardía: wp_after_insert_post corre después de save_post (metaboxes).
@@ -77,8 +79,12 @@ class LMS_Editor_Sync {
 			if ( ! in_array( $post->post_status, array( 'publish', 'draft', 'private' ), true ) ) {
 				return 'skipped';
 			}
-			if ( $write && ! LMS_Migrator::migrate_course_post( $post ) ) {
-				return 'skipped';
+			if ( $write ) {
+				$id = LMS_Migrator::migrate_course_post( $post );
+				if ( ! $id ) {
+					return 'skipped';
+				}
+				do_action( 'atora/lms/content_revised', 'course', $id, 1 );
 			}
 			return 'inserted';
 		}
@@ -127,19 +133,28 @@ class LMS_Editor_Sync {
 				return 'skipped';
 			}
 			$order = absint( $post->menu_order ) ?: self::next_lesson_order( $atora_course_id );
-			if ( $write && ! LMS_Course_Service::upsert_lesson( LMS_Migrator::lesson_row_from_post( $post, $atora_course_id, $order ) ) ) {
-				return 'skipped';
+			if ( $write ) {
+				$id = LMS_Course_Service::upsert_lesson( LMS_Migrator::lesson_row_from_post( $post, $atora_course_id, $order ) );
+				if ( ! $id ) {
+					return 'skipped';
+				}
+				do_action( 'atora/lms/content_revised', 'lesson', $id, 1 );
 			}
 			return 'inserted';
 		}
 
 		// Sin orden en el editor (menu_order = 0) se conserva el de la tabla.
 		$order   = absint( $post->menu_order ) ?: absint( $row['lesson_order'] );
-		$changes = self::changes(
-			LMS_Course_Service::normalize_lesson_fields( LMS_Migrator::lesson_row_from_post( $post, $atora_course_id, $order ) ),
-			$row,
-			self::LESSON_FIELDS
-		);
+		$desired = LMS_Course_Service::normalize_lesson_fields( LMS_Migrator::lesson_row_from_post( $post, $atora_course_id, $order ) );
+		if ( isset( $desired['content_hash'] ) && '' === (string) ( $row['content_hash'] ?? '' ) ) {
+			// Fila anterior a 6.28.0: la huella se rellena sin contarla como cambio.
+			if ( $write ) {
+				global $wpdb;
+				$wpdb->update( $wpdb->prefix . 'atora_lessons', array( 'content_hash' => $desired['content_hash'] ), array( 'id' => absint( $row['id'] ) ), array( '%s' ), array( '%d' ) );
+			}
+			unset( $desired['content_hash'] );
+		}
+		$changes = self::changes( $desired, $row, self::LESSON_FIELDS );
 		if ( empty( $changes ) ) {
 			return 'unchanged';
 		}
@@ -159,6 +174,7 @@ class LMS_Editor_Sync {
 	public static function repair_all( bool $write = true ): array {
 		global $wpdb;
 		$result = array(
+			'hashes_filled'    => self::backfill_content_hash( $write ),
 			'courses_inserted' => 0,
 			'courses_updated'  => 0,
 			'lessons_inserted' => 0,
@@ -208,18 +224,23 @@ class LMS_Editor_Sync {
 
 	/** Una sola vez tras actualizar: se programa en segundo plano para no cargar la petición. */
 	public static function maybe_schedule_repair(): void {
-		if ( get_option( self::REPAIR_OPTION ) || wp_next_scheduled( self::REPAIR_HOOK ) ) {
+		if ( self::repair_done() || wp_next_scheduled( self::REPAIR_HOOK ) ) {
 			return;
 		}
 		wp_schedule_single_event( time() + 30, self::REPAIR_HOOK );
 	}
 
+	private static function repair_done(): bool {
+		$done = get_option( self::REPAIR_OPTION );
+		return is_array( $done ) && version_compare( (string) ( $done['repair_version'] ?? '6.27.4' ), self::REPAIR_VERSION, '>=' );
+	}
+
 	public static function run_scheduled_repair(): void {
-		if ( get_option( self::REPAIR_OPTION ) ) {
+		if ( self::repair_done() ) {
 			return;
 		}
 		$result = self::repair_all();
-		update_option( self::REPAIR_OPTION, array( 'version' => defined( 'ATORA_LMS_VERSION' ) ? ATORA_LMS_VERSION : '' ) + $result, false );
+		update_option( self::REPAIR_OPTION, array( 'version' => defined( 'ATORA_LMS_VERSION' ) ? ATORA_LMS_VERSION : '', 'repair_version' => self::REPAIR_VERSION ) + $result, false );
 	}
 
 	// ── Auxiliares ───────────────────────────────────────────────────────────
@@ -266,7 +287,7 @@ class LMS_Editor_Sync {
 
 	private static function mark_deleted( string $table, int $wp_post_id ): void {
 		global $wpdb;
-		$wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$changed = $wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$wpdb->prepare(
 				"UPDATE {$wpdb->prefix}{$table} SET status = %s, revision = revision + 1 WHERE wp_post_id = %d AND status <> %s",
 				self::DELETED,
@@ -274,5 +295,38 @@ class LMS_Editor_Sync {
 				self::DELETED
 			)
 		);
+		if ( $changed ) {
+			$row = $wpdb->get_row( $wpdb->prepare( "SELECT id, revision FROM {$wpdb->prefix}{$table} WHERE wp_post_id = %d", $wp_post_id ), ARRAY_A );
+			if ( $row ) {
+				do_action( 'atora/lms/content_revised', 'atora_courses' === $table ? 'course' : 'lesson', absint( $row['id'] ), absint( $row['revision'] ) );
+			}
+		}
+	}
+
+	/**
+	 * 6.28.0: rellena la huella de las filas que aún no la tienen, sin subir
+	 * `revision` ni registrar cambios (antes de 6.28.0 no había con qué comparar).
+	 */
+	public static function backfill_content_hash( bool $write = true ): int {
+		global $wpdb;
+		if ( ! LMS_Course_Service::lessons_have_content_hash() ) {
+			return 0;
+		}
+		$rows = (array) $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			"SELECT id, wp_post_id FROM {$wpdb->prefix}atora_lessons WHERE content_hash = '' AND wp_post_id > 0",
+			ARRAY_A
+		);
+		$filled = 0;
+		foreach ( $rows as $row ) {
+			$post = get_post( absint( $row['wp_post_id'] ) );
+			if ( ! $post ) {
+				continue;
+			}
+			if ( $write ) {
+				$wpdb->update( $wpdb->prefix . 'atora_lessons', array( 'content_hash' => LMS_Migrator::lesson_content_hash( $post ) ), array( 'id' => absint( $row['id'] ) ), array( '%s' ), array( '%d' ) );
+			}
+			++$filled;
+		}
+		return $filled;
 	}
 }

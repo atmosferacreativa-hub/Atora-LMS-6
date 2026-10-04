@@ -224,6 +224,8 @@ class LMS_Course_Service {
 		if ( 1 !== $result ) {
 			return new \WP_Error( 'atora_course_concurrent_update', __( 'No se pudo actualizar porque el curso cambió durante la operación.', 'atora-lms' ), array( 'status' => 409 ) );
 		}
+		/** 6.28.0: única señal de cambio de contenido (la escucha el registro de cambios). */
+		do_action( 'atora/lms/content_revised', 'course', $course_id, $row['revision'] );
 		return true;
 	}
 
@@ -272,6 +274,7 @@ class LMS_Course_Service {
 		if ( 1 !== $result ) {
 			return new \WP_Error( 'atora_lesson_concurrent_update', __( 'No se pudo actualizar porque la lección cambió durante la operación.', 'atora-lms' ), array( 'status' => 409 ) );
 		}
+		do_action( 'atora/lms/content_revised', 'lesson', $lesson_id, $row['revision'] );
 		return true;
 	}
 
@@ -539,6 +542,17 @@ class LMS_Course_Service {
 			'is_required'     => isset( $d['is_required'] )    ? (int) (bool) $d['is_required']                   : null,
 			'video_url'       => isset( $d['video_url'] )      ? esc_url_raw( (string) $d['video_url'] )          : null,
 			'status'          => isset( $d['status'] )         ? sanitize_key( (string) $d['status'] )            : null,
+			'content_hash'    => isset( $d['content_hash'] ) && self::lessons_have_content_hash() ? preg_replace( '/[^a-f0-9]/', '', (string) $d['content_hash'] ) : null,
 		), fn( $v ) => $v !== null );
+	}
+
+	/** 6.28.0: la columna llega con el esquema 6.28.0-sync-schema; antes de migrar no se escribe. */
+	public static function lessons_have_content_hash(): bool {
+		static $has = null;
+		if ( null === $has ) {
+			global $wpdb;
+			$has = (bool) $wpdb->get_var( "SHOW COLUMNS FROM {$wpdb->prefix}atora_lessons LIKE 'content_hash'" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		}
+		return $has;
 	}
 }

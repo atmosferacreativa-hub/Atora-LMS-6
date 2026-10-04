@@ -305,7 +305,39 @@ class LMS_Migrator {
 			'is_free_preview' => (bool) get_post_meta( $lesson_id, '_clms_free_preview', true ),
 			'video_url'       => $video,
 			'status'          => 'publish' === $post->post_status ? 'published' : 'draft',
+			'content_hash'    => self::lesson_content_hash( $post ),
 		);
+	}
+
+	/**
+	 * 6.28.0: huella de lo que la API móvil sirve de la lección y no vive en
+	 * otras columnas de la tabla: texto, recursos (y la fecha de cada adjunto),
+	 * videos, consignas, fechas y tipo de actividad.
+	 */
+	public static function lesson_content_hash( object $post ): string {
+		$lesson_id = absint( $post->ID );
+		$parts     = array( (string) $post->post_content );
+		foreach ( array(
+			'_clms_lesson_resources', '_clms_lesson_extra_videos', '_clms_lesson_video_url', '_clms_video_url',
+			'_clms_quiz_enabled', 'lm_activity_type', '_clms_activity_mode', '_clms_evaluation_mode',
+			'lm_task_title', 'lm_task_description', '_clms_task_instructions',
+			'lm_due_date', 'lm_due_time', '_clms_due_date', '_clms_due_time', '_thumbnail_id',
+		) as $key ) {
+			$parts[ $key ] = get_post_meta( $lesson_id, $key, true );
+		}
+		$resources = $parts['_clms_lesson_resources'];
+		if ( is_string( $resources ) ) {
+			$decoded   = json_decode( $resources, true );
+			$resources = is_array( $decoded ) ? $decoded : array();
+		}
+		foreach ( (array) $resources as $resource ) {
+			$file_id = is_array( $resource ) ? absint( $resource['file_id'] ?? 0 ) : 0;
+			if ( $file_id > 0 ) {
+				// Reemplazar el archivo de un adjunto cambia su fecha aunque el recurso sea el mismo.
+				$parts[ 'file_' . $file_id ] = (string) get_post_field( 'post_modified_gmt', $file_id );
+			}
+		}
+		return md5( (string) wp_json_encode( $parts ) );
 	}
 
 	/**

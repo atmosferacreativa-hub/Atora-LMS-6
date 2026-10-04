@@ -3,7 +3,7 @@
  * Plugin Name:       ATORA LMS
  * Plugin URI:        https://atora.studio
  * Description:       LMS modular para WordPress con IA, evaluaciones, certificados, CRM, mensajería multi-canal, afiliados, live streaming y más. Autor: Atora Studio.
- * Version:           6.27.4
+ * Version:           6.28.0
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Atora Studio
@@ -52,7 +52,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * - Limpieza automática de notificaciones >90 días
  */
 	if ( ! defined( 'ATORA_LMS_VERSION' ) ) {
-		define( 'ATORA_LMS_VERSION', '6.27.4' );
+		define( 'ATORA_LMS_VERSION', '6.28.0' );
 	}
 
 if ( ! defined( 'ATORA_LMS_FILE' ) ) {
@@ -1240,6 +1240,7 @@ add_action( 'init', static function () {
 		'class-lms-enrollment-service.php',
 		'class-lms-migrator.php',
 		'class-lms-editor-sync.php',
+		'class-lms-content-changes.php',
 		'class-lms-rest-controller.php',
 	) as $lms_file ) {
 		atora_lms_require_module( 'modules/lms/' . $lms_file );
@@ -1247,6 +1248,10 @@ add_action( 'init', static function () {
 	// 6.27.4: el editor de WordPress mantiene al día atora_courses / atora_lessons.
 	if ( class_exists( 'ATORA\\LMS\\LMS_Editor_Sync' ) ) {
 		ATORA\LMS\LMS_Editor_Sync::init();
+	}
+	// 6.28.0: registro de cambios para la sincronización móvil.
+	if ( class_exists( 'ATORA\\LMS\\LMS_Content_Changes' ) ) {
+		ATORA\LMS\LMS_Content_Changes::init();
 	}
 	add_action( 'rest_api_init', array( 'ATORA\\LMS\\LMS_REST_Controller', 'register_routes' ) );
 
@@ -1260,6 +1265,8 @@ add_action( 'init', static function () {
 	if ( class_exists( 'ATORA_Video_Thumbnail_Resolver' ) ) {
 		add_action( ATORA_Video_Thumbnail_Resolver::VIMEO_FETCH_HOOK, array( 'ATORA_Video_Thumbnail_Resolver', 'fetch_vimeo_thumbnail' ) );
 	}
+	atora_lms_require_module( 'includes/media/class-download-info.php' );
+	atora_lms_require_module( 'includes/mobile/class-mobile-position-service.php' );
 	atora_lms_require_module( 'includes/mobile/class-mobile-assignment-store.php' );
 	atora_lms_require_module( 'includes/mobile/class-mobile-assignment-service.php' );
 	atora_lms_require_module( 'includes/mobile/class-mobile-rest-controller.php' );

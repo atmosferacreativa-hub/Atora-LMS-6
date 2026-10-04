@@ -114,6 +114,17 @@ final class ATORA_Mobile_REST_Controller {
 			'permission_callback' => array( __CLASS__, 'authorize' ),
 			'args'                => array( 'lesson_id' => array( 'sanitize_callback' => 'absint' ) ),
 		) );
+		// 6.28.0: sincronización incremental y posición de reproducción.
+		register_rest_route( self::REST_NAMESPACE, '/sync/changes', array(
+			'methods'             => WP_REST_Server::READABLE,
+			'callback'            => array( __CLASS__, 'sync_changes' ),
+			'permission_callback' => array( __CLASS__, 'authorize' ),
+		) );
+		register_rest_route( self::REST_NAMESPACE, '/lessons/(?P<lesson_id>\d+)/position', array(
+			'methods'             => 'PUT',
+			'callback'            => array( __CLASS__, 'save_position' ),
+			'permission_callback' => array( __CLASS__, 'authorize' ),
+		) );
 		register_rest_route( self::REST_NAMESPACE, '/uploads/sessions', array(
 			'methods'             => WP_REST_Server::CREATABLE,
 			'callback'            => array( __CLASS__, 'create_upload_session' ),
@@ -175,8 +186,13 @@ final class ATORA_Mobile_REST_Controller {
 			'authentication'   => 'opaque_bearer',
 			'access_ttl'       => ATORA_Mobile_Token_Service::ACCESS_TTL,
 			'refresh_ttl'      => ATORA_Mobile_Token_Service::REFRESH_TTL,
-			'features'         => array( 'profile', 'dashboard', 'courses', 'progress', 'lesson_completion', 'quizzes', 'assignments' ),
-			'capabilities'     => array( 'assignments' => true ),
+			'features'         => array( 'profile', 'dashboard', 'courses', 'progress', 'lesson_completion', 'quizzes', 'assignments', 'sync_changes', 'playback_position', 'resource_downloads' ),
+			'capabilities'     => array(
+				'assignments'        => true,
+				'sync_changes'       => class_exists( '\\ATORA\\LMS\\LMS_Content_Changes' ),
+				'playback_position'  => class_exists( 'ATORA_Mobile_Position_Service' ),
+				'resource_downloads' => class_exists( 'ATORA_Download_Info' ),
+			),
 		), 200 );
 	}
 
@@ -374,6 +390,9 @@ final class ATORA_Mobile_REST_Controller {
 		$video_url    = self::resolve_lesson_video_url( $lesson, $wp_post_id );
 
 		$video_embed = self::google_drive_embed_url( $video_url, $raw_content );
+		$video_download = '' === $video_embed && class_exists( 'ATORA_Download_Info' )
+			? ATORA_Download_Info::for_video( $video_url )
+			: array( 'video_downloadable' => false, 'video_bytes' => null );
 		$resources   = $wp_post_id ? self::normalize_lesson_resources( $wp_post_id ) : array();
 		$quiz_available = ( $wp_post_id && '1' === (string) get_post_meta( $wp_post_id, '_clms_quiz_enabled', true ) )
 			|| self::has_table_quiz( $lesson_id );
@@ -390,6 +409,10 @@ final class ATORA_Mobile_REST_Controller {
 				'video_embed_url' => $video_embed,
 				'video_thumbnail_url' => self::video_thumbnail( $wp_post_id, $video_url, $course_id ),
 				'video_provider'  => '' !== $video_embed ? 'google_drive' : ( '' !== $video_url ? 'direct' : '' ),
+				// 6.28.0: solo MP4 directo de la academia se puede descargar.
+				'video_downloadable' => (bool) $video_download['video_downloadable'],
+				'video_bytes'        => $video_download['video_bytes'],
+				'resume_position_seconds' => class_exists( 'ATORA_Mobile_Position_Service' ) ? ATORA_Mobile_Position_Service::resume_seconds( $user_id, $lesson_id ) : 0,
 				'content_html'    => $content_html,
 				'content_text' => sanitize_textarea_field( wp_strip_all_tags( $content_html ) ),
 				'completed'    => in_array( $lesson_id, self::completed_lesson_ids( $user_id, $course_id ), true ),
@@ -1158,6 +1181,56 @@ final class ATORA_Mobile_REST_Controller {
 		}
 	}
 
+	/** 6.28.0: cambios desde el cursor, solo de los cursos matriculados del usuario. */
+	public static function sync_changes( WP_REST_Request $request ) {
+		if ( ! class_exists( '\\ATORA\\LMS\\LMS_Content_Changes' ) ) {
+			return new WP_Error( 'atora_mobile_sync_unavailable', __( 'La sincronización no está disponible.', 'atora-lms' ), array( 'status' => 503 ) );
+		}
+		$user_id = get_current_user_id();
+		$courses = array();
+		foreach ( self::enrollment_index( $user_id ) as $row ) {
+			$course_id = absint( $row['course_id'] ?? 0 );
+			$course    = $course_id ? \ATORA\LMS\LMS_Course_Service::get( $course_id ) : null;
+			if ( $course && self::course_is_student_visible( $course ) ) {
+				$courses[] = $course_id;
+			}
+		}
+		$courses = array_values( array_unique( $courses ) );
+		$result  = \ATORA\LMS\LMS_Content_Changes::for_user( $user_id, $courses, sanitize_text_field( (string) $request->get_param( 'cursor' ) ) );
+		// Matrículas vigentes: cubre también caducidades y matrículas legacy, que no generan evento.
+		$result['enrolled_course_ids'] = $courses;
+		return new WP_REST_Response( $result, 200 );
+	}
+
+	/** 6.28.0: posición de reproducción; gana la marca más reciente según client_recorded_at. */
+	public static function save_position( WP_REST_Request $request ) {
+		$user_id   = get_current_user_id();
+		$lesson_id = absint( $request['lesson_id'] );
+		$lesson    = \ATORA\LMS\LMS_Course_Service::get_lesson( $lesson_id );
+		$not_found = new WP_Error( 'atora_mobile_lesson_not_found', __( 'Lección no encontrada.', 'atora-lms' ), array( 'status' => 404 ) );
+		if ( ! $lesson || 'published' !== (string) ( $lesson['status'] ?? '' ) ) {
+			return $not_found;
+		}
+		$course_id = absint( $lesson['course_id'] );
+		// Sin matrícula, la lección no existe para este usuario.
+		if ( is_wp_error( self::authorize_course_id( $user_id, $course_id ) ) ) {
+			return $not_found;
+		}
+
+		$event_id = (string) $request->get_param( 'client_event_id' );
+		$recorded = ATORA_Mobile_Position_Service::parse_recorded_at( (string) $request->get_param( 'client_recorded_at' ) );
+		$position = $request->get_param( 'position_seconds' );
+		$duration = $request->get_param( 'duration_seconds' );
+		if ( ! preg_match( '/^[A-Za-z0-9_-]{8,64}$/', $event_id ) || null === $recorded
+			|| ! is_numeric( $position ) || (float) $position < 0
+			|| ( null !== $duration && ( ! is_numeric( $duration ) || (float) $duration < 0 ) ) ) {
+			return new WP_Error( 'atora_mobile_position_invalid', __( 'Posición no válida.', 'atora-lms' ), array( 'status' => 400 ) );
+		}
+
+		$result = ATORA_Mobile_Position_Service::save( $user_id, $lesson_id, $course_id, (int) floor( (float) $position ), (int) floor( (float) $duration ), $event_id, $recorded );
+		return new WP_REST_Response( $result, 200 );
+	}
+
 	public static function complete_lesson( WP_REST_Request $request ) {
 		$user_id  = get_current_user_id();
 		$lesson_id = absint( $request['lesson_id'] );
@@ -1316,6 +1389,10 @@ final class ATORA_Mobile_REST_Controller {
 				$final_type = $file_id > 0 ? 'file' : 'link';
 			}
 
+			$download = class_exists( 'ATORA_Download_Info' )
+				? ATORA_Download_Info::for_resource( $file_id, $resolved_url )
+				: array( 'downloadable' => false, 'bytes' => null, 'updated_at' => null );
+
 			$items[] = array(
 				'type'         => $final_type,
 				'title'        => $title ?: ( $file_id > 0 ? __( 'Archivo', 'atora-lms' ) : __( 'Enlace', 'atora-lms' ) ),
@@ -1325,6 +1402,10 @@ final class ATORA_Mobile_REST_Controller {
 				'file_id'      => $file_id,
 				'mime'         => $mime,
 				'thumb_url'    => $thumb_url,
+				// 6.28.0: descargable solo si es de la propia academia; tamaño y fecha del adjunto.
+				'downloadable' => (bool) $download['downloadable'],
+				'bytes'        => $download['bytes'],
+				'updated_at'   => $download['updated_at'],
 			);
 		}
 

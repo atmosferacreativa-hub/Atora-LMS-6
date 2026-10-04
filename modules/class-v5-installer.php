@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class V5_Installer {
 
 	/** Versión del esquema. Incrementar para forzar re-instalación. */
-	const SCHEMA_VERSION = '6.26.5-rubrics-schema';
+	const SCHEMA_VERSION = '6.28.0-sync-schema';
 
 	/** Option key que almacena la versión instalada. */
 	const OPTION_KEY = 'atora_v5_schema_version';
@@ -54,6 +54,7 @@ class V5_Installer {
 			&& self::migrate_followup_plan_domain_columns()
 			&& self::migrate_6265_offline_schema()
 			&& self::migrate_6265_content_revisions()
+			&& self::migrate_6280_lesson_content_hash()
 			&& self::migrate_6131_schema_fixes() ) {
 			update_option( self::OPTION_KEY, self::SCHEMA_VERSION );
 		}
@@ -81,6 +82,7 @@ class V5_Installer {
 			&& self::migrate_followup_plan_domain_columns()
 			&& self::migrate_6265_offline_schema()
 			&& self::migrate_6265_content_revisions()
+			&& self::migrate_6280_lesson_content_hash()
 			&& self::migrate_6131_schema_fixes() ) {
 			update_option( self::OPTION_KEY, self::SCHEMA_VERSION );
 		}
@@ -451,6 +453,30 @@ class V5_Installer {
 			$wpdb->query( "ALTER TABLE {$lessons} ADD COLUMN revision INT UNSIGNED NOT NULL DEFAULT 1 AFTER content" );
 		}
 
+		return true;
+	}
+
+	/**
+	 * 6.28.0: huella del contenido que sirve la API móvil (texto, recursos,
+	 * videos, consignas, fechas) para detectar cambios que no tocan otras columnas.
+	 */
+	private static function migrate_6280_lesson_content_hash(): bool {
+		global $wpdb;
+		$lessons = $wpdb->prefix . 'atora_lessons';
+		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $lessons ) ) ) !== $lessons ) {
+			return true;
+		}
+		$has = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+				 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND COLUMN_NAME = 'content_hash'",
+				$lessons
+			)
+		) > 0;
+		if ( ! $has ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$wpdb->query( "ALTER TABLE {$lessons} ADD COLUMN content_hash CHAR(32) NOT NULL DEFAULT '' AFTER revision" );
+		}
 		return true;
 	}
 
@@ -2144,6 +2170,40 @@ class V5_Installer {
 			UNIQUE KEY upload_token (upload_token),
 			KEY user_status         (user_id, status),
 			KEY submission_id       (submission_id)
+		) $charset_collate;" );
+
+		// ── Sincronización móvil (6.28.0) ───────────────────────────────────
+		// Registro de cambios: marca qué objeto cambió; el estado se lee al responder.
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_content_changes (
+			id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			institution_id  BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			object_type     VARCHAR(20)     NOT NULL,
+			object_id       BIGINT UNSIGNED NOT NULL,
+			course_id       BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			user_id         BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			change_type     VARCHAR(20)     NOT NULL DEFAULT 'updated',
+			revision        INT UNSIGNED    NOT NULL DEFAULT 0,
+			created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			KEY course_change (course_id, id),
+			KEY user_change   (user_id, id),
+			KEY created_at    (created_at)
+		) $charset_collate;" );
+
+		// Posición de reproducción: una fila por usuario y lección; gana la marca más reciente.
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_lesson_positions (
+			id                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			institution_id      BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			user_id             BIGINT UNSIGNED NOT NULL,
+			lesson_id           BIGINT UNSIGNED NOT NULL,
+			course_id           BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			position_seconds    INT UNSIGNED    NOT NULL DEFAULT 0,
+			duration_seconds    INT UNSIGNED    NOT NULL DEFAULT 0,
+			client_event_id     VARCHAR(64)     NOT NULL DEFAULT '',
+			client_recorded_ms  BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			updated_at          DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			UNIQUE KEY user_lesson (user_id, lesson_id)
 		) $charset_collate;" );
 
 		// ── Sesiones móviles fuera de usermeta (6.26.5) ─────────────────────
