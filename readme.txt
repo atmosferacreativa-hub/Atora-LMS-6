@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 6.27.2
+Stable tag: 6.27.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,9 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.27.3 =
+* API móvil: la portada de cada curso sale de la imagen destacada en vivo; la tabla de cursos se mantiene al día y se repara una vez al actualizar.
+
 = 6.27.2 =
 * Fix: el registro extendido y los popups cargaban archivos JS/CSS que no existían (404); se agregan.
 

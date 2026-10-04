@@ -37,6 +37,7 @@ namespace ATORA\Tests\Media {
 
 	use PHPUnit\Framework\TestCase;
 
+	require_once __DIR__ . '/../../includes/media/class-course-cover-resolver.php';
 	require_once __DIR__ . '/../../includes/media/class-video-thumbnail-resolver.php';
 
 	final class VideoThumbnailResolverTest extends TestCase {

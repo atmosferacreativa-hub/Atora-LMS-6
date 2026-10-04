@@ -1,5 +1,16 @@
 # CHANGELOG — ATORA LMS
 
+## 6.27.3 (2026-10-03)
+
+### Portadas de cursos en la app
+
+- **Fix** — la API móvil tomaba la portada de la columna `thumbnail_url` de `atora_courses`, que solo llenaba el migrador: los cursos creados o con imagen cambiada después de migrar llegaban a la app sin portada o con la vieja.
+- **Resolución única** en `ATORA_Course_Cover_Resolver::resolve()`: imagen destacada del post del curso (`large`) → columna de la tabla. La usan lista de cursos, detalle, panel "Hoy" y cursos de un programa; el resolvedor de miniaturas de video la usa como último paso.
+- **Sincronización**: añadir, cambiar o quitar la imagen destacada (`_thumbnail_id`) de un `lm_course` actualiza la columna.
+- **Reparación**: una vez al actualizar (opción `atora_course_covers_repaired`) se rellena la columna desde la imagen destacada donde difiere; repetible con `wp atora courses repair-covers [--dry-run]`. No toca cursos correctos ni cursos sin imagen destacada.
+- **Programas**: sin cambios; ya leían la imagen destacada en vivo.
+- **TESTS**: `tests/Media/CourseCoverResolverTest.php`.
+
 ## 6.27.2 (2026-10-03)
 
 - **Fix — assets faltantes (404)**: se agregan `modules/security/assets/registration.js`, `modules/security/assets/registration.css` y `modules/analytics/assets/popups.js`, que el registro extendido (`class-extended-registration.php`) y los popups (`class-popups.php`) encolaban sin que existieran (PR #19).
