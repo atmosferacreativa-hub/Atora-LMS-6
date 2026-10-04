@@ -1,5 +1,15 @@
 # CHANGELOG — ATORA LMS
 
+## 6.27.4 (2026-10-04)
+
+### El editor de WordPress mantiene la tabla al día
+
+- **Fix** — el editor solo escribía el post y sus metas. Verificado en local antes del arreglo: una lección creada después de migrar su curso no entraba a `atora_lessons` (ni al currículo de `/courses/{id}`); los cambios de título, extracto y orden, el paso a borrador y la papelera, de cursos y de lecciones, no llegaban a la tabla; `revision` no subía nunca.
+- **Sincronización** (`LMS_Editor_Sync`): en `wp_after_insert_post` (después de las metaboxes) inserta o actualiza la fila con las funciones del migrador y sube `revision` una vez si algo cambió; guardar sin cambios no la sube. El borrado definitivo marca la fila `deleted` (no se elimina, por las referencias de progreso).
+- **Migrador**: el armado de filas se extrae a `course_row_from_post()`, `lesson_row_from_post()` y `migrate_course_post()`, sin cambio de comportamiento; la sincronización las reutiliza.
+- **Reparación**: una vez tras actualizar, en segundo plano (cron único; opción `atora_lms_editor_sync_repaired`), y con `wp atora lms align-tables [--dry-run]`. Inserta lo que falta, actualiza lo que difiere, marca las filas sin post; repetible, no toca lo que está bien. Cursos: título, slug, descripción, extracto, estado, portada y fecha de publicación; instructor y precio siguen con su propio flujo.
+- **TESTS**: `tests/integration/EditorTableSyncTest.php` (WordPress real): lección nueva en el currículo, título/orden con `revision`, guardar sin cambios, borrador/papelera fuera del currículo, borrado definitivo, cambios de curso, reparación selectiva y repetible. Fallan los 7 sin el arreglo.
+
 ## 6.27.3 (2026-10-03)
 
 ### Portadas de cursos en la app

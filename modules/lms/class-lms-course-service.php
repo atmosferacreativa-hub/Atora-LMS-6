@@ -491,6 +491,15 @@ class LMS_Course_Service {
 		);
 	}
 
+	/** 6.27.4: misma normalización que al escribir, para comparar con la fila guardada. */
+	public static function normalize_course_fields( array $d ): array {
+		return self::sanitize_course_data( $d );
+	}
+
+	public static function normalize_lesson_fields( array $d ): array {
+		return self::sanitize_lesson_data( $d );
+	}
+
 	private static function sanitize_course_data( array $d ): array {
 		return array_filter( array(
 			'wp_post_id'     => isset( $d['wp_post_id'] )     ? absint( $d['wp_post_id'] )                         : null,
