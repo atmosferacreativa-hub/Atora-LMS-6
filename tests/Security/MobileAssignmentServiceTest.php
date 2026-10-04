@@ -6,6 +6,7 @@ namespace ATORA\Tests\Security;
 
 use PHPUnit\Framework\TestCase;
 
+require_once __DIR__ . '/../../includes/mobile/class-mobile-db-errors.php';
 require_once __DIR__ . '/../../includes/mobile/class-mobile-assignment-store.php';
 require_once __DIR__ . '/../../includes/mobile/class-mobile-assignment-service.php';
 
@@ -13,6 +14,8 @@ require_once __DIR__ . '/../../includes/mobile/class-mobile-assignment-service.p
 final class InMemoryAssignmentStore implements \ATORA_Mobile_Assignment_Store {
 	public array $submissions = array();
 	public array $uploads     = array();
+	/** 6.28.2: simula un error de base de datos en las escrituras de actualización. */
+	public bool $fail_writes  = false;
 	private int $next_sub     = 1;
 	private int $next_upload  = 1;
 
@@ -52,8 +55,12 @@ final class InMemoryAssignmentStore implements \ATORA_Mobile_Assignment_Store {
 		return $row['id'];
 	}
 
-	public function update_submission( int $id, array $fields ): void {
+	public function update_submission( int $id, array $fields ): bool {
+		if ( $this->fail_writes ) {
+			return false;
+		}
 		$this->submissions[ $id ] = array_merge( $this->submissions[ $id ], $fields );
+		return true;
 	}
 
 	public function delete_submission( int $id ): void {
@@ -75,11 +82,18 @@ final class InMemoryAssignmentStore implements \ATORA_Mobile_Assignment_Store {
 		return null;
 	}
 
-	public function update_upload( int $id, array $fields ): void {
+	public function update_upload( int $id, array $fields ): bool {
+		if ( $this->fail_writes ) {
+			return false;
+		}
 		$this->uploads[ $id ] = array_merge( $this->uploads[ $id ], $fields );
+		return true;
 	}
 
-	public function advance_upload( int $id, int $from, int $to ): bool {
+	public function advance_upload( int $id, int $from, int $to ): ?bool {
+		if ( $this->fail_writes ) {
+			return null;
+		}
 		if ( 'open' !== $this->uploads[ $id ]['status'] || (int) $this->uploads[ $id ]['received_bytes'] !== $from ) {
 			return false;
 		}
@@ -170,6 +184,41 @@ final class MobileAssignmentServiceTest extends TestCase {
 		$this->assertIsArray( $put );
 		$this->assertIsArray( $service->complete_upload( $user_id, $session['upload_token'] ) );
 		return $session['upload_token'];
+	}
+
+	private static function http_status( $result ): int {
+		return $result instanceof \WP_Error ? (int) ( $result->get_error_data()['status'] ?? 0 ) : 200;
+	}
+
+	public function test_db_error_while_advancing_a_chunk_is_503_not_out_of_order(): void {
+		$service = $this->service();
+		$session = $service->create_upload_session( 10, array( 'filename' => 'tarea.pdf', 'total_bytes' => strlen( self::PDF ) ) );
+		$this->store->fail_writes = true;
+		$len = strlen( self::PDF );
+		$put = $service->put_chunk( 10, $session['upload_token'], 'bytes 0-' . ( $len - 1 ) . '/' . $len, self::PDF );
+		$this->assertSame( 503, self::http_status( $put ) );
+		$this->assertSame( 0, (int) $this->store->find_upload( $session['upload_token'] )['received_bytes'] );
+
+		$this->store->fail_writes = false;
+		$this->assertIsArray( $service->put_chunk( 10, $session['upload_token'], 'bytes 0-' . ( $len - 1 ) . '/' . $len, self::PDF ), 'El reintento del mismo fragmento entra.' );
+	}
+
+	public function test_db_error_closing_an_upload_is_503_and_retry_closes_it(): void {
+		$service = $this->service();
+		$session = $service->create_upload_session( 10, array( 'filename' => 'tarea.pdf', 'total_bytes' => strlen( self::PDF ) ) );
+		$len = strlen( self::PDF );
+		$service->put_chunk( 10, $session['upload_token'], 'bytes 0-' . ( $len - 1 ) . '/' . $len, self::PDF );
+		$this->store->fail_writes = true;
+		$this->assertSame( 503, self::http_status( $service->complete_upload( 10, $session['upload_token'] ) ) );
+		$this->store->fail_writes = false;
+		$this->assertSame( 'complete', $service->complete_upload( 10, $session['upload_token'] )['status'] );
+	}
+
+	public function test_db_error_finishing_a_submission_is_503_not_200(): void {
+		$service = $this->service();
+		$this->store->fail_writes = true;
+		$result = $service->create_submission( 10, $this->lesson(), array( 'client_event_id' => 'evt-dbfail-01', 'body_text' => 'Hola' ) );
+		$this->assertSame( 503, self::http_status( $result ) );
 	}
 
 	public function test_replaying_the_same_event_returns_the_same_submission_without_duplicating(): void {

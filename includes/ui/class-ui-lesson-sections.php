@@ -215,18 +215,7 @@ class CLMS_UI_Lesson_Sections {
 		$lesson_id = absint( $lesson_id );
 		unset( self::$lesson_comment_panel_rendered[ $lesson_id ] );
 
-		$resolver = new CLMS_UI_Template_Resolver();
-		$repo     = $resolver->repository();
-
-		$schema = apply_filters(
-			'clms_lesson_ui_schema',
-			$resolver->resolve( $lesson_id, 'lesson' ),
-			$lesson_id
-		);
-
-		if ( ! $repo->validate( $schema ) || empty( $schema['sections'] ) ) {
-			$schema = self::fallback_schema();
-		}
+		$schema = self::lesson_schema( $lesson_id );
 
 		$ctx             = CLMS_UI_Template_Context::make( $lesson_id, 'lesson' );
 		$engine          = new CLMS_UI_Template_Engine();
@@ -1162,6 +1151,32 @@ class CLMS_UI_Lesson_Sections {
 		}
 	}
 
+	/** Esquema de la plantilla de lección (filtrado y validado), el mismo que usa el render. */
+	private static function lesson_schema( int $lesson_id ): array {
+		$resolver = new CLMS_UI_Template_Resolver();
+		$repo     = $resolver->repository();
+
+		$schema = apply_filters(
+			'clms_lesson_ui_schema',
+			$resolver->resolve( $lesson_id, 'lesson' ),
+			$lesson_id
+		);
+
+		if ( ! $repo->validate( $schema ) || empty( $schema['sections'] ) ) {
+			$schema = self::fallback_schema();
+		}
+		return $schema;
+	}
+
+	/**
+	 * 6.28.2: límite de videos de la lección tal como lo aplica la web
+	 * (esquema de la plantilla + `_clms_lesson_ui_limit_videos`). Lo usa
+	 * ATORA_Lesson_Videos para que la app muestre la misma lista.
+	 */
+	public static function videos_limit( int $lesson_id ): int {
+		return self::resolve_limits( $lesson_id, self::lesson_schema( $lesson_id ) )['videos'];
+	}
+
 	/**
 	 * @return array{videos:int,resources:int,tips:int}
 	 */
@@ -1206,40 +1221,9 @@ class CLMS_UI_Lesson_Sections {
 		return max( 0, absint( $limits[ $key ] ) );
 	}
 
+	/** 6.28.2: la lista vive en ATORA_Lesson_Videos, compartida con la API móvil. */
 	private static function normalize_videos( int $lesson_id ): array {
-		$extra_videos = get_post_meta( $lesson_id, '_clms_lesson_extra_videos', true );
-		$extra_videos = is_array( $extra_videos )
-			? array_values(
-				array_filter(
-					$extra_videos,
-					static function ( $video ) {
-						return is_array( $video ) && ! empty( $video['url'] );
-					}
-				)
-			)
-			: array();
-
-		if ( ! empty( $extra_videos ) ) {
-			return $extra_videos;
-		}
-
-		$legacy_url    = (string) get_post_meta( $lesson_id, '_clms_lesson_video_url', true );
-		$legacy_source = (string) ( get_post_meta( $lesson_id, '_clms_lesson_video_source', true ) ?: 'youtube' );
-
-		if ( ! $legacy_url ) {
-			return array();
-		}
-
-		return array(
-			array(
-				'source'      => $legacy_source,
-				'url'         => $legacy_url,
-				'description' => '',
-				'tip_1'       => get_post_meta( $lesson_id, '_clms_tip_1', true ),
-				'tip_2'       => get_post_meta( $lesson_id, '_clms_tip_2', true ),
-				'tip_3'       => get_post_meta( $lesson_id, '_clms_tip_3', true ),
-			),
-		);
+		return ATORA_Lesson_Videos::all( $lesson_id );
 	}
 
 	private static function normalize_resources( int $lesson_id ): array {

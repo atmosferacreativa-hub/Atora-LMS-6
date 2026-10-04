@@ -214,7 +214,13 @@ final class ATORA_Mobile_Assignment_Service {
 				ftruncate( $handle, $start );
 				return self::error( 'atora_mobile_upload_storage', __( 'No se pudo guardar el fragmento.', 'atora-lms' ), 500 );
 			}
-			if ( ! $this->store->advance_upload( (int) $upload['id'], $start, $start + $length ) ) {
+			$advanced = $this->store->advance_upload( (int) $upload['id'], $start, $start + $length );
+			if ( null === $advanced ) {
+				// Error de base de datos: no es un conflicto de orden; la app reintenta el mismo fragmento.
+				ftruncate( $handle, $start );
+				return ATORA_Mobile_Db_Errors::unavailable( 'subida (avance)' );
+			}
+			if ( ! $advanced ) {
 				ftruncate( $handle, $start );
 				$current = $this->store->find_upload( $upload_token );
 				return self::error( 'atora_mobile_upload_out_of_order', __( 'El fragmento no continúa la subida.', 'atora-lms' ), 409, array( 'received_bytes' => (int) ( $current['received_bytes'] ?? $received ) ) );
@@ -255,10 +261,14 @@ final class ATORA_Mobile_Assignment_Service {
 			return self::error( 'atora_mobile_upload_type', __( 'El contenido del archivo no corresponde a un formato permitido.', 'atora-lms' ), 422 );
 		}
 
-		$this->store->update_upload( (int) $upload['id'], array(
+		$closed = $this->store->update_upload( (int) $upload['id'], array(
 			'status'    => 'complete',
 			'mime_type' => (string) $this->policy['allowed_mimes'][ $ext ],
 		) );
+		if ( ! $closed ) {
+			// Sigue 'open' con todos los bytes: reintentar /complete vuelve a validar y cerrar.
+			return ATORA_Mobile_Db_Errors::unavailable( 'subida (cierre)' );
+		}
 		return array( 'status' => 'complete', 'received_bytes' => (int) $upload['received_bytes'] );
 	}
 
@@ -372,9 +382,15 @@ final class ATORA_Mobile_Assignment_Service {
 			'wp_post_id' => (int) ( $bridged['wp_post_id'] ?? 0 ),
 			'files_json' => self::files_json( $uploads, (array) ( $bridged['attachment_ids'] ?? array() ) ),
 		);
-		$this->store->update_submission( $id, $final );
+		if ( ! $this->store->update_submission( $id, $final ) ) {
+			// El puente ya existe; la fila queda 'processing' y el reintento responde 503 hasta que la base vuelva.
+			return ATORA_Mobile_Db_Errors::unavailable( 'entrega (cierre)' );
+		}
 		foreach ( $uploads as $upload ) {
-			$this->store->update_upload( (int) $upload['id'], array( 'status' => 'attached', 'submission_id' => $id ) );
+			if ( ! $this->store->update_upload( (int) $upload['id'], array( 'status' => 'attached', 'submission_id' => $id ) ) ) {
+				// La entrega ya está guardada: solo se registra (la limpieza horaria podría borrar el temporal).
+				ATORA_Mobile_Db_Errors::log( 'entrega (adjuntar subida)' );
+			}
 		}
 
 		return array( 'submission' => self::present_submission( array_merge( $row, $final ) ), 'replayed' => false );

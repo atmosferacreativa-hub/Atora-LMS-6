@@ -1,12 +1,16 @@
 <?php
 /**
- * Posición de reproducción por usuario y lección (API móvil, 6.28.0).
+ * Posición de reproducción por usuario, lección y video (API móvil, 6.28.0).
  *
  * Regla (docs/SINCRONIZACION-OFFLINE.md): gana la marca más reciente según
  * `client_recorded_at`, aunque la posición sea menor (el estudiante puede
  * volver atrás a repasar). Lo monótono es la lección completada, no la posición.
  * Una marca más de 5 minutos en el futuro se acota. Reenviar el mismo
  * `client_event_id` no cambia nada.
+ *
+ * 6.28.2: una fila por video (`video_key`). Vacío = primer video: es lo que
+ * guardan las apps anteriores y las filas de 6.28.0/6.28.1. Un error de base
+ * de datos devuelve WP_Error 503 (antes se confundía con "no aplicada").
  *
  * @package ATORA_LMS
  * @since 6.28.0
@@ -21,9 +25,9 @@ final class ATORA_Mobile_Position_Service {
 	const MAX_CLOCK_SKEW_MS = 5 * 60 * 1000;
 
 	/**
-	 * @return array{applied:bool, replayed:bool, position:array{position_seconds:int, duration_seconds:int, client_recorded_at:string}}
+	 * @return array{applied:bool, replayed:bool, position:array{position_seconds:int, duration_seconds:int, client_recorded_at:string}}|WP_Error
 	 */
-	public static function save( int $user_id, int $lesson_id, int $course_id, int $position, int $duration, string $event_id, int $recorded_ms ): array {
+	public static function save( int $user_id, int $lesson_id, int $course_id, int $position, int $duration, string $event_id, int $recorded_ms, string $video_key = '' ) {
 		global $wpdb;
 		$table       = $wpdb->prefix . 'atora_lesson_positions';
 		$recorded_ms = min( $recorded_ms, (int) floor( microtime( true ) * 1000 ) + self::MAX_CLOCK_SKEW_MS );
@@ -31,6 +35,7 @@ final class ATORA_Mobile_Position_Service {
 			'institution_id'     => self::institution_id( $course_id ),
 			'user_id'            => $user_id,
 			'lesson_id'          => $lesson_id,
+			'video_key'          => $video_key,
 			'course_id'          => $course_id,
 			'position_seconds'   => $position,
 			'duration_seconds'   => $duration,
@@ -39,14 +44,17 @@ final class ATORA_Mobile_Position_Service {
 			'updated_at'         => current_time( 'mysql', true ),
 		);
 
-		// 1) Primera marca de este usuario en esta lección.
+		// 1) Primera marca de este usuario en este video.
 		$inserted = $wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			$wpdb->prepare(
-				"INSERT IGNORE INTO {$table} (institution_id, user_id, lesson_id, course_id, position_seconds, duration_seconds, client_event_id, client_recorded_ms, updated_at)
-				 VALUES (%d, %d, %d, %d, %d, %d, %s, %d, %s)",
+				"INSERT IGNORE INTO {$table} (institution_id, user_id, lesson_id, video_key, course_id, position_seconds, duration_seconds, client_event_id, client_recorded_ms, updated_at)
+				 VALUES (%d, %d, %d, %s, %d, %d, %d, %s, %d, %s)",
 				array_values( $data )
 			)
 		);
+		if ( false === $inserted ) {
+			return ATORA_Mobile_Db_Errors::unavailable( 'posición (insert)' );
+		}
 		if ( 1 === (int) $inserted ) {
 			return array( 'applied' => true, 'replayed' => false, 'position' => self::shape( $data ) );
 		}
@@ -56,15 +64,18 @@ final class ATORA_Mobile_Position_Service {
 			$wpdb->prepare(
 				"UPDATE {$table}
 				 SET position_seconds = %d, duration_seconds = %d, client_event_id = %s, client_recorded_ms = %d, updated_at = %s
-				 WHERE user_id = %d AND lesson_id = %d
+				 WHERE user_id = %d AND lesson_id = %d AND video_key = %s
 				   AND ( client_recorded_ms < %d OR ( client_recorded_ms = %d AND client_event_id < %s ) )",
 				$position, $duration, $event_id, $recorded_ms, $data['updated_at'],
-				$user_id, $lesson_id,
+				$user_id, $lesson_id, $video_key,
 				$recorded_ms, $recorded_ms, $event_id
 			)
 		);
+		if ( false === $updated ) {
+			return ATORA_Mobile_Db_Errors::unavailable( 'posición (update)' );
+		}
 
-		$current = self::get( $user_id, $lesson_id );
+		$current = self::get( $user_id, $lesson_id, $video_key );
 		return array(
 			'applied'  => 1 === (int) $updated,
 			'replayed' => 1 !== (int) $updated && $current && $current['client_event_id'] === $event_id,
@@ -72,18 +83,29 @@ final class ATORA_Mobile_Position_Service {
 		);
 	}
 
-	public static function get( int $user_id, int $lesson_id ): ?array {
+	public static function get( int $user_id, int $lesson_id, string $video_key = '' ): ?array {
 		global $wpdb;
 		$row = $wpdb->get_row(
-			$wpdb->prepare( "SELECT * FROM {$wpdb->prefix}atora_lesson_positions WHERE user_id = %d AND lesson_id = %d", $user_id, $lesson_id ),
+			$wpdb->prepare( "SELECT * FROM {$wpdb->prefix}atora_lesson_positions WHERE user_id = %d AND lesson_id = %d AND video_key = %s", $user_id, $lesson_id, $video_key ),
 			ARRAY_A
 		);
 		return $row ?: null;
 	}
 
-	public static function resume_seconds( int $user_id, int $lesson_id ): int {
-		$row = self::get( $user_id, $lesson_id );
-		return $row ? absint( $row['position_seconds'] ) : 0;
+	/**
+	 * Posición de un video. El primero también lee la fila sin clave (apps
+	 * anteriores y filas de 6.28.0/6.28.1) y gana la marca más reciente.
+	 */
+	public static function resume_seconds( int $user_id, int $lesson_id, string $video_key = '', bool $is_first = true ): int {
+		$rows = array_filter( array(
+			'' !== $video_key ? self::get( $user_id, $lesson_id, $video_key ) : null,
+			$is_first ? self::get( $user_id, $lesson_id, '' ) : null,
+		) );
+		if ( ! $rows ) {
+			return 0;
+		}
+		usort( $rows, static fn( array $a, array $b ): int => (int) $b['client_recorded_ms'] <=> (int) $a['client_recorded_ms'] );
+		return absint( $rows[0]['position_seconds'] );
 	}
 
 	/** ISO 8601 → milisegundos UTC; null si no es válida. */

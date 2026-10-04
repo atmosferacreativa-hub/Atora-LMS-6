@@ -25,7 +25,8 @@ interface ATORA_Mobile_Assignment_Store {
 	/** @return int ID insertado, o 0 si (user_id, client_event_id) ya existía. */
 	public function insert_submission( array $row ): int;
 
-	public function update_submission( int $id, array $fields ): void;
+	/** @return bool false ante un error de base de datos (6.28.2). */
+	public function update_submission( int $id, array $fields ): bool;
 
 	public function delete_submission( int $id ): void;
 
@@ -33,10 +34,15 @@ interface ATORA_Mobile_Assignment_Store {
 
 	public function find_upload( string $upload_token ): ?array;
 
-	public function update_upload( int $id, array $fields ): void;
+	/** @return bool false ante un error de base de datos (6.28.2). */
+	public function update_upload( int $id, array $fields ): bool;
 
-	/** Compare-and-set de received_bytes: solo avanza si el valor actual es $from. */
-	public function advance_upload( int $id, int $from, int $to ): bool;
+	/**
+	 * Compare-and-set de received_bytes: solo avanza si el valor actual es $from.
+	 *
+	 * @return bool|null true si avanzó, false si otro valor ganó, null ante un error de base de datos (6.28.2).
+	 */
+	public function advance_upload( int $id, int $from, int $to ): ?bool;
 
 	/** @return array<int, array> Sesiones vencidas (expires_at < $now_utc) que no quedaron adjuntas. */
 	public function expired_uploads( string $now_utc, int $limit ): array;
@@ -90,9 +96,9 @@ final class ATORA_Mobile_Assignment_Wpdb_Store implements ATORA_Mobile_Assignmen
 		return false === $ok ? 0 : absint( $wpdb->insert_id );
 	}
 
-	public function update_submission( int $id, array $fields ): void {
+	public function update_submission( int $id, array $fields ): bool {
 		global $wpdb;
-		$wpdb->update( $this->submissions_table(), $fields, array( 'id' => $id ) );
+		return false !== $wpdb->update( $this->submissions_table(), $fields, array( 'id' => $id ) );
 	}
 
 	public function delete_submission( int $id ): void {
@@ -115,12 +121,12 @@ final class ATORA_Mobile_Assignment_Wpdb_Store implements ATORA_Mobile_Assignmen
 		return is_array( $row ) ? $row : null;
 	}
 
-	public function update_upload( int $id, array $fields ): void {
+	public function update_upload( int $id, array $fields ): bool {
 		global $wpdb;
-		$wpdb->update( $this->uploads_table(), $fields, array( 'id' => $id ) );
+		return false !== $wpdb->update( $this->uploads_table(), $fields, array( 'id' => $id ) );
 	}
 
-	public function advance_upload( int $id, int $from, int $to ): bool {
+	public function advance_upload( int $id, int $from, int $to ): ?bool {
 		global $wpdb;
 		$affected = $wpdb->query( $wpdb->prepare(
 			"UPDATE {$this->uploads_table()} SET received_bytes = %d WHERE id = %d AND received_bytes = %d AND status = 'open'", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
@@ -128,6 +134,9 @@ final class ATORA_Mobile_Assignment_Wpdb_Store implements ATORA_Mobile_Assignmen
 			$id,
 			$from
 		) );
+		if ( false === $affected ) {
+			return null;
+		}
 		return 1 === (int) $affected;
 	}
 

@@ -211,12 +211,13 @@ final class ATORA_Mobile_REST_Controller {
 			'authentication'   => 'opaque_bearer',
 			'access_ttl'       => ATORA_Mobile_Token_Service::ACCESS_TTL,
 			'refresh_ttl'      => ATORA_Mobile_Token_Service::REFRESH_TTL,
-			'features'         => array( 'profile', 'dashboard', 'courses', 'progress', 'lesson_completion', 'quizzes', 'assignments', 'sync_changes', 'playback_position', 'resource_downloads' ),
+			'features'         => array( 'profile', 'dashboard', 'courses', 'progress', 'lesson_completion', 'quizzes', 'assignments', 'sync_changes', 'playback_position', 'resource_downloads', 'multi_video' ),
 			'capabilities'     => array(
 				'assignments'        => true,
 				'sync_changes'       => class_exists( '\\ATORA\\LMS\\LMS_Content_Changes' ),
 				'playback_position'  => class_exists( 'ATORA_Mobile_Position_Service' ),
 				'resource_downloads' => class_exists( 'ATORA_Download_Info' ),
+				'multi_video'        => class_exists( 'ATORA_Lesson_Videos' ),
 			),
 		), 200 );
 	}
@@ -384,6 +385,8 @@ final class ATORA_Mobile_REST_Controller {
 			$wp_lesson_id        = absint( $lesson['wp_post_id'] ?? 0 );
 			$video_url           = self::resolve_lesson_video_url( $lesson, $wp_lesson_id );
 			$lesson['has_video'] = '' !== $video_url;
+			// 6.28.2: cantidad de videos que ve el estudiante (la app la muestra si es mayor que 1).
+			$lesson['video_count'] = class_exists( 'ATORA_Lesson_Videos' ) && $wp_lesson_id > 0 ? count( ATORA_Lesson_Videos::visible( $wp_lesson_id ) ) : (int) $lesson['has_video'];
 			// 6.27.1: miniatura para el currículo (nunca vacía si el curso tiene portada).
 			$lesson['video_thumbnail_url'] = class_exists( 'ATORA_Video_Thumbnail_Resolver' )
 				? ATORA_Video_Thumbnail_Resolver::resolve( $wp_lesson_id, $video_url, $cover, absint( $course['wp_post_id'] ?? 0 ) )
@@ -415,6 +418,7 @@ final class ATORA_Mobile_REST_Controller {
 		$video_url    = self::resolve_lesson_video_url( $lesson, $wp_post_id );
 
 		$video_embed = self::google_drive_embed_url( $video_url, $raw_content );
+		$videos = self::lesson_videos( $user_id, $lesson_id, $wp_post_id, $course_id );
 		$video_download = '' === $video_embed && class_exists( 'ATORA_Download_Info' )
 			? ATORA_Download_Info::for_video( $video_url )
 			: array( 'video_downloadable' => false, 'video_bytes' => null );
@@ -437,7 +441,10 @@ final class ATORA_Mobile_REST_Controller {
 				// 6.28.0: solo MP4 directo de la academia se puede descargar.
 				'video_downloadable' => (bool) $video_download['video_downloadable'],
 				'video_bytes'        => $video_download['video_bytes'],
-				'resume_position_seconds' => class_exists( 'ATORA_Mobile_Position_Service' ) ? ATORA_Mobile_Position_Service::resume_seconds( $user_id, $lesson_id ) : 0,
+				// Compatibilidad (0.4.0): datos del primer video.
+				'resume_position_seconds' => $videos ? $videos[0]['resume_position_seconds'] : ( class_exists( 'ATORA_Mobile_Position_Service' ) ? ATORA_Mobile_Position_Service::resume_seconds( $user_id, $lesson_id ) : 0 ),
+				// 6.28.2: todos los videos de la lección, en el orden del editor y con el límite de la web.
+				'videos'                  => $videos,
 				'content_html'    => $content_html,
 				'content_text' => sanitize_textarea_field( wp_strip_all_tags( $content_html ) ),
 				'completed'    => in_array( $lesson_id, self::completed_lesson_ids( $user_id, $course_id ), true ),
@@ -446,6 +453,52 @@ final class ATORA_Mobile_REST_Controller {
 				'resources'      => $resources,
 			),
 		), 200 );
+	}
+
+	/**
+	 * 6.28.2: los videos de la lección para la app (misma lista que la web).
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	private static function lesson_videos( int $user_id, int $lesson_id, int $wp_post_id, int $course_id ): array {
+		if ( $wp_post_id <= 0 || ! class_exists( 'ATORA_Lesson_Videos' ) ) {
+			return array();
+		}
+		$course    = \ATORA\LMS\LMS_Course_Service::get( $course_id );
+		$cover     = is_array( $course ) ? self::course_cover( $course ) : '';
+		$wp_course = absint( is_array( $course ) ? ( $course['wp_post_id'] ?? 0 ) : 0 );
+		$items     = array();
+		foreach ( ATORA_Lesson_Videos::visible( $wp_post_id ) as $i => $video ) {
+			$url      = esc_url_raw( trim( (string) ( $video['url'] ?? '' ) ) );
+			$embed    = self::google_drive_embed_url( $url, '' );
+			$provider = '' !== $embed ? 'google_drive' : 'direct';
+			if ( class_exists( 'ATORA_Video_Thumbnail_Resolver' ) ) {
+				if ( '' !== ATORA_Video_Thumbnail_Resolver::youtube_id( $url ) ) {
+					$provider = 'youtube';
+				} elseif ( '' !== ATORA_Video_Thumbnail_Resolver::vimeo_id( $url ) ) {
+					$provider = 'vimeo';
+				}
+			}
+			$download = 'direct' === $provider && class_exists( 'ATORA_Download_Info' )
+				? ATORA_Download_Info::for_video( $url )
+				: array( 'video_downloadable' => false, 'video_bytes' => null );
+			$items[] = array(
+				'key'                     => (string) $video['key'],
+				'title'                   => sanitize_text_field( (string) ( $video['title'] ?? '' ) ),
+				'description'             => sanitize_textarea_field( wp_strip_all_tags( (string) ( $video['description'] ?? '' ) ) ),
+				'source'                  => sanitize_key( (string) ( $video['source'] ?? '' ) ),
+				'url'                     => $url,
+				'embed_url'               => $embed,
+				'provider'                => $provider,
+				'thumbnail_url'           => class_exists( 'ATORA_Video_Thumbnail_Resolver' ) ? ATORA_Video_Thumbnail_Resolver::resolve( $wp_post_id, $url, $cover, $wp_course ) : $cover,
+				'downloadable'            => (bool) $download['video_downloadable'],
+				'bytes'                   => $download['video_bytes'],
+				'resume_position_seconds' => class_exists( 'ATORA_Mobile_Position_Service' )
+					? ATORA_Mobile_Position_Service::resume_seconds( $user_id, $lesson_id, (string) $video['key'], 0 === $i )
+					: 0,
+			);
+		}
+		return $items;
 	}
 
 	/**
@@ -1252,7 +1305,19 @@ final class ATORA_Mobile_REST_Controller {
 			return new WP_Error( 'atora_mobile_position_invalid', __( 'Posición no válida.', 'atora-lms' ), array( 'status' => 400 ) );
 		}
 
-		$result = ATORA_Mobile_Position_Service::save( $user_id, $lesson_id, $course_id, (int) floor( (float) $position ), (int) floor( (float) $duration ), $event_id, $recorded );
+		// 6.28.2: video_key opcional; sin él (apps anteriores) es el primer video.
+		$video_key = (string) ( $request->get_param( 'video_key' ) ?? '' );
+		if ( '' !== $video_key ) {
+			$keys = class_exists( 'ATORA_Lesson_Videos' ) ? array_column( ATORA_Lesson_Videos::visible( absint( $lesson['wp_post_id'] ?? 0 ) ), 'key' ) : array();
+			if ( ! in_array( $video_key, $keys, true ) ) {
+				return new WP_Error( 'atora_mobile_video_not_found', __( 'El video no pertenece a esta lección.', 'atora-lms' ), array( 'status' => 404 ) );
+			}
+		}
+
+		$result = ATORA_Mobile_Position_Service::save( $user_id, $lesson_id, $course_id, (int) floor( (float) $position ), (int) floor( (float) $duration ), $event_id, $recorded, $video_key );
+		if ( is_wp_error( $result ) ) {
+			return $result; // 503: la app reintenta.
+		}
 		return new WP_REST_Response( $result, 200 );
 	}
 
