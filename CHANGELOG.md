@@ -1,5 +1,10 @@
 # CHANGELOG — ATORA LMS
 
+## 6.27.2 (2026-10-03)
+
+- **Fix — assets faltantes (404)**: se agregan `modules/security/assets/registration.js`, `modules/security/assets/registration.css` y `modules/analytics/assets/popups.js`, que el registro extendido (`class-extended-registration.php`) y los popups (`class-popups.php`) encolaban sin que existieran (PR #19).
+- **TESTS**: `tests/Assets/EnqueuedModuleAssetsTest.php` falla si algún asset encolado por esos dos módulos no existe en disco.
+
 ## 6.27.1 (2026-10-03)
 
 ### Miniaturas de video en la API móvil
