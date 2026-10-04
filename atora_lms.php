@@ -3,7 +3,7 @@
  * Plugin Name:       ATORA LMS
  * Plugin URI:        https://atora.studio
  * Description:       LMS modular para WordPress con IA, evaluaciones, certificados, CRM, mensajería multi-canal, afiliados, live streaming y más. Autor: Atora Studio.
- * Version:           6.28.0
+ * Version:           6.28.1
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Atora Studio
@@ -52,7 +52,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * - Limpieza automática de notificaciones >90 días
  */
 	if ( ! defined( 'ATORA_LMS_VERSION' ) ) {
-		define( 'ATORA_LMS_VERSION', '6.28.0' );
+		define( 'ATORA_LMS_VERSION', '6.28.1' );
 	}
 
 if ( ! defined( 'ATORA_LMS_FILE' ) ) {
@@ -1272,6 +1272,7 @@ add_action( 'init', static function () {
 	atora_lms_require_module( 'includes/mobile/class-mobile-rest-controller.php' );
 	if ( class_exists( 'ATORA_Mobile_REST_Controller' ) ) {
 		add_action( 'rest_api_init', array( 'ATORA_Mobile_REST_Controller', 'register_routes' ) );
+		add_filter( 'rest_post_dispatch', array( 'ATORA_Mobile_REST_Controller', 'no_cache' ), 99, 3 );
 	}
 	// 6.27.0: limpieza de subidas móviles vencidas (fragmentos parciales).
 	if ( class_exists( 'ATORA_Mobile_Assignment_Service' ) ) {

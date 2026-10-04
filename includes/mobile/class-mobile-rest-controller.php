@@ -142,6 +142,31 @@ final class ATORA_Mobile_REST_Controller {
 		) );
 	}
 
+	/**
+	 * 6.28.1: ninguna respuesta de la API móvil se guarda en cachés de página
+	 * (LiteSpeed Cache, proxys). Son respuestas por usuario: guardadas, una
+	 * caché entregaba el panel de un usuario a cualquiera, con o sin token.
+	 *
+	 * @param WP_REST_Response|WP_HTTP_Response|WP_Error|mixed $response
+	 */
+	public static function no_cache( $response, $server = null, $request = null ) {
+		$route = $request instanceof WP_REST_Request ? (string) $request->get_route() : '';
+		if ( 0 !== strpos( $route, '/' . self::REST_NAMESPACE ) ) {
+			return $response;
+		}
+		if ( is_object( $response ) && method_exists( $response, 'header' ) ) {
+			$response->header( 'Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0, private' );
+			$response->header( 'X-LiteSpeed-Cache-Control', 'no-cache' );
+			$response->header( 'CDN-Cache-Control', 'no-store' );
+			$response->header( 'Vary', 'Authorization' );
+		}
+		do_action( 'litespeed_control_set_nocache', 'atora-mobile: respuesta por usuario' );
+		if ( ! defined( 'DONOTCACHEPAGE' ) ) {
+			define( 'DONOTCACHEPAGE', true );
+		}
+		return $response;
+	}
+
 	public static function allow_public_discovery(): bool {
 		return true;
 	}
