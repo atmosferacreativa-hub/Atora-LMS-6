@@ -29,7 +29,7 @@ Namespace: `/wp-json/atora-mobile/v1`
 | GET | `/programs` | Bearer | Programas del estudiante |
 | GET | `/programs/{id}` | Bearer + matrícula | Programa y sus cursos |
 | GET | `/lessons/{id}` | Bearer + matrícula | Contenido de la lección (`quiz_available`, `assignment_available`, `video_thumbnail_url`; desde 6.28.0 `video_downloadable`, `video_bytes`, `resume_position_seconds` y, en cada recurso, `downloadable`, `bytes`, `updated_at`) |
-| PUT | `/lessons/{id}/position` | Bearer + matrícula (si no, 404) | Guardar posición de reproducción (6.28.0) |
+| PUT | `/lessons/{id}/position` | Bearer + matrícula (si no, 404) | Guardar posición de reproducción (6.28.0); `video_key` opcional (6.28.2) |
 | GET | `/sync/changes?cursor=` | Bearer | Cambios desde el cursor, solo de los cursos matriculados (6.28.0) |
 | GET, POST | `/lessons/{id}/quiz` | Bearer + matrícula | Consultar y responder la evaluación |
 | POST | `/lessons/{id}/complete` | Bearer + matrícula | Completar lección |
@@ -117,3 +117,32 @@ La renovación invalida access y refresh tokens anteriores de esa sesión.
 ## Miniaturas de video (6.27.1)
 
 `video_thumbnail_url` se resuelve en este orden: miniatura manual del editor de la lección → YouTube → Vimeo (en caché; la primera vez se consulta en segundo plano) → imagen destacada de la lección → portada del curso. Google Drive y MP4 directo no tienen miniatura desde el servidor: la app puede generar una localmente. Nunca viene vacía si el curso tiene portada.
+
+
+## Varios videos por lección (6.28.2)
+
+`GET /lessons/{id}` suma `videos[]`: la misma lista que muestra la web, en el orden del editor y con el límite de videos de la lección.
+
+```json
+{
+  "key": "a5016cd483f3",
+  "title": "Introducción",
+  "description": "",
+  "source": "youtube",
+  "url": "https://www.youtube.com/watch?v=…",
+  "embed_url": "",
+  "provider": "youtube",
+  "thumbnail_url": "https://img.youtube.com/vi/…/hqdefault.jpg",
+  "downloadable": false,
+  "bytes": null,
+  "resume_position_seconds": 0
+}
+```
+
+- `provider`: `google_drive` (con `embed_url`), `youtube`, `vimeo` o `direct`. Solo `direct` de la academia puede ser `downloadable`.
+- `key` es estable: no cambia al reordenar. Si la misma URL aparece dos veces, la segunda lleva `-2`.
+- Compatibilidad: `video_url`, `video_embed_url`, `video_provider`, `video_thumbnail_url`, `video_downloadable` y `resume_position_seconds` siguen describiendo el **primer** video.
+- El currículo de `/courses/{id}` suma `video_count`.
+- `PUT /lessons/{id}/position` acepta `video_key`. Sin él, la posición es la del primer video (apps anteriores). Una clave que no es de la lección responde 404.
+- Errores de base de datos al guardar posición, subidas o entregas responden **503**: reintentar.
+- `GET /discovery` declara `capabilities.multi_video`.

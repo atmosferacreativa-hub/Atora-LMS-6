@@ -65,7 +65,7 @@ class LMS_Content_Changes {
 		$institution_id = $course_id > 0
 			? absint( $wpdb->get_var( $wpdb->prepare( "SELECT institution_id FROM {$wpdb->prefix}atora_courses WHERE id = %d", $course_id ) ) )
 			: 0;
-		$wpdb->insert( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+		$ok = $wpdb->insert( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 			$wpdb->prefix . 'atora_content_changes',
 			array(
 				'institution_id' => $institution_id,
@@ -79,6 +79,12 @@ class LMS_Content_Changes {
 			),
 			array( '%d', '%s', '%d', '%d', '%d', '%s', '%d', '%s' )
 		);
+		if ( false === $ok && class_exists( '\\ATORA_Mobile_Db_Errors' ) ) {
+			// 6.28.2: corre dentro de un guardado del editor, no de una ruta móvil: se registra.
+			// La reparación de tablas (wp atora lms align-tables) no recupera la fila; el
+			// siguiente guardado del mismo objeto vuelve a marcarlo.
+			\ATORA_Mobile_Db_Errors::log( 'registro de cambios (' . $object_type . ' ' . $object_id . ')' );
+		}
 	}
 
 	/** Borra filas de más de 90 días y recuerda hasta qué id se borró. */

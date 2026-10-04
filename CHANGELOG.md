@@ -1,5 +1,15 @@
 # CHANGELOG — ATORA LMS
 
+## 6.28.2 (2026-10-04)
+
+### Correcciones de la auditoría y varios videos por lección
+
+- **Fix — errores de base de datos en la API móvil**: `$wpdb->query()` devuelve `false` ante un error SQL y se trataba como "0 filas". La posición respondía 200 (la app daba el evento por entregado y la perdía). Ahora un error responde **503** y la app reintenta; el error se registra sin valores (`ATORA_Mobile_Db_Errors`). Mismo patrón corregido en subidas (`advance_upload` lo confundía con fragmento fuera de orden → 409), cierre de subida y cierre de entrega (`update_upload` / `update_submission` ignoraban el fallo → 200). El registro de cambios, que corre dentro del guardado del editor, registra el fallo.
+- **NEW — `atora_lms_get_progress( int $user_id, int $wp_course_id ): int`** (`includes/public-api.php`): API estable para el tema. Recibe el ID del **post** del curso y lo traduce al `id` de `atora_courses` antes de `LMS_Enrollment_Service::get_progress()`; mismo porcentaje que la app.
+- **NEW — varios videos por lección**: la lista se extrae a `ATORA_Lesson_Videos` y la usan la web (`CLMS_UI_Lesson_Sections::normalize_videos()`) y la API, con el mismo límite (`CLMS_UI_Lesson_Sections::videos_limit()`: esquema de la plantilla + `_clms_lesson_ui_limit_videos`). `/lessons/{id}` devuelve `videos[]` en el orden del editor (`key`, `title`, `description`, `source`, `url`, `embed_url`, `provider`, `thumbnail_url` por video, `downloadable`, `bytes`, `resume_position_seconds`). `key` = 12 caracteres del sha1 de la URL normalizada (YouTube, Vimeo y Drive por identificador), sufijo solo si la URL se repite: reordenar no la cambia. Los campos de un solo video se mantienen con el primero (APK 0.4.0). El currículo suma `video_count`. `capabilities.multi_video`.
+- **Posición por video**: `PUT /lessons/{id}/position` acepta `video_key` (404 si no es de la lección). `atora_lesson_positions` suma `video_key` (vacío = primer video) e índice único usuario + lección + video; las filas existentes quedan en el primer video. Para el primero gana la marca más reciente entre su clave y la vacía. Esquema `6.28.2-video-positions`.
+- **TESTS**: `tests/integration/MobileAuditMultiVideoTest.php` (503 con un fallo SQL forzado, progreso 2 de 4 = 50 con el ID del post, 3 videos en orden y límite, claves estables al reordenar, posición por video y app anterior, `video_count` y campos de compatibilidad) y casos de error en `tests/Security/MobileAssignmentServiceTest.php`. Fallan con el código de 6.28.1.
+
 ## 6.28.1 (2026-10-04)
 
 ### Seguridad — API móvil sin caché de página

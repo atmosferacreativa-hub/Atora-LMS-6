@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class V5_Installer {
 
 	/** Versión del esquema. Incrementar para forzar re-instalación. */
-	const SCHEMA_VERSION = '6.28.0-sync-schema';
+	const SCHEMA_VERSION = '6.28.2-video-positions';
 
 	/** Option key que almacena la versión instalada. */
 	const OPTION_KEY = 'atora_v5_schema_version';
@@ -55,6 +55,7 @@ class V5_Installer {
 			&& self::migrate_6265_offline_schema()
 			&& self::migrate_6265_content_revisions()
 			&& self::migrate_6280_lesson_content_hash()
+			&& self::migrate_6282_video_positions()
 			&& self::migrate_6131_schema_fixes() ) {
 			update_option( self::OPTION_KEY, self::SCHEMA_VERSION );
 		}
@@ -83,6 +84,7 @@ class V5_Installer {
 			&& self::migrate_6265_offline_schema()
 			&& self::migrate_6265_content_revisions()
 			&& self::migrate_6280_lesson_content_hash()
+			&& self::migrate_6282_video_positions()
 			&& self::migrate_6131_schema_fixes() ) {
 			update_option( self::OPTION_KEY, self::SCHEMA_VERSION );
 		}
@@ -453,6 +455,52 @@ class V5_Installer {
 			$wpdb->query( "ALTER TABLE {$lessons} ADD COLUMN revision INT UNSIGNED NOT NULL DEFAULT 1 AFTER content" );
 		}
 
+		return true;
+	}
+
+	/**
+	 * 6.28.2: posición por video. Las filas existentes quedan con video_key
+	 * vacío, que la API lee como el primer video de la lección.
+	 */
+	private static function migrate_6282_video_positions(): bool {
+		global $wpdb;
+		$table = $wpdb->prefix . 'atora_lesson_positions';
+		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) ) !== $table ) {
+			return true;
+		}
+		$has_column = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+				 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND COLUMN_NAME = 'video_key'",
+				$table
+			)
+		) > 0;
+		if ( ! $has_column ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			if ( false === $wpdb->query( "ALTER TABLE {$table} ADD COLUMN video_key VARCHAR(20) NOT NULL DEFAULT '' AFTER lesson_id" ) ) {
+				return false;
+			}
+		}
+		$index = static function ( string $name ) use ( $wpdb, $table ): bool {
+			return (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS
+					 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND INDEX_NAME = %s",
+					$table,
+					$name
+				)
+			) > 0;
+		};
+		if ( ! $index( 'user_lesson_video' ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			if ( false === $wpdb->query( "ALTER TABLE {$table} ADD UNIQUE KEY user_lesson_video (user_id, lesson_id, video_key)" ) ) {
+				return false;
+			}
+		}
+		if ( $index( 'user_lesson' ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$wpdb->query( "ALTER TABLE {$table} DROP INDEX user_lesson" );
+		}
 		return true;
 	}
 
@@ -2190,12 +2238,13 @@ class V5_Installer {
 			KEY created_at    (created_at)
 		) $charset_collate;" );
 
-		// Posición de reproducción: una fila por usuario y lección; gana la marca más reciente.
+		// Posición de reproducción: una fila por usuario, lección y video (6.28.2); gana la marca más reciente.
 		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_lesson_positions (
 			id                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 			institution_id      BIGINT UNSIGNED NOT NULL DEFAULT 0,
 			user_id             BIGINT UNSIGNED NOT NULL,
 			lesson_id           BIGINT UNSIGNED NOT NULL,
+			video_key           VARCHAR(20)     NOT NULL DEFAULT '',
 			course_id           BIGINT UNSIGNED NOT NULL DEFAULT 0,
 			position_seconds    INT UNSIGNED    NOT NULL DEFAULT 0,
 			duration_seconds    INT UNSIGNED    NOT NULL DEFAULT 0,
@@ -2203,7 +2252,7 @@ class V5_Installer {
 			client_recorded_ms  BIGINT UNSIGNED NOT NULL DEFAULT 0,
 			updated_at          DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			PRIMARY KEY (id),
-			UNIQUE KEY user_lesson (user_id, lesson_id)
+			UNIQUE KEY user_lesson_video (user_id, lesson_id, video_key)
 		) $charset_collate;" );
 
 		// ── Sesiones móviles fuera de usermeta (6.26.5) ─────────────────────
