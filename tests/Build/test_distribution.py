@@ -11,7 +11,7 @@ import zipfile
 
 
 ROOT = Path(__file__).resolve().parents[2]
-VERSION = "6.28.0"
+VERSION = "6.28.1"
 COMMIT = "5793f8458969614181aaba62c5bae65d3e838300"
 
 

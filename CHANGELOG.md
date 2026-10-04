@@ -1,5 +1,14 @@
 # CHANGELOG — ATORA LMS
 
+## 6.28.1 (2026-10-04)
+
+### Seguridad — API móvil sin caché de página
+
+- **Fix**: con LiteSpeed Cache activo en el demo, `GET /dashboard` respondía `200` desde caché (`x-litespeed-cache: hit`) incluso con un token inventado: cualquier usuario recibía el panel guardado del primero que entró. Afectaba a toda ruta `atora-mobile/v1`.
+- Toda respuesta de `atora-mobile/v1` (incluidos errores y 401) sale con `Cache-Control: no-store, private`, `X-LiteSpeed-Cache-Control: no-cache`, `CDN-Cache-Control: no-store` y `Vary: Authorization`; además dispara `litespeed_control_set_nocache` y define `DONOTCACHEPAGE`. No depende de la configuración del plugin de caché.
+- **Al actualizar**: purgar la caché del sitio una vez (LiteSpeed → Purgar todo) para descartar lo que ya estaba guardado.
+- **TESTS**: `tests/integration/MobileNoCacheTest.php` (falla sin el arreglo).
+
 ## 6.28.0 (2026-10-04)
 
 ### Fase 1 — Aprender (API móvil)
