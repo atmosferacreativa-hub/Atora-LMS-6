@@ -92,7 +92,8 @@ trait CLMS_Shortcodes_Enrollment_Catalog_Trait {
 		}
 
 		if ( ! is_user_logged_in() ) {
-			return '<a class="clms-course-login-btn" href="' . esc_url( wp_login_url( $redirect_url ) ) . '">Iniciar sesión</a>';
+			$login_url = class_exists( 'CLMS_Frontend_URLs' ) ? CLMS_Frontend_URLs::login_url( $redirect_url ) : wp_login_url( $redirect_url );
+			return '<a class="clms-course-login-btn" href="' . esc_url( $login_url ) . '">Iniciar sesión</a>';
 		}
 
 		if ( ! $user_id ) {

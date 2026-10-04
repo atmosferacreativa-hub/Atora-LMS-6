@@ -24,6 +24,23 @@ class LMS_Enrollment_Service {
 	 * Idempotente: si ya existe la reactiva en lugar de duplicar.
 	 */
 	public static function enroll( int $user_id, int $course_id, int $order_id = 0 ): int {
+		if ( ! $user_id ) {
+			return 0;
+		}
+		if ( function_exists( 'get_user_by' ) ) {
+			$user = get_user_by( 'id', $user_id );
+			if ( ! $user || empty( $user->ID ) ) {
+				return 0;
+			}
+		} elseif ( function_exists( 'get_userdata' ) ) {
+			$data = get_userdata( $user_id );
+			if ( ! $data || empty( $data->ID ) ) {
+				return 0;
+			}
+		} else {
+			return 0;
+		}
+
 		global $wpdb;
 
 		$table   = $wpdb->prefix . 'atora_enrollments';
@@ -331,6 +348,23 @@ class LMS_Enrollment_Service {
 	}
 
 	/**
+	 * Caducidad de acceso de programa desde tabla.
+	 * Equivalente tabular de CLMS_Helper::get_user_program_access_expiration().
+	 */
+	public static function get_program_access_expiry_by_wp_id( int $user_id, int $wp_program_id ): string {
+		global $wpdb;
+		$expires_at = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT expires_at FROM {$wpdb->prefix}atora_program_enrollments
+				 WHERE user_id = %d AND wp_program_id = %d AND status IN ('active', 'completed') LIMIT 1",
+				$user_id,
+				$wp_program_id
+			)
+		);
+		return $expires_at ? (string) $expires_at : '';
+	}
+
+	/**
 	 * Completación de curso desde tabla (status = 'completed' en atora_enrollments).
 	 * Equivalente tabular de CLMS_Helper::is_course_completed().
 	 *
@@ -384,6 +418,7 @@ class LMS_Enrollment_Service {
 			'id'            => absint( $row['id'] ),
 			'user_id'       => absint( $row['user_id'] ),
 			'course_id'     => absint( $row['course_id'] ),
+			'wp_course_id'  => absint( $row['wp_course_id'] ?? 0 ),
 			'status'        => sanitize_key( (string) ( $row['status']      ?? 'active' ) ),
 			'progress_pct'  => absint( $row['progress_pct'] ?? 0 ),
 			'grade'         => isset( $row['grade'] ) && $row['grade'] !== null ? (float) $row['grade'] : null,
@@ -391,6 +426,7 @@ class LMS_Enrollment_Service {
 			'enrolled_at'   => sanitize_text_field( (string) ( $row['enrolled_at']   ?? '' ) ),
 			'completed_at'  => sanitize_text_field( (string) ( $row['completed_at']  ?? '' ) ),
 			'last_activity' => sanitize_text_field( (string) ( $row['last_activity'] ?? '' ) ),
+			'expires_at'    => sanitize_text_field( (string) ( $row['expires_at']    ?? '' ) ),
 		);
 	}
 }

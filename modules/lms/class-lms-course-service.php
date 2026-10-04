@@ -37,6 +37,29 @@ class LMS_Course_Service {
 		return $row ? self::format_course( $row ) : null;
 	}
 
+	/**
+	 * Valida si el vínculo `wp_post_id` apunta a un CPT `lm_course` publicado.
+	 *
+	 * Objetivo: evitar exponer cursos tabulares `published` cuyo puente legacy
+	 * (CPT) está en `trash` o ya no existe.
+	 *
+	 * Nota: esto es una validación de visibilidad/enrolabilidad para estudiantes;
+	 * NO debe usarse para ocultar el registro a administración.
+	 */
+	public static function legacy_wp_course_post_is_public( int $wp_post_id ): bool {
+		if ( $wp_post_id <= 0 || ! function_exists( 'get_post' ) ) {
+			return false;
+		}
+		$post = get_post( $wp_post_id );
+		if ( ! $post ) {
+			return false;
+		}
+		if ( 'lm_course' !== (string) ( $post->post_type ?? '' ) ) {
+			return false;
+		}
+		return 'publish' === (string) ( $post->post_status ?? '' );
+	}
+
 	public static function get_all( array $args = array() ): array {
 		global $wpdb;
 
@@ -46,36 +69,54 @@ class LMS_Course_Service {
 		$status   = sanitize_key( (string) ( $args['status'] ?? 'published' ) );
 		$search   = sanitize_text_field( (string) ( $args['search'] ?? '' ) );
 		$instr_id = absint( $args['instructor_id'] ?? 0 );
+		$only_public_legacy_wp_links = ! empty( $args['only_public_legacy_wp_links'] );
+
+		$posts_table = property_exists( $wpdb, 'posts' )
+			? (string) $wpdb->posts
+			: ( $wpdb->prefix . 'posts' );
+		$from  = "{$table} c";
+		$joins = '';
 
 		$where  = 'WHERE 1=1';
 		$params = array();
 
 		if ( '' !== $status && 'all' !== $status ) {
-			$where   .= ' AND status = %s';
+			$where   .= ' AND c.status = %s';
 			$params[] = $status;
 		}
 		if ( '' !== $search ) {
-			$where   .= ' AND (title LIKE %s OR description LIKE %s)';
+			$where   .= ' AND (c.title LIKE %s OR c.description LIKE %s)';
 			$like     = '%' . $wpdb->esc_like( $search ) . '%';
 			$params[] = $like;
 			$params[] = $like;
 		}
 		if ( $instr_id ) {
-			$where   .= ' AND instructor_id = %d';
+			$where   .= ' AND c.instructor_id = %d';
 			$params[] = $instr_id;
 		}
 
-		$params_c = $params;
-		$total    = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		// Opción explícita: al listar cursos para estudiantes, excluir
+		// cursos tabulares `published` cuyo wp_post_id apunta a un CPT
+		// inexistente o no público.
+		if ( $only_public_legacy_wp_links ) {
+			$joins    .= " LEFT JOIN {$posts_table} p ON p.ID = c.wp_post_id";
+			$where    .= ' AND (COALESCE(c.wp_post_id, 0) <= 0 OR (p.ID IS NOT NULL AND p.post_type = %s AND p.post_status = %s))';
+			$params[] = 'lm_course';
+			$params[] = 'publish';
+		}
+
+		$params_c  = $params;
+		$count_sql = "SELECT COUNT(*) FROM {$from} {$joins} {$where}";
+		$total     = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			! empty( $params_c )
-				? $wpdb->prepare( "SELECT COUNT(*) FROM {$table} {$where}", ...$params_c )
-				: "SELECT COUNT(*) FROM {$table} {$where}"
+				? $wpdb->prepare( $count_sql, ...$params_c )
+				: $count_sql
 		);
 
 		$params[] = $limit;
 		$params[] = $offset;
 		$rows = (array) $wpdb->get_results( // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-			$wpdb->prepare( "SELECT * FROM {$table} {$where} ORDER BY published_at DESC, id DESC LIMIT %d OFFSET %d", ...$params ),
+			$wpdb->prepare( "SELECT c.* FROM {$from} {$joins} {$where} ORDER BY c.published_at DESC, c.id DESC LIMIT %d OFFSET %d", ...$params ),
 			ARRAY_A
 		);
 
@@ -134,19 +175,104 @@ class LMS_Course_Service {
 	 * @param array $data
 	 * @return bool
 	 */
-	public static function update( int $course_id, array $data ): bool {
+	/**
+	 * Actualiza un curso en tablas, incrementando revision exactamente una vez.
+	 *
+	 * Si el cliente envía `revision`, se interpreta como revision esperada
+	 * (optimistic concurrency).
+	 *
+	 * @param int   $course_id
+	 * @param array $data
+	 * @return bool|\WP_Error
+	 */
+	public static function update( int $course_id, array $data ): bool|\WP_Error {
 		global $wpdb;
+		$expected_revision = absint( $data['revision'] ?? 0 );
+		unset( $data['revision'] );
 		unset( $data['wp_post_id'] );
 		$row = self::sanitize_course_data( $data );
 		unset( $row['created_at'] );
-		if ( empty( $row ) ) { return false; }
-		return false !== $wpdb->update(
+		if ( empty( $row ) ) {
+			return new \WP_Error( 'atora_course_no_changes', __( 'No se enviaron cambios para guardar.', 'atora-lms' ), array( 'status' => 400 ) );
+		}
+
+		$current = $wpdb->get_row(
+			$wpdb->prepare( "SELECT id, revision FROM {$wpdb->prefix}atora_courses WHERE id = %d LIMIT 1", $course_id ),
+			ARRAY_A
+		);
+		if ( ! $current ) {
+			return new \WP_Error( 'atora_course_not_found', __( 'Curso no encontrado.', 'atora-lms' ), array( 'status' => 404 ) );
+		}
+		$current_revision = absint( $current['revision'] ?? 1 );
+		if ( $expected_revision && $expected_revision !== $current_revision ) {
+			return new \WP_Error( 'atora_course_revision_conflict', __( 'El curso cambió. Actualiza antes de guardar.', 'atora-lms' ), array( 'status' => 409 ) );
+		}
+
+		$row['revision'] = $current_revision + 1;
+
+		$result = $wpdb->update(
 			$wpdb->prefix . 'atora_courses',
 			$row,
-			array( 'id' => $course_id ),
+			array( 'id' => $course_id, 'revision' => $current_revision ),
 			null,
-			array( '%d' )
+			array( '%d', '%d' )
 		);
+
+		if ( false === $result ) {
+			return new \WP_Error( 'atora_course_update_failed', __( 'No se pudo actualizar.', 'atora-lms' ), array( 'status' => 500 ) );
+		}
+		if ( 1 !== $result ) {
+			return new \WP_Error( 'atora_course_concurrent_update', __( 'No se pudo actualizar porque el curso cambió durante la operación.', 'atora-lms' ), array( 'status' => 409 ) );
+		}
+		return true;
+	}
+
+	/**
+	 * Actualiza una lección en tablas, incrementando revision exactamente una vez.
+	 *
+	 * @param int   $lesson_id
+	 * @param array $data
+	 * @return bool|\WP_Error
+	 */
+	public static function update_lesson( int $lesson_id, array $data ): bool|\WP_Error {
+		global $wpdb;
+		$expected_revision = absint( $data['revision'] ?? 0 );
+		unset( $data['revision'] );
+		unset( $data['wp_post_id'] );
+		$row = self::sanitize_lesson_data( $data );
+		unset( $row['created_at'] );
+		if ( empty( $row ) ) {
+			return new \WP_Error( 'atora_lesson_no_changes', __( 'No se enviaron cambios para guardar.', 'atora-lms' ), array( 'status' => 400 ) );
+		}
+
+		$current = $wpdb->get_row(
+			$wpdb->prepare( "SELECT id, revision FROM {$wpdb->prefix}atora_lessons WHERE id = %d LIMIT 1", $lesson_id ),
+			ARRAY_A
+		);
+		if ( ! $current ) {
+			return new \WP_Error( 'atora_lesson_not_found', __( 'Lección no encontrada.', 'atora-lms' ), array( 'status' => 404 ) );
+		}
+		$current_revision = absint( $current['revision'] ?? 1 );
+		if ( $expected_revision && $expected_revision !== $current_revision ) {
+			return new \WP_Error( 'atora_lesson_revision_conflict', __( 'La lección cambió. Actualiza antes de guardar.', 'atora-lms' ), array( 'status' => 409 ) );
+		}
+
+		$row['revision'] = $current_revision + 1;
+
+		$result = $wpdb->update(
+			$wpdb->prefix . 'atora_lessons',
+			$row,
+			array( 'id' => $lesson_id, 'revision' => $current_revision ),
+			null,
+			array( '%d', '%d' )
+		);
+		if ( false === $result ) {
+			return new \WP_Error( 'atora_lesson_update_failed', __( 'No se pudo actualizar.', 'atora-lms' ), array( 'status' => 500 ) );
+		}
+		if ( 1 !== $result ) {
+			return new \WP_Error( 'atora_lesson_concurrent_update', __( 'No se pudo actualizar porque la lección cambió durante la operación.', 'atora-lms' ), array( 'status' => 409 ) );
+		}
+		return true;
 	}
 
 	/**

@@ -10,7 +10,7 @@ import zipfile
 def inspect(archive_path, version, commit):
     if not re.fullmatch(r"[0-9a-f]{40}", commit):
         raise ValueError("Expected commit must be a full Git SHA")
-    forbidden = {".git", ".claude", "tests", "docs", "vendor", "composer.json", "composer.lock", "phpunit.xml"}
+    forbidden = {".git", ".claude", "tests", "docs", "vendor", "composer.json", "composer.lock", "phpunit.xml", ".atora-baseline", ".tmp", ".phpunit.result.cache"}
     with zipfile.ZipFile(archive_path) as archive:
         names = archive.namelist()
         if len(names) != len(set(names)):
@@ -19,7 +19,7 @@ def inspect(archive_path, version, commit):
             path = PurePosixPath(name)
             if path.is_absolute() or ".." in path.parts or "\\" in name or not path.parts or path.parts[0] != "atora-lms":
                 raise ValueError("Unexpected ZIP path: " + name)
-            if forbidden.intersection(path.parts):
+            if forbidden.intersection(path.parts) or any(part.startswith("demo-audit") for part in path.parts):
                 raise ValueError("Development file in ZIP: " + name)
         corrupt = archive.testzip()
         if corrupt:

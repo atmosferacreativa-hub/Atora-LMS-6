@@ -101,7 +101,8 @@ jobs:
             tests/LMS/GradeAppealOwnershipTest.php \
             tests/LMS/LMSCourseOwnershipTest.php \
             tests/LMS/LMSCourseVisibilityTest.php \
-            tests/Rest/WebhookPermissionsTest.php
+            tests/Rest/WebhookPermissionsTest.php \
+            tests/Rest/MobileAssignmentRoutesTest.php
 
   unit-tests:
     name: PHPUnit full suite (file-isolated)

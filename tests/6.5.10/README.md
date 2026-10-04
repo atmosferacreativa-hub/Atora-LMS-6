@@ -75,5 +75,5 @@ registration) — verified by running
 `git diff fix/6.5.9-cierre-estatico...fix/6.5.10-production-hotfix --stat`
 and confirming the file list contains no `modules/security/`,
 `includes/class-atora-*` rate-limiting, REST permission-callback, or
-authentication file. See `SECURITY-REPORT-6.5.10.md` section "Security
+authentication file. See `docs/reportes/SECURITY-REPORT-6.5.10.md` section "Security
 regression results" for the full diff-based accounting.

@@ -2,7 +2,7 @@
 **Fecha:** 2026-08-22
 **Auditor:** Agente autónomo Claude Code
 **Alcance:** Cierre de 1 HIGH + 4 MEDIUM confirmados por una auditoría
-externa línea por línea contra 6.5.8. Ver `SECURITY-REPORT-6.5.9.md`
+externa línea por línea contra 6.5.8. Ver `docs/reportes/SECURITY-REPORT-6.5.9.md`
 (excluido de la distribución) para el Evidence Gate completo
 (archivo/diff/test/resultado por hallazgo).
 
@@ -53,7 +53,7 @@ actualizados con el fixture de `ATORA_Rate_Limiter` que
 **Fecha:** 2026-08-23
 **Auditor:** Agente autónomo Claude Code
 **Alcance:** Cierre final de la etapa de hardening estático. Ver
-`SECURITY-REPORT-6.5.8.md` (excluido de la distribución) para el
+`docs/reportes/SECURITY-REPORT-6.5.8.md` (excluido de la distribución) para el
 Evidence Gate completo (archivo/diff/test/resultado por hallazgo).
 
 ## FIXED (6.5.8)
@@ -95,7 +95,7 @@ Evidence Gate completo (archivo/diff/test/resultado por hallazgo).
 **Auditor:** Agente autónomo Claude Code
 **Alcance:** Sprint 6.5.7 — cierre verificable de 6 hallazgos con
 evidencia obligatoria (archivo + diff + test + revisión final) cada
-uno. Ver `SECURITY-REPORT-6.5.7.md` (excluido de la distribución)
+uno. Ver `docs/reportes/SECURITY-REPORT-6.5.7.md` (excluido de la distribución)
 para el informe completo con la tabla de evidencia y la matriz REST.
 
 ## FIXED (6.5.7)
@@ -142,7 +142,7 @@ de carrera concurrente),
 namespace `clms/v1`): cursos, programas, lecciones, rúbricas,
 transcripciones, peer review, quizzes, reportes institucionales,
 acciones masivas, reordenamiento, webhooks. Ver
-`SECURITY-REPORT-6.5.6.md` (excluido de la distribución) para el
+`docs/reportes/SECURITY-REPORT-6.5.6.md` (excluido de la distribución) para el
 informe completo.
 
 ## FIXED (6.5.6)
@@ -180,7 +180,7 @@ equivalente dentro del propio handler, incluso cuando el
 **Alcance:** Sprint 6.5.5 — cierre de hallazgos RED/ORANGE/YELLOW de la
 auditoría 6.5.4, más un barrido de auditoría propio (P8 endpoints
 públicos, P9 capability/ownership, P10 SQL/output) sobre todo el
-codebase. Ver `SECURITY-REPORT-6.5.5.md` (excluido de la
+codebase. Ver `docs/reportes/SECURITY-REPORT-6.5.5.md` (excluido de la
 distribución) para el informe ejecutivo completo con conteos de
 validación y tabla PASS/FAIL.
 

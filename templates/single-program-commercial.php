@@ -248,7 +248,7 @@ $_subtitle   = (string) ( $_d['subtitle'] ?? '' );
 $_enrolled   = ! empty( $_d['is_enrolled'] );
 
 if ( ( ( '' !== trim( $_cta_url ) && ! $_enrolled ) || ! is_user_logged_in() ) && ! $has_block_content ) :
-	$_mobile_url   = '' !== trim( $_cta_url ) ? $_cta_url : wp_login_url( get_permalink( $program_id ) );
+	$_mobile_url   = '' !== trim( $_cta_url ) ? $_cta_url : CLMS_Frontend_URLs::login_url( get_permalink( $program_id ) );
 	$_mobile_label = '' !== trim( $_cta_url ) ? ( '' !== trim( $_cta_label ) ? $_cta_label : __( 'Inscribirme ahora', 'atora-lms' ) ) : __( 'Iniciar sesión', 'atora-lms' );
 	$_mobile_copy  = '' !== trim( $_price_copy ) ? $_price_copy : ( '' !== trim( $_tagline ) ? $_tagline : $_subtitle );
 	?>

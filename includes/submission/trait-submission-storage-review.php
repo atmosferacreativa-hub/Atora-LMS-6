@@ -87,6 +87,11 @@ trait CLMS_Submission_Storage_Review_Trait {
 					'_clms_peer_scores',
 					'_clms_peer_grade_at',
 					'_clms_final_grade',
+					// Marcas de un intento móvil anterior (6.27.0).
+					'_clms_submission_client_submitted_at',
+					'_clms_submission_source',
+					'_clms_submission_mobile_row_id',
+					'_clms_submission_is_late',
 				);
 
 				foreach ( $stale_review_meta as $meta_key ) {
@@ -167,6 +172,11 @@ trait CLMS_Submission_Storage_Review_Trait {
 			'_clms_peer_scores',
 			'_clms_peer_grade_at',
 			'_clms_final_grade',
+			// Marcas de un intento móvil anterior (6.27.0).
+			'_clms_submission_client_submitted_at',
+			'_clms_submission_source',
+			'_clms_submission_mobile_row_id',
+			'_clms_submission_is_late',
 		);
 
 		foreach ( $stale_review_meta as $meta_key ) {
@@ -266,6 +276,28 @@ trait CLMS_Submission_Storage_Review_Trait {
 			'comment'       => (string) get_post_meta( $submission_id, '_clms_submission_comment', true ),
 			'rubric_scores' => get_post_meta( $submission_id, '_clms_submission_rubric_scores', true ),
 			'files'         => $files,
+		);
+	}
+
+	/**
+	 * Revisión visible para el estudiante (misma regla que la web): nota solo si
+	 * está publicada; retroalimentación también en needs_revision/returned.
+	 *
+	 * @param int $user_id   Usuario.
+	 * @param int $lesson_id Lección (post lm_lesson).
+	 * @return array{submission_id:int, status:string, grade:?int, feedback:?string}
+	 */
+	public function get_student_review_view( $user_id, $lesson_id ) {
+		$submission = $this->get_user_submission_for_grading( $user_id, $lesson_id );
+		if ( empty( $submission ) ) {
+			return array( 'submission_id' => 0, 'status' => '', 'grade' => null, 'feedback' => null );
+		}
+
+		return array(
+			'submission_id' => absint( $submission['submission_id'] ),
+			'status'        => sanitize_key( (string) $submission['status'] ),
+			'grade'         => $this->can_student_view_published_grade( $submission ) ? $this->normalize_grade_display( $submission['grade'] ) : null,
+			'feedback'      => $this->can_student_view_feedback( $submission ) ? wp_strip_all_tags( (string) $submission['feedback'] ) : null,
 		);
 	}
 

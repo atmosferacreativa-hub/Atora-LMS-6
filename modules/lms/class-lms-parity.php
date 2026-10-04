@@ -385,19 +385,23 @@ class LMS_Parity {
 	public static function get_volume_stats(): array {
 		global $wpdb;
 		$reads = $wpdb->prefix . self::TABLE_READS;
+		$enroll_table = $wpdb->prefix . 'atora_enrollments';
 		$since = gmdate( 'Y-m-d', strtotime( '-14 days' ) );
 
-		// Alumnos observados (union de todos los readers en 14 días).
+		// Alumnos observados = alumnos activos que además tienen al menos una lectura
+		// en la tabla de paridad dentro de la ventana actual.
 		$observed = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			$wpdb->prepare(
-				"SELECT COUNT(DISTINCT user_id) FROM {$reads} WHERE logged_date >= %s",
+				"SELECT COUNT(DISTINCT e.user_id)
+				 FROM {$enroll_table} e
+				 INNER JOIN {$reads} r ON r.user_id = e.user_id
+				 WHERE e.status IN ('active','completed') AND r.logged_date >= %s",
 				$since
 			)
 		);
 
 		// Alumnos activos en tablas.
-		$enroll_table = $wpdb->prefix . 'atora_enrollments';
-		$active       = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$active = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			"SELECT COUNT(DISTINCT user_id) FROM {$enroll_table} WHERE status IN ('active','completed')"
 		);
 
@@ -519,6 +523,7 @@ class LMS_Parity {
 	 */
 	public static function cutover_ready(): array {
 		$reasons = array();
+		$reconcile_clean_and_recent = false;
 
 		if ( ! (bool) get_option( 'atora_lms_dualwrite', false ) ) {
 			$reasons[] = 'atora_lms_dualwrite está inactivo.';
@@ -543,6 +548,8 @@ class LMS_Parity {
 				$reasons[] = 'La reconciliación no tiene una fecha de verificación válida.';
 			} elseif ( ( time() - $checked_at ) > self::RECONCILE_MAX_AGE ) {
 				$reasons[] = 'La reconciliación está vencida; debe ejecutarse nuevamente antes del cutover.';
+			} elseif ( 0 === $pending ) {
+				$reconcile_clean_and_recent = true;
 			}
 		}
 
@@ -556,9 +563,33 @@ class LMS_Parity {
 		}
 
 		foreach ( self::core_table_counts() as $table => $count ) {
-			if ( $count <= 0 ) {
-				$reasons[] = sprintf( 'La tabla %s no tiene filas.', $table );
+			if ( $count > 0 ) {
+				continue;
 			}
+
+			if ( str_ends_with( $table, 'atora_program_enrollments' ) ) {
+				if ( -1 === $count ) {
+					$reasons[] = sprintf( 'La tabla %s no existe.', $table );
+				} elseif ( -2 === $count ) {
+					$reasons[] = sprintf( 'No se pudo contar filas en la tabla %s.', $table );
+				} elseif ( 0 === $count && $reconcile_clean_and_recent ) {
+					continue;
+				} else {
+					$reasons[] = sprintf( 'La tabla %s no tiene filas.', $table );
+				}
+				continue;
+			}
+
+			if ( -1 === $count ) {
+				$reasons[] = sprintf( 'La tabla %s no existe.', $table );
+				continue;
+			}
+			if ( -2 === $count ) {
+				$reasons[] = sprintf( 'No se pudo contar filas en la tabla %s.', $table );
+				continue;
+			}
+
+			$reasons[] = sprintf( 'La tabla %s no tiene filas.', $table );
 		}
 
 		return array(
@@ -568,7 +599,8 @@ class LMS_Parity {
 	}
 
 	/**
-	 * Conteo de filas de las tablas núcleo (prefijadas), 0 si la tabla no existe.
+	 * Conteo de filas de las tablas núcleo (prefijadas).
+	 * -1 si la tabla no existe, -2 si el COUNT(*) falla.
 	 *
 	 * @return array<string,int>  nombre de tabla (con prefijo) => filas.
 	 */
@@ -578,7 +610,17 @@ class LMS_Parity {
 		foreach ( self::CORE_TABLES as $name ) {
 			$table  = $wpdb->prefix . $name;
 			$exists = (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) === $table; // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-			$counts[ $table ] = $exists ? (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table}" ) : 0; // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			if ( ! $exists ) {
+				$counts[ $table ] = -1;
+				continue;
+			}
+
+			$raw = $wpdb->get_var( "SELECT COUNT(*) FROM {$table}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			if ( null === $raw || false === $raw || '' === $raw ) {
+				$counts[ $table ] = -2;
+				continue;
+			}
+			$counts[ $table ] = (int) $raw;
 		}
 		return $counts;
 	}

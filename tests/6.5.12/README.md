@@ -54,7 +54,7 @@ No security control was touched. Verified via
 and a targeted grep for
 `permission_callback|current_user_can|check_ajax_referer|check_admin_referer|wp_verify_nonce`
 across the added/removed diff lines (zero code matches — see
-`ROUTING-REPORT-6.5.12.md`).
+`docs/reportes/ROUTING-REPORT-6.5.12.md`).
 
 ## 15 — upgrade 6.5.11 → 6.5.12
 
@@ -62,4 +62,4 @@ Not executable here — requires a real WordPress install with an
 existing 6.5.11 database (including its own `atora_lms_rewrite_version`
 option already set to `'6.5.11-1'`) to actually demonstrate the
 corrective re-flush. Manually traced instead — see
-`ROUTING-REPORT-6.5.12.md` section 17.
+`docs/reportes/ROUTING-REPORT-6.5.12.md` section 17.

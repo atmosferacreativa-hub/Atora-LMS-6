@@ -3,15 +3,24 @@
 Última actualización: 2026-09-10  
 Base: ATORA LMS `6.21.0`
 
-## Estado actual (implementado en 6.14.0)
-- Epic 1 (MVP): Group Assessment (grupos por curso + entregas grupales + propagación + overrides + CSV + REST).
-- Epic 2 (MVP): Rubrics v2 (pesos, escalas por curso con lock tras primera nota, holística, ejemplares, presets).
-- Epic 3 (MVP): Early Warning (entregas perdidas + notificación interna + REST + pantalla admin).
+## Estado actual (6.27.0)
 
-## Estado actual (implementado en 6.15.0)
-- Epic 3 (MVP, ampliación): Learning Analytics (snapshots de riesgo por estudiante/curso + cron + REST + dashboard + CSV).
+Actualizado: 2026-10-03 (`main` en 6.27.1). Las epics del roadmap ya existen como módulo:
 
-**Pendiente (roadmap):** analítica de riesgo completa, coevaluación avanzada, portafolios, interoperabilidad (Classroom/Microsoft), H5P, hardening y QA ampliado.
+| Epic | Módulo | Desde |
+|---|---|---|
+| 1 — Group Assessment | `modules/groups` | 6.14.0 (UI de estudiante y hardening en 6.18.7–6.18.11) |
+| 2 — Rubrics v2 | `modules/rubrics` | 6.14.0 (snapshot por entrega en 6.18.6; tablas en 6.26.5) |
+| 3 — Early Warning | `modules/early-warning` | 6.14.0 |
+| 3 — Learning Analytics | `modules/learning-analytics` | 6.15.0–6.15.4 y 6.18.5 |
+| 5 — Portafolios | `modules/portfolios` | 6.17.0–6.17.2 |
+| 6 — H5P | `modules/h5p` | 6.19.0 |
+| 7 — Google Classroom | `modules/classroom` | 6.18.0–6.18.3 |
+| 7 — Microsoft (Entra, Teams, Outlook) | `modules/microsoft` | 6.20.0 |
+
+Además, fuera de las epics originales: Gradebook institucional (6.22.0), SpeedGrader 2 con moderación (6.23.0), Biblioteca académica (6.24.0), Credenciales verificables (6.25.0), Mobile API v1 (6.26.0) con entregas de tareas sin conexión (6.27.0) y miniaturas de video (6.27.1).
+
+**Pendiente:** coevaluación avanzada; historial de entregas web en tabla y varios intentos en SpeedGrader (Fase 4); hardening y QA ampliado.
 
 ## Objetivo
 Evolucionar ATORA LMS en ciclos continuos, priorizando (1) evaluación colaborativa, (2) calidad y auditabilidad de la evaluación, (3) analítica académica y alertas tempranas, y (4) evidencia de aprendizaje (portafolios), sin comprometer compatibilidad ni performance.

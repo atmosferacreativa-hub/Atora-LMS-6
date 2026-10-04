@@ -44,6 +44,7 @@ class LMS_Migrator {
 
 		// Cursos y lecciones (NOT EXISTS, sin cursor)
 		$courses_result = self::migrate_courses( $batch );
+		$lessons_retried = self::retry_missing_lessons_for_migrated_courses( $batch );
 
 		// Taxonomías de curso D-003=B (paginado)
 		$terms_limit  = $batch * 4;
@@ -87,6 +88,7 @@ class LMS_Migrator {
 		self::save_migration_cursors( $cursors );
 
 		$results = array(
+			'lessons_retried'     => $lessons_retried,
 			'courses'             => $courses_result,
 			'course_terms'        => $terms_result,
 			'programs'            => $programs_result,
@@ -353,6 +355,154 @@ class LMS_Migrator {
 		}
 
 		return $count;
+	}
+
+	/**
+	 * Reintenta migrar lecciones faltantes para cursos CPT ya vinculados a atora_courses.
+	 *
+	 * Bugfix: migrate_all() migra lecciones al crear el curso, pero no reintenta
+	 * lecciones agregadas/desfasadas cuando el curso ya tiene fila en tabla.
+	 *
+	 * Solo considera lecciones lm_lesson en publish/draft con _clms_course_id
+	 * apuntando a un lm_course existente y ya migrado (atora_courses.wp_post_id).
+	 * No actualiza lecciones que ya tengan fila (solo backfill NOT EXISTS).
+	 */
+	private static function retry_missing_lessons_for_migrated_courses( int $limit = 50 ): int {
+		global $wpdb;
+		$limit = max( 1, absint( $limit ) );
+
+		$posts    = isset( $wpdb->posts ) ? $wpdb->posts : ( $wpdb->prefix . 'posts' );
+		$postmeta = isset( $wpdb->postmeta ) ? $wpdb->postmeta : ( $wpdb->prefix . 'postmeta' );
+		$courses_table = $wpdb->prefix . 'atora_courses';
+		$lessons_table = $wpdb->prefix . 'atora_lessons';
+
+		$unambiguous_lesson_course = "(
+			SELECT post_id, CAST(MIN(meta_value) AS UNSIGNED) AS wp_course_id
+			FROM {$postmeta}
+			WHERE meta_key = '_clms_course_id'
+			GROUP BY post_id
+			HAVING COUNT(DISTINCT meta_value) = 1
+			   AND SUM(meta_value REGEXP '^[0-9]+$') = COUNT(*)
+		)";
+
+		$rows = (array) $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$wpdb->prepare(
+				"SELECT l.ID AS lesson_wp_id, pm.wp_course_id, c.id AS atora_course_id
+				 FROM {$posts} l
+				 INNER JOIN {$unambiguous_lesson_course} pm
+				         ON pm.post_id = l.ID
+				 INNER JOIN {$courses_table} c
+				         ON c.wp_post_id = pm.wp_course_id
+				 INNER JOIN {$posts} p
+				         ON p.ID = c.wp_post_id
+				        AND p.post_type = 'lm_course'
+				        AND p.post_status IN ('publish','draft','private')
+				 LEFT JOIN {$lessons_table} al
+				        ON al.wp_post_id = l.ID
+				 WHERE l.post_type = 'lm_lesson'
+				   AND l.post_status IN ('publish','draft')
+				   AND al.id IS NULL
+				 ORDER BY l.ID ASC
+				 LIMIT %d",
+				$limit
+			),
+			ARRAY_A
+		);
+
+		$orders_by_course = array();
+
+		$inserted = 0;
+		foreach ( $rows as $row ) {
+			$lesson_wp_id   = absint( $row['lesson_wp_id'] ?? 0 );
+			$wp_course_id    = absint( $row['wp_course_id'] ?? 0 );
+			$atora_course_id = absint( $row['atora_course_id'] ?? 0 );
+			if ( ! $lesson_wp_id || ! $atora_course_id || ! $wp_course_id ) {
+				continue;
+			}
+
+			// Doble guard: nunca actualizar una lección ya presente.
+			$existing = (int) $wpdb->get_var(
+				$wpdb->prepare( "SELECT id FROM {$lessons_table} WHERE wp_post_id = %d LIMIT 1", $lesson_wp_id )
+			);
+			if ( $existing ) {
+				continue;
+			}
+
+			$post = get_post( $lesson_wp_id );
+			if ( ! $post ) {
+				continue;
+			}
+
+			if ( ! isset( $orders_by_course[ $wp_course_id ] ) ) {
+				$lesson_rows = (array) $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+					$wpdb->prepare(
+						"SELECT l.ID, l.menu_order
+						 FROM {$posts} l
+						 INNER JOIN {$unambiguous_lesson_course} pm
+						         ON pm.post_id = l.ID AND pm.wp_course_id = %d
+						 WHERE l.post_type = 'lm_lesson'
+						   AND l.post_status IN ('publish','draft')
+						 ORDER BY l.menu_order ASC, l.ID ASC",
+						$wp_course_id
+					),
+					ARRAY_A
+				);
+				$map = array();
+				$i   = 0;
+				foreach ( $lesson_rows as $lr ) {
+					$lid = absint( $lr['ID'] ?? 0 );
+					if ( ! $lid ) {
+						continue;
+					}
+					$i++;
+					$menu_order = absint( $lr['menu_order'] ?? 0 );
+					$map[ $lid ] = $menu_order > 0 ? $menu_order : $i;
+				}
+				$orders_by_course[ $wp_course_id ] = $map;
+			}
+
+			$section = sanitize_text_field( (string) get_post_meta( $lesson_wp_id, '_clms_section', true ) );
+			$type    = sanitize_key( (string) ( get_post_meta( $lesson_wp_id, '_clms_lesson_type', true ) ?: 'text' ) );
+			$video        = '';
+			$extra_videos = get_post_meta( $lesson_wp_id, '_clms_lesson_extra_videos', true );
+			if ( is_array( $extra_videos ) ) {
+				foreach ( $extra_videos as $extra_video ) {
+					$candidate = is_array( $extra_video ) ? esc_url_raw( (string) ( $extra_video['url'] ?? '' ) ) : '';
+					if ( '' !== $candidate ) {
+						$video = $candidate;
+						break;
+					}
+				}
+			}
+			if ( '' === $video ) {
+				$video = esc_url_raw( (string) get_post_meta( $lesson_wp_id, '_clms_lesson_video_url', true ) );
+			}
+			if ( '' === $video ) {
+				$video = esc_url_raw( (string) get_post_meta( $lesson_wp_id, '_clms_video_url', true ) );
+			}
+
+			$data = array(
+				'wp_post_id'      => $lesson_wp_id,
+				'course_id'       => $atora_course_id,
+				'title'           => $post->post_title,
+				'slug'            => $post->post_name,
+				'content'         => $post->post_content,
+				'lesson_order'    => absint( $orders_by_course[ $wp_course_id ][ $lesson_wp_id ] ?? 1 ),
+				'section'         => $section,
+				'section_order'   => absint( get_post_meta( $lesson_wp_id, '_clms_section_order', true ) ?: 0 ),
+				'type'            => $type,
+				'duration_min'    => absint( get_post_meta( $lesson_wp_id, '_clms_duration', true ) ),
+				'is_free_preview' => (bool) get_post_meta( $lesson_wp_id, '_clms_free_preview', true ),
+				'video_url'       => $video,
+				'status'          => 'publish' === $post->post_status ? 'published' : 'draft',
+			);
+
+			if ( LMS_Course_Service::upsert_lesson( $data ) ) {
+				$inserted++;
+			}
+		}
+
+		return $inserted;
 	}
 
 	// ── Taxonomías de curso / atora_course_terms (D-003 = B) ────────────────
@@ -1218,11 +1368,23 @@ class LMS_Migrator {
 
 	public static function get_status(): array {
 		global $wpdb;
+		$statuses = "'" . implode( "','", array_map( 'esc_sql', self::$migratable_post_statuses ) ) . "'";
 
 		$total_cpt_courses = self::count_migratable_posts( 'lm_course' );
 		$total_cpt_lessons = self::count_migratable_posts( 'lm_lesson' );
-		$migrated_courses  = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}atora_courses WHERE wp_post_id > 0" ); // phpcs:ignore
-		$migrated_lessons  = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}atora_lessons WHERE wp_post_id > 0" ); // phpcs:ignore
+
+		// Migrados = filas cuya referencia a wp_posts existe y apunta al CPT correcto,
+		// en un estado que este migrador realmente procesa (publish/draft/private).
+		$migrated_courses  = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			"SELECT COUNT(DISTINCT p.ID) FROM {$wpdb->prefix}atora_courses c
+			 INNER JOIN {$wpdb->posts} p ON p.ID = c.wp_post_id
+			 WHERE c.wp_post_id > 0 AND p.post_type = 'lm_course' AND p.post_status IN ({$statuses})"
+		);
+		$migrated_lessons  = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			"SELECT COUNT(DISTINCT p.ID) FROM {$wpdb->prefix}atora_lessons l
+			 INNER JOIN {$wpdb->posts} p ON p.ID = l.wp_post_id
+			 WHERE l.wp_post_id > 0 AND p.post_type = 'lm_lesson' AND p.post_status IN ({$statuses})"
+		);
 		$migrated_enroll   = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}atora_enrollments" ); // phpcs:ignore
 
 		$reconcile     = self::reconcile();
@@ -1307,13 +1469,48 @@ class LMS_Migrator {
 		);
 
 		// 3) Matrículas: usermeta «_clms_enrolled_courses» vs atora_enrollments.
-		$course_map = array(); // wp_post_id (curso) => atora_courses.id
-		foreach ( $wpdb->get_results( "SELECT id, wp_post_id FROM {$courses_table} WHERE wp_post_id > 0" ) as $row ) { // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$course_map[ (int) $row->wp_post_id ] = (int) $row->id;
+		$valid_wp_courses = array(); // wp_post_id => true (solo lm_course publish/draft/private).
+		foreach ( (array) $wpdb->get_col( "SELECT ID FROM {$wpdb->posts} WHERE post_type = 'lm_course' AND post_status IN ({$statuses})" ) as $id ) { // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$valid_wp_courses[ (int) $id ] = true;
 		}
 
-		$expected_pairs              = array(); // "user_id:atora_course_id" esperados según usermeta.
+		$course_map   = array(); // wp_post_id (curso) => atora_courses.id
+		$courses_by_id = array(); // atora_courses.id => wp_post_id
+		foreach ( (array) $wpdb->get_results( "SELECT id, wp_post_id FROM {$courses_table}" ) as $row ) { // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$courses_by_id[ (int) $row->id ] = (int) $row->wp_post_id;
+			if ( (int) $row->wp_post_id > 0 ) {
+				$course_map[ (int) $row->wp_post_id ] = (int) $row->id;
+			}
+		}
+
+		$now_mysql      = (string) current_time( 'mysql', true );
+		$now_timestamp  = (int) current_time( 'timestamp', true );
+		$legacy_expiry  = array(); // user_id => [wp_course_id => expires_at]
+		$expiry_rows = $wpdb->get_results( "SELECT user_id, meta_value FROM {$wpdb->usermeta} WHERE meta_key = '_clms_course_access_expiry'" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		foreach ( (array) $expiry_rows as $row ) {
+			$exp = maybe_unserialize( $row->meta_value );
+			$legacy_expiry[ (int) $row->user_id ] = is_array( $exp ) ? $exp : array();
+		}
+
+		$is_legacy_expired = static function( string $datetime ) use ( $now_timestamp ): bool {
+			$datetime = sanitize_text_field( $datetime );
+			if ( '' === $datetime ) {
+				return false;
+			}
+			$timestamp = strtotime( $datetime . ' UTC' );
+			if ( ! $timestamp ) {
+				$timestamp = strtotime( $datetime );
+			}
+			if ( ! $timestamp ) {
+				return false;
+			}
+			return $timestamp < $now_timestamp;
+		};
+
+		$expected_pairs              = array(); // "user_id:atora_course_id" esperados según el universo legacy.
+		$expected_pairs_access       = array(); // subset filtrado por reglas de acceso (estado/caducidad).
 		$enrollments_blocked_by_course = 0;     // matrículas legacy cuyo curso aún no está migrado.
+		$enrollments_blocked_by_broken_wp_link = 0; // IDs WP inexistentes/no-migrables o vínculo tabla→WP roto.
 
 		$enrolled_rows = $wpdb->get_results( "SELECT user_id, meta_value FROM {$wpdb->usermeta} WHERE meta_key = '_clms_enrolled_courses'" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		foreach ( $enrolled_rows as $row ) {
@@ -1328,22 +1525,87 @@ class LMS_Migrator {
 					continue;
 				}
 
+				if ( ! isset( $valid_wp_courses[ $wp_course_id ] ) ) {
+					$enrollments_blocked_by_broken_wp_link++;
+					continue;
+				}
+
 				if ( ! isset( $course_map[ $wp_course_id ] ) ) {
 					$enrollments_blocked_by_course++;
 					continue;
 				}
 
-				$expected_pairs[ (int) $row->user_id . ':' . $course_map[ $wp_course_id ] ] = true;
+				$key = (int) $row->user_id . ':' . $course_map[ $wp_course_id ];
+				$expected_pairs[ $key ] = true;
+				$expires_at = (string) ( $legacy_expiry[ (int) $row->user_id ][ $wp_course_id ] ?? '' );
+				if ( ! $is_legacy_expired( $expires_at ) ) {
+					$expected_pairs_access[ $key ] = true;
+				}
 			}
 		}
 
-		$actual_pairs = array(); // "user_id:course_id" presentes en atora_enrollments.
-		foreach ( $wpdb->get_results( "SELECT user_id, course_id FROM {$enroll_table}" ) as $row ) { // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-			$actual_pairs[ (int) $row->user_id . ':' . (int) $row->course_id ] = true;
+		$missing_user_ids = array(); // user_id => true (usuarios ausentes en wp_users)
+		foreach ( (array) $wpdb->get_col( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			"SELECT DISTINCT e.user_id
+			 FROM {$enroll_table} e
+			 LEFT JOIN {$wpdb->users} u ON u.ID = e.user_id
+			 WHERE u.ID IS NULL"
+		) as $uid ) {
+			$missing_user_ids[ (int) $uid ] = true;
 		}
 
-		$enrollments_missing_in_table    = count( array_diff_key( $expected_pairs, $actual_pairs ) );
-		$enrollments_missing_in_usermeta = count( array_diff_key( $actual_pairs, $expected_pairs ) );
+		$actual_pairs = array(); // "user_id:course_id" presentes en atora_enrollments.
+		$actual_pairs_access = array(); // subset filtrado por reglas de acceso (estado/caducidad).
+		$actual_pairs_missing_user = array(); // subset de $actual_pairs con user_id ausente.
+		$enrollments_blocked_by_missing_course_id = 0; // filas en atora_enrollments cuyo course_id no existe.
+		foreach ( $wpdb->get_results( "SELECT user_id, course_id, status, expires_at FROM {$enroll_table}" ) as $row ) { // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$course_id = (int) $row->course_id;
+			if ( ! isset( $courses_by_id[ $course_id ] ) ) {
+				$enrollments_blocked_by_missing_course_id++;
+				continue;
+			}
+
+			$wp_post_id = (int) $courses_by_id[ $course_id ];
+			// Cursos nativos (sin vínculo WP) no se comparan contra usermeta.
+			if ( $wp_post_id <= 0 ) {
+				continue;
+			}
+
+			if ( ! isset( $valid_wp_courses[ $wp_post_id ] ) ) {
+				$enrollments_blocked_by_broken_wp_link++;
+				continue;
+			}
+
+			$key = (int) $row->user_id . ':' . $course_id;
+			$actual_pairs[ $key ] = true;
+			if ( isset( $missing_user_ids[ (int) $row->user_id ] ) ) {
+				$actual_pairs_missing_user[ $key ] = true;
+			}
+
+			$status = sanitize_key( (string) ( $row->status ?? '' ) );
+			if ( ! in_array( $status, array( 'active', 'completed' ), true ) ) {
+				continue;
+			}
+			$expires_at = sanitize_text_field( (string) ( $row->expires_at ?? '' ) );
+			if ( '' !== $expires_at && $expires_at < $now_mysql ) {
+				continue;
+			}
+			$actual_pairs_access[ $key ] = true;
+		}
+
+		$enrollments_blocked_by_missing_user = count( $actual_pairs_missing_user );
+
+		// Las matrículas cuyo usuario WP no existe deben reportarse como bloqueadas
+		// (datos), pero no deben contaminar las comparaciones tabla↔usermeta.
+		$expected_pairs_cmp      = array_diff_key( $expected_pairs_access, $actual_pairs_missing_user );
+		$actual_pairs_any_cmp    = array_diff_key( $actual_pairs, $actual_pairs_missing_user );
+		$actual_pairs_access_cmp = array_diff_key( $actual_pairs_access, $actual_pairs_missing_user );
+
+		$missing_in_table_pairs    = array_diff_key( $expected_pairs_cmp, $actual_pairs_access_cmp );
+		$missing_in_usermeta_pairs = array_diff_key( $actual_pairs_access_cmp, $expected_pairs_cmp );
+
+		$enrollments_missing_in_table    = count( $missing_in_table_pairs );
+		$enrollments_missing_in_usermeta = count( $missing_in_usermeta_pairs );
 
 		// 4) Progreso: usuarios con «_clms_completed_lessons» no vacío y 0 filas en atora_lesson_progress.
 		$users_with_legacy_progress = array();
@@ -1447,7 +1709,10 @@ class LMS_Migrator {
 			'orphan_lessons_table_to_legacy'   => $orphan_lessons_table,
 			'enrollments_missing_in_table'     => $enrollments_missing_in_table,
 			'enrollments_missing_in_usermeta'  => $enrollments_missing_in_usermeta,
+			'enrollments_blocked_by_missing_user' => $enrollments_blocked_by_missing_user,
 			'enrollments_blocked_by_course'    => $enrollments_blocked_by_course,
+			'enrollments_blocked_by_broken_wp_link' => $enrollments_blocked_by_broken_wp_link,
+			'enrollments_blocked_by_missing_course_id' => $enrollments_blocked_by_missing_course_id,
 			'users_progress_not_migrated'      => $users_progress_not_migrated,
 			'orphan_programs_legacy'           => $orphan_programs_legacy,
 			'program_enrollments_missing'      => $program_enrollments_missing,

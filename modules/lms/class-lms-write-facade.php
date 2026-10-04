@@ -83,16 +83,18 @@ class LMS_Write_Facade {
 	/**
 	 * Matricula a un usuario en un curso (tabla + espejo legacy si dualwrite ON).
 	 */
-	public static function enroll( int $user_id, int $atora_course_id ): int {
+	public static function enroll( int $user_id, int $atora_course_id, int $order_id = 0 ): int {
 		if ( ! self::ensure_loaded() ) { return 0; }
 
 		self::$syncing = true;
-		$enroll_id = LMS_Enrollment_Service::enroll( $user_id, $atora_course_id );
+		$enroll_id = LMS_Enrollment_Service::enroll( $user_id, $atora_course_id, $order_id );
 		self::$syncing = false;
 
 		if ( $enroll_id && self::dualwrite_enabled() ) {
 			$wp_id = self::wp_course_id( $atora_course_id );
-			if ( $wp_id ) { self::mirror_enroll_to_legacy( $user_id, $wp_id ); }
+			if ( $wp_id && LMS_Course_Service::legacy_wp_course_post_is_public( $wp_id ) ) {
+				self::mirror_enroll_to_legacy( $user_id, $wp_id );
+			}
 		}
 		return $enroll_id;
 	}

@@ -124,7 +124,7 @@ class CLMS_Student_Profile {
 		if ( ! is_user_logged_in() ) {
 			return $this->gate_html(
 				__( 'Inicia sesión para ver tu perfil.', 'atora-lms' ),
-				wp_login_url( get_permalink() ),
+				CLMS_Frontend_URLs::login_url( get_permalink() ),
 				__( 'Iniciar sesión', 'atora-lms' )
 			);
 		}

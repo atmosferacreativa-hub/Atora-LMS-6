@@ -41,5 +41,7 @@ class CLMS_Admin_Menu {
 		// PT-2/PT-3 (6.11.0): ficha de estudiante + asignación de coordinador de sección.
 		add_action( 'admin_post_atora_student_profile_add_note', array( $this, 'handle_student_profile_add_note' ) );
 		add_action( 'admin_post_atora_set_section_coordinator',  array( $this, 'handle_set_section_coordinator' ) );
+		add_action( 'admin_post_atora_enrollments_set_access',    array( $this, 'handle_enrollments_set_access' ) );
+		add_action( 'wp_ajax_atora_enrollments_search',           array( $this, 'ajax_enrollments_search' ) );
 	}
 }

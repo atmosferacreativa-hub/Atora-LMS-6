@@ -53,7 +53,7 @@ $sidebar_html      = (string) ( $view['sidebar_html'] ?? '' );
 			<?php if ( 'guest' === $view_state ) : ?>
 				<div class="atora-lesson-gate">
 					<p><?php esc_html_e( 'Debes iniciar sesión para ver esta lección.', 'atora-lms' ); ?></p>
-					<a class="atora-btn atora-btn-primary" href="<?php echo esc_url( wp_login_url( get_permalink() ) ); ?>">
+					<a class="atora-btn atora-btn-primary" href="<?php echo esc_url( CLMS_Frontend_URLs::login_url( get_permalink() ) ); ?>">
 						<?php esc_html_e( 'Iniciar sesión', 'atora-lms' ); ?>
 					</a>
 				</div>

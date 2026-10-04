@@ -107,7 +107,7 @@ the_post();
 					<p class="cov-cta-footer-sub"><?php echo esc_html( wp_trim_words( $_excerpt, 18 ) ); ?></p>
 				<?php endif; ?>
 				<?php if ( ! $_user_id ) : ?>
-					<a class="cov-btn cov-btn-primary" href="<?php echo esc_url( wp_login_url( get_permalink() ) ); ?>">
+					<a class="cov-btn cov-btn-primary" href="<?php echo esc_url( CLMS_Frontend_URLs::login_url( get_permalink() ) ); ?>">
 						<?php esc_html_e( 'Iniciar sesión para acceder', 'atora-lms' ); ?>
 					</a>
 				<?php else : ?>

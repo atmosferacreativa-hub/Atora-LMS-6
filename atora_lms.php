@@ -3,7 +3,7 @@
  * Plugin Name:       ATORA LMS
  * Plugin URI:        https://atora.studio
  * Description:       LMS modular para WordPress con IA, evaluaciones, certificados, CRM, mensajería multi-canal, afiliados, live streaming y más. Autor: Atora Studio.
- * Version:           6.26.7
+ * Version:           6.27.1
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Atora Studio
@@ -52,7 +52,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * - Limpieza automática de notificaciones >90 días
  */
 	if ( ! defined( 'ATORA_LMS_VERSION' ) ) {
-		define( 'ATORA_LMS_VERSION', '6.26.7' );
+		define( 'ATORA_LMS_VERSION', '6.27.1' );
 	}
 
 if ( ! defined( 'ATORA_LMS_FILE' ) ) {
@@ -187,7 +187,7 @@ add_filter( 'cron_schedules', static function ( array $schedules ): array {
 // una llamada directa a flush_rewrite_rules() por código nunca
 // dispara. Subir la versión acá fuerza un flush más, ahora
 // acompañado de una purga explícita de caché de página (ver abajo).
-define( 'ATORA_LMS_REWRITE_VERSION', '6.5.13-1' );
+define( 'ATORA_LMS_REWRITE_VERSION', '6.26.74' );
 
 add_action( 'wp_loaded', static function () {
 	$stored = (string) get_option( 'atora_lms_rewrite_version', '' );
@@ -905,6 +905,10 @@ add_action( 'init', static function () {
 	// 6.26.7: sello de versión (build-info.json / git).
 	require_once ATORA_LMS_DIR . 'includes/class-build-info.php';
 
+	// URLs frontend: si existen páginas tipo /cuenta/ y /dashboard/,
+	// preferirlas sobre wp-login.php crudo.
+	require_once ATORA_LMS_DIR . 'includes/frontend/class-frontend-urls.php';
+
 	// P10.1 (6.13.0): cifrado de tokens OAuth — bloqueante, debe cargar
 	// antes que Calendar_Sync y cualquier proveedor Google (Meet/Drive).
 	require_once ATORA_LMS_DIR . 'includes/security/class-token-crypto.php';
@@ -973,6 +977,14 @@ add_action( 'init', static function () {
 	atora_lms_require_module( 'includes/class-loader.php', static function() use ( &$clms_loader_instance ) {
 		if ( class_exists( 'CLMS_Loader' ) && method_exists( 'CLMS_Loader', 'boot' ) ) {
 			$clms_loader_instance = CLMS_Loader::boot();
+		}
+	} );
+
+	// Sync: cuando una submission se califica, reflejar la nota en la tabla
+	// atora_quiz_submissions (solo si existe una fila vinculada por wp_post_id).
+	atora_lms_require_module( 'includes/grading/class-table-quiz-submission-sync.php', static function() {
+		if ( class_exists( 'CLMS_Table_Quiz_Submission_Sync' ) && method_exists( 'CLMS_Table_Quiz_Submission_Sync', 'register_hooks' ) ) {
+			CLMS_Table_Quiz_Submission_Sync::register_hooks();
 		}
 	} );
 
@@ -1221,9 +1233,24 @@ add_action( 'init', static function () {
 
 	// ── Mobile API v1: tokens opacos y experiencia estudiantil ───────────────
 	atora_lms_require_module( 'includes/mobile/class-mobile-token-service.php' );
+	atora_lms_require_module( 'includes/media/class-video-thumbnail-resolver.php' );
+	if ( class_exists( 'ATORA_Video_Thumbnail_Resolver' ) ) {
+		add_action( ATORA_Video_Thumbnail_Resolver::VIMEO_FETCH_HOOK, array( 'ATORA_Video_Thumbnail_Resolver', 'fetch_vimeo_thumbnail' ) );
+	}
+	atora_lms_require_module( 'includes/mobile/class-mobile-assignment-store.php' );
+	atora_lms_require_module( 'includes/mobile/class-mobile-assignment-service.php' );
 	atora_lms_require_module( 'includes/mobile/class-mobile-rest-controller.php' );
 	if ( class_exists( 'ATORA_Mobile_REST_Controller' ) ) {
 		add_action( 'rest_api_init', array( 'ATORA_Mobile_REST_Controller', 'register_routes' ) );
+	}
+	// 6.27.0: limpieza de subidas móviles vencidas (fragmentos parciales).
+	if ( class_exists( 'ATORA_Mobile_Assignment_Service' ) ) {
+		add_action( ATORA_Mobile_Assignment_Service::CLEANUP_HOOK, static function () {
+			ATORA_Mobile_Assignment_Service::instance()->cleanup_expired();
+		} );
+		if ( ! wp_next_scheduled( ATORA_Mobile_Assignment_Service::CLEANUP_HOOK ) ) {
+			wp_schedule_event( time() + HOUR_IN_SECONDS, 'hourly', ATORA_Mobile_Assignment_Service::CLEANUP_HOOK );
+		}
 	}
 	// Sincronizar CPT con tablas propias al publicar/actualizar
 	add_action( 'save_post_lm_course', function( int $post_id ) {
@@ -1374,15 +1401,15 @@ function atora_lms_activate(): void {
 		error_log( '[ATORA LMS] Activación completada con módulos faltantes: ' . implode( ', ', array_unique( $GLOBALS['atora_lms_missing_modules'] ) ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
 	}
 
-	flush_rewrite_rules( false );
 	update_option( 'atora_lms_activated', current_time( 'mysql' ) );
-	// PT-3 (6.5.11): la activación ya hizo su propio flush arriba —
-	// marcar la versión de reescritura acá para que el chequeo de
-	// 'wp_loaded' no repita un segundo flush innecesario en el
-	// siguiente request tras una activación fresca.
-	if ( defined( 'ATORA_LMS_REWRITE_VERSION' ) ) {
-		update_option( 'atora_lms_rewrite_version', ATORA_LMS_REWRITE_VERSION, false );
-	}
+	// 6.26.74: NO hacer flush acá. La activación corre después de 'init',
+	// así que los CPT (hookeados a 'init') no están registrados y el flush
+	// guardaba reglas sin /cursos/ ni /programas/ → 404 tras subir un ZIP
+	// (WordPress reactiva el plugin). Además marcaba la versión como
+	// aplicada, así que nada lo corregía. Borrar la versión hace que el
+	// chequeo de 'wp_loaded' del siguiente request haga el flush con todo
+	// registrado.
+	delete_option( 'atora_lms_rewrite_version' );
 }
 
 register_activation_hook( ATORA_LMS_FILE, 'atora_lms_activate' );
@@ -1392,6 +1419,7 @@ register_activation_hook( ATORA_LMS_FILE, 'atora_lms_activate' );
  */
 function atora_lms_deactivate(): void {
 	flush_rewrite_rules( false );
+	wp_clear_scheduled_hook( 'atora_mobile_upload_cleanup' );
 }
 
 register_deactivation_hook( ATORA_LMS_FILE, 'atora_lms_deactivate' );
