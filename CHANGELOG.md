@@ -1,5 +1,17 @@
 # CHANGELOG — ATORA LMS
 
+## 6.28.0 (2026-10-04)
+
+### Fase 1 — Aprender (API móvil)
+
+- **NEW — `GET /sync/changes?cursor=`**: sin cursor, estado completo resumido de los cursos matriculados; con cursor, solo lo que cambió (id, tipo, `revision`, `removed`), las matrículas propias nuevas o terminadas y `enrolled_course_ids` vigente. Siempre `next_cursor`; paginado de a 200; varios guardados del mismo objeto llegan como uno; `reset: true` si el cursor es más antiguo que lo conservado o ilegible.
+- **Registro de cambios** `atora_content_changes` (con `institution_id` y, en matrículas, `user_id`): se escribe desde un único punto, la acción `atora/lms/content_revised` que emiten `LMS_Course_Service::update*()` y la sincronización del editor de 6.27.4, más `atora/lms/enrolled` y `atora/lms/unenrolled`. Retención de 90 días (cron diario).
+- **Huella `content_hash`** en `atora_lessons`: cambiar solo recursos, videos, consignas, fechas o tipo de actividad también sube `revision`. Las filas existentes la reciben en silencio, sin subir `revision`; la reparación única vuelve a correr una vez para rellenarla.
+- **Descargas**: cada recurso de `/lessons/{id}` suma `downloadable` (solo adjuntos de la academia o archivos del mismo dominio), `bytes` y `updated_at`; la lección suma `video_downloadable` (solo MP4 de la academia) y `video_bytes` (`ATORA_Download_Info`).
+- **NEW — `PUT /lessons/{id}/position`** y `resume_position_seconds`: tabla `atora_lesson_positions`, una fila por usuario y lección; gana la marca más reciente según `client_recorded_at` aunque sea menor; reenvío idempotente; sin matrícula, 404. Regla añadida a `docs/SINCRONIZACION-OFFLINE.md`.
+- **Esquema** `6.28.0-sync-schema`. `GET /discovery` declara `sync_changes`, `playback_position` y `resource_downloads`. `docs/MOBILE-API-V1.md` actualizado.
+- **TESTS**: `tests/integration/MobileSyncChangesTest.php` (cursor y paginación, cursos ajenos, colapso y bajas, estado completo paginado, reset por retención, matrícula por usuario, purga, posición: tardía no pisa, reenvío, repaso, ajeno 404) y `tests/Media/DownloadInfoTest.php`.
+
 ## 6.27.4 (2026-10-04)
 
 ### El editor de WordPress mantiene la tabla al día
