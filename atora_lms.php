@@ -3,7 +3,7 @@
  * Plugin Name:       ATORA LMS
  * Plugin URI:        https://atora.studio
  * Description:       LMS modular para WordPress con IA, evaluaciones, certificados, CRM, mensajería multi-canal, afiliados, live streaming y más. Autor: Atora Studio.
- * Version:           6.27.3
+ * Version:           6.27.4
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Atora Studio
@@ -52,7 +52,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * - Limpieza automática de notificaciones >90 días
  */
 	if ( ! defined( 'ATORA_LMS_VERSION' ) ) {
-		define( 'ATORA_LMS_VERSION', '6.27.3' );
+		define( 'ATORA_LMS_VERSION', '6.27.4' );
 	}
 
 if ( ! defined( 'ATORA_LMS_FILE' ) ) {
@@ -1096,6 +1096,13 @@ add_action( 'init', static function () {
 				}
 			} );
 
+			// ── 6.27.4: comando WP-CLI `wp atora lms align-tables` ───────────────
+			atora_lms_require_module( 'modules/lms/class-lms-editor-sync-cli.php', static function() {
+				if ( class_exists( '\ATORA\LMS\LMS_Editor_Sync_CLI' ) ) {
+					\ATORA\LMS\LMS_Editor_Sync_CLI::init();
+				}
+			} );
+
 			// ── 6.27.3: comando WP-CLI `wp atora courses repair-covers` ──────────
 			atora_lms_require_module( 'modules/lms/class-lms-course-covers-cli.php', static function() {
 				if ( class_exists( '\ATORA\LMS\LMS_Course_Covers_CLI' ) ) {
@@ -1232,9 +1239,14 @@ add_action( 'init', static function () {
 		'class-lms-course-service.php',
 		'class-lms-enrollment-service.php',
 		'class-lms-migrator.php',
+		'class-lms-editor-sync.php',
 		'class-lms-rest-controller.php',
 	) as $lms_file ) {
 		atora_lms_require_module( 'modules/lms/' . $lms_file );
+	}
+	// 6.27.4: el editor de WordPress mantiene al día atora_courses / atora_lessons.
+	if ( class_exists( 'ATORA\\LMS\\LMS_Editor_Sync' ) ) {
+		ATORA\LMS\LMS_Editor_Sync::init();
 	}
 	add_action( 'rest_api_init', array( 'ATORA\\LMS\\LMS_REST_Controller', 'register_routes' ) );
 

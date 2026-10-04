@@ -144,6 +144,64 @@ class LMS_Migrator {
 	// ── Cursos ───────────────────────────────────────────────────────────────
 
 	/**
+	 * Fila de `atora_courses` a partir del post `lm_course` (6.27.4: compartida
+	 * con la sincronización del editor).
+	 */
+	public static function course_row_from_post( object $post ): array {
+		$post_id = absint( $post->ID );
+		$instructor_ids = get_post_meta( $post_id, '_clms_instructor_ids', true );
+		$instructor_id  = is_array( $instructor_ids ) && ! empty( $instructor_ids )
+			? absint( $instructor_ids[0] )
+			: absint( $post->post_author );
+
+		$price    = (float) get_post_meta( $post_id, '_price', true );
+		$currency = function_exists( 'get_woocommerce_currency' ) ? get_woocommerce_currency() : 'USD';
+
+		// D-003=B: nivel de dificultad del primer término de lm_course_level;
+		// los términos de todas las taxonomías irán a atora_course_terms vía
+		// migrate_course_terms() (ya no se escriben en meta_json.categories).
+		$level_terms = self::resolve_course_categories( $post_id );
+
+		$data = array(
+			'wp_post_id'    => $post_id,
+			'title'         => $post->post_title,
+			'slug'          => $post->post_name,
+			'description'   => $post->post_content,
+			'excerpt'       => $post->post_excerpt,
+			'status'        => 'publish' === $post->post_status ? 'published' : $post->post_status,
+			'instructor_id' => $instructor_id,
+			'price'         => $price,
+			'currency'      => sanitize_key( $currency ),
+			'thumbnail_url' => get_the_post_thumbnail_url( $post_id, 'large' ) ?: '',
+			'passing_grade' => absint( get_post_meta( $post_id, '_clms_passing_grade', true ) ?: 70 ),
+			'published_at'  => 'publish' === $post->post_status ? $post->post_date_gmt : null,
+			'level'         => $level_terms[0] ?? 'beginner',
+		);
+
+		return $data;
+	}
+
+	/**
+	 * Inserta un curso (y sus lecciones y términos) que aún no tiene fila.
+	 * 6.27.4: lo usa también la sincronización del editor.
+	 *
+	 * @return int id de `atora_courses`, 0 si falla.
+	 */
+	public static function migrate_course_post( object $post ): int {
+		$post_id = absint( $post->ID );
+		// PT-6 (6.5.5): create() genérico ya no acepta wp_post_id bajo
+		// ninguna circunstancia — el migrador usa la vía explícita
+		// para contenido legado, donde wp_post_id es por definición
+		// el post que se está migrando.
+		$id = LMS_Course_Service::create_from_legacy( self::course_row_from_post( $post ) );
+		if ( $id ) {
+			self::migrate_lessons_for_course( $post_id, $id );
+			self::upsert_course_terms( $post_id, $id ); // D-003=B: tabla pivote
+		}
+		return $id;
+	}
+
+	/**
 	 * Migra cursos CPT aún no presentes en atora_courses (NOT EXISTS).
 	 * No usa offset fijo — siempre avanza hacia los pendientes reales.
 	 */
@@ -192,44 +250,8 @@ class LMS_Migrator {
 			$post = get_post( $post_id );
 			if ( ! $post ) { $errors++; continue; }
 
-			$instructor_ids = get_post_meta( $post_id, '_clms_instructor_ids', true );
-			$instructor_id  = is_array( $instructor_ids ) && ! empty( $instructor_ids )
-				? absint( $instructor_ids[0] )
-				: absint( $post->post_author );
-
-			$price    = (float) get_post_meta( $post_id, '_price', true );
-			$currency = function_exists( 'get_woocommerce_currency' ) ? get_woocommerce_currency() : 'USD';
-
-			// D-003=B: nivel de dificultad del primer término de lm_course_level;
-			// los términos de todas las taxonomías irán a atora_course_terms vía
-			// migrate_course_terms() (ya no se escriben en meta_json.categories).
-			$level_terms = self::resolve_course_categories( $post_id );
-
-			$data = array(
-				'wp_post_id'    => $post_id,
-				'title'         => $post->post_title,
-				'slug'          => $post->post_name,
-				'description'   => $post->post_content,
-				'excerpt'       => $post->post_excerpt,
-				'status'        => 'publish' === $post->post_status ? 'published' : $post->post_status,
-				'instructor_id' => $instructor_id,
-				'price'         => $price,
-				'currency'      => sanitize_key( $currency ),
-				'thumbnail_url' => get_the_post_thumbnail_url( $post_id, 'large' ) ?: '',
-				'passing_grade' => absint( get_post_meta( $post_id, '_clms_passing_grade', true ) ?: 70 ),
-				'published_at'  => 'publish' === $post->post_status ? $post->post_date_gmt : null,
-				'level'         => $level_terms[0] ?? 'beginner',
-			);
-
-			// PT-6 (6.5.5): create() genérico ya no acepta wp_post_id bajo
-			// ninguna circunstancia — el migrador usa la vía explícita
-			// para contenido legado, donde wp_post_id es por definición
-			// el post que se está migrando.
-			$id = LMS_Course_Service::create_from_legacy( $data );
-			if ( $id ) {
+			if ( self::migrate_course_post( $post ) ) {
 				$migrated++;
-				self::migrate_lessons_for_course( $post_id, $id );
-				self::upsert_course_terms( $post_id, $id ); // D-003=B: tabla pivote
 			} else {
 				$errors++;
 			}
@@ -240,6 +262,49 @@ class LMS_Migrator {
 			'skipped'  => $skipped,
 			'errors'   => $errors,
 			'total'    => count( $pending_ids ),
+		);
+	}
+
+	/**
+	 * Fila de `atora_lessons` a partir del post `lm_lesson` (6.27.4: compartida
+	 * con la sincronización del editor).
+	 */
+	public static function lesson_row_from_post( object $post, int $atora_course_id, int $lesson_order ): array {
+		$lesson_id = absint( $post->ID );
+		$section = sanitize_text_field( (string) get_post_meta( $lesson_id, '_clms_section', true ) );
+		$type    = sanitize_key( (string) ( get_post_meta( $lesson_id, '_clms_lesson_type', true ) ?: 'text' ) );
+		$video        = '';
+		$extra_videos = get_post_meta( $lesson_id, '_clms_lesson_extra_videos', true );
+		if ( is_array( $extra_videos ) ) {
+			foreach ( $extra_videos as $extra_video ) {
+				$candidate = is_array( $extra_video ) ? esc_url_raw( (string) ( $extra_video['url'] ?? '' ) ) : '';
+				if ( '' !== $candidate ) {
+					$video = $candidate;
+					break;
+				}
+			}
+		}
+		if ( '' === $video ) {
+			$video = esc_url_raw( (string) get_post_meta( $lesson_id, '_clms_lesson_video_url', true ) );
+		}
+		if ( '' === $video ) {
+			$video = esc_url_raw( (string) get_post_meta( $lesson_id, '_clms_video_url', true ) );
+		}
+
+		return array(
+			'wp_post_id'      => $lesson_id,
+			'course_id'       => $atora_course_id,
+			'title'           => $post->post_title,
+			'slug'            => $post->post_name,
+			'content'         => $post->post_content,
+			'lesson_order'    => $lesson_order,
+			'section'         => $section,
+			'section_order'   => absint( get_post_meta( $lesson_id, '_clms_section_order', true ) ?: 0 ),
+			'type'            => $type,
+			'duration_min'    => absint( get_post_meta( $lesson_id, '_clms_duration', true ) ),
+			'is_free_preview' => (bool) get_post_meta( $lesson_id, '_clms_free_preview', true ),
+			'video_url'       => $video,
+			'status'          => 'publish' === $post->post_status ? 'published' : 'draft',
 		);
 	}
 
@@ -313,41 +378,7 @@ class LMS_Migrator {
 			$post      = get_post( $lesson_id );
 			if ( ! $post ) { continue; }
 
-			$section = sanitize_text_field( (string) get_post_meta( $lesson_id, '_clms_section', true ) );
-			$type    = sanitize_key( (string) ( get_post_meta( $lesson_id, '_clms_lesson_type', true ) ?: 'text' ) );
-			$video        = '';
-			$extra_videos = get_post_meta( $lesson_id, '_clms_lesson_extra_videos', true );
-			if ( is_array( $extra_videos ) ) {
-				foreach ( $extra_videos as $extra_video ) {
-					$candidate = is_array( $extra_video ) ? esc_url_raw( (string) ( $extra_video['url'] ?? '' ) ) : '';
-					if ( '' !== $candidate ) {
-						$video = $candidate;
-						break;
-					}
-				}
-			}
-			if ( '' === $video ) {
-				$video = esc_url_raw( (string) get_post_meta( $lesson_id, '_clms_lesson_video_url', true ) );
-			}
-			if ( '' === $video ) {
-				$video = esc_url_raw( (string) get_post_meta( $lesson_id, '_clms_video_url', true ) );
-			}
-
-			$data = array(
-				'wp_post_id'      => $lesson_id,
-				'course_id'       => $atora_course_id,
-				'title'           => $post->post_title,
-				'slug'            => $post->post_name,
-				'content'         => $post->post_content,
-				'lesson_order'    => absint( $post->menu_order ) ?: ( $i + 1 ),
-				'section'         => $section,
-				'section_order'   => absint( get_post_meta( $lesson_id, '_clms_section_order', true ) ?: 0 ),
-				'type'            => $type,
-				'duration_min'    => absint( get_post_meta( $lesson_id, '_clms_duration', true ) ),
-				'is_free_preview' => (bool) get_post_meta( $lesson_id, '_clms_free_preview', true ),
-				'video_url'       => $video,
-				'status'          => 'publish' === $post->post_status ? 'published' : 'draft',
-			);
+			$data = self::lesson_row_from_post( $post, $atora_course_id, absint( $post->menu_order ) ?: ( $i + 1 ) );
 
 			if ( LMS_Course_Service::upsert_lesson( $data ) ) {
 				$count++;
@@ -461,41 +492,7 @@ class LMS_Migrator {
 				$orders_by_course[ $wp_course_id ] = $map;
 			}
 
-			$section = sanitize_text_field( (string) get_post_meta( $lesson_wp_id, '_clms_section', true ) );
-			$type    = sanitize_key( (string) ( get_post_meta( $lesson_wp_id, '_clms_lesson_type', true ) ?: 'text' ) );
-			$video        = '';
-			$extra_videos = get_post_meta( $lesson_wp_id, '_clms_lesson_extra_videos', true );
-			if ( is_array( $extra_videos ) ) {
-				foreach ( $extra_videos as $extra_video ) {
-					$candidate = is_array( $extra_video ) ? esc_url_raw( (string) ( $extra_video['url'] ?? '' ) ) : '';
-					if ( '' !== $candidate ) {
-						$video = $candidate;
-						break;
-					}
-				}
-			}
-			if ( '' === $video ) {
-				$video = esc_url_raw( (string) get_post_meta( $lesson_wp_id, '_clms_lesson_video_url', true ) );
-			}
-			if ( '' === $video ) {
-				$video = esc_url_raw( (string) get_post_meta( $lesson_wp_id, '_clms_video_url', true ) );
-			}
-
-			$data = array(
-				'wp_post_id'      => $lesson_wp_id,
-				'course_id'       => $atora_course_id,
-				'title'           => $post->post_title,
-				'slug'            => $post->post_name,
-				'content'         => $post->post_content,
-				'lesson_order'    => absint( $orders_by_course[ $wp_course_id ][ $lesson_wp_id ] ?? 1 ),
-				'section'         => $section,
-				'section_order'   => absint( get_post_meta( $lesson_wp_id, '_clms_section_order', true ) ?: 0 ),
-				'type'            => $type,
-				'duration_min'    => absint( get_post_meta( $lesson_wp_id, '_clms_duration', true ) ),
-				'is_free_preview' => (bool) get_post_meta( $lesson_wp_id, '_clms_free_preview', true ),
-				'video_url'       => $video,
-				'status'          => 'publish' === $post->post_status ? 'published' : 'draft',
-			);
+			$data = self::lesson_row_from_post( $post, $atora_course_id, absint( $orders_by_course[ $wp_course_id ][ $lesson_wp_id ] ?? 1 ) );
 
 			if ( LMS_Course_Service::upsert_lesson( $data ) ) {
 				$inserted++;
