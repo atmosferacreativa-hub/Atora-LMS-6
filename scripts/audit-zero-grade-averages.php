@@ -1,16 +1,21 @@
 <?php
 /**
- * Diagnóstico (6.29.5): notas finales que cambian con la regla nueva del promedio.
+ * Diagnóstico de solo lectura (6.29.5): qué notas finales cambian con la regla
+ * nueva del promedio (una nota de cero no es "sin notas").
  *
- * Uso: wp eval-file scripts/audit-zero-grade-averages.php
+ * Uso (con el plugin que esté instalado, ANTES de actualizar):
+ *   wp eval-file wp-content/plugins/atora-lms/scripts/audit-zero-grade-averages.php > auditoria-ceros.txt
  *
- * Antes de 6.29.5 el promedio del curso decidía qué combinar con `> 0`
- * (quiz 0 + tarea 100 = 100) y "sin notas" se guardaba como 0. Este script
- * recorre estudiante × curso matriculado, toma los promedios de quiz y tarea
- * que da el motor actual y reconstruye la nota anterior con la regla vieja.
+ * Funciona con cualquier versión instalada (6.28.x en adelante): no depende de
+ * que el motor ya tenga la regla nueva.
+ * - "Actual": la nota final que el plugin instalado muestra hoy.
+ * - "Nueva": la regla de 6.29.5, calculada desde cada nota (quizzes con intento;
+ *   tareas con nota liberada), combinando por cantidad de notas y separando
+ *   "sin notas" de 0.
  *
- * No modifica notas ni matrículas. Al pedir el resumen, el motor puede
- * regenerar su caché (lo mismo que abrir el panel).
+ * No modifica notas ni matrículas. Al pedir el resumen, el motor puede regenerar
+ * su caché (lo mismo que abrir el panel). La salida trae nombres de estudiantes:
+ * guardarla en un lugar privado.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -23,42 +28,70 @@ if ( ! $engine || ! method_exists( $engine, 'build_course_gradebook' ) || ! clas
 	return;
 }
 
-/** Regla anterior a 6.29.5, a partir de los promedios por tipo (null = sin notas). */
-$old_rule = static function ( $quiz, $task ): int {
-	$q = null === $quiz ? 0 : (int) $quiz;
-	$t = null === $task ? 0 : (int) $task;
-	if ( $q > 0 && $t > 0 ) {
-		return (int) round( ( $q + $t ) / 2 );
+/** Promedio entero 0–100, o null sin notas (igual que CLMS_Grade_Average). */
+$average = static function ( array $scores ) {
+	$scores = array_values( array_filter( $scores, 'is_numeric' ) );
+	if ( ! $scores ) {
+		return null;
 	}
-	return $q > 0 ? $q : $t;
+	$scores = array_map( static fn( $v ) => max( 0, min( 100, (float) $v ) ), $scores );
+	return (int) round( array_sum( $scores ) / count( $scores ) );
 };
 
-$students = get_users( array( 'fields' => array( 'ID', 'display_name' ) ) );
+/** Nota liberada: la regla de 6.29.0 (solo `graded`), o la clase si está instalada. */
+$released = static function ( string $status, $grade ): bool {
+	if ( class_exists( 'CLMS_Student_Grade_Visibility' ) ) {
+		return CLMS_Student_Grade_Visibility::grade_visible( $status, $grade );
+	}
+	return '' !== (string) $grade && 'graded' === $status;
+};
+
+$label = static fn( $v ) => null === $v ? 'sin notas' : (string) $v;
+
+$version  = defined( 'ATORA_LMS_VERSION' ) ? ATORA_LMS_VERSION : '?';
+$students = get_users( array( 'fields' => array( 'ID', 'display_name', 'user_email' ) ) );
 $changed  = array();
-$to_null  = 0;
 $pairs    = 0;
+$to_null  = 0;
 
 foreach ( $students as $student ) {
 	$courses = array_filter( array_map( 'absint', (array) CLMS_Helper::get_user_enrolled_courses( (int) $student->ID ) ) );
 	foreach ( $courses as $course_id ) {
 		++$pairs;
-		$summary = (array) ( $engine->build_course_gradebook( (int) $student->ID, $course_id )['summary'] ?? array() );
-		$quiz    = isset( $summary['quiz_average'] ) && is_numeric( $summary['quiz_average'] ) ? (int) $summary['quiz_average'] : null;
-		$task    = isset( $summary['assignment_average'] ) && is_numeric( $summary['assignment_average'] ) ? (int) $summary['assignment_average'] : null;
-		$new     = isset( $summary['final_average'] ) && is_numeric( $summary['final_average'] ) ? (int) $summary['final_average'] : null;
-		$old     = $old_rule( $quiz, $task );
+		$gradebook = (array) $engine->build_course_gradebook( (int) $student->ID, $course_id );
+		$summary   = (array) ( $gradebook['summary'] ?? array() );
+		$current   = isset( $summary['final_average'] ) && is_numeric( $summary['final_average'] ) ? (int) $summary['final_average'] : null;
 
-		if ( null === $new ) {
-			++$to_null; // Antes 0, ahora "sin notas": no cambia una nota real.
+		$quiz = array();
+		$task = array();
+		foreach ( (array) ( $gradebook['entries'] ?? array() ) as $entry ) {
+			if ( '' !== (string) ( $entry['quiz_grade'] ?? '' ) ) {
+				$quiz[] = $entry['quiz_grade'];
+			}
+			$grade = $entry['assignment_grade'] ?? '';
+			if ( '' !== (string) $grade && $released( (string) ( $entry['submission_status'] ?? '' ), $grade ) ) {
+				$task[] = $grade;
+			}
+		}
+		$q   = $average( $quiz );
+		$t   = $average( $task );
+		$new = ( null !== $q && null !== $t ) ? (int) round( ( $q + $t ) / 2 ) : ( $q ?? $t );
+
+		if ( null === $new && ( null === $current || 0 === $current ) ) {
+			++$to_null; // Antes "0", ahora "sin notas": no cambia ninguna nota real.
 			continue;
 		}
-		if ( $old !== $new ) {
-			$changed[] = array( (int) $student->ID, $student->display_name, $course_id, get_the_title( $course_id ), $old, $new, $quiz, $task );
+		if ( $current !== $new ) {
+			$changed[] = array( (int) $student->ID, $student->display_name, $student->user_email, $course_id, get_the_title( $course_id ), $current, $new, $q, $t, count( $quiz ), count( $task ) );
 		}
 	}
 }
 
-printf( "Pares estudiante × curso revisados: %d\nSin notas (antes 0, ahora \"sin notas\"): %d\nNotas finales que cambian: %d\n\n", $pairs, $to_null, count( $changed ) );
+printf( "Auditoría de promedios con cero — plugin instalado %s — %s\n\n", $version, wp_date( 'Y-m-d H:i' ) );
+printf( "Pares estudiante × curso revisados: %d\nSin notas (hoy se ve 0, con 6.29.5 \"sin notas\"): %d\nNotas finales que cambian: %d\n\n", $pairs, $to_null, count( $changed ) );
 foreach ( $changed as $row ) {
-	printf( "Estudiante %d (%s) · curso %d \"%s\": %d → %d (quiz %s, tareas %s)\n", $row[0], $row[1], $row[2], $row[3], $row[4], $row[5], null === $row[6] ? '—' : $row[6], null === $row[7] ? '—' : $row[7] );
+	printf(
+		"Estudiante %d (%s, %s) · curso %d \"%s\": actual %s → nueva %s (quizzes: %s en %d notas; tareas: %s en %d notas)\n",
+		$row[0], $row[1], $row[2], $row[3], $row[4], $label( $row[5] ), $label( $row[6] ), $label( $row[7] ), $row[9], $label( $row[8] ), $row[10]
+	);
 }
