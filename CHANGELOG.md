@@ -1,5 +1,10 @@
 # CHANGELOG — ATORA LMS
 
+## 6.29.1 (2026-10-04)
+
+- **API móvil**: cada curso de `GET /grades` suma `graded_count` (notas liberadas) y `last_graded_at`, para que la app avise de una calificación nueva sin pedir el detalle de cada curso. Una nota guardada sin liberar no las cambia.
+- **TESTS**: `MobileGradesCertificatesTest` lo comprueba con nota liberada y sin liberar.
+
 ## 6.29.0 (2026-10-04)
 
 ### Fase 2 — Rendir (plugin)
