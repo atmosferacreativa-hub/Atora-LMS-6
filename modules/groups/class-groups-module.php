@@ -19,6 +19,8 @@ final class Groups_Module {
 
 		add_action( 'atora/groups/master_submission_saved', array( __CLASS__, 'on_master_submission_saved' ), 10, 5 );
 		add_action( 'clms_submission_graded', array( __CLASS__, 'on_submission_graded' ), 20, 5 );
+		// 6.30.1: el borrador también llega a las copias, como borrador (el estudiante no lo ve).
+		add_action( \CLMS_Student_Grade_Visibility::DRAFT_HOOK, array( __CLASS__, 'on_submission_graded' ), 20, 5 );
 
 		add_action( 'rest_api_init', array( __CLASS__, 'register_rest_routes' ) );
 
@@ -97,6 +99,7 @@ final class Groups_Module {
 
 	/**
 	 * Propagates grades from master submission to member shadow submissions, applying per-student overrides.
+	 * Copies inherit the master's status (draft or published) and rubric scores (6.30.1).
 	 */
 	public static function on_submission_graded( int $submission_id, int $student_id, string $status = '', $grade = '', string $feedback = '' ): void {
 		$submission_id = absint( $submission_id );
@@ -122,7 +125,9 @@ final class Groups_Module {
 			return;
 		}
 
-		$base_grade = ( '' !== (string) $grade && is_numeric( $grade ) ) ? max( 0, min( 100, (int) round( (float) $grade ) ) ) : '';
+		$base_grade    = ( '' !== (string) $grade && is_numeric( $grade ) ) ? max( 0, min( 100, (int) round( (float) $grade ) ) ) : '';
+		$rubric_scores = get_post_meta( $submission_id, '_clms_submission_rubric_scores', true );
+		$rubric_scores = is_array( $rubric_scores ) ? $rubric_scores : array();
 
 		foreach ( $member_ids as $member_id ) {
 			$member_id = absint( $member_id );
@@ -139,7 +144,7 @@ final class Groups_Module {
 			}
 
 			$final_grade = $service->apply_override_if_any( $group_id, $lesson_id, $member_id, $base_grade );
-			$service->publish_shadow_grade( $shadow_id, $final_grade, $feedback );
+			$service->publish_shadow_grade( $shadow_id, $final_grade, $feedback, $status, $rubric_scores );
 		}
 	}
 

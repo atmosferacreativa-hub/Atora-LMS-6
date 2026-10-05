@@ -36,6 +36,7 @@ class CLMS_Learning_Path {
 		// Invalidar caché cuando hay nueva actividad
 		add_action( 'clms_quiz_attempt_saved',        array( $this, 'invalidate_cache' ), 10, 2 );
 		add_action( 'clms_submission_graded',         array( $this, 'invalidate_cache_submission' ), 10, 2 );
+		add_action( CLMS_Student_Grade_Visibility::DRAFT_HOOK, array( $this, 'invalidate_cache_submission' ), 10, 2 );
 	}
 
 	// ── Shortcode ─────────────────────────────────────────────────────────────────

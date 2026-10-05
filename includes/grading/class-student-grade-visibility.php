@@ -21,6 +21,26 @@ final class CLMS_Student_Grade_Visibility {
 
 	const RELEASED_STATUS = 'graded';
 
+	/**
+	 * 6.30.1: hook de un guardado que el estudiante todavía no ve (borrador, en
+	 * revisión, enviado a moderación). Mismos argumentos que `clms_submission_graded`:
+	 * (submission_id, student_id, status, grade, feedback).
+	 */
+	const DRAFT_HOOK = 'clms_submission_grade_draft_saved';
+
+	/** Estados de un guardado sin publicar: no avisan ni cuentan para el estudiante. */
+	public static function is_draft_status( $status ): bool {
+		return in_array( sanitize_key( (string) $status ), array( 'submitted', 'in_review', 'pending' ), true );
+	}
+
+	/**
+	 * Hook que corresponde a un guardado de calificación: `clms_submission_graded`
+	 * solo cuando el estudiante lo ve (publicada o devuelta para corregir).
+	 */
+	public static function grade_saved_hook( $status ): string {
+		return self::is_draft_status( $status ) ? self::DRAFT_HOOK : 'clms_submission_graded';
+	}
+
 	public static function grade_visible( $status, $grade ): bool {
 		return self::RELEASED_STATUS === sanitize_key( (string) $status ) && '' !== (string) $grade && null !== $grade;
 	}
