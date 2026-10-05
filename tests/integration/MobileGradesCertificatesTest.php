@@ -90,6 +90,8 @@ final class MobileGradesCertificatesTest extends WP_UnitTestCase {
 		$this->grade( $this->student, 'in_review', 95 );
 
 		$this->assertNull( $this->course_grade_for( $this->student ), 'No cuenta en el promedio.' );
+		$course = array_values( array_filter( $this->as( $this->student, 'grades' )['courses'], fn( $c ) => $c['course_id'] === $this->course ) )[0];
+		$this->assertSame( 0, $course['graded_count'], 'Una nota no liberada no dispara el aviso.' );
 		$activities = $this->as( $this->student, 'course_grades', array( 'course_id' => $this->course ) )['activities'];
 		$this->assertNull( $activities[0]['grade'] );
 		$this->assertSame( 'in_review', $activities[0]['status'] );
@@ -103,6 +105,9 @@ final class MobileGradesCertificatesTest extends WP_UnitTestCase {
 		$this->grade( $this->student, 'graded', 80 );
 
 		$this->assertEquals( 80.0, $this->course_grade_for( $this->student ) );
+		$course = array_values( array_filter( $this->as( $this->student, 'grades' )['courses'], fn( $c ) => $c['course_id'] === $this->course ) )[0];
+		$this->assertSame( 1, $course['graded_count'], 'La app usa esto para avisar de una nota nueva.' );
+		$this->assertNotNull( $course['last_graded_at'] );
 		$activities = $this->as( $this->student, 'course_grades', array( 'course_id' => $this->course ) )['activities'];
 		$this->assertEquals( 80.0, $activities[0]['grade'] );
 		$this->assertSame( 'graded', $activities[0]['status'] );

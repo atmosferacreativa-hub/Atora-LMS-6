@@ -1315,6 +1315,14 @@ final class ATORA_Mobile_REST_Controller {
 			$summary          = CLMS_Student_Grades_Service::course_summary( $user_id, $wp_course_id );
 			$by_wp[ $wp_course_id ] = $summary;
 			unset( $summary['wp_course_id'] );
+			// 6.29.1: para que la app avise de una nota nueva (solo notas liberadas).
+			$graded = array_filter(
+				CLMS_Student_Grades_Service::course_activities( $user_id, $wp_course_id ),
+				static fn( array $item ): bool => null !== $item['grade']
+			);
+			$dates  = array_filter( array_column( $graded, 'graded_at' ) );
+			$summary['graded_count']   = count( $graded );
+			$summary['last_graded_at'] = $dates ? max( $dates ) : null;
 			$courses[] = array( 'course_id' => $course_id ) + $summary;
 		}
 		return new WP_REST_Response( array(
