@@ -1,5 +1,29 @@
 # CHANGELOG — ATORA LMS
 
+## 6.30.0 (2026-10-05)
+
+### Fase 3 — Organizarse (plugin)
+
+**Buzón propio** (decisión A del titular: el hilo "Avisos" reemplaza a `CLMS_Notifications`).
+- Tablas nuevas `atora_message_threads` (tipo `direct`/`course`/`system`, curso, asunto, último mensaje), `atora_message_participants` (rol, último leído, silenciado) y `atora_messages` (autor, `kind`, título, cuerpo, enlace, lección, `client_event_id` único por autor, `legacy_id`, `dedupe_key`, `read_at`), con `institution_id`. Esquema `6.30.0-inbox`.
+- `CLMS_Messaging` y `CLMS_Notifications` conservan su API pública (`send_message`, `get_messages`, `get_threads`, `get_unread_count`, `mark_message_read`; `add_notification`, `get_notifications`, `mark_notification_read`, `mark_all_read`) pero escriben y leen en las tablas. Lo escrito por una persona (mensaje manual, aviso del docente al curso) va a la conversación remitente ↔ destinatario y se puede responder; lo automático va al hilo **Avisos** del usuario con su `kind` y su enlace. Sin tope de 100/50; dos escrituras simultáneas ya no se pisan.
+- **Un solo contador** de no leídos (mensajes + avisos): campana web, panel del estudiante, buzón del docente y app.
+- Se elimina la copia automática de cada mensaje como aviso (`mirror_notification` se ignora).
+- Lo que se disparaba al crear un aviso sigue igual: `atora/notification_added` (Teams) y los filtros `clms_modularity_messaging_raw_item` / `_item` (el tercer argumento ahora es un arreglo vacío en lugar de la meta del destinatario). Correo, WhatsApp y Telegram cuelgan de los eventos de dominio, no del aviso: sin cambios.
+- Avisos del personal (`early_warning`, `learning_analytics`, `submission_created`): solo a usuarios con permisos docentes; nunca a un estudiante.
+- Retención: cron diario borra los avisos **leídos** de más de 180 días. Los mensajes de conversación no se borran.
+- **Migración** de `clms_internal_messages` y `clms_notifications`: idempotente (uuid → `legacy_id`), por lotes en segundo plano al actualizar y `wp atora inbox migrate`. Las metas viejas no se borran. Las notificaciones `message_*` (copias de un mensaje) no se migran. Los ids viejos siguen sirviendo para marcar como leído.
+- **Acceso directo a las metas, pasado a la API**: `includes/commerce/class-commerce-notifications.php` (escritura de respaldo en `clms_notifications` y la "limpieza" que la reescribía a 90 días/50 ítems tras cada aviso). En el tema Meridian 3.0.10 no había accesos.
+
+**API móvil** (`atora-mobile/v1`, con `authorize`, sin caché y en `capabilities`):
+- `GET /messages/threads`, `GET /messages/threads/{id}`, `POST /messages` (idempotente por `client_event_id`, límite 20/min con `ATORA_Rate_Limiter`, solo texto), `POST /messages/threads/{id}/read`, `GET /messages/unread-count`, `GET /messages/recipients`. Hilo ajeno 404; destinatario no permitido 403; entre estudiantes no.
+- `GET /agenda?from=&to=` (máximo 62 días): eventos del calendario del usuario o de sus cursos, fechas límite de tareas y quizzes y clases en vivo, en ISO 8601 con desfase, con enlace interno; solo cursos matriculados y lecciones publicadas (`CLMS_Agenda_Service`).
+- `GET /today`: Hoy según el rol. El caso del estudiante está en el servicio (`CLMS_Today_Aggregator_Service::get_student_today()`): continuar la última lección, entregas y evaluaciones de 7 días, vencidas sin entregar, mensajes sin leer y notas nuevas.
+- Notificaciones al teléfono: tabla `atora_mobile_push_tokens`; `POST /devices`, `DELETE /devices/{id}`; `GET/PUT /notification-preferences` (mensajes, avisos, notas, fechas límite). Envío por cola (Action Scheduler o WP-Cron), nunca en la petición; título genérico sin contenido; reintento con espera; `DeviceNotRegistered` borra el token. Token de acceso de Expo opcional en Ajustes → Canales.
+- Recordatorio diario de fechas límite (próximas 24 h, sin entregar), un aviso `deadline_reminder` por lección.
+
+**TESTS**: `InboxTest` (API pública igual, sin copia automática, contador único, mismo hook al crear un aviso, filtros de mensajería, avisos automáticos con `kind` y dedupe, avisos del personal, migración sin duplicar, retención) y `MobileOrganizeTest` (envío idempotente y respuesta del docente, 404/403, Avisos fijo y contador, agenda solo de cursos matriculados y lecciones publicadas, Hoy del estudiante, cola que no envía en la petición y borra el token inválido, preferencias, recordatorio único, cabeceras de no-caché).
+
 ## 6.29.5 (2026-10-05)
 
 ### Fix — el promedio confundía una nota de cero con "sin notas" (alta, académica)

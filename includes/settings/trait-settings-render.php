@@ -695,6 +695,21 @@ trait CLMS_Settings_Render_Trait {
 				</tr>
 			</table>
 
+			<h3 style="margin-top:26px"><?php esc_html_e( 'Notificaciones al teléfono (app ATORA)', 'atora-lms' ); ?></h3>
+			<p class="description"><?php esc_html_e( 'Opcional. Sin token, los avisos se envían igual a través del servicio de Expo cuando la app está configurada; con un token de acceso de Expo el envío queda autenticado. Si falla, nada se rompe: el mensaje ya está en el buzón.', 'atora-lms' ); ?></p>
+			<table class="form-table" role="presentation">
+				<tr>
+					<th><label for="atora_expo_access_token"><?php esc_html_e( 'Token de acceso de Expo', 'atora-lms' ); ?></label></th>
+					<td>
+						<?php $atora_expo_token_set = '' !== (string) get_option( 'atora_expo_access_token', '' ); ?>
+						<input type="password" class="regular-text" id="atora_expo_access_token" name="atora_expo_access_token" value="" autocomplete="new-password" placeholder="<?php echo esc_attr( $atora_expo_token_set ? __( 'Guardado (dejar vacío para mantenerlo)', 'atora-lms' ) : '' ); ?>">
+						<?php if ( $atora_expo_token_set ) : ?>
+							<label style="margin-left:8px"><input type="checkbox" name="atora_expo_access_token_clear" value="1"> <?php esc_html_e( 'Borrar', 'atora-lms' ); ?></label>
+						<?php endif; ?>
+					</td>
+				</tr>
+			</table>
+
 		<h2 style="margin-top:28px"><?php esc_html_e( 'Anthropic / Claude', 'atora-lms' ); ?></h2>
 		<table class="form-table" role="presentation">
 			<tr>

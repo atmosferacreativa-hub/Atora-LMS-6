@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 6.29.5
+Stable tag: 6.30.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,9 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.30.0 =
+* Fase 3 — Organizarse: buzón propio (mensajes y avisos en tablas, sin tope, un solo contador), agenda, Hoy del estudiante y notificaciones al teléfono (Expo). Migración automática de los mensajes y avisos guardados.
+
 = 6.29.5 =
 * Notas: una nota de cero ya no se confunde con "sin notas" (promedio del curso, riesgo, certificados de programa, informes y API móvil). Puede cambiar notas finales que hoy se ven.
 

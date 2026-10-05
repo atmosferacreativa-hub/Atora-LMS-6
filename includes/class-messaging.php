@@ -6,8 +6,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class CLMS_Messaging {
 
+	/** Meta anterior a 6.30.0: solo la lee la migración al buzón (no se borra en esta versión). */
 	const META_KEY             = 'clms_internal_messages';
 	const META_LAST_RULES      = '_clms_messaging_last_rules';
+	/** @deprecated 6.30.0 El buzón ya no tiene tope; se conserva por compatibilidad. */
 	const MAX_ITEMS            = 100;
 	const FOLLOWUP_CRON_HOOK   = 'clms_messaging_followups_daily';
 	const MIN_HOURS_BETWEEN_RULES = 48;
@@ -37,8 +39,8 @@ class CLMS_Messaging {
 			return false;
 		}
 
-		$messages = get_user_meta( $recipient_user_id, self::META_KEY, true );
-		$messages = is_array( $messages ) ? $messages : array();
+		// 6.30.0: los filtros reciben un arreglo vacío como tercer argumento (antes, la meta del destinatario).
+		$messages = array();
 
 		$item = wp_parse_args(
 			$data,
@@ -94,89 +96,112 @@ class CLMS_Messaging {
 		$item['is_read']             = ! empty( $item['is_read'] ) ? 1 : 0;
 		$item['created_at']          = sanitize_text_field( $item['created_at'] );
 		$item['dedupe_key']          = sanitize_key( $item['dedupe_key'] );
-		$item['mirror_notification'] = ! empty( $item['mirror_notification'] );
+		// 6.30.0: se ignora; el mensaje ya está en el buzón y cuenta en el contador único.
+		$item['mirror_notification'] = false;
 		$item                       = $this->normalize_thread_data( $item );
 		if ( class_exists( 'CLMS_Helper' ) && method_exists( 'CLMS_Helper', 'modular_apply' ) ) {
 			$item = (array) CLMS_Helper::modular_apply( 'messaging_item', $item, $recipient_user_id, $messages );
 		}
 
-		if ( $item['dedupe_key'] && $this->has_recent_message_with_key( $messages, $item['dedupe_key'] ) ) {
+		// 6.30.0: se escribe en el buzón propio. Lo que escribe una persona (mensaje
+		// manual o aviso del docente al curso) va a la conversación remitente ↔
+		// destinatario y se puede responder; lo automático va al hilo "Avisos" con
+		// su `kind`. Ya no se copia cada mensaje como notificación.
+		$stored = $this->store_message( $recipient_user_id, $item );
+		if ( ! is_array( $stored ) ) {
 			return false;
 		}
 
-		array_unshift( $messages, $item );
+		return $stored;
+	}
 
-		if ( count( $messages ) > self::MAX_ITEMS ) {
-			$messages = array_slice( $messages, 0, self::MAX_ITEMS );
+	/** Tipos escritos por una persona: van a una conversación que se puede responder. */
+	public static function conversation_message_types(): array {
+		return (array) apply_filters( 'atora_inbox_conversation_message_types', array( 'manual', 'teacher_notice' ) );
+	}
+
+	/**
+	 * @return array|false Mensaje con la forma heredada, o false si no se guardó (dedupe o error).
+	 */
+	protected function store_message( $recipient_user_id, array $item ) {
+		if ( ! class_exists( 'ATORA_Inbox_Store' ) ) {
+			return false;
+		}
+		$sender_id      = absint( $item['sender_id'] );
+		$is_conversation = $sender_id > 0 && $sender_id !== $recipient_user_id && in_array( $item['message_type'], self::conversation_message_types(), true );
+
+		if ( $is_conversation ) {
+			$roles     = array( $sender_id => 'teacher', $recipient_user_id => 'student' );
+			$thread_id = ATORA_Inbox_Store::direct_thread_id( $sender_id, $recipient_user_id, absint( $item['course_id'] ), $item['course_id'] ? get_the_title( $item['course_id'] ) : '', $roles );
+			$author    = $sender_id;
+			$kind      = 'message';
+		} else {
+			$thread_id = ATORA_Inbox_Store::system_thread_id( $recipient_user_id );
+			$author    = 0;
+			$kind      = $item['message_type'] ? $item['message_type'] : 'general';
+		}
+		if ( is_wp_error( $thread_id ) ) {
+			return false;
 		}
 
-		update_user_meta( $recipient_user_id, self::META_KEY, $messages );
-
-		if ( $item['mirror_notification'] ) {
-			$this->mirror_as_notification( $recipient_user_id, $item );
+		$result = ATORA_Inbox_Store::add_message(
+			(int) $thread_id,
+			$author,
+			array(
+				'kind'          => $kind,
+				'title'         => $item['title'],
+				'body'          => $item['message'],
+				'link'          => $item['link'],
+				'course_id'     => $item['course_id'],
+				'lesson_id'     => $item['lesson_id'],
+				'submission_id' => $item['submission_id'],
+				'dedupe_key'    => $item['dedupe_key'],
+				'legacy_id'     => $item['id'],
+				'read_at'       => $item['is_read'] ? current_time( 'mysql', true ) : null,
+				'meta'          => array(
+					'message_type'        => $item['message_type'],
+					'sender_type'         => $item['sender_type'],
+					'sender_name'         => $item['sender_name'],
+					'program_id'          => $item['program_id'],
+					'recommendation_type' => $item['recommendation_type'],
+					'priority'            => $item['priority'],
+					'reply_to'            => $item['reply_to'],
+					'automation_source'   => $item['automation_source'],
+				),
+			)
+		);
+		// Error, o un aviso repetido (mismo dedupe_key): como antes, no se envía.
+		if ( is_wp_error( $result ) || ! $result['created'] ) {
+			return false;
 		}
 
-		return $item;
+		return ATORA_Inbox_Store::legacy_message( $result['message'] );
 	}
 
 	public function get_messages( $user_id, $args = array() ) {
 		$user_id = absint( $user_id );
 		$args    = is_array( $args ) ? $args : array();
 
-		if ( ! $user_id ) {
+		if ( ! $user_id || ! class_exists( 'ATORA_Inbox_Store' ) ) {
 			return array();
 		}
 
-		$messages = get_user_meta( $user_id, self::META_KEY, true );
-		$messages = is_array( $messages ) ? $messages : array();
 		$limit    = isset( $args['limit'] ) ? max( 1, absint( $args['limit'] ) ) : 0;
-		$messages = $this->sanitize_messages( $messages );
+		$rows     = ATORA_Inbox_Store::received( $user_id, array( 'unread_only' => ! empty( $args['unread_only'] ) ) );
+		$messages = array_map( array( 'ATORA_Inbox_Store', 'legacy_message' ), $rows );
 
-		if ( ! empty( $args['unread_only'] ) ) {
-			$messages = array_values(
-				array_filter(
-					$messages,
-					static function( $item ) {
-						return empty( $item['is_read'] );
-					}
-				)
-			);
-		}
-
-		if ( ! empty( $args['sender_type'] ) ) {
-			$sender_type = sanitize_key( (string) $args['sender_type'] );
-			$messages    = array_values(
-				array_filter(
-					$messages,
-					static function( $item ) use ( $sender_type ) {
-						return $sender_type === $item['sender_type'];
-					}
-				)
-			);
-		}
-
-		if ( ! empty( $args['recommendation_type'] ) ) {
-			$recommendation_type = sanitize_key( (string) $args['recommendation_type'] );
-			$messages            = array_values(
-				array_filter(
-					$messages,
-					static function( $item ) use ( $recommendation_type ) {
-						return $recommendation_type === $item['recommendation_type'];
-					}
-				)
-			);
-		}
-
-		if ( ! empty( $args['thread_id'] ) ) {
-			$thread_id = sanitize_key( (string) $args['thread_id'] );
-			$messages  = array_values(
-				array_filter(
-					$messages,
-					static function( $item ) use ( $thread_id ) {
-						return $thread_id === sanitize_key( (string) ( $item['thread_id'] ?? '' ) );
-					}
-				)
-			);
+		foreach ( array( 'sender_type', 'recommendation_type', 'thread_id' ) as $field ) {
+			if ( ! empty( $args[ $field ] ) ) {
+				$wanted   = sanitize_key( (string) $args[ $field ] );
+				$messages = array_values(
+					array_filter(
+						$messages,
+						static function( $item ) use ( $field, $wanted ) {
+							return $wanted === sanitize_key( (string) ( $item[ $field ] ?? '' ) );
+						}
+					)
+				);
+			}
 		}
 
 		if ( $limit > 0 ) {
@@ -187,54 +212,54 @@ class CLMS_Messaging {
 	}
 
 	public function get_threads( $user_id, $args = array() ) {
-		$user_id  = absint( $user_id );
-		$args     = is_array( $args ) ? $args : array();
-		$messages = $this->get_messages( $user_id );
-		$threads  = array();
-		$limit    = isset( $args['limit'] ) ? max( 1, absint( $args['limit'] ) ) : 0;
+		$user_id = absint( $user_id );
+		$args    = is_array( $args ) ? $args : array();
+		$limit   = isset( $args['limit'] ) ? max( 1, absint( $args['limit'] ) ) : 50;
 
-		foreach ( $messages as $message ) {
-			$thread_id = ! empty( $message['thread_id'] ) ? sanitize_key( (string) $message['thread_id'] ) : 'general';
-
-			if ( ! isset( $threads[ $thread_id ] ) ) {
-				$threads[ $thread_id ] = array(
-					'thread_id'     => $thread_id,
-					'thread_type'   => isset( $message['thread_type'] ) ? sanitize_key( (string) $message['thread_type'] ) : 'general',
-					'thread_label'  => isset( $message['thread_label'] ) ? sanitize_text_field( (string) $message['thread_label'] ) : 'General',
-					'message_count' => 0,
-					'unread_count'  => 0,
-					'last_message'  => $message,
-				);
-			}
-
-			++$threads[ $thread_id ]['message_count'];
-
-			if ( empty( $message['is_read'] ) ) {
-				++$threads[ $thread_id ]['unread_count'];
-			}
+		if ( ! $user_id || ! class_exists( 'ATORA_Inbox_Store' ) ) {
+			return array();
 		}
 
-		$threads = array_values( $threads );
-
-		usort(
-			$threads,
-			static function( $a, $b ) {
-				$a_date = strtotime( (string) ( $a['last_message']['created_at'] ?? '' ) );
-				$b_date = strtotime( (string) ( $b['last_message']['created_at'] ?? '' ) );
-
-				return $b_date <=> $a_date;
-			}
-		);
-
-		if ( $limit > 0 ) {
-			$threads = array_slice( $threads, 0, $limit );
+		$page    = ATORA_Inbox_Store::threads_for_user( $user_id, '', $limit );
+		$threads = array();
+		foreach ( $page['items'] as $thread ) {
+			$last = ATORA_Inbox_Store::message( (int) $thread['last_message_id'] );
+			$threads[] = array(
+				'thread_id'     => 't' . (int) $thread['id'],
+				'thread_type'   => (string) $thread['type'],
+				'thread_label'  => self::thread_label( $thread, $user_id ),
+				'message_count' => count( ATORA_Inbox_Store::thread_messages( (int) $thread['id'], 0, 100 ) ),
+				'unread_count'  => (int) $thread['unread'],
+				'last_message'  => $last ? ATORA_Inbox_Store::legacy_message( $last ) : array(),
+			);
 		}
 
 		return $threads;
 	}
 
+	/** Nombre que ve el usuario: "Avisos", el asunto o la otra persona (y el curso). */
+	public static function thread_label( array $thread, $user_id ) {
+		if ( 'system' === $thread['type'] ) {
+			return ATORA_Inbox_Store::SYSTEM_SUBJECT;
+		}
+		$names = array();
+		foreach ( ATORA_Inbox_Store::participant_ids( (int) $thread['id'] ) as $participant ) {
+			if ( $participant === absint( $user_id ) ) {
+				continue;
+			}
+			$user    = get_user_by( 'id', $participant );
+			$names[] = $user ? ( $user->display_name ?: $user->user_login ) : '';
+		}
+		$label = implode( ', ', array_filter( $names ) );
+		if ( ! empty( $thread['course_id'] ) ) {
+			$label .= ( '' !== $label ? ' · ' : '' ) . get_the_title( (int) $thread['course_id'] );
+		}
+		return '' !== $label ? $label : (string) $thread['subject'];
+	}
+
+	/** 6.30.0: contador único (mensajes y avisos), el mismo que CLMS_Notifications. */
 	public function get_unread_count( $user_id ) {
-		return count( $this->get_messages( $user_id, array( 'unread_only' => true ) ) );
+		return class_exists( 'ATORA_Inbox_Store' ) ? ATORA_Inbox_Store::unread_count( absint( $user_id ) ) : 0;
 	}
 
 	public function get_message_stats( $user_id ) {
@@ -274,31 +299,12 @@ class CLMS_Messaging {
 		$user_id    = absint( $user_id );
 		$message_id = sanitize_text_field( $message_id );
 
-		if ( ! $user_id || ! $message_id ) {
+		if ( ! $user_id || ! $message_id || ! class_exists( 'ATORA_Inbox_Store' ) ) {
 			return false;
 		}
 
-		$messages = get_user_meta( $user_id, self::META_KEY, true );
-		$messages = is_array( $messages ) ? $messages : array();
-		$updated  = false;
-
-		foreach ( $messages as $index => $item ) {
-			if ( ! is_array( $item ) || empty( $item['id'] ) ) {
-				continue;
-			}
-
-			if ( $message_id === (string) $item['id'] ) {
-				$messages[ $index ]['is_read'] = 1;
-				$updated                       = true;
-				break;
-			}
-		}
-
-		if ( $updated ) {
-			update_user_meta( $user_id, self::META_KEY, $messages );
-		}
-
-		return $updated;
+		$row = ATORA_Inbox_Store::find_for_user( $user_id, $message_id );
+		return $row ? ATORA_Inbox_Store::mark_message_read( $user_id, (int) $row['id'] ) : false;
 	}
 
 	public function get_compose_context_for_user( $user_id ) {
@@ -790,84 +796,6 @@ class CLMS_Messaging {
 		);
 	}
 
-	protected function sanitize_messages( $messages ) {
-		$messages = is_array( $messages ) ? $messages : array();
-		$clean    = array();
-
-		foreach ( $messages as $item ) {
-			if ( ! is_array( $item ) || empty( $item['id'] ) ) {
-				continue;
-			}
-
-			$clean[] = array(
-				'id'                  => sanitize_text_field( (string) $item['id'] ),
-				'message_type'        => sanitize_key( (string) ( $item['message_type'] ?? 'general' ) ),
-				'sender_type'         => sanitize_key( (string) ( $item['sender_type'] ?? 'system' ) ),
-				'sender_id'           => absint( $item['sender_id'] ?? 0 ),
-				'sender_name'         => sanitize_text_field( (string) ( $item['sender_name'] ?? '' ) ),
-				'title'               => sanitize_text_field( (string) ( $item['title'] ?? '' ) ),
-				'message'             => sanitize_textarea_field( (string) ( $item['message'] ?? '' ) ),
-				'link'                => esc_url_raw( (string) ( $item['link'] ?? '' ) ),
-				'course_id'           => absint( $item['course_id'] ?? 0 ),
-				'program_id'          => absint( $item['program_id'] ?? 0 ),
-				'lesson_id'           => absint( $item['lesson_id'] ?? 0 ),
-				'submission_id'       => absint( $item['submission_id'] ?? 0 ),
-				'recommendation_type' => sanitize_key( (string) ( $item['recommendation_type'] ?? '' ) ),
-				'priority'            => sanitize_key( (string) ( $item['priority'] ?? 'normal' ) ),
-				'thread_id'           => sanitize_key( (string) ( $item['thread_id'] ?? '' ) ),
-				'thread_type'         => sanitize_key( (string) ( $item['thread_type'] ?? '' ) ),
-				'thread_label'        => sanitize_text_field( (string) ( $item['thread_label'] ?? '' ) ),
-				'reply_to'            => sanitize_text_field( (string) ( $item['reply_to'] ?? '' ) ),
-				'automation_source'   => sanitize_key( (string) ( $item['automation_source'] ?? '' ) ),
-				'is_read'             => ! empty( $item['is_read'] ) ? 1 : 0,
-				'created_at'          => sanitize_text_field( (string) ( $item['created_at'] ?? '' ) ),
-				'dedupe_key'          => sanitize_key( (string) ( $item['dedupe_key'] ?? '' ) ),
-			);
-		}
-
-		return $clean;
-	}
-
-	protected function mirror_as_notification( $recipient_user_id, $message ) {
-		$notifications = clms_core('CLMS_Notifications');
-
-		if ( ! $notifications || ! method_exists( $notifications, 'add_notification' ) ) {
-			return;
-		}
-
-		$notifications->add_notification(
-			$recipient_user_id,
-			array(
-				'type'          => 'message_' . sanitize_key( (string) $message['message_type'] ),
-				'title'         => sanitize_text_field( (string) $message['title'] ),
-				'message'       => sanitize_textarea_field( (string) $message['message'] ),
-				'link'          => esc_url_raw( (string) $message['link'] ),
-				'course_id'     => absint( $message['course_id'] ),
-				'lesson_id'     => absint( $message['lesson_id'] ),
-				'submission_id' => absint( $message['submission_id'] ),
-			)
-		);
-	}
-
-	protected function has_recent_message_with_key( $messages, $dedupe_key ) {
-		$messages   = is_array( $messages ) ? $messages : array();
-		$dedupe_key = sanitize_key( (string) $dedupe_key );
-
-		if ( ! $dedupe_key ) {
-			return false;
-		}
-
-		foreach ( $messages as $item ) {
-			if ( empty( $item['dedupe_key'] ) || $dedupe_key !== sanitize_key( (string) $item['dedupe_key'] ) ) {
-				continue;
-			}
-
-			return true;
-		}
-
-		return false;
-	}
-
 	protected function resolve_sender_name( $sender_type, $sender_id = 0 ) {
 		$sender_type = sanitize_key( (string) $sender_type );
 		$sender_id   = absint( $sender_id );
@@ -884,6 +812,11 @@ class CLMS_Messaging {
 		}
 
 		return wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
+	}
+
+	/** 6.30.0: misma regla, pública para la API móvil (sin cambios en la regla). */
+	public function can_message_student( $sender_user_id, $student_id, $course_id = 0 ) {
+		return $this->current_user_can_message_student( $sender_user_id, $student_id, $course_id );
 	}
 
 	protected function current_user_can_message_student( $sender_user_id, $student_id, $course_id = 0 ) {

@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class V5_Installer {
 
 	/** Versión del esquema. Incrementar para forzar re-instalación. */
-	const SCHEMA_VERSION = '6.28.2-video-positions';
+	const SCHEMA_VERSION = '6.30.0-inbox';
 
 	/** Option key que almacena la versión instalada. */
 	const OPTION_KEY = 'atora_v5_schema_version';
@@ -2253,6 +2253,78 @@ class V5_Installer {
 			updated_at          DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			PRIMARY KEY (id),
 			UNIQUE KEY user_lesson_video (user_id, lesson_id, video_key)
+		) $charset_collate;" );
+
+		// ── Buzón propio (6.30.0): hilos, participantes y mensajes ──────────
+		// Reemplaza a las metas clms_internal_messages y clms_notifications (que no
+		// se borran en esta versión). El hilo `system` de cada usuario es "Avisos".
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_message_threads (
+			id               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			institution_id   BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			type             VARCHAR(20)     NOT NULL DEFAULT 'direct',
+			thread_key       VARCHAR(100)             DEFAULT NULL,
+			course_id        BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			subject          VARCHAR(255)    NOT NULL DEFAULT '',
+			last_message_id  BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			last_message_at  DATETIME                 DEFAULT NULL,
+			created_at       DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			UNIQUE KEY thread_key (thread_key),
+			KEY institution_id (institution_id),
+			KEY type_course (type, course_id)
+		) $charset_collate;" );
+
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_message_participants (
+			thread_id             BIGINT UNSIGNED NOT NULL,
+			user_id               BIGINT UNSIGNED NOT NULL,
+			institution_id        BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			role                  VARCHAR(20)     NOT NULL DEFAULT 'member',
+			last_read_message_id  BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			muted                 TINYINT(1)      NOT NULL DEFAULT 0,
+			created_at            DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (thread_id, user_id),
+			KEY user_id (user_id)
+		) $charset_collate;" );
+
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_messages (
+			id               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			institution_id   BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			thread_id        BIGINT UNSIGNED NOT NULL,
+			author_id        BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			kind             VARCHAR(40)     NOT NULL DEFAULT 'message',
+			title            VARCHAR(255)    NOT NULL DEFAULT '',
+			body             TEXT            NOT NULL,
+			link             VARCHAR(500)    NOT NULL DEFAULT '',
+			course_id        BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			lesson_id        BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			submission_id    BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			meta             LONGTEXT                 DEFAULT NULL,
+			client_event_id  VARCHAR(64)              DEFAULT NULL,
+			legacy_id        VARCHAR(64)              DEFAULT NULL,
+			dedupe_key       VARCHAR(100)    NOT NULL DEFAULT '',
+			read_at          DATETIME                 DEFAULT NULL,
+			created_at       DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			UNIQUE KEY author_event (author_id, client_event_id),
+			UNIQUE KEY thread_legacy (thread_id, legacy_id),
+			KEY thread_message (thread_id, id),
+			KEY thread_dedupe (thread_id, dedupe_key),
+			KEY retention (read_at)
+		) $charset_collate;" );
+
+		// ── Notificaciones al teléfono (6.30.0): tokens de Expo por usuario ─
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_mobile_push_tokens (
+			id               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			institution_id   BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			user_id          BIGINT UNSIGNED NOT NULL,
+			token            VARCHAR(255)    NOT NULL,
+			platform         VARCHAR(20)     NOT NULL DEFAULT '',
+			academy          VARCHAR(190)    NOT NULL DEFAULT '',
+			created_at       DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			last_seen_at     DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			UNIQUE KEY token (token),
+			KEY user_id (user_id)
 		) $charset_collate;" );
 
 		// ── Sesiones móviles fuera de usermeta (6.26.5) ─────────────────────

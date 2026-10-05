@@ -3,7 +3,7 @@
  * Plugin Name:       ATORA LMS
  * Plugin URI:        https://atora.studio
  * Description:       LMS modular para WordPress con IA, evaluaciones, certificados, CRM, mensajería multi-canal, afiliados, live streaming y más. Autor: Atora Studio.
- * Version:           6.29.5
+ * Version:           6.30.0
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Atora Studio
@@ -52,7 +52,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * - Limpieza automática de notificaciones >90 días
  */
 	if ( ! defined( 'ATORA_LMS_VERSION' ) ) {
-		define( 'ATORA_LMS_VERSION', '6.29.5' );
+		define( 'ATORA_LMS_VERSION', '6.30.0' );
 	}
 
 if ( ! defined( 'ATORA_LMS_FILE' ) ) {
@@ -342,6 +342,11 @@ add_action( 'plugins_loaded', static function() {
 			// 6.29.5: y confundían una nota de cero con "sin notas"; se recalculan todos.
 			\CLMS_Cache::bump_version( 'gradebook' );
 			\CLMS_Cache::bump_version( 'analytics' );
+		}
+
+		// 6.30.0: pasar mensajes y avisos de las metas al buzón (por lotes, en segundo plano).
+		if ( class_exists( 'ATORA_Inbox_Migration' ) ) {
+			ATORA_Inbox_Migration::schedule();
 		}
 	}
 }, 1 );
@@ -1255,6 +1260,10 @@ add_action( 'init', static function () {
 	atora_lms_require_module( 'includes/grading/class-student-grade-visibility.php' );
 	atora_lms_require_module( 'includes/grading/class-rubric-level-bands.php' );
 	atora_lms_require_module( 'includes/grading/class-grade-average.php' );
+	// 6.30.0: buzón propio (mensajes y avisos en tablas).
+	atora_lms_require_module( 'includes/messaging/class-inbox-store.php' );
+	atora_lms_require_module( 'includes/messaging/class-inbox-migration.php' );
+	atora_lms_require_module( 'includes/messaging/class-inbox-hooks.php', static function () { ATORA_Inbox_Hooks::boot(); } );
 	atora_lms_require_module( 'includes/grading/class-student-grades-service.php' );
 	// 6.27.4: el editor de WordPress mantiene al día atora_courses / atora_lessons.
 	if ( class_exists( 'ATORA\\LMS\\LMS_Editor_Sync' ) ) {
@@ -1283,6 +1292,15 @@ add_action( 'init', static function () {
 	atora_lms_require_module( 'includes/mobile/class-mobile-assignment-store.php' );
 	atora_lms_require_module( 'includes/mobile/class-mobile-assignment-service.php' );
 	atora_lms_require_module( 'includes/mobile/class-mobile-rest-controller.php' );
+	// 6.30.0: Fase 3 — mensajes, agenda, Hoy y notificaciones al teléfono.
+	atora_lms_require_module( 'includes/today/class-agenda-service.php', static function () { CLMS_Agenda_Service::boot(); } );
+	atora_lms_require_module( 'includes/mobile/class-mobile-messages-controller.php' );
+	atora_lms_require_module( 'includes/mobile/class-mobile-push-service.php', static function () { ATORA_Mobile_Push_Service::boot(); } );
+	atora_lms_require_module( 'includes/mobile/class-mobile-organize-controller.php' );
+	if ( class_exists( 'ATORA_Mobile_Messages_Controller' ) ) {
+		add_action( 'rest_api_init', array( 'ATORA_Mobile_Messages_Controller', 'register_routes' ) );
+		add_action( 'rest_api_init', array( 'ATORA_Mobile_Organize_Controller', 'register_routes' ) );
+	}
 	if ( class_exists( 'ATORA_Mobile_REST_Controller' ) ) {
 		add_action( 'rest_api_init', array( 'ATORA_Mobile_REST_Controller', 'register_routes' ) );
 		add_filter( 'rest_post_dispatch', array( 'ATORA_Mobile_REST_Controller', 'no_cache' ), 99, 3 );
