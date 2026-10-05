@@ -117,9 +117,10 @@ trait CLMS_Grading_Helpers_Trait {
 			'completed_lessons'  => 0,
 			'total_lessons'      => 0,
 			'progress_percent'   => 0,
-			'quiz_average'       => 0,
-			'assignment_average' => 0,
-			'final_average'      => 0,
+			// 6.29.5: sin notas = null (no 0).
+			'quiz_average'       => null,
+			'assignment_average' => null,
+			'final_average'      => null,
 			'graded_lessons'     => 0,
 			'source_breakdown'   => array(),
 			'updated_at'         => '',

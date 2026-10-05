@@ -96,8 +96,8 @@ final class CLMS_Student_Grades_Service {
 	public static function course_summary( int $user_id, int $wp_course_id ): array {
 		$grading = function_exists( 'clms_core' ) ? clms_core( 'CLMS_Grading' ) : null;
 		$summary = $grading && method_exists( $grading, 'get_course_grade_summary' ) ? (array) $grading->get_course_grade_summary( $user_id, $wp_course_id ) : array();
-		$graded  = absint( $summary['graded_lessons'] ?? 0 ) + ( ( (float) ( $summary['quiz_average'] ?? 0 ) ) > 0 ? 1 : 0 );
-		$final   = $graded > 0 && isset( $summary['final_average'] ) ? (float) $summary['final_average'] : null;
+		// 6.29.5: null = sin notas, 0 = nota cero (antes un quiz en 0 no contaba como nota).
+		$final   = isset( $summary['final_average'] ) && is_numeric( $summary['final_average'] ) ? (float) $summary['final_average'] : null;
 		$progress = function_exists( 'atora_lms_get_progress' ) ? atora_lms_get_progress( $user_id, $wp_course_id ) : absint( $summary['progress_percent'] ?? 0 );
 		$passing  = absint( get_post_meta( $wp_course_id, '_clms_passing_grade', true ) ?: 70 );
 

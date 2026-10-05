@@ -662,16 +662,11 @@ class CLMS_Assessment_Engine {
 
 		$total_lessons   = count( $lesson_ids );
 		$completed_count = count( array_intersect( $lesson_ids, $completed_lessons ) );
-		$quiz_average    = $this->calculate_average( $quiz_scores );
-		$task_average    = $this->calculate_average( $assignment_scores );
-
-		if ( $quiz_average > 0 && $task_average > 0 ) {
-			$final_average = (int) round( ( $quiz_average + $task_average ) / 2 );
-		} elseif ( $quiz_average > 0 ) {
-			$final_average = $quiz_average;
-		} else {
-			$final_average = $task_average;
-		}
+		// 6.29.5: se combina por cantidad de notas, no por `> 0` (un 0 es una nota). Sin notas: null.
+		$averages        = CLMS_Grade_Average::combine( $quiz_scores, $assignment_scores );
+		$quiz_average    = $averages['quiz_average'];
+		$task_average    = $averages['assignment_average'];
+		$final_average   = $averages['final_average'];
 
 		$summary = array(
 			'completed_lessons'  => $completed_count,
@@ -1425,9 +1420,10 @@ class CLMS_Assessment_Engine {
 			'completed_lessons'  => 0,
 			'total_lessons'      => 0,
 			'progress_percent'   => 0,
-			'quiz_average'       => 0,
-			'assignment_average' => 0,
-			'final_average'      => 0,
+			// 6.29.5: sin notas = null (no 0).
+			'quiz_average'       => null,
+			'assignment_average' => null,
+			'final_average'      => null,
 			'graded_lessons'     => 0,
 			'source_breakdown'   => array(),
 			'updated_at'         => '',

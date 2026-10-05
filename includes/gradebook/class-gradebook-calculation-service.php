@@ -28,8 +28,13 @@ class CLMS_Gradebook_Calculation_Service {
 			$course_summary = (array) $grading->get_course_grade_summary( $student_id, $course_id );
 			$summary['total']    = absint( $course_summary['final_average'] ?? 0 );
 			$summary['progress'] = absint( $course_summary['progress_percent'] ?? 0 );
+			// 6.29.5: sin notas (null) no es "riesgo alto"; un 0 sí.
+			$has_grade = isset( $course_summary['final_average'] ) && is_numeric( $course_summary['final_average'] );
 		}
 
+		if ( empty( $has_grade ) ) {
+			return $summary;
+		}
 		if ( $summary['total'] < 60 ) {
 			$summary['risk_level'] = 'high';
 		} elseif ( $summary['total'] < 80 ) {

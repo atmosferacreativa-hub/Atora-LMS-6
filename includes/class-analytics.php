@@ -632,7 +632,9 @@ class CLMS_Analytics {
 				: array();
 
 			$progress_values[] = isset( $summary['progress_percent'] ) ? absint( $summary['progress_percent'] ) : 0;
-			$grade_values[]    = isset( $summary['final_average'] ) ? absint( $summary['final_average'] ) : 0;
+			if ( isset( $summary['final_average'] ) && is_numeric( $summary['final_average'] ) ) { // 6.29.5: sin notas no entra como 0.
+				$grade_values[] = absint( $summary['final_average'] );
+			}
 
 			if ( method_exists( 'CLMS_Helper', 'is_course_completed' ) && CLMS_Helper::is_course_completed( $student_id, $course_id ) ) {
 				++$completed_count;

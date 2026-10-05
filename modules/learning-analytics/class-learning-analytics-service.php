@@ -225,7 +225,7 @@ final class Learning_Analytics_Service {
 		}
 
 		if ( null !== $average ) {
-			if ( $average > 0 && $average < 50 ) {
+			if ( $average < 50 ) { // 6.29.5: ya filtrado por null; un 0 es riesgo.
 				$score = max( $score, 95 );
 			} elseif ( $average >= 50 && $average < 70 ) {
 				$score = max( $score, 70 );

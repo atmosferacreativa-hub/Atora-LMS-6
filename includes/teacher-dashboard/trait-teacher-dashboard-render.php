@@ -110,7 +110,7 @@ trait CLMS_Teacher_Dashboard_Render_Trait {
 		$enrolled_count      = absint( $group_overview['enrolled'] ?? 0 );
 		$active_count        = absint( $group_overview['active'] ?? 0 );
 		$pending_count       = absint( $group_overview['pending'] ?? 0 );
-			$avg_grade_label     = ! empty( $group_overview['avg_grade'] ) ? absint( $group_overview['avg_grade'] ) . '%' : __( 'Sin datos', 'atora-lms' );
+			$avg_grade_label     = isset( $group_overview['avg_grade'] ) && is_numeric( $group_overview['avg_grade'] ) ? absint( $group_overview['avg_grade'] ) . '%' : __( 'Sin datos', 'atora-lms' );
 			$selected_course_id  = $this->get_selected_course_id( $course_ids );
 			$academic_configuration_notice = '';
 			$diagnostics_service = class_exists( 'CLMS_Helper' ) ? clms_core('CLMS_Academic_Diagnostics_Service') : null;

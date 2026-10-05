@@ -68,7 +68,7 @@ trait CLMS_Grading_Summary_Cache_Trait {
 			'progress_percent'                 => isset( $summary['progress_percent'] ) ? absint( $summary['progress_percent'] ) : 0,
 			'completed_lessons'                => isset( $summary['completed_lessons'] ) ? absint( $summary['completed_lessons'] ) : 0,
 			'total_lessons'                    => isset( $summary['total_lessons'] ) ? absint( $summary['total_lessons'] ) : 0,
-			'final_average'                    => isset( $summary['final_average'] ) ? absint( $summary['final_average'] ) : 0,
+			'final_average'                    => isset( $summary['final_average'] ) && is_numeric( $summary['final_average'] ) ? absint( $summary['final_average'] ) : null,
 			'pending_activities'               => $pending,
 			'last_feedback'                    => $last_fb,
 			'next_step'                        => $next_step,
@@ -109,11 +109,34 @@ trait CLMS_Grading_Summary_Cache_Trait {
 			}
 		}
 
+		$summary = $this->build_summary_from_lessons( $user_id, $course_id );
+		if ( null === $summary ) {
+			return $this->get_empty_summary();
+		}
+
+		if ( class_exists( 'CLMS_Cache' ) ) {
+			CLMS_Cache::set( 'gradebook', array( 'summary', $user_id, $course_id ), $summary, self::CACHE_TTL );
+		} else {
+			set_transient( $this->get_grade_summary_cache_key( $user_id, $course_id ), $summary, self::CACHE_TTL );
+		}
+
+		return $summary;
+	}
+
+	/**
+	 * Resumen calculado por CLMS_Grading cuando no hay motor de evaluación
+	 * (6.29.5: extraído sin cambios salvo el promedio, para probarlo junto al motor).
+	 *
+	 * @return array|null Null si el curso no tiene lecciones.
+	 */
+	protected function build_summary_from_lessons( $user_id, $course_id ) {
+		$user_id   = absint( $user_id );
+		$course_id = absint( $course_id );
 		$lesson_ids = CLMS_Helper::get_course_lessons( $course_id );
 		$lesson_ids = is_array( $lesson_ids ) ? array_map( 'absint', $lesson_ids ) : array();
 
 		if ( empty( $lesson_ids ) ) {
-			return $this->get_empty_summary();
+			return null;
 		}
 
 		$total_lessons   = count( $lesson_ids );
@@ -131,23 +154,20 @@ trait CLMS_Grading_Summary_Cache_Trait {
 			}
 
 			$submission = $this->get_user_submission_for_grading( $user_id, $lesson_id );
-			if ( isset( $submission['grade'] ) && '' !== (string) $submission['grade'] ) {
+			// 6.29.5: misma regla de nota liberada que el motor (6.29.0), que este camino no aplicaba.
+			$released = class_exists( 'CLMS_Student_Grade_Visibility' )
+				? CLMS_Student_Grade_Visibility::grade_visible( $submission['status'] ?? '', $submission['grade'] ?? '' )
+				: isset( $submission['grade'] ) && '' !== (string) $submission['grade'];
+			if ( $released ) {
 				$assignment_scores[] = max( 0, min( 100, absint( $submission['grade'] ) ) );
 			}
 		}
 
-		$quiz_average       = $this->calculate_average( $quiz_scores );
-		$assignment_average = $this->calculate_average( $assignment_scores );
-
-		if ( $quiz_average > 0 && $assignment_average > 0 ) {
-			$final_average = (int) round( ( $quiz_average + $assignment_average ) / 2 );
-		} elseif ( $quiz_average > 0 ) {
-			$final_average = $quiz_average;
-		} elseif ( $assignment_average > 0 ) {
-			$final_average = $assignment_average;
-		} else {
-			$final_average = 0;
-		}
+		// 6.29.5: misma regla que el motor (CLMS_Grade_Average): por cantidad de notas, sin notas = null.
+		$averages           = CLMS_Grade_Average::combine( $quiz_scores, $assignment_scores );
+		$quiz_average       = $averages['quiz_average'];
+		$assignment_average = $averages['assignment_average'];
+		$final_average      = $averages['final_average'];
 
 		$summary = array(
 			'completed_lessons'  => $completed_count,
@@ -159,12 +179,6 @@ trait CLMS_Grading_Summary_Cache_Trait {
 			'graded_lessons'     => count( $assignment_scores ),
 			'updated_at'         => current_time( 'mysql' ),
 		);
-
-		if ( class_exists( 'CLMS_Cache' ) ) {
-			CLMS_Cache::set( 'gradebook', array( 'summary', $user_id, $course_id ), $summary, self::CACHE_TTL );
-		} else {
-			set_transient( $this->get_grade_summary_cache_key( $user_id, $course_id ), $summary, self::CACHE_TTL );
-		}
 
 		return $summary;
 	}
@@ -278,12 +292,13 @@ trait CLMS_Grading_Summary_Cache_Trait {
 		$summary       = is_array( $summary ) ? $summary : array();
 		$pending_count = absint( $pending_count );
 		$progress      = isset( $summary['progress_percent'] ) ? absint( $summary['progress_percent'] ) : 0;
-		$average       = isset( $summary['final_average'] ) ? absint( $summary['final_average'] ) : 0;
+		// 6.29.5: sin notas (null) no es un promedio bajo; un 0 sí.
+		$average       = isset( $summary['final_average'] ) && is_numeric( $summary['final_average'] ) ? absint( $summary['final_average'] ) : null;
 
-		if ( $progress >= 100 && $average >= 70 ) {
+		if ( $progress >= 100 && null !== $average && $average >= 70 ) {
 			return 'al_dia';
 		}
-		if ( $average < 60 || $pending_count >= 3 ) {
+		if ( ( null !== $average && $average < 60 ) || $pending_count >= 3 ) {
 			return 'en_riesgo';
 		}
 		if ( $pending_count > 0 || $progress < 70 ) {
