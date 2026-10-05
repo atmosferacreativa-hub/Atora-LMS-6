@@ -1,5 +1,10 @@
 # CHANGELOG — ATORA LMS
 
+## 6.29.2 (2026-10-04)
+
+- **API móvil — nivel alcanzado por criterio** (Fase 2, Parte B.3): cada fila de `rubric.rows[]` en `GET /assignments/{lesson_id}` suma `level`, la etiqueta del nivel de la rúbrica cuyos puntos coinciden con el puntaje, la misma regla con la que SpeedGrader marca el nivel elegido. Vacío si el puntaje no coincide con ningún nivel. Sigue apareciendo solo con la nota liberada.
+- **TESTS**: `MobileGradesCertificatesTest::test_rubric_only_after_release` comprueba el nivel (fallaba con 6.29.1).
+
 ## 6.29.1 (2026-10-04)
 
 - **API móvil**: cada curso de `GET /grades` suma `graded_count` (notas liberadas) y `last_graded_at`, para que la app avise de una calificación nueva sin pedir el detalle de cada curso. Una nota guardada sin liberar no las cambia.
