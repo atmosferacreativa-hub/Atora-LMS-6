@@ -3,7 +3,7 @@
  * Plugin Name:       ATORA LMS
  * Plugin URI:        https://atora.studio
  * Description:       LMS modular para WordPress con IA, evaluaciones, certificados, CRM, mensajería multi-canal, afiliados, live streaming y más. Autor: Atora Studio.
- * Version:           6.29.2
+ * Version:           6.29.3
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Atora Studio
@@ -52,7 +52,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * - Limpieza automática de notificaciones >90 días
  */
 	if ( ! defined( 'ATORA_LMS_VERSION' ) ) {
-		define( 'ATORA_LMS_VERSION', '6.29.2' );
+		define( 'ATORA_LMS_VERSION', '6.29.3' );
 	}
 
 if ( ! defined( 'ATORA_LMS_FILE' ) ) {
@@ -1251,6 +1251,7 @@ add_action( 'init', static function () {
 	atora_lms_require_module( 'includes/public-api.php' );
 	// 6.29.0: regla única de visibilidad de notas para el estudiante y servicio de notas.
 	atora_lms_require_module( 'includes/grading/class-student-grade-visibility.php' );
+	atora_lms_require_module( 'includes/grading/class-rubric-level-bands.php' );
 	atora_lms_require_module( 'includes/grading/class-student-grades-service.php' );
 	// 6.27.4: el editor de WordPress mantiene al día atora_courses / atora_lessons.
 	if ( class_exists( 'ATORA\\LMS\\LMS_Editor_Sync' ) ) {

@@ -333,15 +333,10 @@ trait CLMS_Submission_Storage_Review_Trait {
 			$feedback       = isset( $score_data['feedback'] ) ? sanitize_text_field( (string) $score_data['feedback'] ) : '';
 			$ratio          = $max_points > 0 ? ( $score_value / $max_points ) : 0;
 
-			// 6.29.2: nivel alcanzado = el nivel con exactamente esos puntos (misma regla que SpeedGrader).
+			// 6.29.3: nivel con las bandas de SpeedGrader (nivel exacto, "entre X y Y" o "por debajo de X"), puntaje decimal sin truncar.
 			$level = '';
-			if ( isset( $score_data['score'] ) && '' !== (string) $score_data['score'] ) {
-				foreach ( (array) ( $criterion['levels'] ?? array() ) as $lv ) {
-					if ( is_array( $lv ) && absint( $lv['points'] ?? 0 ) === (int) $score_value ) {
-						$level = sanitize_text_field( (string) ( $lv['label'] ?? '' ) );
-						break;
-					}
-				}
+			if ( isset( $score_data['score'] ) && '' !== (string) $score_data['score'] && class_exists( 'CLMS_Rubric_Level_Bands' ) ) {
+				$level = CLMS_Rubric_Level_Bands::level_for( (array) ( $criterion['levels'] ?? array() ), $max_points, $score_value );
 			}
 
 			$rows[] = array(

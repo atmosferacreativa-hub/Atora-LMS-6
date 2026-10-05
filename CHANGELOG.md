@@ -1,5 +1,10 @@
 # CHANGELOG — ATORA LMS
 
+## 6.29.3 (2026-10-04)
+
+- **Fix — el nivel de la rúbrica no seguía la regla de SpeedGrader** (6.29.2): buscaba coincidencia exacta y convertía el puntaje con `(int)`/`absint()`, así 3,5 sobre niveles de 3 y 4 daba el nivel de 3. Las bandas de umbral de SpeedGrader (6.26.5) pasan a `CLMS_Rubric_Level_Bands` (`build()` sin cambios de comportamiento; `CLMS_Rubric_Panel_Renderer::build_level_bands()` delega en él) y `describe()` lee un puntaje igual que el panel: nivel exacto, "entre X y Y" o "por debajo de X". `rubric.rows[].level` usa ese helper con el puntaje decimal.
+- **TESTS**: `RubricLevelBandsTest` sin cambios y en verde; `RubricLevelDescribeTest` nuevo (3,5 → "entre…", exacto → su nivel, mismas bandas que el panel); `MobileGradesCertificatesTest::test_rubric_level_follows_speedgrader_bands` (falla con 6.29.2: 3,5 daba "Suficiente").
+
 ## 6.29.2 (2026-10-04)
 
 - **API móvil — nivel alcanzado por criterio** (Fase 2, Parte B.3): cada fila de `rubric.rows[]` en `GET /assignments/{lesson_id}` suma `level`, la etiqueta del nivel de la rúbrica cuyos puntos coinciden con el puntaje, la misma regla con la que SpeedGrader marca el nivel elegido. Vacío si el puntaje no coincide con ningún nivel. Sigue apareciendo solo con la nota liberada.
