@@ -137,12 +137,7 @@ final class CLMS_Rubric_Level_Bands {
 	 * gana la última banda que contiene el valor. Vacío si ninguna lo contiene.
 	 */
 	public static function describe( array $bands, float $value ): string {
-		$match = null;
-		foreach ( $bands as $band ) {
-			if ( $value >= (float) $band['min'] && $value <= (float) $band['max'] ) {
-				$match = $band;
-			}
-		}
+		$match = self::match( $bands, $value );
 		if ( null === $match ) {
 			return '';
 		}
@@ -153,6 +148,35 @@ final class CLMS_Rubric_Level_Bands {
 			return (string) $match['between'];
 		}
 		return (string) ( $match['label'] ?? '' );
+	}
+
+	/**
+	 * Puntos del nivel que el panel resalta para un puntaje (6.29.4), o null.
+	 * Misma banda que `describe()`: entre dos niveles, el de abajo.
+	 */
+	public static function active_points( array $bands, float $value ): ?float {
+		$match = self::match( $bands, $value );
+		return null !== $match && is_numeric( $match['active_points'] ?? null ) ? (float) $match['active_points'] : null;
+	}
+
+	/**
+	 * Puntaje guardado tal como se muestra y se reenvía en el formulario (6.29.4):
+	 * con sus decimales, sin redondear ni truncar. Vacío si no hay puntaje.
+	 */
+	public static function score_field_value( $raw ): string {
+		$text = str_replace( ',', '.', trim( (string) $raw ) );
+		return '' !== $text && is_numeric( $text ) ? $text : '';
+	}
+
+	/** La última banda que contiene el valor (como el JS del panel). */
+	private static function match( array $bands, float $value ): ?array {
+		$match = null;
+		foreach ( $bands as $band ) {
+			if ( $value >= (float) $band['min'] && $value <= (float) $band['max'] ) {
+				$match = $band;
+			}
+		}
+		return $match;
 	}
 
 	/** Atajo: nivel (o "entre…") para un criterio con sus niveles y puntaje decimal. */

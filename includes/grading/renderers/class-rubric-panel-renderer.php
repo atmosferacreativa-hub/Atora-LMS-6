@@ -90,18 +90,26 @@ class CLMS_Rubric_Panel_Renderer {
 						$c_tip     = (string) ( $criterion['improvement_tip'] ?? '' );
 						$c_max     = isset( $criterion['max_points'] ) ? absint( $criterion['max_points'] ) : 0;
 						$c_levels  = isset( $criterion['levels'] ) && is_array( $criterion['levels'] ) ? $criterion['levels'] : array();
-						$c_score   = isset( $saved_scores[ $ri ]['score'] ) && '' !== (string) $saved_scores[ $ri ]['score'] ? absint( $saved_scores[ $ri ]['score'] ) : '';
+						// 6.29.4: el puntaje guardado se muestra y se reenvía con sus decimales (antes absint: 3,5 volvía como 3 al guardar).
+						$c_score   = CLMS_Rubric_Level_Bands::score_field_value( $saved_scores[ $ri ]['score'] ?? '' );
 						$c_fb      = isset( $saved_scores[ $ri ]['feedback'] ) ? (string) $saved_scores[ $ri ]['feedback'] : '';
 
+						// 6.29.4: nivel resaltado con las bandas de umbral (igual que al escribir en el campo), no por coincidencia exacta.
+						$bands             = self::build_level_bands( $c_levels, $c_max );
 						$saved_level_index = -1;
-						if ( '' !== $c_score && ! empty( $c_levels ) ) {
+						$active_pts        = '' !== $c_score ? CLMS_Rubric_Level_Bands::active_points( $bands, (float) $c_score ) : null;
+						if ( null !== $active_pts ) {
 							foreach ( $c_levels as $li => $lv ) {
-								if ( absint( $lv['points'] ?? 0 ) === (int) $c_score ) {
+								if ( (float) absint( $lv['points'] ?? 0 ) === $active_pts ) {
 									$saved_level_index = $li;
 									break;
 								}
 							}
 						}
+						// Pista "entre X y Y" / "por debajo de X" como la escribe el JS; con puntaje exacto, ninguna.
+						$c_hint = '' !== $c_score && ( null === $active_pts || abs( $active_pts - (float) $c_score ) > 0.0001 )
+							? CLMS_Rubric_Level_Bands::describe( $bands, (float) $c_score )
+							: '';
 					?>
 						<div class="clms-sg-rubric-criterion">
 						<div class="clms-sg-rubric-criterion-header">
@@ -119,7 +127,6 @@ class CLMS_Rubric_Panel_Renderer {
 							</div>
 							<div class="clms-sg-rubric-score-box">
 								<?php
-								$bands = self::build_level_bands( $c_levels, $c_max );
 								$bands_json = wp_json_encode( $bands );
 								$bands_title = self::levels_to_tooltip( $c_levels, $c_max );
 								?>
@@ -134,7 +141,7 @@ class CLMS_Rubric_Panel_Renderer {
 									title="<?php echo esc_attr( $bands_title ); ?>"
 								>
 								<div class="clms-sg-rubric-score-error" aria-live="polite" data-criterion="<?php echo esc_attr( $ri ); ?>"></div>
-								<div class="clms-sg-rubric-score-label" data-criterion="<?php echo esc_attr( $ri ); ?>"></div>
+								<div class="clms-sg-rubric-score-label" data-criterion="<?php echo esc_attr( $ri ); ?>"><?php echo esc_html( $c_hint ); ?></div>
 								<span class="clms-sg-rubric-score-label"><?php echo esc_html( "/ $c_max pts" ); ?></span>
 							</div>
 						</div>
