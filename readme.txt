@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 6.28.2
+Stable tag: 6.29.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,9 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.29.0 =
+* Notas del estudiante: una sola regla (solo notas liberadas) para la web y la app; API móvil de notas, devolución con rúbrica y certificados con enlace firmado.
+
 = 6.28.2 =
 * API móvil: todos los videos de la lección (videos[]) con posición por video; la posición responde 503 ante un error de base de datos; función atora_lms_get_progress() para el tema.
 

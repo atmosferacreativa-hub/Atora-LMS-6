@@ -285,19 +285,22 @@ trait CLMS_Submission_Storage_Review_Trait {
 	 *
 	 * @param int $user_id   Usuario.
 	 * @param int $lesson_id Lección (post lm_lesson).
-	 * @return array{submission_id:int, status:string, grade:?int, feedback:?string}
+	 * @return array{submission_id:int, status:string, grade:?int, feedback:?string, rubric:?array}
 	 */
 	public function get_student_review_view( $user_id, $lesson_id ) {
 		$submission = $this->get_user_submission_for_grading( $user_id, $lesson_id );
 		if ( empty( $submission ) ) {
-			return array( 'submission_id' => 0, 'status' => '', 'grade' => null, 'feedback' => null );
+			return array( 'submission_id' => 0, 'status' => '', 'grade' => null, 'feedback' => null, 'rubric' => null );
 		}
 
+		$released = $this->can_student_view_published_grade( $submission );
 		return array(
 			'submission_id' => absint( $submission['submission_id'] ),
 			'status'        => sanitize_key( (string) $submission['status'] ),
-			'grade'         => $this->can_student_view_published_grade( $submission ) ? $this->normalize_grade_display( $submission['grade'] ) : null,
+			'grade'         => $released ? $this->normalize_grade_display( $submission['grade'] ) : null,
 			'feedback'      => $this->can_student_view_feedback( $submission ) ? wp_strip_all_tags( (string) $submission['feedback'] ) : null,
+			// 6.29.0: rúbrica por criterio (puntaje, máximo, comentario) solo con la nota liberada.
+			'rubric'        => $released ? ( $this->build_student_rubric_feedback( $lesson_id, $submission ) ?: null ) : null,
 		);
 	}
 
@@ -739,10 +742,8 @@ trait CLMS_Submission_Storage_Review_Trait {
 	 */
 	protected function can_student_view_published_grade( $submission ) {
 		$submission = is_array( $submission ) ? $submission : array();
-		$status     = sanitize_key( (string) ( $submission['status'] ?? '' ) );
-		$grade      = $submission['grade'] ?? '';
-
-		return 'graded' === $status && '' !== (string) $grade;
+		// 6.29.0: regla única (web, panel, promedios y API móvil).
+		return CLMS_Student_Grade_Visibility::grade_visible( $submission['status'] ?? '', $submission['grade'] ?? '' );
 	}
 
 	/**
@@ -753,13 +754,7 @@ trait CLMS_Submission_Storage_Review_Trait {
 	 */
 	protected function can_student_view_feedback( $submission ) {
 		$submission = is_array( $submission ) ? $submission : array();
-		$status     = sanitize_key( (string) ( $submission['status'] ?? '' ) );
-
-		if ( $this->can_student_view_published_grade( $submission ) ) {
-			return true;
-		}
-
-		return in_array( $status, array( 'needs_revision', 'returned' ), true );
+		return CLMS_Student_Grade_Visibility::feedback_visible( $submission['status'] ?? '', $submission['grade'] ?? '' );
 	}
 
 	/**

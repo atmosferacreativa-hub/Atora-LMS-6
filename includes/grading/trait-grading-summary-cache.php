@@ -245,7 +245,8 @@ trait CLMS_Grading_Summary_Cache_Trait {
 		);
 
 		foreach ( (array) $ids as $submission_id ) {
-			$feedback = (string) get_post_meta( absint( $submission_id ), '_clms_submission_feedback', true );
+			// 6.29.0: solo comentarios que el estudiante puede ver.
+			$feedback = (string) ( CLMS_Student_Grade_Visibility::for_submission_post( absint( $submission_id ) )['feedback'] ?? '' );
 			if ( '' !== trim( $feedback ) ) {
 				return sanitize_text_field( $feedback );
 			}

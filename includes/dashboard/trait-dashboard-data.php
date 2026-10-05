@@ -41,9 +41,11 @@ trait CLMS_Dashboard_Data_Trait {
 		foreach ( $ids as $submission_id ) {
 			$lesson_id = absint( get_post_meta( $submission_id, '_clms_submission_lesson_id', true ) );
 			$course_id = absint( get_post_meta( $submission_id, '_clms_submission_course_id', true ) );
-			$status    = (string) get_post_meta( $submission_id, '_clms_submission_status', true );
-			$grade     = get_post_meta( $submission_id, '_clms_submission_grade', true );
-			$feedback  = (string) get_post_meta( $submission_id, '_clms_submission_feedback', true );
+			// 6.29.0: misma regla que la vista de la tarea y la app.
+			$visible   = CLMS_Student_Grade_Visibility::for_submission_post( absint( $submission_id ) );
+			$status    = $visible['status'];
+			$grade     = null === $visible['grade'] ? '' : $visible['grade'];
+			$feedback  = (string) ( $visible['feedback'] ?? '' );
 
 			if ( ! $lesson_id || '' === $feedback ) {
 				continue;

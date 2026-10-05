@@ -356,8 +356,10 @@ class CLMS_Academic_Status_Service {
 		}
 
 		foreach ( $query->posts as $submission_id ) {
-			$feedback = (string) get_post_meta( absint( $submission_id ), '_clms_submission_feedback', true );
-			$grade    = get_post_meta( absint( $submission_id ), '_clms_submission_grade', true );
+			// 6.29.0: solo lo que el estudiante puede ver.
+			$visible  = CLMS_Student_Grade_Visibility::for_submission_post( absint( $submission_id ) );
+			$feedback = (string) ( $visible['feedback'] ?? '' );
+			$grade    = null === $visible['grade'] ? '' : $visible['grade'];
 			$has_data = '' !== trim( $feedback ) || '' !== (string) $grade;
 			if ( $has_data ) {
 				return array(
