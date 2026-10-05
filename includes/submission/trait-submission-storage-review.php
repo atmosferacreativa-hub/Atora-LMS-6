@@ -333,11 +333,23 @@ trait CLMS_Submission_Storage_Review_Trait {
 			$feedback       = isset( $score_data['feedback'] ) ? sanitize_text_field( (string) $score_data['feedback'] ) : '';
 			$ratio          = $max_points > 0 ? ( $score_value / $max_points ) : 0;
 
+			// 6.29.2: nivel alcanzado = el nivel con exactamente esos puntos (misma regla que SpeedGrader).
+			$level = '';
+			if ( isset( $score_data['score'] ) && '' !== (string) $score_data['score'] ) {
+				foreach ( (array) ( $criterion['levels'] ?? array() ) as $lv ) {
+					if ( is_array( $lv ) && absint( $lv['points'] ?? 0 ) === (int) $score_value ) {
+						$level = sanitize_text_field( (string) ( $lv['label'] ?? '' ) );
+						break;
+					}
+				}
+			}
+
 			$rows[] = array(
 				'name'       => $criterion_name,
 				'competency' => $criterion_comp,
 				'score'      => round( $score_value, 2 ),
 				'max'        => $max_points,
+				'level'      => $level,
 				'feedback'   => $feedback,
 			);
 

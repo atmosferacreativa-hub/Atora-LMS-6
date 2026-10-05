@@ -123,7 +123,16 @@ final class MobileGradesCertificatesTest extends WP_UnitTestCase {
 
 	public function test_rubric_only_after_release(): void {
 		$rubric = self::factory()->post->create( array( 'post_type' => 'clms_rubric', 'post_status' => 'publish', 'post_title' => 'Rúbrica' ) );
-		update_post_meta( $rubric, CLMS_Rubric::META_CRITERIA, array( array( 'name' => 'Argumentación', 'max_points' => 10, 'competency' => 'Escritura' ) ) );
+		update_post_meta( $rubric, CLMS_Rubric::META_CRITERIA, array( array(
+			'name'       => 'Argumentación',
+			'max_points' => 10,
+			'competency' => 'Escritura',
+			'levels'     => array(
+				array( 'label' => 'En desarrollo', 'points' => 5 ),
+				array( 'label' => 'Competente', 'points' => 8 ),
+				array( 'label' => 'Excelente', 'points' => 10 ),
+			),
+		) ) );
 		update_post_meta( $this->wp_lesson, '_clms_rubric_id', $rubric );
 		$submission = $this->grade( $this->student, 'in_review', 70, 'Revisa la conclusión' );
 		$review = clms_core( 'CLMS_Submission' )->get_student_review_view( $this->student, $this->wp_lesson );
@@ -138,6 +147,7 @@ final class MobileGradesCertificatesTest extends WP_UnitTestCase {
 		$this->assertSame( 'Clara', $review['rubric']['rows'][0]['feedback'] ?? null, 'Con la nota liberada llega la rúbrica por criterio.' );
 		$this->assertEquals( 8, $review['rubric']['rows'][0]['score'] );
 		$this->assertSame( 'Argumentación', $review['rubric']['rows'][0]['name'] );
+		$this->assertSame( 'Competente', $review['rubric']['rows'][0]['level'], 'Nivel alcanzado: el de esos puntos, como en SpeedGrader.' );
 	}
 
 	public function test_certificate_link_expires_and_is_bound_to_the_user(): void {
