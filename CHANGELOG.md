@@ -1,5 +1,16 @@
 # CHANGELOG — ATORA LMS
 
+## 6.29.0 (2026-10-04)
+
+### Fase 2 — Rendir (plugin)
+
+- **Fix — notas no liberadas visibles para el estudiante en la web**: SpeedGrader guarda nota, comentario y rúbrica también con "guardar borrador" (estado `in_review`), y el promedio del curso (`CLMS_Assessment_Engine::build_course_gradebook()` → `CLMS_Grading::get_course_grade_summary()`), el "último comentario y nota" del estado académico, el último comentario del resumen y las "devoluciones recientes" del panel los leían sin mirar el estado. Ahora una sola regla, `CLMS_Student_Grade_Visibility` (nota solo con `graded`; comentario también con `needs_revision`/`returned`), la aplican todos esos caminos y la vista de la tarea. La celda del docente en el gradebook sigue mostrando su borrador. Al actualizar se invalida la caché del gradebook.
+- **NEW — `CLMS_Student_Grades_Service`**: notas por actividad (con grupo y peso del esquema, estado `graded`/`in_review`/`needs_revision`/`completed`/`pending`), resumen por curso (nota acumulada del panel, avance de `atora_lms_get_progress()`, estado académico) y por programa. Lo usan las rutas móviles; la web y la app dan el mismo número.
+- **NEW — API móvil**: `GET /grades`, `GET /courses/{id}/grades`, `GET /certificates` y `GET /certificates/{course|program}/{id}/document`. En `GET /assignments/{lesson_id}` cada intento suma `rubric` (puntaje y comentario por criterio) solo con la nota liberada, e `in_review` mientras no. `capabilities.grades` y `capabilities.certificates`. Las rutas nuevas heredan el filtro de no-caché de 6.28.1.
+- **Certificados (provisional HTML)**: la vista se separa en `resolve_certificate_for_user()` (permisos, requisitos y registro, sin nonce) y `render_certificate_document()` (el mismo HTML); la web y la app usan ambos. La app recibe un enlace firmado (HMAC con usuario, objeto y vencimiento de 15 minutos) que además exige el token del mismo usuario. El formato institucional (logo, firmas, QR verificable) queda para más adelante.
+- **Fix**: el certificado ya no avisa si el registro no trae `verification_code`.
+- **TESTS**: `tests/integration/MobileGradesCertificatesTest.php` (nota guardada no liberada no aparece ni cuenta en la web; liberada coincide web y app; no se ven notas de otro; rúbrica solo tras liberar; enlace del certificado vencido o de otro usuario → 403; rutas nuevas no cacheables).
+
 ## 6.28.2 (2026-10-04)
 
 ### Correcciones de la auditoría y varios videos por lección

@@ -31,6 +31,10 @@ Namespace: `/wp-json/atora-mobile/v1`
 | GET | `/lessons/{id}` | Bearer + matrícula | Contenido de la lección (`quiz_available`, `assignment_available`, `video_thumbnail_url`; desde 6.28.0 `video_downloadable`, `video_bytes`, `resume_position_seconds` y, en cada recurso, `downloadable`, `bytes`, `updated_at`) |
 | PUT | `/lessons/{id}/position` | Bearer + matrícula (si no, 404) | Guardar posición de reproducción (6.28.0); `video_key` opcional (6.28.2) |
 | GET | `/sync/changes?cursor=` | Bearer | Cambios desde el cursor, solo de los cursos matriculados (6.28.0) |
+| GET | `/grades` | Bearer | Resumen de notas por curso y por programa (6.29.0) |
+| GET | `/courses/{id}/grades` | Bearer + matrícula | Nota por actividad (6.29.0) |
+| GET | `/certificates` | Bearer | Certificados obtenidos con enlace firmado (6.29.0) |
+| GET | `/certificates/{course\|program}/{id}/document?expires=&sig=` | Bearer del mismo usuario + firma vigente | Documento HTML del certificado (6.29.0) |
 | GET, POST | `/lessons/{id}/quiz` | Bearer + matrícula | Consultar y responder la evaluación |
 | POST | `/lessons/{id}/complete` | Bearer + matrícula | Completar lección |
 | GET | `/assignments/{lesson_id}` | Bearer + matrícula | Consigna, límites y entregas propias (6.27.0) |
@@ -146,3 +150,14 @@ La renovación invalida access y refresh tokens anteriores de esa sesión.
 - `PUT /lessons/{id}/position` acepta `video_key`. Sin él, la posición es la del primer video (apps anteriores). Una clave que no es de la lección responde 404.
 - Errores de base de datos al guardar posición, subidas o entregas responden **503**: reintentar.
 - `GET /discovery` declara `capabilities.multi_video`.
+
+
+## Notas y certificados (6.29.0)
+
+**Regla:** el estudiante nunca ve en la app una nota que no vería en la web. Toda nota sale de `CLMS_Student_Grades_Service` y de `CLMS_Student_Grade_Visibility`: una nota guardada en SpeedGrader sin publicar (`in_review`) no aparece ni cuenta en el promedio.
+
+- `GET /grades` → `courses[]` (`course_id`, `title`, `final_grade` o `null`, `passing_grade`, `progress`, `status`: `not_started`, `in_progress`, `at_risk`, `approved`, `not_approved`), `programs[]` (`final_grade`, `progress`, `courses`) y `generated_at`.
+- `GET /courses/{id}/grades` → `course` (igual que arriba) y `activities[]` (`lesson_id`, `title`, `kind`: `assignment`/`quiz`/`activity`, `weight_label`, `weight`, `grade` o `null`, `status`: `graded`, `in_review`, `needs_revision`, `completed`, `pending`, `has_feedback`, `graded_at`).
+- `GET /assignments/{lesson_id}`: cada intento suma `rubric` (`rows[]` con `name`, `competency`, `score`, `max`, `feedback`; `strengths`, `reinforce`, `recommendation`) solo con la nota liberada, e `in_review: true` mientras está en revisión.
+- `GET /certificates` → `certificates[]` (`type`, `id`, `course_id`, `title`, `status`: `issued`, `available`, `revoked`, `issued_at`, `certificate_code`, `download_url`, `download_expires_at`). El enlace vence a los 15 minutos y solo sirve con el token del mismo usuario; pedir la lista otra vez da uno nuevo. El documento es HTML (provisional) para guardarlo y verlo sin conexión.
+- `GET /discovery` declara `capabilities.grades` y `capabilities.certificates`.

@@ -252,15 +252,18 @@ trait CLMS_Certificates_Render_Trait {
 	/**
 	 * Render imprimible del certificado.
 	 */
-	public function handle_view_certificate() {
-		if ( ! is_user_logged_in() ) {
-			wp_die( esc_html__( 'Debes iniciar sesión.', 'atora-lms' ) );
-		}
-
-		$user_id     = get_current_user_id();
-		$target_type = isset( $_GET['target_type'] ) ? sanitize_key( wp_unslash( $_GET['target_type'] ) ) : 'course';
-		if ( ! in_array( $target_type, array( 'course', 'program' ), true ) ) {
-			$target_type = 'course';
+	/**
+	 * 6.29.0: certificado de un usuario (curso o programa) listo para mostrar:
+	 * permisos, requisitos y registro emitido. Sin nonce y devolviendo WP_Error,
+	 * para que lo usen la vista web y la API móvil.
+	 *
+	 * @return array{target_type:string, course_id:int, program_id:int, record:array, eligibility:array}|WP_Error
+	 */
+	public function resolve_certificate_for_user( $user_id, $target_type, $target_id ) {
+		$user_id     = absint( $user_id );
+		$target_type = 'program' === $target_type ? 'program' : 'course';
+		if ( ! $user_id ) {
+			return new WP_Error( 'clms_certificate_auth', __( 'Debes iniciar sesión.', 'atora-lms' ), array( 'status' => 401 ) );
 		}
 
 		$course_id   = 0;
@@ -272,13 +275,11 @@ trait CLMS_Certificates_Render_Trait {
 		);
 
 		if ( 'program' === $target_type ) {
-			$program_id = isset( $_GET['program_id'] ) ? absint( wp_unslash( $_GET['program_id'] ) ) : 0;
+			$program_id = absint( $target_id );
 
 			if ( ! $program_id || 'lm_program' !== get_post_type( $program_id ) ) {
-				wp_die( esc_html__( 'Programa no válido.', 'atora-lms' ) );
+				return new WP_Error( 'clms_certificate_unavailable', __( 'Programa no válido.', 'atora-lms' ), array( 'status' => 404 ) );
 			}
-
-			check_admin_referer( 'clms_view_program_certificate_' . $user_id . '_' . $program_id );
 
 			$is_admin_view = CLMS_Helper::user_can_manage_lms( $program_id );
 			$is_enrolled_program = class_exists( 'CLMS_Helper' ) && method_exists( 'CLMS_Helper', 'user_is_enrolled_in_program' )
@@ -286,7 +287,7 @@ trait CLMS_Certificates_Render_Trait {
 				: false;
 
 			if ( ! $is_admin_view && ! $is_enrolled_program ) {
-				wp_die( esc_html__( 'No tienes permiso para ver este certificado.', 'atora-lms' ) );
+				return new WP_Error( 'clms_certificate_forbidden', __( 'No tienes permiso para ver este certificado.', 'atora-lms' ), array( 'status' => 403 ) );
 			}
 
 			$program_service = class_exists( 'CLMS_Helper' ) ? clms_core('CLMS_Program_Certificate_Service') : null;
@@ -298,7 +299,7 @@ trait CLMS_Certificates_Render_Trait {
 				$record = is_array( $issued ) ? $issued : array();
 			}
 			if ( empty( $record ) ) {
-				wp_die( esc_html__( 'No se pudo preparar el certificado.', 'atora-lms' ) );
+				return new WP_Error( 'clms_certificate_unavailable', __( 'No se pudo preparar el certificado.', 'atora-lms' ), array( 'status' => 404 ) );
 			}
 
 			$eligibility = array(
@@ -308,31 +309,83 @@ trait CLMS_Certificates_Render_Trait {
 				'required_evidences'  => array(),
 			);
 		} else {
-			$course_id = isset( $_GET['course_id'] ) ? absint( wp_unslash( $_GET['course_id'] ) ) : 0;
+			$course_id = absint( $target_id );
 
 			if ( ! $course_id || 'lm_course' !== get_post_type( $course_id ) ) {
-				wp_die( esc_html__( 'Curso no válido.', 'atora-lms' ) );
+				return new WP_Error( 'clms_certificate_unavailable', __( 'Curso no válido.', 'atora-lms' ), array( 'status' => 404 ) );
 			}
-
-			check_admin_referer( 'clms_view_certificate_' . $user_id . '_' . $course_id );
 
 			$is_admin_view = CLMS_Helper::user_can_manage_lms( $course_id );
 
 			if ( ! $is_admin_view && ! $this->user_is_enrolled_in_course( $user_id, $course_id ) ) {
-				wp_die( esc_html__( 'No tienes permiso para ver este certificado.', 'atora-lms' ) );
+				return new WP_Error( 'clms_certificate_forbidden', __( 'No tienes permiso para ver este certificado.', 'atora-lms' ), array( 'status' => 403 ) );
 			}
 
 			$eligibility = $this->get_certificate_eligibility( $user_id, $course_id );
 
 			if ( ! $eligibility['eligible'] ) {
-				wp_die( esc_html__( 'Aún no cumples los requisitos para este certificado.', 'atora-lms' ) );
+				return new WP_Error( 'clms_certificate_not_eligible', __( 'Aún no cumples los requisitos para este certificado.', 'atora-lms' ), array( 'status' => 403 ) );
 			}
 
 			$record = $this->maybe_issue_certificate( $user_id, $course_id );
 			if ( empty( $record ) ) {
-				wp_die( esc_html__( 'No se pudo preparar el certificado.', 'atora-lms' ) );
+				return new WP_Error( 'clms_certificate_unavailable', __( 'No se pudo preparar el certificado.', 'atora-lms' ), array( 'status' => 404 ) );
 			}
 		}
+
+		return array(
+			'target_type' => $target_type,
+			'course_id'   => $course_id,
+			'program_id'  => $program_id,
+			'record'      => $record,
+			'eligibility' => $eligibility,
+		);
+	}
+
+	public function handle_view_certificate() {
+		if ( ! is_user_logged_in() ) {
+			wp_die( esc_html__( 'Debes iniciar sesión.', 'atora-lms' ) );
+		}
+
+		$user_id     = get_current_user_id();
+		$target_type = isset( $_GET['target_type'] ) ? sanitize_key( wp_unslash( $_GET['target_type'] ) ) : 'course';
+		if ( ! in_array( $target_type, array( 'course', 'program' ), true ) ) {
+			$target_type = 'course';
+		}
+
+		if ( 'program' === $target_type ) {
+			$target_id = isset( $_GET['program_id'] ) ? absint( wp_unslash( $_GET['program_id'] ) ) : 0;
+			check_admin_referer( 'clms_view_program_certificate_' . $user_id . '_' . $target_id );
+		} else {
+			$target_id = isset( $_GET['course_id'] ) ? absint( wp_unslash( $_GET['course_id'] ) ) : 0;
+			check_admin_referer( 'clms_view_certificate_' . $user_id . '_' . $target_id );
+		}
+
+		$resolved = $this->resolve_certificate_for_user( $user_id, $target_type, $target_id );
+		if ( is_wp_error( $resolved ) ) {
+			wp_die( esc_html( $resolved->get_error_message() ) );
+		}
+
+		nocache_headers();
+		echo $this->render_certificate_document( $user_id, $resolved ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- documento ya escapado al generarse.
+		exit;
+	}
+
+	/**
+	 * 6.29.0: documento HTML del certificado (provisional) como texto. Lo
+	 * imprime la vista web y lo entrega la API móvil para verlo sin conexión.
+	 *
+	 * @param int   $user_id  Estudiante.
+	 * @param array $resolved Resultado de resolve_certificate_for_user().
+	 * @return string
+	 */
+	public function render_certificate_document( $user_id, array $resolved ) {
+		$user_id     = absint( $user_id );
+		$target_type = (string) $resolved['target_type'];
+		$course_id   = absint( $resolved['course_id'] );
+		$program_id  = absint( $resolved['program_id'] );
+		$record      = (array) $resolved['record'];
+		$eligibility = (array) $resolved['eligibility'];
 
 		$user         = get_userdata( $user_id );
 		$course       = 'program' === $target_type ? get_the_title( $program_id ) : get_the_title( $course_id );
@@ -386,7 +439,7 @@ trait CLMS_Certificates_Render_Trait {
 		$evidences_done  = absint( $record['completed_evidences_count'] ?? ( is_array( $eligibility['completed_evidences'] ?? null ) ? count( $eligibility['completed_evidences'] ) : 0 ) );
 		$evidences_total = absint( $record['required_evidences_count'] ?? ( is_array( $eligibility['required_evidences'] ?? null ) ? count( $eligibility['required_evidences'] ) : 0 ) );
 
-		nocache_headers();
+		ob_start();
 		?>
 		<!DOCTYPE html>
 		<html <?php language_attributes(); ?>>
@@ -745,7 +798,7 @@ trait CLMS_Certificates_Render_Trait {
 									?>
 								<?php endif; ?>
 								<strong><?php esc_html_e( 'Código de verificación', 'atora-lms' ); ?></strong><br>
-								<?php echo esc_html( (string) $record['verification_code'] ); ?>
+								<?php echo esc_html( (string) ( $record['verification_code'] ?? '' ) ); ?>
 								<?php if ( $verify_url ) : ?>
 									<br><strong><?php esc_html_e( 'Verificación', 'atora-lms' ); ?></strong><br>
 									<?php echo esc_html( $verify_url ); ?>
@@ -797,7 +850,7 @@ trait CLMS_Certificates_Render_Trait {
 		</body>
 		</html>
 		<?php
-		exit;
+		return (string) ob_get_clean();
 	}
 
 }

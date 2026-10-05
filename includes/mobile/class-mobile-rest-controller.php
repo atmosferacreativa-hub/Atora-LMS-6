@@ -114,6 +114,28 @@ final class ATORA_Mobile_REST_Controller {
 			'permission_callback' => array( __CLASS__, 'authorize' ),
 			'args'                => array( 'lesson_id' => array( 'sanitize_callback' => 'absint' ) ),
 		) );
+		// 6.29.0: notas, devoluciones y certificados del estudiante.
+		register_rest_route( self::REST_NAMESPACE, '/grades', array(
+			'methods'             => WP_REST_Server::READABLE,
+			'callback'            => array( __CLASS__, 'grades' ),
+			'permission_callback' => array( __CLASS__, 'authorize' ),
+		) );
+		register_rest_route( self::REST_NAMESPACE, '/courses/(?P<course_id>\\d+)/grades', array(
+			'methods'             => WP_REST_Server::READABLE,
+			'callback'            => array( __CLASS__, 'course_grades' ),
+			'permission_callback' => array( __CLASS__, 'authorize' ),
+		) );
+		register_rest_route( self::REST_NAMESPACE, '/certificates', array(
+			'methods'             => WP_REST_Server::READABLE,
+			'callback'            => array( __CLASS__, 'certificates' ),
+			'permission_callback' => array( __CLASS__, 'authorize' ),
+		) );
+		register_rest_route( self::REST_NAMESPACE, '/certificates/(?P<target_type>course|program)/(?P<target_id>\\d+)/document', array(
+			'methods'             => WP_REST_Server::READABLE,
+			'callback'            => array( __CLASS__, 'certificate_document' ),
+			'permission_callback' => array( __CLASS__, 'authorize' ),
+		) );
+
 		// 6.28.0: sincronización incremental y posición de reproducción.
 		register_rest_route( self::REST_NAMESPACE, '/sync/changes', array(
 			'methods'             => WP_REST_Server::READABLE,
@@ -211,13 +233,15 @@ final class ATORA_Mobile_REST_Controller {
 			'authentication'   => 'opaque_bearer',
 			'access_ttl'       => ATORA_Mobile_Token_Service::ACCESS_TTL,
 			'refresh_ttl'      => ATORA_Mobile_Token_Service::REFRESH_TTL,
-			'features'         => array( 'profile', 'dashboard', 'courses', 'progress', 'lesson_completion', 'quizzes', 'assignments', 'sync_changes', 'playback_position', 'resource_downloads', 'multi_video' ),
+			'features'         => array( 'profile', 'dashboard', 'courses', 'progress', 'lesson_completion', 'quizzes', 'assignments', 'sync_changes', 'playback_position', 'resource_downloads', 'multi_video', 'grades', 'certificates' ),
 			'capabilities'     => array(
 				'assignments'        => true,
 				'sync_changes'       => class_exists( '\\ATORA\\LMS\\LMS_Content_Changes' ),
 				'playback_position'  => class_exists( 'ATORA_Mobile_Position_Service' ),
 				'resource_downloads' => class_exists( 'ATORA_Download_Info' ),
 				'multi_video'        => class_exists( 'ATORA_Lesson_Videos' ),
+				'grades'             => class_exists( 'CLMS_Student_Grades_Service' ),
+				'certificates'       => class_exists( 'CLMS_Certificates' ) || ( function_exists( 'clms_core' ) && (bool) clms_core( 'CLMS_Certificates' ) ),
 			),
 		), 200 );
 	}
@@ -1121,6 +1145,9 @@ final class ATORA_Mobile_REST_Controller {
 			$submissions[ $i ]['grade']    = $is_current ? $review['grade'] : null;
 			$submissions[ $i ]['feedback'] = $is_current ? $review['feedback'] : null;
 			$submissions[ $i ]['review_status'] = $is_current ? (string) $review['status'] : '';
+			// 6.29.0: devolución con rúbrica solo con la nota liberada; si no, "en revisión".
+			$submissions[ $i ]['rubric'] = $is_current ? ( $review['rubric'] ?? null ) : null;
+			$submissions[ $i ]['in_review'] = $is_current && null === $review['grade'] && in_array( (string) $review['status'], array( 'submitted', 'in_review', 'graded' ), true );
 			unset( $submissions[ $i ]['wp_post_id'] );
 		}
 
@@ -1257,6 +1284,177 @@ final class ATORA_Mobile_REST_Controller {
 		} catch ( Exception $e ) {
 			return 0;
 		}
+	}
+
+	/** 6.29.0: cursos matriculados y visibles del usuario (tabla) con su post. @return array<int, array> course_id => curso */
+	private static function visible_courses( int $user_id ): array {
+		$courses = array();
+		foreach ( self::enrollment_index( $user_id ) as $row ) {
+			$course_id = absint( $row['course_id'] ?? 0 );
+			$course    = $course_id ? \ATORA\LMS\LMS_Course_Service::get( $course_id ) : null;
+			if ( $course && self::course_is_student_visible( $course ) && absint( $course['wp_post_id'] ?? 0 ) > 0 ) {
+				$courses[ $course_id ] = $course;
+			}
+		}
+		return $courses;
+	}
+
+	/**
+	 * 6.29.0: resumen de notas por curso matriculado y por programa. Mismo
+	 * servicio y misma regla de visibilidad que el panel web.
+	 */
+	public static function grades( WP_REST_Request $request ) {
+		$user_id = get_current_user_id();
+		if ( ! class_exists( 'CLMS_Student_Grades_Service' ) ) {
+			return new WP_Error( 'atora_mobile_grades_unavailable', __( 'Las notas no están disponibles.', 'atora-lms' ), array( 'status' => 503 ) );
+		}
+		$by_wp   = array();
+		$courses = array();
+		foreach ( self::visible_courses( $user_id ) as $course_id => $course ) {
+			$wp_course_id     = absint( $course['wp_post_id'] );
+			$summary          = CLMS_Student_Grades_Service::course_summary( $user_id, $wp_course_id );
+			$by_wp[ $wp_course_id ] = $summary;
+			unset( $summary['wp_course_id'] );
+			$courses[] = array( 'course_id' => $course_id ) + $summary;
+		}
+		return new WP_REST_Response( array(
+			'courses'      => $courses,
+			'programs'     => CLMS_Student_Grades_Service::program_summaries( $user_id, $by_wp ),
+			'generated_at' => gmdate( 'Y-m-d\TH:i:s\Z' ),
+		), 200 );
+	}
+
+	/** 6.29.0: nota por actividad de un curso matriculado (las no liberadas no aparecen). */
+	public static function course_grades( WP_REST_Request $request ) {
+		$user_id   = get_current_user_id();
+		$course_id = absint( $request['course_id'] );
+		$auth      = self::authorize_course_id( $user_id, $course_id );
+		if ( is_wp_error( $auth ) ) {
+			return $auth;
+		}
+		$course       = \ATORA\LMS\LMS_Course_Service::get( $course_id );
+		$wp_course_id = absint( $course['wp_post_id'] ?? 0 );
+		if ( ! $wp_course_id || ! class_exists( 'CLMS_Student_Grades_Service' ) ) {
+			return new WP_Error( 'atora_mobile_grades_unavailable', __( 'Las notas no están disponibles.', 'atora-lms' ), array( 'status' => 503 ) );
+		}
+		$activities = array();
+		foreach ( CLMS_Student_Grades_Service::course_activities( $user_id, $wp_course_id ) as $item ) {
+			$lesson = \ATORA\LMS\LMS_Course_Service::get_lesson_by_wp_post( absint( $item['wp_lesson_id'] ) );
+			if ( ! $lesson || 'published' !== (string) ( $lesson['status'] ?? '' ) ) {
+				continue;
+			}
+			unset( $item['wp_lesson_id'] );
+			$activities[] = array( 'lesson_id' => absint( $lesson['id'] ) ) + $item;
+		}
+		$summary = CLMS_Student_Grades_Service::course_summary( $user_id, $wp_course_id );
+		unset( $summary['wp_course_id'] );
+		return new WP_REST_Response( array(
+			'course'     => array( 'course_id' => $course_id ) + $summary,
+			'activities' => $activities,
+		), 200 );
+	}
+
+	/** 6.29.0: firma de un enlace de certificado, atada a usuario, objeto y vencimiento. */
+	public static function certificate_signature( int $user_id, string $type, int $target_id, int $expires ): string {
+		return hash_hmac( 'sha256', $user_id . '|' . $type . '|' . $target_id . '|' . $expires, wp_salt( 'auth' ) . 'atora-mobile-certificate' );
+	}
+
+	const CERTIFICATE_LINK_TTL = 15 * MINUTE_IN_SECONDS;
+
+	private static function certificate_link( int $user_id, string $type, int $target_id ): array {
+		$expires = time() + self::CERTIFICATE_LINK_TTL;
+		$url     = add_query_arg(
+			array(
+				'expires' => $expires,
+				'sig'     => self::certificate_signature( $user_id, $type, $target_id, $expires ),
+			),
+			rest_url( self::REST_NAMESPACE . '/certificates/' . $type . '/' . $target_id . '/document' )
+		);
+		return array( 'download_url' => esc_url_raw( $url ), 'download_expires_at' => gmdate( 'Y-m-d\TH:i:s\Z', $expires ) );
+	}
+
+	/** 6.29.0: certificados obtenidos (emitidos o ya disponibles) con enlace firmado y temporal. */
+	public static function certificates( WP_REST_Request $request ) {
+		$user_id = get_current_user_id();
+		$certs   = function_exists( 'clms_core' ) ? clms_core( 'CLMS_Certificates' ) : null;
+		if ( ! $certs || ! method_exists( $certs, 'get_certificate_status_for_student_course' ) ) {
+			return new WP_Error( 'atora_mobile_certificates_unavailable', __( 'Los certificados no están disponibles.', 'atora-lms' ), array( 'status' => 503 ) );
+		}
+		$items = array();
+		foreach ( self::visible_courses( $user_id ) as $course_id => $course ) {
+			$wp_course_id = absint( $course['wp_post_id'] );
+			$status       = (array) $certs->get_certificate_status_for_student_course( $user_id, $wp_course_id );
+			$state        = sanitize_key( (string) ( $status['status'] ?? 'pending' ) );
+			if ( 'pending' === $state ) {
+				continue;
+			}
+			$record  = (array) ( $status['record'] ?? array() );
+			$revoked = 'revoked' === $state;
+			$items[] = array(
+				'type'             => 'course',
+				'id'               => $wp_course_id,
+				'course_id'        => $course_id,
+				'title'            => sanitize_text_field( (string) ( $course['title'] ?? '' ) ),
+				'status'           => $revoked ? 'revoked' : ( empty( $record ) ? 'available' : 'issued' ),
+				'issued_at'        => sanitize_text_field( (string) ( $record['issued_at'] ?? '' ) ),
+				'certificate_code' => sanitize_text_field( (string) ( $record['certificate_code'] ?? '' ) ),
+			) + ( $revoked ? array( 'download_url' => '', 'download_expires_at' => null ) : self::certificate_link( $user_id, 'course', $wp_course_id ) );
+		}
+		$programs = function_exists( 'clms_core' ) ? clms_core( 'CLMS_Program_Certificate_Service' ) : null;
+		if ( $programs && method_exists( $programs, 'get_program_certificate_record' ) && class_exists( 'CLMS_Helper' ) && method_exists( 'CLMS_Helper', 'get_user_enrolled_programs' ) ) {
+			foreach ( array_filter( array_map( 'absint', (array) CLMS_Helper::get_user_enrolled_programs( $user_id ) ) ) as $program_id ) {
+				$record = (array) $programs->get_program_certificate_record( $user_id, $program_id );
+				if ( empty( $record ) ) {
+					continue;
+				}
+				$revoked = 'revoked' === sanitize_key( (string) ( $record['status'] ?? '' ) );
+				$items[] = array(
+					'type'             => 'program',
+					'id'               => $program_id,
+					'course_id'        => null,
+					'title'            => sanitize_text_field( (string) get_the_title( $program_id ) ),
+					'status'           => $revoked ? 'revoked' : 'issued',
+					'issued_at'        => sanitize_text_field( (string) ( $record['issued_at'] ?? '' ) ),
+					'certificate_code' => sanitize_text_field( (string) ( $record['certificate_code'] ?? '' ) ),
+				) + ( $revoked ? array( 'download_url' => '', 'download_expires_at' => null ) : self::certificate_link( $user_id, 'program', $program_id ) );
+			}
+		}
+		return new WP_REST_Response( array( 'certificates' => $items ), 200 );
+	}
+
+	/**
+	 * 6.29.0: documento del certificado (HTML provisional). Exige el token del
+	 * usuario y una firma vigente emitida para ese mismo usuario: otro usuario o
+	 * un enlace vencido reciben 403.
+	 */
+	public static function certificate_document( WP_REST_Request $request ) {
+		$user_id   = get_current_user_id();
+		$type      = 'program' === (string) $request['target_type'] ? 'program' : 'course';
+		$target_id = absint( $request['target_id'] );
+		$expires   = absint( $request->get_param( 'expires' ) );
+		$signature = (string) $request->get_param( 'sig' );
+		$expected  = self::certificate_signature( $user_id, $type, $target_id, $expires );
+		if ( $expires < time() || '' === $signature || ! hash_equals( $expected, $signature ) ) {
+			return new WP_Error( 'atora_mobile_certificate_link', __( 'El enlace del certificado venció o no es válido.', 'atora-lms' ), array( 'status' => 403 ) );
+		}
+		$certs = function_exists( 'clms_core' ) ? clms_core( 'CLMS_Certificates' ) : null;
+		if ( ! $certs || ! method_exists( $certs, 'resolve_certificate_for_user' ) ) {
+			return new WP_Error( 'atora_mobile_certificates_unavailable', __( 'Los certificados no están disponibles.', 'atora-lms' ), array( 'status' => 503 ) );
+		}
+		$resolved = $certs->resolve_certificate_for_user( $user_id, $type, $target_id );
+		if ( is_wp_error( $resolved ) ) {
+			return $resolved;
+		}
+		$html = $certs->render_certificate_document( $user_id, $resolved );
+		// Se entrega el documento tal cual (no JSON) para guardarlo y verlo sin conexión.
+		add_filter( 'rest_pre_serve_request', static function ( $served ) use ( $html ) {
+			if ( ! headers_sent() ) {
+				header( 'Content-Type: text/html; charset=' . get_option( 'blog_charset' ) );
+			}
+			echo $html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- documento ya escapado al generarse.
+			return true;
+		} );
+		return new WP_REST_Response( null, 200 );
 	}
 
 	/** 6.28.0: cambios desde el cursor, solo de los cursos matriculados del usuario. */

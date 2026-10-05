@@ -622,7 +622,12 @@ class CLMS_Assessment_Engine {
 				$quiz_scores[] = $quiz_grade;
 			}
 
-			if ( '' !== (string) $assignment ) {
+			// 6.29.0: una nota guardada pero no liberada no cuenta en el promedio
+			// (la celda del docente la sigue mostrando en `entries`).
+			$released = class_exists( 'CLMS_Student_Grade_Visibility' )
+				? CLMS_Student_Grade_Visibility::grade_visible( $submission['status'] ?? '', $assignment )
+				: '' !== (string) $assignment;
+			if ( $released ) {
 				$assignment_scores[] = $assignment;
 			}
 
