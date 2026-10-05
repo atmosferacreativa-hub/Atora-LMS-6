@@ -1045,9 +1045,9 @@ trait CLMS_Admin_Menu_Main_Pages_Academic_Trait {
 			echo '<td>' . esc_html( $row['student_email'] ) . '</td>';
 			echo '<td>' . esc_html( $row['progress_percent'] ) . '%</td>';
 			echo '<td>' . esc_html( $row['completed_lessons'] ) . '/' . esc_html( $row['total_lessons'] ) . '</td>';
-			echo '<td>' . esc_html( $row['quiz_average'] ) . '%</td>';
-			echo '<td>' . esc_html( $row['assignment_average'] ) . '%</td>';
-			echo '<td><strong>' . esc_html( $row['final_average'] ) . '%</strong></td>';
+			echo '<td>' . esc_html( null !== $row['quiz_average'] ? $row['quiz_average'] . '%' : '—' ) . '</td>';
+			echo '<td>' . esc_html( null !== $row['assignment_average'] ? $row['assignment_average'] . '%' : '—' ) . '</td>';
+			echo '<td><strong>' . esc_html( null !== $row['final_average'] ? $row['final_average'] . '%' : '—' ) . '</strong></td>';
 			echo '<td>' . esc_html( $row['source_breakdown'] ) . '</td>';
 			echo '<td>' . esc_html( $row['graded_lessons'] ) . '</td>';
 			echo '<td>' . esc_html( $row['updated_at'] ) . '</td>';
@@ -1400,9 +1400,9 @@ trait CLMS_Admin_Menu_Main_Pages_Academic_Trait {
 				'completed_lessons'  => isset( $summary['completed_lessons'] ) ? absint( $summary['completed_lessons'] ) : 0,
 				'total_lessons'      => isset( $summary['total_lessons'] ) ? absint( $summary['total_lessons'] ) : 0,
 				'progress_percent'   => isset( $summary['progress_percent'] ) ? absint( $summary['progress_percent'] ) : 0,
-				'quiz_average'       => isset( $summary['quiz_average'] ) ? absint( $summary['quiz_average'] ) : 0,
-				'assignment_average' => isset( $summary['assignment_average'] ) ? absint( $summary['assignment_average'] ) : 0,
-				'final_average'      => isset( $summary['final_average'] ) ? absint( $summary['final_average'] ) : 0,
+				'quiz_average'       => isset( $summary['quiz_average'] ) && is_numeric( $summary['quiz_average'] ) ? absint( $summary['quiz_average'] ) : null,
+				'assignment_average' => isset( $summary['assignment_average'] ) && is_numeric( $summary['assignment_average'] ) ? absint( $summary['assignment_average'] ) : null,
+				'final_average'      => isset( $summary['final_average'] ) && is_numeric( $summary['final_average'] ) ? absint( $summary['final_average'] ) : null,
 				'source_breakdown'   => $this->format_source_breakdown( isset( $summary['source_breakdown'] ) ? $summary['source_breakdown'] : array() ),
 				'graded_lessons'     => isset( $summary['graded_lessons'] ) ? absint( $summary['graded_lessons'] ) : 0,
 				'updated_at'         => isset( $summary['updated_at'] ) ? sanitize_text_field( $summary['updated_at'] ) : '',
@@ -1449,7 +1449,7 @@ trait CLMS_Admin_Menu_Main_Pages_Academic_Trait {
 
 		echo '<div class="clms-admin-metrics">';
 		echo '<div class="clms-admin-metric"><span>' . esc_html__( 'Progreso', 'atora-lms' ) . '</span><strong>' . esc_html( absint( $summary['progress_percent'] ?? 0 ) ) . '%</strong></div>';
-		echo '<div class="clms-admin-metric"><span>' . esc_html__( 'Promedio final', 'atora-lms' ) . '</span><strong>' . esc_html( absint( $summary['final_average'] ?? 0 ) ) . '%</strong></div>';
+		echo '<div class="clms-admin-metric"><span>' . esc_html__( 'Promedio final', 'atora-lms' ) . '</span><strong>' . esc_html( isset( $summary['final_average'] ) && is_numeric( $summary['final_average'] ) ? absint( $summary['final_average'] ) . '%' : '—' ) . '</strong></div>';
 		echo '<div class="clms-admin-metric"><span>' . esc_html__( 'Tareas calificadas', 'atora-lms' ) . '</span><strong>' . esc_html( absint( $summary['graded_lessons'] ?? 0 ) ) . '</strong></div>';
 		echo '<div class="clms-admin-metric"><span>' . esc_html__( 'Fuentes', 'atora-lms' ) . '</span><strong>' . esc_html( $this->format_source_breakdown( $summary['source_breakdown'] ?? array() ) ) . '</strong></div>';
 		echo '</div>';

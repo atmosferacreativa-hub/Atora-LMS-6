@@ -499,7 +499,7 @@ trait CLMS_Teacher_Dashboard_Data_Trait {
 				'active'          => 0,
 				'pending'         => 0,
 				'graded'          => 0,
-				'avg_grade'       => 0,
+				'avg_grade'       => null,
 				'completion_rate' => 0,
 				'at_risk'         => 0,
 				'low_grade'       => 0,
@@ -576,7 +576,7 @@ trait CLMS_Teacher_Dashboard_Data_Trait {
 			}
 		}
 
-		$avg_grade = ! empty( $grades ) ? (int) round( array_sum( $grades ) / count( $grades ) ) : 0;
+		$avg_grade = ! empty( $grades ) ? (int) round( array_sum( $grades ) / count( $grades ) ) : null; // 6.29.5: sin notas = null.
 		$completion_total = 0;
 		$completion_count = 0;
 

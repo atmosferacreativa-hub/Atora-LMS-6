@@ -1,5 +1,19 @@
 # CHANGELOG — ATORA LMS
 
+## 6.29.5 (2026-10-05)
+
+### Fix — el promedio confundía una nota de cero con "sin notas" (alta, académica)
+
+**Puede cambiar notas finales que hoy ven estudiantes y docentes**, y con ellas la elegibilidad de certificados y el estado "en riesgo". Antes de actualizar un sitio con datos reales, correr `scripts/audit-zero-grade-averages.php` (solo lectura, fuera del ZIP).
+
+- El motor (`CLMS_Assessment_Engine::build_course_gradebook()`) y el resumen propio de `CLMS_Grading` decidían qué combinar con `quiz_average > 0` / `assignment_average > 0`: quiz 0 + tarea 100 daba 100, y "sin notas" se guardaba como 0. Ahora ambos usan `CLMS_Grade_Average::combine()`: se combina por **cantidad de notas existentes**; `null` = sin notas, `0` = cero. Quiz no intentado o tarea no calificada no cuentan.
+- El cálculo propio de `CLMS_Grading` (sin motor) pasa a `build_summary_from_lessons()` y aplica también la regla de nota liberada de 6.29.0, que ese camino no aplicaba.
+- Mismo patrón corregido en: riesgo académico (`get_risk_level`, `build_risk_indicators`: un 0 ahora es riesgo; "sin notas" no), riesgo del resumen (`get_course_risk_level`: sin notas ya no es "en_riesgo"), gradebook (`build_student_summary`: sin notas no es riesgo alto), analítica de aprendizaje, informes académicos (un 0 entra al promedio del grupo), certificado de programa (un curso en 0 cuenta en el promedio), promedios del panel del estudiante y de analítica (un curso sin notas no entra como 0), competencias (con notas en 0 es "en desarrollo"), revisión entre pares (la nota del docente existe aunque sea 0), asistente docente y panel docente ("Sin datos" solo sin notas). Pantallas de progreso y académica del administrador muestran "—" sin notas.
+- API móvil: `/grades` y `/courses/{id}/grades` devuelven `null` sin notas y `0` con nota cero (antes un curso con solo quizzes en 0 salía como `null`).
+- Al actualizar se suben las versiones de caché `gradebook` y `analytics`: todos los resúmenes se recalculan.
+- **Escala**: la nota global sigue siendo entera 0–100; decisión documentada en `docs/ESCALA-NOTAS.md` con los lugares donde se trunca o redondea.
+- **TESTS**: `GradeZeroAverageTest` (quiz 0 + tarea 100 → 50; solo quizzes en 0 → 0; sin notas → `null`; quiz no intentado + tarea 80 → 80; motor y `CLMS_Grading` dan lo mismo; `/grades` separa `null` y `0`; riesgo con 0 y sin notas). Con el código de 6.29.4 fallan 4 de 6 (100 en vez de 50; 0 en vez de `null`; `/grades` y riesgo); los otros dos ya daban el número correcto y quedan como resguardo.
+
 ## 6.29.4 (2026-10-05)
 
 - **Fix — SpeedGrader truncaba el puntaje de rúbrica al reabrir una entrega** (alta): `CLMS_Rubric_Panel_Renderer` cargaba el puntaje guardado con `absint()` en el `value` de `rubric_scores[]`; una entrega con 3,5 se mostraba con 3 y, al guardarla sin cambios (p. ej. para editar un comentario), se reenviaba 3 y la nota bajaba. Ahora el campo lleva el puntaje guardado tal cual, con sus decimales (`CLMS_Rubric_Level_Bands::score_field_value()`).

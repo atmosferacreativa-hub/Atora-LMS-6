@@ -912,12 +912,12 @@ class CLMS_Peer_Review {
 		$avg_scores = isset( $calc['avg_scores'] ) && is_array( $calc['avg_scores'] ) ? $calc['avg_scores'] : array();
 		$included_completed = absint( $calc['included_completed'] ?? 0 );
 
-		$teacher_grade = absint( get_post_meta( $submission_id, '_clms_submission_grade', true ) );
+		// 6.29.5: la nota del docente existe aunque sea 0 (antes `> 0` la ignoraba).
+		$teacher_raw   = get_post_meta( $submission_id, '_clms_submission_grade', true );
+		$teacher_grade = absint( $teacher_raw );
 		$final_grade   = $peer_grade;
-		if ( $teacher_grade > 0 && $peer_grade > 0 ) {
+		if ( '' !== (string) $teacher_raw && is_numeric( $teacher_raw ) ) {
 			$final_grade = round( ( $teacher_grade * 0.6 ) + ( $peer_grade * 0.4 ) );
-		} elseif ( $teacher_grade > 0 && 0 === $peer_grade ) {
-			$final_grade = $teacher_grade;
 		}
 
 		update_post_meta( $submission_id, '_clms_peer_grade',    $peer_grade );
@@ -1854,13 +1854,13 @@ class CLMS_Peer_Review {
 		$peer_grade = absint( $calc['peer_grade'] ?? 0 );
 		$avg_scores = isset( $calc['avg_scores'] ) && is_array( $calc['avg_scores'] ) ? $calc['avg_scores'] : array();
 
-		$teacher_grade = absint( get_post_meta( $submission_id, '_clms_submission_grade', true ) );
+		// 6.29.5: la nota del docente existe aunque sea 0 (antes `> 0` la ignoraba).
+		$teacher_raw   = get_post_meta( $submission_id, '_clms_submission_grade', true );
+		$teacher_grade = absint( $teacher_raw );
 
 		$final_grade = $peer_grade;
-		if ( $teacher_grade > 0 && $peer_grade > 0 ) {
+		if ( '' !== (string) $teacher_raw && is_numeric( $teacher_raw ) ) {
 			$final_grade = round( ( $teacher_grade * 0.6 ) + ( $peer_grade * 0.4 ) );
-		} elseif ( $teacher_grade > 0 && 0 === $peer_grade ) {
-			$final_grade = $teacher_grade;
 		}
 
 		update_post_meta( $submission_id, '_clms_peer_grade',     $peer_grade );

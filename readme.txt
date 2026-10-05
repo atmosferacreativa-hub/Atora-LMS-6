@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 6.29.4
+Stable tag: 6.29.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,9 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.29.5 =
+* Notas: una nota de cero ya no se confunde con "sin notas" (promedio del curso, riesgo, certificados de programa, informes y API móvil). Puede cambiar notas finales que hoy se ven.
+
 = 6.29.4 =
 * SpeedGrader: al reabrir una entrega, el puntaje de cada criterio se muestra y se reenvía con sus decimales (antes 3,5 volvía como 3 y guardar bajaba la nota); el nivel resaltado usa las bandas de umbral.
 

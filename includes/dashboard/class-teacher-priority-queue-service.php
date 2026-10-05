@@ -219,7 +219,7 @@ class CLMS_Teacher_Priority_Queue_Service {
 
 		$pending   = absint( $summary['pending'] ?? 0 );
 		$at_risk   = absint( $summary['at_risk'] ?? 0 );
-		$avg_grade = absint( $group_overview['avg_grade'] ?? 0 );
+		$avg_grade = isset( $group_overview['avg_grade'] ) && is_numeric( $group_overview['avg_grade'] ) ? absint( $group_overview['avg_grade'] ) : null;
 		$progress  = absint( $group_overview['completion_rate'] ?? 0 );
 
 		$recommendation = __( 'Mantén el seguimiento semanal del grupo.', 'atora-lms' );
@@ -227,7 +227,7 @@ class CLMS_Teacher_Priority_Queue_Service {
 			$recommendation = __( 'Prioriza intervención con estudiantes en riesgo esta semana.', 'atora-lms' );
 		} elseif ( $pending >= 6 ) {
 			$recommendation = __( 'Enfoca tiempo en la cola de revisión para evitar retrasos.', 'atora-lms' );
-		} elseif ( $avg_grade > 0 && $avg_grade < 70 ) {
+		} elseif ( null !== $avg_grade && $avg_grade < 70 ) {
 			$recommendation = __( 'Planifica una actividad de refuerzo para elevar el desempeño.', 'atora-lms' );
 		}
 

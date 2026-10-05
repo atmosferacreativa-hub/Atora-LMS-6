@@ -580,14 +580,19 @@ trait CLMS_Dashboard_Data_Trait {
 			if ( isset( $academic_statuses[ $course_id ] ) && is_array( $academic_statuses[ $course_id ] ) ) {
 				$status_data = $academic_statuses[ $course_id ];
 				$total_progress[] = isset( $status_data['progress_percent'] ) ? absint( $status_data['progress_percent'] ) : 0;
-				$total_average[]  = isset( $status_data['final_average'] ) ? absint( $status_data['final_average'] ) : 0;
+				// 6.29.5: un curso sin notas no entra al promedio como 0.
+				if ( isset( $status_data['final_average'] ) && is_numeric( $status_data['final_average'] ) ) {
+					$total_average[] = absint( $status_data['final_average'] );
+				}
 				continue;
 			}
 
 			if ( $grading && method_exists( $grading, 'get_course_grade_summary' ) ) {
 				$summary = $grading->get_course_grade_summary( $user_id, $course_id );
 				$total_progress[] = isset( $summary['progress_percent'] ) ? absint( $summary['progress_percent'] ) : 0;
-				$total_average[]  = isset( $summary['final_average'] ) ? absint( $summary['final_average'] ) : 0;
+				if ( isset( $summary['final_average'] ) && is_numeric( $summary['final_average'] ) ) {
+					$total_average[] = absint( $summary['final_average'] );
+				}
 			}
 		}
 

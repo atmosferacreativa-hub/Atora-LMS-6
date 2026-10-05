@@ -398,16 +398,17 @@ class CLMS_Progress {
 		$grading            = $this->get_grading_instance();
 		$course_summary     = array();
 		$progress_percent   = 0;
-		$final_average      = 0;
-		$quiz_average       = 0;
-		$assignment_average = 0;
+		$final_average      = '—';
+		$quiz_average       = '—';
+		$assignment_average = '—';
 
 		if ( $grading && $course_id && method_exists( $grading, 'get_course_grade_summary' ) ) {
 			$course_summary     = $grading->get_course_grade_summary( $user_id, $course_id );
 			$progress_percent   = isset( $course_summary['progress_percent'] ) ? absint( $course_summary['progress_percent'] ) : 0;
-			$final_average      = isset( $course_summary['final_average'] ) ? absint( $course_summary['final_average'] ) : 0;
-			$quiz_average       = isset( $course_summary['quiz_average'] ) ? absint( $course_summary['quiz_average'] ) : 0;
-			$assignment_average = isset( $course_summary['assignment_average'] ) ? absint( $course_summary['assignment_average'] ) : 0;
+			// 6.29.5: sin notas se muestra "—", no 0%.
+			$final_average      = isset( $course_summary['final_average'] ) && is_numeric( $course_summary['final_average'] ) ? absint( $course_summary['final_average'] ) . '%' : '—';
+			$quiz_average       = isset( $course_summary['quiz_average'] ) && is_numeric( $course_summary['quiz_average'] ) ? absint( $course_summary['quiz_average'] ) . '%' : '—';
+			$assignment_average = isset( $course_summary['assignment_average'] ) && is_numeric( $course_summary['assignment_average'] ) ? absint( $course_summary['assignment_average'] ) . '%' : '—';
 		}
 
 		$show_quiz        = ! empty( $atts['show_quiz'] );
@@ -467,17 +468,17 @@ class CLMS_Progress {
 
 						<div class="clms-progress-card">
 							<h4>Promedio final</h4>
-							<div class="clms-progress-value"><?php echo esc_html( $final_average ); ?>%</div>
+							<div class="clms-progress-value"><?php echo esc_html( $final_average ); ?></div>
 						</div>
 
 						<div class="clms-progress-card">
 							<h4>Promedio quizzes</h4>
-							<div class="clms-progress-value"><?php echo esc_html( $quiz_average ); ?>%</div>
+							<div class="clms-progress-value"><?php echo esc_html( $quiz_average ); ?></div>
 						</div>
 
 						<div class="clms-progress-card">
 							<h4>Promedio tareas</h4>
-							<div class="clms-progress-value"><?php echo esc_html( $assignment_average ); ?>%</div>
+							<div class="clms-progress-value"><?php echo esc_html( $assignment_average ); ?></div>
 						</div>
 					</div>
 				<?php endif; ?>

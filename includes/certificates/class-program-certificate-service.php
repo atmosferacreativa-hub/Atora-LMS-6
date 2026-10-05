@@ -159,10 +159,10 @@ class CLMS_Program_Certificate_Service {
 			foreach ( $course_ids as $course_id ) {
 				$summary = (array) $grading->get_course_grade_summary( $user_id, $course_id );
 				$item_progress = isset( $summary['progress_percent'] ) ? absint( $summary['progress_percent'] ) : 0;
-				$item_average  = isset( $summary['final_average'] ) ? absint( $summary['final_average'] ) : 0;
+				$item_average  = isset( $summary['final_average'] ) && is_numeric( $summary['final_average'] ) ? absint( $summary['final_average'] ) : null;
 
 				$sum_progress += $item_progress;
-				if ( $item_average > 0 ) {
+				if ( null !== $item_average ) { // 6.29.5: un curso con 0 cuenta en el promedio del programa.
 					$sum_average += $item_average;
 					++$count_avg;
 				}

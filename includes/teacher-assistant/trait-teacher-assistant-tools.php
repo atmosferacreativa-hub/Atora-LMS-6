@@ -657,9 +657,10 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#1a1a2e;color:#fff}
 			'active'           => count( $active_ids ),
 			'pending'          => $pending,
 			'graded'           => $graded,
-			'avg_grade'        => $avg_grade > 0 ? $avg_grade : 'sin datos',
-			'max_grade'        => $max_grade > 0 ? $max_grade : 'sin datos',
-			'min_grade'        => $min_grade > 0 ? $min_grade : 'sin datos',
+			// 6.29.5: "sin datos" solo cuando no hay notas; un 0 es un dato.
+			'avg_grade'        => ! empty( $all_grades ) ? $avg_grade : 'sin datos',
+			'max_grade'        => ! empty( $all_grades ) ? $max_grade : 'sin datos',
+			'min_grade'        => ! empty( $all_grades ) ? $min_grade : 'sin datos',
 			'completion_rate'  => $completion_rate,
 			'at_risk'          => $at_risk,
 		);

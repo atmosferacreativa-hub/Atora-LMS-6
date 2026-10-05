@@ -418,12 +418,13 @@ class CLMS_Academic_Status_Service {
 	protected function get_risk_level( $summary, $pending_count, $activity_snapshot = array() ) {
 		$summary       = is_array( $summary ) ? $summary : array();
 		$progress      = isset( $summary['progress_percent'] ) ? absint( $summary['progress_percent'] ) : 0;
-		$average       = isset( $summary['final_average'] ) ? absint( $summary['final_average'] ) : 0;
+		// 6.29.5: null = sin notas; 0 es una nota (antes `> 0` dejaba fuera de riesgo a quien tenía 0).
+		$average       = isset( $summary['final_average'] ) && is_numeric( $summary['final_average'] ) ? absint( $summary['final_average'] ) : null;
 		$pending_count = absint( $pending_count );
 		$activity_snapshot = is_array( $activity_snapshot ) ? $activity_snapshot : array();
 		$is_inactive = $this->is_activity_snapshot_inactive( $activity_snapshot );
 
-		if ( $average > 0 && $average < 50 ) {
+		if ( null !== $average && $average < 50 ) {
 			return 'high';
 		}
 		if ( $is_inactive && ( $pending_count >= 2 || $progress < 50 ) ) {
@@ -452,16 +453,16 @@ class CLMS_Academic_Status_Service {
 		$next_step     = sanitize_text_field( (string) $next_step );
 		$activity_snapshot = is_array( $activity_snapshot ) ? $activity_snapshot : array();
 		$progress      = isset( $summary['progress_percent'] ) ? absint( $summary['progress_percent'] ) : 0;
-		$average       = isset( $summary['final_average'] ) && is_numeric( $summary['final_average'] ) ? absint( $summary['final_average'] ) : 0;
+		$average       = isset( $summary['final_average'] ) && is_numeric( $summary['final_average'] ) ? absint( $summary['final_average'] ) : null;
 		$completed     = isset( $summary['completed_lessons'] ) ? absint( $summary['completed_lessons'] ) : 0;
 		$total         = isset( $summary['total_lessons'] ) ? absint( $summary['total_lessons'] ) : 0;
 		$is_inactive   = $this->is_activity_snapshot_inactive( $activity_snapshot );
 
 		$reasons = array();
 
-		if ( $average > 0 && $average < 50 ) {
+		if ( null !== $average && $average < 50 ) {
 			$reasons[] = __( 'Promedio académico bajo.', 'atora-lms' );
-		} elseif ( $average >= 50 && $average < 70 ) {
+		} elseif ( null !== $average && $average >= 50 && $average < 70 ) {
 			$reasons[] = __( 'Promedio en zona de atención.', 'atora-lms' );
 		}
 
@@ -862,7 +863,7 @@ class CLMS_Academic_Status_Service {
 				$status = 'destacado';
 			} elseif ( $avg_score >= 70 ) {
 				$status = 'competente';
-			} elseif ( $avg_score > 0 || $completed > 0 ) {
+			} elseif ( ! empty( $scores ) || $completed > 0 ) { // 6.29.5: con notas (aunque sean 0) está en desarrollo.
 				$status = 'en_desarrollo';
 			}
 

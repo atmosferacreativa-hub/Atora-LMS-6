@@ -364,11 +364,11 @@ class CLMS_Academic_Report_Service {
 				: array();
 
 			$progress = isset( $status['progress_percent'] ) ? absint( $status['progress_percent'] ) : 0;
-			$average  = isset( $status['final_average'] ) && is_numeric( $status['final_average'] ) ? absint( $status['final_average'] ) : 0;
+			$average  = isset( $status['final_average'] ) && is_numeric( $status['final_average'] ) ? absint( $status['final_average'] ) : null;
 			$risk     = sanitize_key( (string) ( $status['risk_level'] ?? 'unknown' ) );
 
 			$progress_values[] = $progress;
-			if ( $average > 0 ) {
+			if ( null !== $average ) { // 6.29.5: un 0 cuenta en el promedio; sin notas no.
 				$average_values[] = $average;
 			}
 
@@ -604,11 +604,11 @@ class CLMS_Academic_Report_Service {
 				: array();
 
 			$progress = absint( $status['progress_percent'] ?? 0 );
-			$grade    = isset( $status['final_average'] ) && is_numeric( $status['final_average'] ) ? absint( $status['final_average'] ) : 0;
+			$grade    = isset( $status['final_average'] ) && is_numeric( $status['final_average'] ) ? absint( $status['final_average'] ) : null;
 			$risk     = sanitize_key( (string) ( $status['risk_level'] ?? 'unknown' ) );
 
 			$progress_values[] = $progress;
-			if ( $grade > 0 ) {
+			if ( null !== $grade ) { // 6.29.5: un 0 cuenta en el promedio; sin notas no.
 				$grade_values[] = $grade;
 			}
 

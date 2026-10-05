@@ -3,7 +3,7 @@
  * Plugin Name:       ATORA LMS
  * Plugin URI:        https://atora.studio
  * Description:       LMS modular para WordPress con IA, evaluaciones, certificados, CRM, mensajería multi-canal, afiliados, live streaming y más. Autor: Atora Studio.
- * Version:           6.29.4
+ * Version:           6.29.5
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Atora Studio
@@ -52,7 +52,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * - Limpieza automática de notificaciones >90 días
  */
 	if ( ! defined( 'ATORA_LMS_VERSION' ) ) {
-		define( 'ATORA_LMS_VERSION', '6.29.4' );
+		define( 'ATORA_LMS_VERSION', '6.29.5' );
 	}
 
 if ( ! defined( 'ATORA_LMS_FILE' ) ) {
@@ -339,7 +339,9 @@ add_action( 'plugins_loaded', static function() {
 		if ( class_exists( 'CLMS_Cache' ) ) {
 			\CLMS_Cache::bump_version( 'dashboard' );
 			// 6.29.0: los promedios en caché podían incluir notas no liberadas.
+			// 6.29.5: y confundían una nota de cero con "sin notas"; se recalculan todos.
 			\CLMS_Cache::bump_version( 'gradebook' );
+			\CLMS_Cache::bump_version( 'analytics' );
 		}
 	}
 }, 1 );
@@ -1252,6 +1254,7 @@ add_action( 'init', static function () {
 	// 6.29.0: regla única de visibilidad de notas para el estudiante y servicio de notas.
 	atora_lms_require_module( 'includes/grading/class-student-grade-visibility.php' );
 	atora_lms_require_module( 'includes/grading/class-rubric-level-bands.php' );
+	atora_lms_require_module( 'includes/grading/class-grade-average.php' );
 	atora_lms_require_module( 'includes/grading/class-student-grades-service.php' );
 	// 6.27.4: el editor de WordPress mantiene al día atora_courses / atora_lessons.
 	if ( class_exists( 'ATORA\\LMS\\LMS_Editor_Sync' ) ) {
