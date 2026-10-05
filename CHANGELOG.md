@@ -1,5 +1,13 @@
 # CHANGELOG — ATORA LMS
 
+## 6.29.4 (2026-10-05)
+
+- **Fix — SpeedGrader truncaba el puntaje de rúbrica al reabrir una entrega** (alta): `CLMS_Rubric_Panel_Renderer` cargaba el puntaje guardado con `absint()` en el `value` de `rubric_scores[]`; una entrega con 3,5 se mostraba con 3 y, al guardarla sin cambios (p. ej. para editar un comentario), se reenviaba 3 y la nota bajaba. Ahora el campo lleva el puntaje guardado tal cual, con sus decimales (`CLMS_Rubric_Level_Bands::score_field_value()`).
+- **Nivel resaltado al reabrir**: usaba coincidencia exacta con `absint`; ahora usa las bandas de umbral de 6.29.3 (`CLMS_Rubric_Level_Bands::active_points()`), igual que al escribir en el campo, y muestra de entrada la pista "entre X y Y" / "por debajo de X".
+- **Revisión del resto del plugin**: el único `absint()`/`(int)` sobre un puntaje de rúbrica que alimenta un formulario era este. La nota global 0–100 es entera en todo el sistema por diseño (campo `step=1` en SpeedGrader, `(int) round()` al guardar, `absint()` en el motor de evaluación y en el guardado del gradebook); no se cambia aquí.
+- **Diagnóstico**: `scripts/audit-rubric-decimal-truncation.php` (solo lectura, `wp eval-file`) lista guardados seguidos de una misma entrega en `atora_rubric_evaluations` donde un criterio pasó de X,d a floor(X,d).
+- **TESTS**: `SpeedGraderDecimalScoreTest` (integración): una entrega con 3,5 se renderiza con 3,5, resalta el nivel de 3 con "entre…", y guardada sin cambios sigue en 3,5. Falla con 6.29.3 (3,0). `RubricLevelBandsTest` y `RubricLevelDescribeTest` sin cambios, en verde.
+
 ## 6.29.3 (2026-10-04)
 
 - **Fix — el nivel de la rúbrica no seguía la regla de SpeedGrader** (6.29.2): buscaba coincidencia exacta y convertía el puntaje con `(int)`/`absint()`, así 3,5 sobre niveles de 3 y 4 daba el nivel de 3. Las bandas de umbral de SpeedGrader (6.26.5) pasan a `CLMS_Rubric_Level_Bands` (`build()` sin cambios de comportamiento; `CLMS_Rubric_Panel_Renderer::build_level_bands()` delega en él) y `describe()` lee un puntaje igual que el panel: nivel exacto, "entre X y Y" o "por debajo de X". `rubric.rows[].level` usa ese helper con el puntaje decimal.
