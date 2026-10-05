@@ -121,6 +121,115 @@ class CLMS_Today_Aggregator_Service {
 	}
 
 	/**
+	 * 6.30.0: "Hoy" del estudiante (la app lo muestra en bloques).
+	 *
+	 * - `continue`: la última lección que vio (o la siguiente sin completar de ese curso).
+	 * - `upcoming`: tareas y quizzes con fecha límite en los próximos 7 días, sin entregar.
+	 * - `overdue`: vencidos en los últimos 14 días, sin entregar.
+	 * - `unread_messages`: contador único del buzón.
+	 * - `new_grades`: cursos con nota liberada en los últimos 7 días (la app los compara con lo que ya vio: marcador de 6.29.1).
+	 *
+	 * Ids de curso y lección: los de las tablas (API móvil).
+	 *
+	 * @return array<string,mixed>
+	 */
+	public function get_student_today( $user_id ) {
+		$user_id = absint( $user_id );
+		$now     = time();
+		$courses = class_exists( 'CLMS_Agenda_Service' ) ? CLMS_Agenda_Service::courses( $user_id ) : array();
+
+		$upcoming = array();
+		$overdue  = array();
+		if ( $courses ) {
+			foreach ( CLMS_Agenda_Service::deadlines( $user_id, $now - 14 * DAY_IN_SECONDS, $now + 7 * DAY_IN_SECONDS, $courses ) as $item ) {
+				if ( $item['done'] ) {
+					continue;
+				}
+				$ts = (int) $item['_ts'];
+				unset( $item['_ts'], $item['done'] );
+				if ( $ts < $now ) {
+					$overdue[] = $item;
+				} else {
+					$upcoming[] = $item;
+				}
+			}
+		}
+
+		$new_grades = array();
+		if ( class_exists( 'CLMS_Student_Grades_Service' ) ) {
+			foreach ( $courses as $course_id => $course ) {
+				$graded = array_filter(
+					CLMS_Student_Grades_Service::course_activities( $user_id, $course['wp'] ),
+					static fn( array $item ): bool => null !== $item['grade']
+				);
+				$dates = array_filter( array_column( $graded, 'graded_at' ) );
+				$last  = $dates ? max( $dates ) : null;
+				if ( $last && strtotime( $last ) >= $now - 7 * DAY_IN_SECONDS ) {
+					$new_grades[] = array( 'course_id' => $course_id, 'title' => $course['title'], 'graded_count' => count( $graded ), 'last_graded_at' => $last );
+				}
+			}
+		}
+
+		return array(
+			'role'            => 'student',
+			'continue'        => $this->collect_continue_lesson( $user_id, $courses ),
+			'upcoming'        => $upcoming,
+			'overdue'         => $overdue,
+			'unread_messages' => class_exists( 'ATORA_Inbox_Store' ) ? ATORA_Inbox_Store::unread_count( $user_id ) : 0,
+			'new_grades'      => $new_grades,
+		);
+	}
+
+	/** Última lección vista; si ya la completó, la siguiente sin completar de ese curso. */
+	protected function collect_continue_lesson( $user_id, array $courses ) {
+		global $wpdb;
+		if ( ! $courses || ! class_exists( '\\ATORA\\LMS\\LMS_Course_Service' ) ) {
+			return null;
+		}
+		$ids  = implode( ',', array_map( 'absint', array_keys( $courses ) ) );
+		$last = $wpdb->get_row( // phpcs:ignore WordPress.DB
+			$wpdb->prepare(
+				"SELECT lesson_id, course_id, status FROM {$wpdb->prefix}atora_lesson_progress
+				 WHERE user_id = %d AND course_id IN ({$ids})
+				 ORDER BY GREATEST(COALESCE(last_viewed_at, '1970-01-01'), COALESCE(completed_at, '1970-01-01')) DESC, id DESC LIMIT 1",
+				$user_id
+			),
+			ARRAY_A
+		);
+		$course_id = $last ? absint( $last['course_id'] ) : (int) array_key_first( $courses );
+		$lessons   = \ATORA\LMS\LMS_Course_Service::get_lessons( $course_id );
+		if ( ! $lessons ) {
+			return null;
+		}
+		$completed = array_map( 'absint', (array) $wpdb->get_col( $wpdb->prepare( "SELECT lesson_id FROM {$wpdb->prefix}atora_lesson_progress WHERE user_id = %d AND course_id = %d AND status = 'completed'", $user_id, $course_id ) ) ); // phpcs:ignore WordPress.DB
+		$pick = null;
+		if ( $last && 'completed' !== $last['status'] ) {
+			foreach ( $lessons as $lesson ) {
+				if ( absint( $lesson['id'] ) === absint( $last['lesson_id'] ) ) {
+					$pick = $lesson;
+				}
+			}
+		}
+		if ( ! $pick ) {
+			foreach ( $lessons as $lesson ) {
+				if ( ! in_array( absint( $lesson['id'] ), $completed, true ) ) {
+					$pick = $lesson;
+					break;
+				}
+			}
+		}
+		if ( ! $pick ) {
+			return null;
+		}
+		$total = count( $lessons );
+		return array(
+			'course'   => array( 'id' => $course_id, 'title' => $courses[ $course_id ]['title'] ?? '' ),
+			'lesson'   => array( 'id' => absint( $pick['id'] ), 'title' => sanitize_text_field( (string) ( $pick['title'] ?? '' ) ) ),
+			'progress' => $total ? (int) round( count( array_intersect( $completed, array_map( static fn( $l ) => absint( $l['id'] ), $lessons ) ) ) * 100 / $total ) : 0,
+		);
+	}
+
+	/**
 	 * PT-2: ordena por la regla de urgencia real de la OT.
 	 *
 	 * Nivel 1 (2.1): rango interno `_tier` (1-5, asignado por cada

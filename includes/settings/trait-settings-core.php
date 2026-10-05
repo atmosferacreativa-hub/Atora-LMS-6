@@ -438,6 +438,13 @@ trait CLMS_Settings_Core_Trait {
 		}
 		$teams_settings['send_types'] = $send_types;
 		update_option( self::OPTION_TEAMS, $teams_settings );
+
+		// 6.30.0: token de acceso de Expo (opcional) para las notificaciones al teléfono.
+		if ( ! empty( $_POST['atora_expo_access_token_clear'] ) ) {
+			delete_option( 'atora_expo_access_token' );
+		} elseif ( isset( $_POST['atora_expo_access_token'] ) && '' !== trim( (string) wp_unslash( $_POST['atora_expo_access_token'] ) ) ) {
+			update_option( 'atora_expo_access_token', sanitize_text_field( wp_unslash( $_POST['atora_expo_access_token'] ) ), false );
+		}
 	}
 
 	protected function save_apis() {

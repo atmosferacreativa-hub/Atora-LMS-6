@@ -6,7 +6,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class CLMS_Notifications {
 
+	/** Meta anterior a 6.30.0: solo la lee la migración al buzón (no se borra en esta versión). */
 	const META_KEY = 'clms_notifications';
+	/** @deprecated 6.30.0 Sin tope; los avisos leídos se borran a los 180 días. */
 	const MAX_ITEMS = 50;
 
 	public function __construct() {
@@ -294,37 +296,49 @@ class CLMS_Notifications {
 	 */
 	public function add_notification( $user_id, $data ) {
 		$user_id = absint( $user_id );
+		$data    = is_array( $data ) ? $data : array();
 
-		if ( ! $user_id || ! get_user_by( 'id', $user_id ) ) {
+		if ( ! $user_id || ! get_user_by( 'id', $user_id ) || ! class_exists( 'ATORA_Inbox_Store' ) ) {
 			return false;
 		}
 
-		$notifications = get_user_meta( $user_id, self::META_KEY, true );
-		$notifications = is_array( $notifications ) ? $notifications : array();
-
-		$item = array(
-			'id'            => wp_generate_uuid4(),
-			'type'          => isset( $data['type'] ) ? sanitize_key( $data['type'] ) : 'general',
-			'title'         => isset( $data['title'] ) ? sanitize_text_field( $data['title'] ) : 'Notificación',
-			'message'       => isset( $data['message'] ) ? sanitize_textarea_field( $data['message'] ) : '',
-			'link'          => isset( $data['link'] ) ? esc_url_raw( $data['link'] ) : '',
-			'course_id'     => isset( $data['course_id'] ) ? absint( $data['course_id'] ) : 0,
-			'lesson_id'     => isset( $data['lesson_id'] ) ? absint( $data['lesson_id'] ) : 0,
-			'submission_id' => isset( $data['submission_id'] ) ? absint( $data['submission_id'] ) : 0,
-			'status'        => isset( $data['status'] ) ? sanitize_key( $data['status'] ) : '',
-			'grade'         => isset( $data['grade'] ) && '' !== (string) $data['grade'] ? absint( $data['grade'] ) : '',
-			'feedback'      => isset( $data['feedback'] ) ? sanitize_textarea_field( $data['feedback'] ) : '',
-			'is_read'       => 0,
-			'created_at'    => current_time( 'mysql' ),
-		);
-
-		array_unshift( $notifications, $item );
-
-		if ( count( $notifications ) > self::MAX_ITEMS ) {
-			$notifications = array_slice( $notifications, 0, self::MAX_ITEMS );
+		// 6.30.0: el aviso va al hilo "Avisos" del usuario, con su `kind` y su enlace.
+		$thread_id = ATORA_Inbox_Store::system_thread_id( $user_id );
+		if ( is_wp_error( $thread_id ) ) {
+			return false;
 		}
 
-		update_user_meta( $user_id, self::META_KEY, $notifications );
+		$kind   = isset( $data['type'] ) ? sanitize_key( $data['type'] ) : 'general';
+		// Avisos para el personal (alertas tempranas, analítica, entregas nuevas): nunca a un estudiante.
+		if ( in_array( $kind, self::staff_kinds(), true ) && ! $this->should_notify_teacher_user( $user_id ) ) {
+			return false;
+		}
+		$result = ATORA_Inbox_Store::add_message(
+			(int) $thread_id,
+			0,
+			array(
+				'kind'          => '' !== $kind ? $kind : 'general',
+				'title'         => isset( $data['title'] ) ? sanitize_text_field( $data['title'] ) : 'Notificación',
+				'body'          => isset( $data['message'] ) ? sanitize_textarea_field( $data['message'] ) : '',
+				'link'          => isset( $data['link'] ) ? esc_url_raw( $data['link'] ) : '',
+				'course_id'     => isset( $data['course_id'] ) ? absint( $data['course_id'] ) : 0,
+				'lesson_id'     => isset( $data['lesson_id'] ) ? absint( $data['lesson_id'] ) : 0,
+				'submission_id' => isset( $data['submission_id'] ) ? absint( $data['submission_id'] ) : 0,
+				'legacy_id'     => wp_generate_uuid4(),
+				// 6.30.0: opcional; un aviso con la misma clave no se repite (p. ej. recordatorio de fecha límite).
+				'dedupe_key'    => isset( $data['dedupe_key'] ) ? sanitize_key( $data['dedupe_key'] ) : '',
+				'meta'          => array(
+					'status'   => isset( $data['status'] ) ? sanitize_key( $data['status'] ) : '',
+					'grade'    => isset( $data['grade'] ) && '' !== (string) $data['grade'] ? absint( $data['grade'] ) : '',
+					'feedback' => isset( $data['feedback'] ) ? sanitize_textarea_field( $data['feedback'] ) : '',
+				),
+			)
+		);
+		if ( is_wp_error( $result ) || ! $result['created'] ) {
+			return false;
+		}
+
+		$item = ATORA_Inbox_Store::legacy_notice( $result['message'] );
 
 		/**
 		 * Hook de integración: notificación añadida.
@@ -333,15 +347,20 @@ class CLMS_Notifications {
 		 * a este archivo con proveedores concretos.
 		 *
 		 * @param int   $user_id
-		 * @param array $item Notificación normalizada.
+		 * @param array $item Notificación normalizada (desde 6.30.0 incluye `kind`).
 		 */
 		do_action( 'atora/notification_added', $user_id, $item );
 
 		return true;
 	}
 
+	/** Tipos de aviso que solo recibe el personal (6.30.0). */
+	public static function staff_kinds(): array {
+		return (array) apply_filters( 'atora_inbox_staff_notice_kinds', array( 'early_warning', 'learning_analytics', 'submission_created', 'commerce_staff' ) );
+	}
+
 	/**
-	 * Obtiene notificaciones del usuario.
+	 * Obtiene avisos del usuario (hilo "Avisos" del buzón, 6.30.0).
 	 *
 	 * @param int  $user_id User ID.
 	 * @param bool $unread_only Solo no leídas.
@@ -350,61 +369,12 @@ class CLMS_Notifications {
 	public function get_notifications( $user_id, $unread_only = false ) {
 		$user_id = absint( $user_id );
 
-		if ( ! $user_id ) {
+		if ( ! $user_id || ! class_exists( 'ATORA_Inbox_Store' ) ) {
 			return array();
 		}
 
-		$notifications = get_user_meta( $user_id, self::META_KEY, true );
-		$notifications = is_array( $notifications ) ? $notifications : array();
-
-		$clean = array();
-
-		foreach ( $notifications as $item ) {
-			if ( ! is_array( $item ) || empty( $item['id'] ) ) {
-				continue;
-			}
-
-			$item = wp_parse_args(
-				$item,
-				array(
-					'id'            => '',
-					'type'          => 'general',
-					'title'         => '',
-					'message'       => '',
-					'link'          => '',
-					'course_id'     => 0,
-					'lesson_id'     => 0,
-					'submission_id' => 0,
-					'status'        => '',
-					'grade'         => '',
-					'feedback'      => '',
-					'is_read'       => 0,
-					'created_at'    => '',
-				)
-			);
-
-			$item['id']            = sanitize_text_field( $item['id'] );
-			$item['type']          = sanitize_key( $item['type'] );
-			$item['title']         = sanitize_text_field( $item['title'] );
-			$item['message']       = sanitize_textarea_field( $item['message'] );
-			$item['link']          = esc_url_raw( $item['link'] );
-			$item['course_id']     = absint( $item['course_id'] );
-			$item['lesson_id']     = absint( $item['lesson_id'] );
-			$item['submission_id'] = absint( $item['submission_id'] );
-			$item['status']        = sanitize_key( $item['status'] );
-			$item['grade']         = '' !== (string) $item['grade'] ? absint( $item['grade'] ) : '';
-			$item['feedback']      = sanitize_textarea_field( $item['feedback'] );
-			$item['is_read']       = ! empty( $item['is_read'] ) ? 1 : 0;
-			$item['created_at']    = sanitize_text_field( $item['created_at'] );
-
-			if ( $unread_only && ! empty( $item['is_read'] ) ) {
-				continue;
-			}
-
-			$clean[] = $item;
-		}
-
-		return $clean;
+		$rows = ATORA_Inbox_Store::received( $user_id, array( 'system_only' => true, 'unread_only' => (bool) $unread_only ) );
+		return array_map( array( 'ATORA_Inbox_Store', 'legacy_notice' ), $rows );
 	}
 
 	/**
@@ -418,36 +388,16 @@ class CLMS_Notifications {
 		$user_id         = absint( $user_id );
 		$notification_id = sanitize_text_field( $notification_id );
 
-		if ( ! $user_id || ! $notification_id ) {
+		if ( ! $user_id || ! $notification_id || ! class_exists( 'ATORA_Inbox_Store' ) ) {
 			return false;
 		}
 
-		$notifications = get_user_meta( $user_id, self::META_KEY, true );
-		$notifications = is_array( $notifications ) ? $notifications : array();
-
-		$updated = false;
-
-		foreach ( $notifications as $index => $item ) {
-			if ( ! is_array( $item ) || empty( $item['id'] ) ) {
-				continue;
-			}
-
-			if ( $notification_id === (string) $item['id'] ) {
-				$notifications[ $index ]['is_read'] = 1;
-				$updated = true;
-				break;
-			}
-		}
-
-		if ( $updated ) {
-			update_user_meta( $user_id, self::META_KEY, $notifications );
-		}
-
-		return $updated;
+		$row = ATORA_Inbox_Store::find_for_user( $user_id, $notification_id );
+		return $row ? ATORA_Inbox_Store::mark_message_read( $user_id, (int) $row['id'] ) : false;
 	}
 
 	/**
-	 * Marca todas como leídas.
+	 * Marca todos los avisos como leídos.
 	 *
 	 * @param int $user_id User ID.
 	 * @return bool
@@ -455,37 +405,23 @@ class CLMS_Notifications {
 	public function mark_all_read( $user_id ) {
 		$user_id = absint( $user_id );
 
-		if ( ! $user_id ) {
+		if ( ! $user_id || ! class_exists( 'ATORA_Inbox_Store' ) ) {
 			return false;
 		}
 
-		$notifications = get_user_meta( $user_id, self::META_KEY, true );
-		$notifications = is_array( $notifications ) ? $notifications : array();
-
-		if ( empty( $notifications ) ) {
-			return true;
-		}
-
-		foreach ( $notifications as $index => $item ) {
-			if ( is_array( $item ) ) {
-				$notifications[ $index ]['is_read'] = 1;
-			}
-		}
-
-		update_user_meta( $user_id, self::META_KEY, $notifications );
-
-		return true;
+		$thread_id = ATORA_Inbox_Store::system_thread_id( $user_id );
+		return ! is_wp_error( $thread_id ) && ATORA_Inbox_Store::mark_thread_read( (int) $thread_id, $user_id );
 	}
 
 	/**
-	 * Cuenta no leídas.
+	 * Cuenta no leídos: desde 6.30.0 es el contador único del buzón (mensajes y
+	 * avisos), el mismo de CLMS_Messaging, el panel y la app.
 	 *
 	 * @param int $user_id User ID.
 	 * @return int
 	 */
 	public function get_unread_count( $user_id ) {
-		$items = $this->get_notifications( $user_id, true );
-		return count( $items );
+		return class_exists( 'ATORA_Inbox_Store' ) ? ATORA_Inbox_Store::unread_count( absint( $user_id ) ) : 0;
 	}
 
 	/* ---------------------------------------------------------------

@@ -233,7 +233,7 @@ final class ATORA_Mobile_REST_Controller {
 			'authentication'   => 'opaque_bearer',
 			'access_ttl'       => ATORA_Mobile_Token_Service::ACCESS_TTL,
 			'refresh_ttl'      => ATORA_Mobile_Token_Service::REFRESH_TTL,
-			'features'         => array( 'profile', 'dashboard', 'courses', 'progress', 'lesson_completion', 'quizzes', 'assignments', 'sync_changes', 'playback_position', 'resource_downloads', 'multi_video', 'grades', 'certificates' ),
+			'features'         => array( 'profile', 'dashboard', 'courses', 'progress', 'lesson_completion', 'quizzes', 'assignments', 'sync_changes', 'playback_position', 'resource_downloads', 'multi_video', 'grades', 'certificates', 'messages', 'agenda', 'today', 'push_notifications' ),
 			'capabilities'     => array(
 				'assignments'        => true,
 				'sync_changes'       => class_exists( '\\ATORA\\LMS\\LMS_Content_Changes' ),
@@ -242,6 +242,11 @@ final class ATORA_Mobile_REST_Controller {
 				'multi_video'        => class_exists( 'ATORA_Lesson_Videos' ),
 				'grades'             => class_exists( 'CLMS_Student_Grades_Service' ),
 				'certificates'       => class_exists( 'CLMS_Certificates' ) || ( function_exists( 'clms_core' ) && (bool) clms_core( 'CLMS_Certificates' ) ),
+				// 6.30.0: Fase 3 — buzón, agenda, Hoy y notificaciones al teléfono.
+				'messages'           => class_exists( 'ATORA_Mobile_Messages_Controller' ) && class_exists( 'ATORA_Inbox_Store' ),
+				'agenda'             => class_exists( 'CLMS_Agenda_Service' ),
+				'today'              => class_exists( 'ATORA_Mobile_Organize_Controller' ),
+				'push_notifications' => class_exists( 'ATORA_Mobile_Push_Service' ),
 			),
 		), 200 );
 	}
@@ -1287,7 +1292,7 @@ final class ATORA_Mobile_REST_Controller {
 	}
 
 	/** 6.29.0: cursos matriculados y visibles del usuario (tabla) con su post. @return array<int, array> course_id => curso */
-	private static function visible_courses( int $user_id ): array {
+	public static function visible_courses( int $user_id ): array {
 		$courses = array();
 		foreach ( self::enrollment_index( $user_id ) as $row ) {
 			$course_id = absint( $row['course_id'] ?? 0 );
@@ -1861,6 +1866,39 @@ final class ATORA_Mobile_REST_Controller {
 			return false;
 		}
 		return \ATORA\LMS\LMS_Course_Service::legacy_wp_course_post_is_public( $wp_course_id );
+	}
+
+	/**
+	 * 6.30.0: enlace interno de la app para una lección (post de WordPress):
+	 * lección, tarea o quiz, con los ids de la API (tablas). Null si no es visible.
+	 *
+	 * @return array{type:string, id:int, course_id:int}|null
+	 */
+	public static function lesson_link( int $wp_lesson_id ): ?array {
+		if ( $wp_lesson_id <= 0 || ! class_exists( '\\ATORA\\LMS\\LMS_Course_Service' ) ) {
+			return null;
+		}
+		$lesson = \ATORA\LMS\LMS_Course_Service::get_lesson_by_wp_post( $wp_lesson_id );
+		if ( ! $lesson || 'published' !== (string) ( $lesson['status'] ?? '' ) ) {
+			return null;
+		}
+		$id   = absint( $lesson['id'] );
+		$type = 'lesson';
+		if ( self::lesson_has_assignment( $wp_lesson_id ) ) {
+			$type = 'assignment';
+		} elseif ( '1' === (string) get_post_meta( $wp_lesson_id, '_clms_quiz_enabled', true ) || self::has_table_quiz( $id ) ) {
+			$type = 'quiz';
+		}
+		return array( 'type' => $type, 'id' => $id, 'course_id' => absint( $lesson['course_id'] ) );
+	}
+
+	/** 6.30.0: id de la tabla para un curso (post de WordPress), o 0. */
+	public static function table_course_id( int $wp_course_id ): int {
+		if ( $wp_course_id <= 0 || ! class_exists( '\\ATORA\\LMS\\LMS_Course_Service' ) ) {
+			return 0;
+		}
+		$course = \ATORA\LMS\LMS_Course_Service::get_by_wp_post( $wp_course_id );
+		return $course ? absint( $course['id'] ) : 0;
 	}
 
 	/** 6.27.3: imagen destacada en vivo; la columna de la tabla solo como respaldo. */

@@ -162,103 +162,13 @@ class CLMS_Commerce_Notifications {
 			return;
 		}
 
-		$notifications_module = null;
-
-		if ( class_exists( 'CLMS_Helper' ) && method_exists( 'CLMS_Helper', 'module' ) ) {
-			$notifications_module = clms_core('CLMS_Notifications');
-		}
-
+		// 6.30.0: solo por la API de CLMS_Notifications (aviso en el buzón con su `kind`).
+		// Antes, además, se reescribía la meta clms_notifications (90 días / 50 ítems) y,
+		// sin el módulo, se escribía directo en ella; la meta ya no se toca.
+		$notifications_module = class_exists( 'CLMS_Helper' ) ? clms_core( 'CLMS_Notifications' ) : null;
 		if ( $notifications_module && method_exists( $notifications_module, 'add_notification' ) ) {
 			$notifications_module->add_notification( $user_id, $data );
-			$this->cleanup_user_notifications_meta( $user_id );
-			return;
 		}
-
-		// Fallback mínimo si no está disponible CLMS_Notifications.
-		$items = get_user_meta( $user_id, 'clms_notifications', true );
-		$items = is_array( $items ) ? $items : array();
-
-		$items[] = array(
-			'id'            => wp_generate_uuid4(),
-			'type'          => isset( $data['type'] ) ? sanitize_key( $data['type'] ) : 'general',
-			'title'         => isset( $data['title'] ) ? sanitize_text_field( $data['title'] ) : __( 'Notificación', 'atora-lms' ),
-			'message'       => isset( $data['message'] ) ? sanitize_textarea_field( $data['message'] ) : '',
-			'link'          => isset( $data['link'] ) ? esc_url_raw( $data['link'] ) : '',
-			'course_id'     => isset( $data['course_id'] ) ? absint( $data['course_id'] ) : 0,
-			'lesson_id'     => 0,
-			'submission_id' => 0,
-			'status'        => 'info',
-			'grade'         => '',
-			'feedback'      => '',
-			'is_read'       => 0,
-			'created_at'    => current_time( 'mysql' ),
-		);
-
-		$items = $this->normalize_notifications_items( $items );
-
-		update_user_meta( $user_id, 'clms_notifications', $items );
-	}
-
-	/**
-	 * Limpia notificaciones legacy de user_meta sin depender del módulo de notificaciones.
-	 *
-	 * @param int $user_id Usuario.
-	 * @return void
-	 */
-	protected function cleanup_user_notifications_meta( $user_id ) {
-		$user_id = absint( $user_id );
-		if ( ! $user_id ) {
-			return;
-		}
-
-		$items = get_user_meta( $user_id, 'clms_notifications', true );
-		$items = is_array( $items ) ? $items : array();
-		$items = $this->normalize_notifications_items( $items );
-
-		update_user_meta( $user_id, 'clms_notifications', $items );
-	}
-
-	/**
-	 * Normaliza colección legacy de notificaciones:
-	 * - elimina entradas con más de 90 días;
-	 * - mantiene entradas sin fecha por compatibilidad;
-	 * - ordena por fecha descendente;
-	 * - limita a 50.
-	 *
-	 * @param array $items Colección cruda.
-	 * @return array
-	 */
-	protected function normalize_notifications_items( $items ) {
-		$items = is_array( $items ) ? $items : array();
-
-		$cutoff = gmdate( 'Y-m-d H:i:s', strtotime( '-90 days' ) );
-		$items  = array_filter(
-			$items,
-			static function ( $item ) use ( $cutoff ) {
-				if ( ! is_array( $item ) ) {
-					return false;
-				}
-				if ( empty( $item['created_at'] ) ) {
-					return true;
-				}
-				return $item['created_at'] >= $cutoff;
-			}
-		);
-
-		usort(
-			$items,
-			static function ( $a, $b ) {
-				$date_a = isset( $a['created_at'] ) ? (string) $a['created_at'] : '';
-				$date_b = isset( $b['created_at'] ) ? (string) $b['created_at'] : '';
-				return strcmp( $date_b, $date_a );
-			}
-		);
-
-		if ( count( $items ) > 50 ) {
-			$items = array_slice( $items, 0, 50 );
-		}
-
-		return array_values( $items );
 	}
 
 	// ── Construcción de mensaje ───────────────────────────────────────────────
