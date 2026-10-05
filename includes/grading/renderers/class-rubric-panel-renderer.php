@@ -4,6 +4,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+require_once dirname( __DIR__ ) . '/class-rubric-level-bands.php';
+
 class CLMS_Rubric_Panel_Renderer {
 
 	/**
@@ -386,109 +388,8 @@ class CLMS_Rubric_Panel_Renderer {
 	 * @return array<int,array{min:float,max:float,label:string,active_points:float,between:string,below:string}>
 	 */
 	public static function build_level_bands( $levels, $max_points ) {
-		$levels = is_array( $levels ) ? array_values( $levels ) : array();
-		$max_points = absint( $max_points );
-		if ( empty( $levels ) || $max_points <= 0 ) {
-			return array();
-		}
-
-		$ordered = array();
-		foreach ( $levels as $idx => $lv ) {
-			$lv = is_array( $lv ) ? $lv : array();
-			$ordered[] = array(
-				'i'     => (int) $idx,
-				'label' => sanitize_text_field( (string) ( $lv['label'] ?? '' ) ),
-				'pts'   => (float) absint( $lv['points'] ?? 0 ),
-			);
-		}
-		usort( $ordered, static function( $a, $b ) {
-			if ( (float) $a['pts'] === (float) $b['pts'] ) {
-				return (int) $a['i'] <=> (int) $b['i'];
-			}
-			return (float) $a['pts'] <=> (float) $b['pts'];
-		} );
-
-		// Niveles únicos por puntos, preservando el primero del schema.
-		$unique = array();
-		foreach ( $ordered as $row ) {
-			$key = (string) $row['pts'];
-			if ( isset( $unique[ $key ] ) ) {
-				continue;
-			}
-			$unique[ $key ] = $row;
-		}
-		$unique = array_values( $unique );
-		if ( empty( $unique ) ) {
-			return array();
-		}
-
-		$eps = 0.0001;
-		$bands = array();
-		$first = $unique[0];
-
-		if ( $first['pts'] > 0 ) {
-			$bands[] = array(
-				'min' => 0.0,
-				'max' => max( 0.0, (float) $first['pts'] - $eps ),
-				'label' => '',
-				'active_points' => null,
-				'between' => '',
-				'below' => sprintf( __( 'por debajo de %s', 'atora-lms' ), $first['label'] ?: __( 'el primer nivel', 'atora-lms' ) ),
-			);
-		}
-
-		// Exact match del primer nivel.
-		$bands[] = array(
-			'min' => (float) $first['pts'],
-			'max' => (float) $first['pts'],
-			'label' => (string) $first['label'],
-			'active_points' => (float) $first['pts'],
-			'between' => '',
-			'below' => '',
-		);
-
-		for ( $j = 1; $j < count( $unique ); $j++ ) {
-			$prev = $unique[ $j - 1 ];
-			$cur  = $unique[ $j ];
-			$prev_pts = (float) $prev['pts'];
-			$cur_pts  = (float) $cur['pts'];
-
-			// Entre niveles: resalta el de abajo.
-			if ( $cur_pts - $prev_pts > $eps ) {
-				$bands[] = array(
-					'min' => $prev_pts + $eps,
-					'max' => $cur_pts - $eps,
-					'label' => (string) $prev['label'],
-					'active_points' => (float) $prev_pts,
-					'between' => sprintf(
-						/* translators: 1: lower label, 2: upper label */
-						__( 'entre %1$s y %2$s', 'atora-lms' ),
-						$prev['label'] ?: __( 'nivel anterior', 'atora-lms' ),
-						$cur['label'] ?: __( 'nivel siguiente', 'atora-lms' )
-					),
-					'below' => '',
-				);
-			}
-
-			// Exact match del nivel actual.
-			$bands[] = array(
-				'min' => $cur_pts,
-				'max' => $cur_pts,
-				'label' => (string) $cur['label'],
-				'active_points' => (float) $cur_pts,
-				'between' => '',
-				'below' => '',
-			);
-		}
-
-		// Clamp de banda máxima.
-		foreach ( $bands as &$b ) {
-			$b['min'] = max( 0.0, (float) $b['min'] );
-			$b['max'] = min( (float) $max_points, (float) $b['max'] );
-		}
-		unset( $b );
-
-		return $bands;
+		// 6.29.3: la regla vive en CLMS_Rubric_Level_Bands (compartida con la devolución al estudiante).
+		return CLMS_Rubric_Level_Bands::build( $levels, $max_points );
 	}
 
 	/**

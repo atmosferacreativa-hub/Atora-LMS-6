@@ -150,6 +150,28 @@ final class MobileGradesCertificatesTest extends WP_UnitTestCase {
 		$this->assertSame( 'Competente', $review['rubric']['rows'][0]['level'], 'Nivel alcanzado: el de esos puntos, como en SpeedGrader.' );
 	}
 
+	/** 6.29.3: el nivel sale de las bandas de SpeedGrader, con el puntaje decimal sin truncar. */
+	public function test_rubric_level_follows_speedgrader_bands(): void {
+		$levels = array( array( 'label' => 'Suficiente', 'points' => 3 ), array( 'label' => 'Bueno', 'points' => 4 ) );
+		$rubric = self::factory()->post->create( array( 'post_type' => 'clms_rubric', 'post_status' => 'publish', 'post_title' => 'Rúbrica 4' ) );
+		update_post_meta( $rubric, CLMS_Rubric::META_CRITERIA, array( array( 'name' => 'Claridad', 'max_points' => 4, 'levels' => $levels ) ) );
+		update_post_meta( $this->wp_lesson, '_clms_rubric_id', $rubric );
+		$submission = $this->grade( $this->student, 'graded', 88 );
+
+		$expect = static fn( float $v ): string => CLMS_Rubric_Level_Bands::describe( CLMS_Rubric_Panel_Renderer::build_level_bands( $levels, 4 ), $v );
+		// Pares (no claves: PHP trunca las claves float).
+		foreach ( array( array( 3.5, 'entre Suficiente y Bueno' ), array( 3.0, 'Suficiente' ), array( 4.0, 'Bueno' ) ) as list( $score, $label ) ) {
+			update_post_meta( $submission, '_clms_submission_rubric_scores', array( array( 'score' => (float) $score, 'feedback' => '' ) ) );
+			$row = clms_core( 'CLMS_Submission' )->get_student_review_view( $this->student, $this->wp_lesson )['rubric']['rows'][0];
+			$this->assertSame( $label, $row['level'], "Puntaje {$score}" );
+			$this->assertSame( $expect( (float) $score ), $row['level'], 'Igual que SpeedGrader con los mismos datos.' );
+		}
+		$this->assertEquals( 3.5, ( function () use ( $submission ) {
+			update_post_meta( $submission, '_clms_submission_rubric_scores', array( array( 'score' => 3.5, 'feedback' => '' ) ) );
+			return clms_core( 'CLMS_Submission' )->get_student_review_view( $this->student, $this->wp_lesson )['rubric']['rows'][0]['score'];
+		} )(), 'El puntaje no se trunca.' );
+	}
+
 	public function test_certificate_link_expires_and_is_bound_to_the_user(): void {
 		$expires = time() + 600;
 		$sig     = ATORA_Mobile_REST_Controller::certificate_signature( $this->student, 'course', $this->wp_course, $expires );

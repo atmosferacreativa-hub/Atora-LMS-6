@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 6.29.2
+Stable tag: 6.29.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,9 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.29.3 =
+* Rúbrica: el nivel que ve el estudiante usa las bandas de SpeedGrader (nivel exacto, "entre X y Y" o "por debajo de X") con el puntaje decimal sin truncar.
+
 = 6.29.2 =
 * API móvil: la rúbrica de una tarea calificada indica el nivel alcanzado en cada criterio (`level`), con la misma regla que SpeedGrader.
 
