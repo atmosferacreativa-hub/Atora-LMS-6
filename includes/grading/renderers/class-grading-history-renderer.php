@@ -68,7 +68,11 @@ class CLMS_Grading_History_Renderer {
 			</div>
 			<div class="clms-sg-meta-item">
 				<span><?php esc_html_e( 'Riesgo académico', 'atora-lms' ); ?></span>
-				<strong><?php echo esc_html( (string) call_user_func( $format_risk, (string) ( $context['risk_level'] ?? '' ) ) ); ?></strong>
+				<?php if ( ! empty( $context['student_risk'] ) ) : ?>
+					<strong><?php echo esc_html( $context['student_risk']['label'] . ( $context['student_risk']['reasons'] ? ': ' . implode( ', ', $context['student_risk']['reasons'] ) : '' ) ); ?></strong>
+				<?php else : ?>
+					<strong><?php echo esc_html( (string) call_user_func( $format_risk, (string) ( $context['risk_level'] ?? '' ) ) ); ?></strong>
+				<?php endif; ?>
 			</div>
 			<div class="clms-sg-meta-item">
 				<span><?php esc_html_e( 'Estado de certificado', 'atora-lms' ); ?></span>
