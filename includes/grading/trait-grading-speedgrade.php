@@ -333,6 +333,8 @@ trait CLMS_Grading_SpeedGrade_Trait {
 								<input type="hidden" name="submission_id" value="<?php echo esc_attr( $context['submission_id'] ); ?>">
 								<input type="hidden" name="<?php echo esc_attr( self::SPEEDGRADE_RETURN ); ?>" value="<?php echo esc_attr( rawurlencode( $return_url ) ); ?>">
 								<?php wp_nonce_field( self::SPEEDGRADE_ACTION . '_' . $context['submission_id'], self::SPEEDGRADE_NONCE ); ?>
+								<?php // 6.31.0: la revisión que se ve; si otro docente guarda antes, no se pisa (409). ?>
+								<input type="hidden" name="expected_revision" value="<?php echo esc_attr( ATORA_Grading_Save_Service::revision( (int) $context['submission_id'] ) ); ?>">
 
 								<?php echo $this->render_speedgrade_rubric_panel( $context ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 
