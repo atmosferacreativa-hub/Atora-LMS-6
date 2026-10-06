@@ -6,7 +6,7 @@ Para consultar y decidir lo que sigue. Histórico del cierre en [ORDEN-CIERRE-0.
 
 | | Versión | Estado |
 |---|---|---|
-| Plugin | **6.30.1** | Borrador de calificación ya no llega al estudiante. PR #59 (ver §4 para CI, etiqueta y ZIP) |
+| Plugin | **6.30.1** | Publicada: PR #59 fusionado, etiqueta `v6.30.1`, ZIP. El borrador de calificación ya no llega al estudiante |
 | App | **0.6.0** | Sin cambios desde la Fase 3. 0.6.1 (pruebas de pantalla en CI) pendiente |
 | Fase 4 | — | Paso 0 hecho (solo lectura). Decisiones del titular tomadas. Sin código todavía |
 
@@ -36,7 +36,8 @@ Para consultar y decidir lo que sigue. Histórico del cierre en [ORDEN-CIERRE-0.
 - Las copias grupales heredan el estado y los puntajes por criterio, con los ajustes individuales aplicados.
 - Prueba `GradeDraftNoLeakTest`: falla con 6.30.0 y pasa con 6.30.1.
 - Script `scripts/audit-draft-grade-leaks.php`: en local da 0 en los tres apartados, y la detección se comprobó con una fuga simulada.
-- **CI / etiqueta / ZIP:** _(se completa al cerrar el PR #59)_
+- **CI / etiqueta / ZIP:** PR #59 con los 11 trabajos del CI en verde (incluida la integración en un entorno limpio, donde `RubricsCliMigrationTest` sí pasa), fusionado (`2f3f21b`). Etiqueta `v6.30.1`. ZIP `atora-lms-6.30.1.zip`, sha256 `ca5186aa2786524f369f07bf41d4b7622dd8917ce8c5ce30217c7e3f9997d890`.
+- El ZIP no trae `scripts/` (excluido por `.distignore`, como siempre): para correr la auditoría en el demo hay que subir `scripts/audit-draft-grade-leaks.php` aparte.
 
 ## 5. Lo que viene: propuesta y decisiones abiertas
 
@@ -78,4 +79,4 @@ Propuesta:
 
 - **Tres listeners que leen mal los argumentos del hook** (anterior a 6.30.1): `CLMS_Dashboard`, `CLMS_Assessment_Engine::invalidate_cache_from_submission()` y `CLMS_Analytics::record_submission_graded()`. ¿Se corrigen en la 6.31.0?
 - **Correr en el demo** `scripts/audit-draft-grade-leaks.php` (requiere acceso del titular al servidor) y decidir qué hacer si aparecen casos en B o C.
-- **`RubricsCliMigrationTest`** falla en el entorno local tanto en `main` como en 6.30.1; en el CI limpio debería pasar. Revisar si se repite.
+- **`RubricsCliMigrationTest`** falla solo en el entorno local, tanto en `main` como en 6.30.1; en el CI limpio pasa. Es el estado de la base de pruebas local, no el código.
