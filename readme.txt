@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 6.30.0
+Stable tag: 6.30.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,9 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.30.1 =
+* Notas: guardar una calificación como borrador ya no avisa al estudiante ni le muestra la nota (antes el aviso y el mensaje decían "Nota actual: X/100"); en tareas grupales, la copia de cada integrante queda también en borrador y lleva los puntajes por criterio. Script de solo lectura para saber si alguien vio una nota antes de tiempo.
+
 = 6.30.0 =
 * Fase 3 — Organizarse: buzón propio (mensajes y avisos en tablas, sin tope, un solo contador), agenda, Hoy del estudiante y notificaciones al teléfono (Expo). Migración automática de los mensajes y avisos guardados.
 
