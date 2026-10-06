@@ -37,6 +37,7 @@ final class AcademicLabRegressionTest extends WP_UnitTestCase {
 		$grading = clms_core( 'CLMS_Grading' );
 		$_POST = array(
 			CLMS_Grading::SPEEDGRADE_NONCE => wp_create_nonce( CLMS_Grading::SPEEDGRADE_ACTION . '_' . $this->submission ),
+			'expected_revision' => (string) ATORA_Grading_Save_Service::revision( $this->submission ), // 6.31.1: obligatoria
 			'status' => 'graded', 'grade' => '87', 'feedback' => 'Revisado', 'clms_sg_submit' => 'publish',
 		);
 		$method = new ReflectionMethod( $grading, 'handle_speedgrade_save' );

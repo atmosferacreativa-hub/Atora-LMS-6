@@ -56,6 +56,7 @@ final class GradeDraftNoLeakTest extends WP_UnitTestCase {
 	private function speedgrade( int $submission_id, string $action, string $grade ) {
 		$_POST = array(
 			CLMS_Grading::SPEEDGRADE_NONCE => wp_create_nonce( CLMS_Grading::SPEEDGRADE_ACTION . '_' . $submission_id ),
+			'expected_revision' => (string) ATORA_Grading_Save_Service::revision( $submission_id ), // 6.31.1: obligatoria
 			'status'         => 'in_review',
 			'feedback'       => 'Buen trabajo',
 			'clms_sg_submit' => $action,

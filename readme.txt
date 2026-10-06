@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 6.31.0
+Stable tag: 6.31.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,9 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.31.1 =
+* Calificar: la revisión de la entrega es obligatoria (web y app); un guardado que falla no la consume; el primer guardado de una entrega también es atómico entre dos docentes.
+
 = 6.31.0 =
 * Fase 4 — Docente: API para calificar desde el teléfono con el mismo guardado que SpeedGrader, una sola regla de acceso docente (sección, autoría, delegación; administrador limitado a su institución), aviso de conflicto si otro docente guardó antes, riesgo del estudiante con motivos, todos los intentos de una entrega en SpeedGrader y tareas grupales en la app.
 

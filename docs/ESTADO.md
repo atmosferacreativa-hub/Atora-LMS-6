@@ -7,7 +7,7 @@ Qué está comprobado y dónde. Se actualiza en cada versión del plugin o de la
 - **Integración**: PHPUnit con WordPress (`tests/integration`).
 - **Unitaria**: PHPUnit sin WordPress o Jest en la app.
 
-Última actualización: **plugin 6.31.0 · app 0.8.0** (cierre de la Fase 4).
+Última actualización: **plugin 6.31.1 · app 0.8.1**.
 
 > No hay registro escrito de qué se recorrió en teléfono antes de esta tabla: la columna "Teléfono" queda "por confirmar" hasta la prueba al cierre de la Fase 4, que incluye la lista acumulada de las fases 0 a 3.
 
@@ -49,7 +49,7 @@ Qué está comprobado y dónde. Se actualiza en cada versión del plugin o de la
 | `wp atora seed-e2e` (datos de las pruebas de pantalla) | 6.30.2 | probado a mano en WordPress local; lo usa el CI de la app | Se niega sin `--yes` o `ATORA_E2E` |
 | Servicio de guardado compartido (SpeedGrader y app) | 6.31.0 | `SpeedGraderRubricEvaluationTest`, `SpeedGraderDecimalScoreTest` (sin cambios), `TeacherApiTest` | |
 | Alcance docente (`ATORA_Teacher_Scope`) | 6.31.0 | `TeacherScopeTest`, `TeacherApiTest` | Auditoría de acceso: local 0; demo con una institución → 0 por construcción (sin correr en el demo) |
-| Conflicto entre docentes (revisión, 409) | 6.31.0 | `GradeRevisionConflictTest`, `TeacherApiTest` | |
+| Conflicto entre docentes (revisión, 409) | 6.31.0 | `GradeRevisionConflictTest`, `TeacherApiTest` | 6.31.1: revisión obligatoria, no se consume al fallar, primer guardado atómico; concurrencia real por HTTP en el CI de la app (`scripts/e2e-concurrent-grade.sh`) |
 | Riesgo con motivos | 6.31.0 | `StudentRiskServiceTest` | |
 | Historial de entregas web y migración | 6.31.0 | `WebSubmissionHistoryTest` | Local: 1 entrega migrada; segunda pasada 0 |
 | Intentos en SpeedGrader | 6.31.0 | `SpeedGraderAttemptsTest` | |

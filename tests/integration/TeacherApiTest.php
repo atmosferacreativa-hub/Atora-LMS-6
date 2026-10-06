@@ -184,6 +184,7 @@ final class TeacherApiTest extends WP_UnitTestCase {
 		wp_set_current_user( $this->teacher );
 		$_POST = array(
 			CLMS_Grading::SPEEDGRADE_NONCE => wp_create_nonce( CLMS_Grading::SPEEDGRADE_ACTION . '_' . $via_web ),
+			'expected_revision' => (string) ATORA_Grading_Save_Service::revision( $via_web ), // 6.31.1: obligatoria
 			'clms_sg_submit'  => 'publish',
 			'status'          => 'graded',
 			'feedback'        => 'Buen ensayo',
@@ -219,6 +220,12 @@ final class TeacherApiTest extends WP_UnitTestCase {
 
 	public function test_conflict_idempotency_and_draft_visibility(): void {
 		$sub = $this->submission( $this->student );
+
+		// 6.31.1: la API exige la revisión que vio el docente.
+		$missing = $this->call( $this->teacher, 'POST', "/teacher/submissions/{$sub}/grade", $this->grade_body( 'evt-sin-revision', false ) );
+		$this->assertSame( 400, $missing->get_status() );
+		$this->assertSame( 'atora_grade_revision_required', $missing->get_data()['code'] );
+		$this->assertSame( 0, ATORA_Grading_Save_Service::revision( $sub ) );
 
 		$draft = $this->call( $this->teacher, 'POST', "/teacher/submissions/{$sub}/grade", $this->grade_body( 'evt-draft', false, 0 ) );
 		$this->assertSame( 200, $draft->get_status() );
