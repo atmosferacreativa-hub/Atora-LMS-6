@@ -1140,13 +1140,17 @@ final class ATORA_Mobile_REST_Controller {
 
 		$service     = ATORA_Mobile_Assignment_Service::instance();
 		$policy      = $service->policy();
-		$submissions = $service->list_submissions( $user_id, $context['lesson_id'] );
+		$group       = $context['group'];
+		// 6.31.0: en una tarea grupal los intentos son los de la entrega del grupo.
+		$submissions = $group && $group['master_id'] ? ATORA_Mobile_Assignment_Service::list_post_submissions( $group['master_id'] ) : ( $group ? array() : $service->list_submissions( $user_id, $context['lesson_id'] ) );
 
 		// La nota vive en el post clms_submission, que corresponde al intento más reciente.
 		$engine = ATORA_Mobile_Assignment_Service::submission_engine();
 		$review = $engine ? $engine->get_student_review_view( $user_id, $context['wp_lesson_id'] ) : array( 'submission_id' => 0 );
+		// En grupo, la nota del integrante vive en su copia; el intento apunta a la maestra.
+		$graded_post = $group ? (int) $group['master_id'] : (int) $review['submission_id'];
 		foreach ( $submissions as $i => $submission ) {
-			$is_current = 0 === $i && $review['submission_id'] > 0 && (int) $submission['wp_post_id'] === (int) $review['submission_id'];
+			$is_current = 0 === $i && $review['submission_id'] > 0 && (int) $submission['wp_post_id'] === $graded_post;
 			$submissions[ $i ]['grade']    = $is_current ? $review['grade'] : null;
 			$submissions[ $i ]['feedback'] = $is_current ? $review['feedback'] : null;
 			$submissions[ $i ]['review_status'] = $is_current ? (string) $review['status'] : '';
@@ -1156,7 +1160,7 @@ final class ATORA_Mobile_REST_Controller {
 			unset( $submissions[ $i ]['wp_post_id'] );
 		}
 
-		$attempts_used = count( $submissions );
+		$attempts_used = $group ? max( count( $submissions ), (int) $group['attempts'] ) : count( $submissions );
 		$extensions    = array_keys( (array) $policy['allowed_mimes'] );
 
 		return new WP_REST_Response( array(
@@ -1170,7 +1174,14 @@ final class ATORA_Mobile_REST_Controller {
 				'attempts_allowed'   => $context['allow_resubmission'] ? null : 1,
 				'attempts_used'      => $attempts_used,
 				'group_mode'         => $context['group_mode'],
-				'can_submit'         => ! $context['group_mode'] && ( $context['allow_resubmission'] || 0 === $attempts_used ),
+				'group'              => $group ? array(
+					'id'           => $group['id'],
+					'name'         => $group['name'],
+					'members'      => $group['members'],
+					'submitted_by' => $group['submitted_by'],
+					'submitted_at' => $group['submitted_at'],
+				) : null,
+				'can_submit'         => ( ! $context['group_mode'] || ! empty( $group['id'] ) ) && ( $context['allow_resubmission'] || 0 === $attempts_used ),
 				'accepted_files'     => array(
 					'extensions' => $extensions,
 					'mime_types' => array_values( array_unique( array_values( (array) $policy['allowed_mimes'] ) ) ),
@@ -1252,6 +1263,7 @@ final class ATORA_Mobile_REST_Controller {
 		}
 
 		$raw_content = (string) get_post_field( 'post_content', $wp_lesson_id );
+		$group_mode  = 'group' === sanitize_key( (string) get_post_meta( $wp_lesson_id, '_clms_evaluation_mode', true ) );
 
 		return array(
 			'lesson_id'          => $lesson_id,
@@ -1261,7 +1273,55 @@ final class ATORA_Mobile_REST_Controller {
 			'instructions_html'  => wp_kses_post( apply_filters( 'the_content', $raw_content ) ),
 			'due_ts'             => self::assignment_due_ts( $wp_lesson_id ),
 			'allow_resubmission' => $allow_resubmission,
-			'group_mode'         => 'group' === sanitize_key( (string) get_post_meta( $wp_lesson_id, '_clms_evaluation_mode', true ) ),
+			'group_mode'         => $group_mode,
+			'group'              => $group_mode ? self::assignment_group( $user_id, $wp_lesson_id ) : null,
+		);
+	}
+
+	/**
+	 * 6.31.0: grupo del estudiante en una tarea grupal, con quién entregó.
+	 *
+	 * @return array{id:int,name:string,members:array,master_id:int,attempts:int,submitted_by:?array,submitted_at:?string}|null
+	 */
+	public static function assignment_group( int $user_id, int $wp_lesson_id ): ?array {
+		$wp_course_id = class_exists( 'CLMS_Helper' ) ? absint( CLMS_Helper::get_lesson_course_id( $wp_lesson_id ) ) : 0;
+		$group_id     = absint( apply_filters( 'atora/groups/user_group_id', 0, $user_id, $wp_course_id, $wp_lesson_id ) );
+		if ( ! $group_id || ! class_exists( '\\ATORA\\Groups\\Group_Service' ) ) {
+			return null;
+		}
+		$service = new \ATORA\Groups\Group_Service();
+		$row     = (array) $service->get_group( $group_id );
+		$members = array();
+		foreach ( $service->get_group_member_ids( $group_id ) as $member_id ) {
+			$member    = get_userdata( (int) $member_id );
+			$members[] = array( 'id' => (int) $member_id, 'name' => $member ? (string) $member->display_name : '' );
+		}
+		$master = get_posts( array(
+			'post_type'      => 'clms_submission',
+			'post_status'    => array( 'publish', 'private' ),
+			'posts_per_page' => 1,
+			'fields'         => 'ids',
+			'no_found_rows'  => true,
+			'meta_query'     => array(
+				array( 'key' => '_clms_submission_group_master', 'value' => '1' ),
+				array( 'key' => '_clms_submission_group_id', 'value' => $group_id, 'type' => 'NUMERIC' ),
+				array( 'key' => '_clms_submission_lesson_id', 'value' => $wp_lesson_id, 'type' => 'NUMERIC' ),
+			),
+		) );
+		$master_id = $master ? (int) $master[0] : 0;
+		$by        = $master_id ? absint( get_post_meta( $master_id, '_clms_submission_submitted_by', true ) ) : 0;
+		$by_user   = $by ? get_userdata( $by ) : null;
+		$at        = $master_id ? (string) get_post_meta( $master_id, '_clms_submission_submitted_at', true ) : '';
+		global $wpdb;
+		$attempts = $master_id ? absint( $wpdb->get_var( $wpdb->prepare( "SELECT MAX(attempt) FROM {$wpdb->prefix}atora_assignment_submissions WHERE wp_post_id = %d", $master_id ) ) ) : 0; // phpcs:ignore WordPress.DB
+		return array(
+			'id'           => $group_id,
+			'name'         => (string) ( $row['name'] ?? '' ),
+			'members'      => $members,
+			'master_id'    => $master_id,
+			'attempts'     => $master_id ? max( 1, $attempts ) : 0,
+			'submitted_by' => $by_user ? array( 'id' => $by, 'name' => (string) $by_user->display_name ) : null,
+			'submitted_at' => '' !== $at ? gmdate( 'c', strtotime( get_gmt_from_date( $at ) . ' UTC' ) ) : null,
 		);
 	}
 
