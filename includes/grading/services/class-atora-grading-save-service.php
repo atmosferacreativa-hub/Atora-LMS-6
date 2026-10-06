@@ -367,6 +367,12 @@ class ATORA_Grading_Save_Service {
 			return $revision;
 		}
 
+		// 6.31.0: intento calificado (por defecto, el último que se mostró).
+		$graded_attempt = isset( $input['attempt'] ) ? absint( $input['attempt'] ) : 0;
+		if ( $graded_attempt > 0 ) {
+			update_post_meta( $submission_id, '_clms_submission_graded_attempt', $graded_attempt );
+		}
+
 		if ( in_array( $submit_action, array( 'submit_moderation', 'approve_moderation', 'request_moderation_changes' ), true ) ) {
 			if ( ! $moderation_service ) {
 				return new WP_Error( 'clms_moderation_unavailable', __( 'El servicio de moderación no está disponible.', 'atora-lms' ) );
@@ -491,6 +497,7 @@ class ATORA_Grading_Save_Service {
 				'rubric_total_points' => $earned_points,
 				'rubric_max_points'   => absint( $rubric_snapshot['total_points'] ?? 0 ),
 				'rubric_percent'      => ( '' !== (string) $rubric_pct_ref ) ? absint( $rubric_pct_ref ) : '',
+				'attempt'             => $graded_attempt,
 			);
 
 			\ATORA\LMS\Rubric_Service::record_evaluation( array(
@@ -518,6 +525,7 @@ class ATORA_Grading_Save_Service {
 			'grade'         => $grade,
 			'feedback'      => $feedback,
 			'revision'      => $revision,
+			'attempt'       => $graded_attempt,
 		);
 	}
 

@@ -276,6 +276,7 @@ trait CLMS_Grading_SpeedGrade_Trait {
 									<?php endif; ?>
 								</div>
 							<?php endif; ?>
+							<?php echo $this->render_speedgrade_attempts( $context ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 						</section>
 
 						<section class="clms-sg-card">
@@ -334,6 +335,7 @@ trait CLMS_Grading_SpeedGrade_Trait {
 								<input type="hidden" name="<?php echo esc_attr( self::SPEEDGRADE_RETURN ); ?>" value="<?php echo esc_attr( rawurlencode( $return_url ) ); ?>">
 								<?php wp_nonce_field( self::SPEEDGRADE_ACTION . '_' . $context['submission_id'], self::SPEEDGRADE_NONCE ); ?>
 								<?php // 6.31.0: la revisión que se ve; si otro docente guarda antes, no se pisa (409). ?>
+								<input type="hidden" name="attempt" value="<?php echo esc_attr( (int) ( $context['selected_attempt'] ?? 0 ) ); ?>">
 								<input type="hidden" name="expected_revision" value="<?php echo esc_attr( ATORA_Grading_Save_Service::revision( (int) $context['submission_id'] ) ); ?>">
 
 								<?php echo $this->render_speedgrade_rubric_panel( $context ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
@@ -580,6 +582,60 @@ trait CLMS_Grading_SpeedGrade_Trait {
 	 * @param array $context Contexto completo de la entrega.
 	 * @return string
 	 */
+	/**
+	 * 6.31.0: lista de intentos con su fecha (y la del dispositivo si existe) y el
+	 * contenido del intento elegido. Se califica ese intento; por defecto, el último.
+	 */
+	protected function render_speedgrade_attempts( $context ) {
+		$attempts = isset( $context['attempts'] ) && is_array( $context['attempts'] ) ? $context['attempts'] : array();
+		if ( count( $attempts ) < 1 ) {
+			return '';
+		}
+		$selected = (int) ( $context['selected_attempt'] ?? 0 );
+		ob_start();
+		?>
+		<div class="clms-sg-attempts" data-attempts="<?php echo esc_attr( count( $attempts ) ); ?>">
+			<h3><?php esc_html_e( 'Intentos', 'atora-lms' ); ?></h3>
+			<ul class="clms-sg-attempt-list">
+				<?php foreach ( $attempts as $attempt ) : ?>
+					<?php
+					$number = (int) $attempt['attempt'];
+					$url    = add_query_arg( 'attempt', $number );
+					$label  = sprintf( __( 'Intento %d', 'atora-lms' ), $number );
+					$date   = $attempt['received_at'] ? $this->format_datetime( get_date_from_gmt( $attempt['received_at'] ) ) : '';
+					?>
+					<li class="<?php echo $selected === $number ? 'is-selected' : ''; ?>">
+						<a href="<?php echo esc_url( $url ); ?>"><strong><?php echo esc_html( $label ); ?></strong></a>
+						<span><?php echo esc_html( $date ); ?></span>
+						<?php if ( $attempt['client_at'] ) : ?>
+							<span><?php echo esc_html( sprintf( __( 'realizada sin conexión el %s', 'atora-lms' ), $this->format_datetime( get_date_from_gmt( $attempt['client_at'] ) ) ) ); ?></span>
+						<?php endif; ?>
+						<span><?php echo esc_html( 'mobile' === $attempt['source'] ? __( 'App', 'atora-lms' ) : __( 'Web', 'atora-lms' ) ); ?></span>
+						<?php if ( $attempt['is_late'] ) : ?>
+							<span><?php esc_html_e( 'Tardía', 'atora-lms' ); ?></span>
+						<?php endif; ?>
+						<?php if ( $selected === $number ) : ?>
+							<em><?php esc_html_e( 'Se califica este intento', 'atora-lms' ); ?></em>
+						<?php endif; ?>
+					</li>
+				<?php endforeach; ?>
+			</ul>
+			<?php foreach ( $attempts as $attempt ) : ?>
+				<?php if ( (int) $attempt['attempt'] !== $selected ) { continue; } ?>
+				<div class="clms-sg-attempt-view">
+					<?php if ( '' !== trim( (string) $attempt['body_text'] ) ) : ?>
+						<div class="clms-sg-copy"><?php echo wp_kses_post( wpautop( (string) $attempt['body_text'] ) ); ?></div>
+					<?php endif; ?>
+					<?php foreach ( $attempt['files'] as $file ) : ?>
+						<p><a href="<?php echo esc_url( $file['url'] ); ?>" target="_blank" rel="noopener"><?php echo esc_html( '' !== $file['filename'] ? $file['filename'] : __( 'Archivo', 'atora-lms' ) ); ?></a></p>
+					<?php endforeach; ?>
+				</div>
+			<?php endforeach; ?>
+		</div>
+		<?php
+		return (string) ob_get_clean();
+	}
+
 	protected function render_speedgrade_history_panel( $context ) {
 		if ( class_exists( 'CLMS_Grading_History_Renderer' ) && method_exists( 'CLMS_Grading_History_Renderer', 'render' ) ) {
 			return CLMS_Grading_History_Renderer::render(
@@ -776,6 +832,10 @@ trait CLMS_Grading_SpeedGrade_Trait {
 				}
 			}
 		}
+		// 6.31.0: todos los intentos (web y móvil); se califica el elegido, por defecto el último.
+		$attempts         = class_exists( 'ATORA_Web_Submission_History' ) ? ATORA_Web_Submission_History::attempts_for_post( $submission_id ) : array();
+		$requested        = isset( $_GET['attempt'] ) ? absint( wp_unslash( $_GET['attempt'] ) ) : absint( get_post_meta( $submission_id, '_clms_submission_graded_attempt', true ) ); // phpcs:ignore WordPress.Security.NonceVerification
+		$selected_attempt = class_exists( 'ATORA_Web_Submission_History' ) ? ATORA_Web_Submission_History::selected_attempt( $attempts, $requested ) : 0;
 		$context = array(
 			'submission_id' => $submission_id,
 			'student_id'    => $student_id,
@@ -791,6 +851,8 @@ trait CLMS_Grading_SpeedGrade_Trait {
 			'comment'       => $comment,
 			'lesson_comment' => $lesson_comment,
 			'files'         => $files,
+			'attempts'      => $attempts,
+			'selected_attempt' => $selected_attempt,
 			'submitted_at'  => $this->format_datetime( $submitted ),
 			'client_submitted_at' => '' !== $client_submitted ? $this->format_datetime( $client_submitted ) : '',
 			'is_late'       => $is_late_mobile,

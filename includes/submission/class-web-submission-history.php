@@ -114,6 +114,53 @@ final class ATORA_Web_Submission_History {
 		return $ok ? (int) $wpdb->insert_id : 0;
 	}
 
+	/**
+	 * Intentos de una entrega (web y móvil), del primero al último, con sus archivos.
+	 *
+	 * @return array<int,array{attempt:int,source:string,received_at:?string,client_at:?string,body_text:string,files:array,is_late:bool}>
+	 */
+	public static function attempts_for_post( int $post_id ): array {
+		global $wpdb;
+		$rows = (array) $wpdb->get_results( $wpdb->prepare( // phpcs:ignore WordPress.DB
+			'SELECT * FROM ' . self::table() . " WHERE wp_post_id = %d AND status <> 'processing' ORDER BY attempt ASC, id ASC",
+			$post_id
+		), ARRAY_A );
+		$out = array();
+		foreach ( $rows as $row ) {
+			$files = array();
+			foreach ( (array) json_decode( (string) $row['files_json'], true ) as $file ) {
+				$attachment = absint( $file['attachment_id'] ?? 0 );
+				$files[]    = array(
+					'attachment_id' => $attachment,
+					'filename'      => (string) ( $file['filename'] ?? '' ),
+					'mime_type'     => (string) ( $file['mime_type'] ?? '' ),
+					'bytes'         => (int) ( $file['bytes'] ?? 0 ),
+					'url'           => $attachment ? (string) wp_get_attachment_url( $attachment ) : '',
+				);
+			}
+			$out[] = array(
+				'attempt'     => (int) $row['attempt'],
+				'user_id'     => (int) $row['user_id'],
+				'source'      => (string) $row['source'],
+				'received_at' => $row['server_received_at'] ? (string) $row['server_received_at'] : null,
+				'client_at'   => $row['client_submitted_at'] ? (string) $row['client_submitted_at'] : null,
+				'body_text'   => (string) $row['body_text'],
+				'files'       => $files,
+				'is_late'     => (bool) $row['is_late'],
+			);
+		}
+		return $out;
+	}
+
+	/** Intento elegido: el pedido si existe; si no, el último. 0 sin intentos. */
+	public static function selected_attempt( array $attempts, int $requested ): int {
+		$numbers = wp_list_pluck( $attempts, 'attempt' );
+		if ( $requested > 0 && in_array( $requested, $numbers, true ) ) {
+			return $requested;
+		}
+		return $numbers ? (int) max( $numbers ) : 0;
+	}
+
 	/** Intento hecho desde el formulario web (no desde la app). */
 	public static function record_web_attempt( int $post_id ): int {
 		return self::record( $post_id, 'web-' . wp_generate_uuid4() );
