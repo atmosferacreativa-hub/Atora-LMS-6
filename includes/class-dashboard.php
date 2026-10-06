@@ -29,7 +29,7 @@ class CLMS_Dashboard {
 		add_shortcode( self::SHORTCODE, array( $this, 'render_dashboard_shortcode' ) );
 		add_action( 'clms_lesson_completed', array( $this, 'invalidate_cache_from_lesson' ), 10, 2 );
 		add_action( 'clms_submission_created', array( $this, 'invalidate_cache_from_submission' ), 10, 3 );
-		add_action( 'clms_submission_graded', array( $this, 'invalidate_cache_from_submission' ), 10, 5 );
+		add_action( 'clms_submission_graded', array( $this, 'invalidate_cache_from_graded_submission' ), 10, 2 );
 		add_action( 'clms_commerce_order_after_processed', array( $this, 'invalidate_cache_for_user' ), 10, 4 );
 		add_action( 'clms_commerce_course_access_notified', array( $this, 'invalidate_cache_for_user' ), 10, 4 );
 		add_action( 'clms_user_enrolled', array( $this, 'invalidate_cache_for_user' ), 10, 2 );

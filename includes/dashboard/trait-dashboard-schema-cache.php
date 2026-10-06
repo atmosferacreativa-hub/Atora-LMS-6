@@ -194,6 +194,12 @@ trait CLMS_Dashboard_Schema_Cache_Trait {
 		$this->invalidate_cache_for_user( $user_id );
 	}
 
+	/** `clms_submission_graded`: (submission_id, student_id, status, grade, feedback). 6.30.2. */
+	public function invalidate_cache_from_graded_submission( $submission_id, $student_id ) {
+		unset( $submission_id );
+		$this->invalidate_cache_for_user( $student_id );
+	}
+
 	public function invalidate_cache_from_profile_update( $user_id, $old_user_data ) {
 		unset( $old_user_data );
 		$this->invalidate_cache_for_user( $user_id );

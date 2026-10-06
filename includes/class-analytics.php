@@ -253,7 +253,14 @@ class CLMS_Analytics {
 		);
 	}
 
-	public function record_submission_graded( $submission_id, $lesson_id, $user_id, $status, $grade ) {
+	/**
+	 * `clms_submission_graded`: (submission_id, student_id, status, grade, feedback).
+	 * Hasta 6.30.1 se leía como (submission_id, lesson_id, user_id, status, grade):
+	 * los eventos anteriores tienen lección, usuario, estado y nota cruzados.
+	 */
+	public function record_submission_graded( $submission_id, $user_id, $status = '', $grade = '', $feedback = '' ) {
+		unset( $feedback );
+		$lesson_id = absint( get_post_meta( absint( $submission_id ), '_clms_submission_lesson_id', true ) );
 		$this->record_event(
 			'submission_graded',
 			'info',
