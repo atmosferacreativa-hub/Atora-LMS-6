@@ -1311,6 +1311,8 @@ add_action( 'init', static function () {
 	atora_lms_require_module( 'includes/mobile/class-mobile-push-service.php', static function () { ATORA_Mobile_Push_Service::boot(); } );
 	atora_lms_require_module( 'includes/mobile/class-mobile-organize-controller.php' );
 	atora_lms_require_module( 'includes/mobile/class-mobile-teacher-controller.php' );
+	// 6.32.0: Fase 5 — IA (asistente y sugerencia de calificación, sin AJAX).
+	atora_lms_require_module( 'includes/ai/class-ai-assistant-service.php' );
 	if ( class_exists( 'ATORA_Mobile_Messages_Controller' ) ) {
 		add_action( 'rest_api_init', array( 'ATORA_Mobile_Messages_Controller', 'register_routes' ) );
 		add_action( 'rest_api_init', array( 'ATORA_Mobile_Organize_Controller', 'register_routes' ) );
