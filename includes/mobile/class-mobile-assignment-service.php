@@ -298,14 +298,17 @@ final class ATORA_Mobile_Assignment_Service {
 			return self::error( 'atora_mobile_submission_in_progress', __( 'La entrega se está procesando. Reintenta en unos segundos.', 'atora-lms' ), 503 );
 		}
 
-		if ( ! empty( $lesson['group_mode'] ) ) {
-			return self::error( 'atora_mobile_submission_group', __( 'Las tareas grupales se entregan desde la web.', 'atora-lms' ), 422 );
+		// 6.31.0: tarea grupal. La entrega de un integrante vale para el grupo (entrega
+		// maestra); los intentos se cuentan sobre la maestra.
+		$group = ! empty( $lesson['group_mode'] ) ? ( $lesson['group'] ?? null ) : null;
+		if ( ! empty( $lesson['group_mode'] ) && empty( $group['id'] ) ) {
+			return self::error( 'atora_mobile_submission_group', __( 'No tienes un grupo asignado para esta tarea.', 'atora-lms' ), 422 );
 		}
 		if ( ! ( $this->rate_limiter )( 'atora_mobile_submission', (string) $user_id, self::SUBMISSION_LIMIT, self::SUBMISSION_WINDOW ) ) {
 			return self::error( 'atora_mobile_rate_limited', __( 'Demasiadas entregas. Espera antes de volver a intentarlo.', 'atora-lms' ), 429 );
 		}
 
-		$previous = $this->store->max_attempt( $user_id, (int) $lesson['lesson_id'] );
+		$previous = $group ? (int) $group['attempts'] : $this->store->max_attempt( $user_id, (int) $lesson['lesson_id'] );
 		if ( empty( $lesson['allow_resubmission'] ) && $previous > 0 ) {
 			return self::error( 'atora_mobile_submission_closed', __( 'Esta tarea no admite más intentos.', 'atora-lms' ), 409 );
 		}
@@ -399,6 +402,16 @@ final class ATORA_Mobile_Assignment_Service {
 	/** @return array<int, array> */
 	public function list_submissions( int $user_id, int $lesson_id ): array {
 		return array_map( array( __CLASS__, 'present_submission' ), $this->store->list_submissions( $user_id, $lesson_id ) );
+	}
+
+	/** 6.31.0: intentos de una entrega grupal (de cualquier integrante), del más reciente al más antiguo. */
+	public static function list_post_submissions( int $wp_post_id ): array {
+		global $wpdb;
+		$rows = (array) $wpdb->get_results( $wpdb->prepare( // phpcs:ignore WordPress.DB
+			"SELECT * FROM {$wpdb->prefix}atora_assignment_submissions WHERE wp_post_id = %d AND status <> 'processing' ORDER BY attempt DESC, id DESC",
+			$wp_post_id
+		), ARRAY_A );
+		return array_map( array( __CLASS__, 'present_submission' ), $rows );
 	}
 
 	/** Borra sesiones vencidas y sus archivos parciales. */

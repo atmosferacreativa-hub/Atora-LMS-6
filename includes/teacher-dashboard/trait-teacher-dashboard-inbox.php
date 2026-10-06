@@ -37,6 +37,11 @@ trait CLMS_Teacher_Dashboard_Inbox_Trait {
 		return false;
 	}
 
+	/** 6.31.0: la misma cola para `GET /teacher/submissions`. */
+	public function teacher_submission_queue( array $lesson_ids, array $filters, int $page = 1, int $limit = 24 ): array {
+		return $this->get_submission_inbox_data( $lesson_ids, $filters, $page, $limit );
+	}
+
 	protected function get_submission_inbox_data( $lesson_ids, $filters, $page = 1, $limit = 24 ) {
 		$lesson_ids = is_array( $lesson_ids ) ? array_map( 'absint', $lesson_ids ) : array();
 		$filters    = is_array( $filters ) ? $filters : array();
@@ -115,13 +120,21 @@ trait CLMS_Teacher_Dashboard_Inbox_Trait {
 			);
 		}
 
+		// 6.31.0 (API del docente): tardías, sin copias grupales (se califica la maestra).
+		if ( ! empty( $filters['late'] ) ) {
+			$meta_query[] = array( 'key' => '_clms_submission_is_late', 'value' => '1' );
+		}
+		if ( ! empty( $filters['exclude_shadows'] ) ) {
+			$meta_query[] = array( 'key' => '_clms_submission_is_shadow', 'compare' => 'NOT EXISTS' );
+		}
+
 		$args = array(
 			'post_type'      => CLMS_Submission::CPT,
 			'post_status'    => array( 'publish', 'private' ),
 			'posts_per_page' => $limit,
 			'fields'         => 'ids',
 			'orderby'        => 'date',
-			'order'          => 'DESC',
+			'order'          => isset( $filters['order'] ) && 'ASC' === strtoupper( (string) $filters['order'] ) ? 'ASC' : 'DESC',
 			'meta_query'     => $meta_query,
 			'paged'          => $page,
 			'no_found_rows'  => false,

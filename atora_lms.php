@@ -3,7 +3,7 @@
  * Plugin Name:       ATORA LMS
  * Plugin URI:        https://atora.studio
  * Description:       LMS modular para WordPress con IA, evaluaciones, certificados, CRM, mensajería multi-canal, afiliados, live streaming y más. Autor: Atora Studio.
- * Version:           6.30.2
+ * Version:           6.31.0
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Atora Studio
@@ -52,7 +52,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * - Limpieza automática de notificaciones >90 días
  */
 	if ( ! defined( 'ATORA_LMS_VERSION' ) ) {
-		define( 'ATORA_LMS_VERSION', '6.30.2' );
+		define( 'ATORA_LMS_VERSION', '6.31.0' );
 	}
 
 if ( ! defined( 'ATORA_LMS_FILE' ) ) {
@@ -992,6 +992,10 @@ add_action( 'init', static function () {
 	// 6.30.1: la regla de visibilidad decide qué hook dispara un guardado de nota;
 	// los módulos que arranca el loader se enganchan a su DRAFT_HOOK.
 	atora_lms_require_module( 'includes/grading/class-student-grade-visibility.php' );
+	// 6.31.0: alcance del docente (SpeedGrader web y /teacher/*).
+	atora_lms_require_module( 'includes/teacher/class-teacher-scope.php' );
+	atora_lms_require_module( 'includes/teacher/class-student-risk-service.php' );
+	atora_lms_require_module( 'includes/submission/class-web-submission-history.php', static function () { ATORA_Web_Submission_History::boot(); } );
 
 	atora_lms_require_module( 'includes/class-loader.php', static function() use ( &$clms_loader_instance ) {
 		if ( class_exists( 'CLMS_Loader' ) && method_exists( 'CLMS_Loader', 'boot' ) ) {
@@ -1306,9 +1310,12 @@ add_action( 'init', static function () {
 	atora_lms_require_module( 'includes/mobile/class-mobile-messages-controller.php' );
 	atora_lms_require_module( 'includes/mobile/class-mobile-push-service.php', static function () { ATORA_Mobile_Push_Service::boot(); } );
 	atora_lms_require_module( 'includes/mobile/class-mobile-organize-controller.php' );
+	atora_lms_require_module( 'includes/mobile/class-mobile-teacher-controller.php' );
 	if ( class_exists( 'ATORA_Mobile_Messages_Controller' ) ) {
 		add_action( 'rest_api_init', array( 'ATORA_Mobile_Messages_Controller', 'register_routes' ) );
 		add_action( 'rest_api_init', array( 'ATORA_Mobile_Organize_Controller', 'register_routes' ) );
+		// 6.31.0: Fase 4 — docente.
+		add_action( 'rest_api_init', array( 'ATORA_Mobile_Teacher_Controller', 'register_routes' ) );
 	}
 	if ( class_exists( 'ATORA_Mobile_REST_Controller' ) ) {
 		add_action( 'rest_api_init', array( 'ATORA_Mobile_REST_Controller', 'register_routes' ) );

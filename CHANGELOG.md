@@ -1,5 +1,29 @@
 # CHANGELOG — ATORA LMS
 
+## 6.31.0 (2026-10-06)
+
+### Fase 4 — Docente (plugin)
+
+Orden: `docs/ordenes/ORDEN-FASE-4.md`, Bloque 3.
+
+**Servicio de guardado.** `ATORA_Grading_Save_Service::save( $submission_id, $actor_id, $input )` es la única puerta para calificar: SpeedGrader web y la app. Extracción pura de `handle_speedgrade_save()` (commit propio): el cuerpo es el mismo y lee `$input` (sin barras) en lugar de `$_POST`; `handle_speedgrade_save()` queda como envoltura (nonce y `$_POST`). Las pruebas de SpeedGrader existentes pasan sin cambios.
+
+**Acceso: `ATORA_Teacher_Scope`.** Una sola regla para SpeedGrader web y `/teacher/*`: puede ver y calificar quien esté asignado a una sección del curso (`atora_section_teachers`), sea autor del curso o de la lección, pueda editar lo ajeno o tenga una delegación vigente, o cumpla la regla anterior (es una suma: nadie pierde acceso por las condiciones nuevas). Con varias instituciones activas, el administrador y quien edita lo ajeno solo alcanzan los cursos de su institución, resuelta desde el curso. La cola de SpeedGrader incluye los cursos de las secciones asignadas. `scripts/audit-teacher-scope-access.php` (solo lectura) lista quién perdería acceso; con una sola institución no puede perder nadie.
+
+**Concurrencia.** Meta `_clms_submission_grade_revision`, que sube en cada guardado (comparar y sumar en una sola consulta). SpeedGrader web envía la revisión que mostró; si otro docente guardó después: "Otro docente guardó esta entrega; recarga para ver su versión", sin guardar. La API responde **409** con la versión actual.
+
+**Riesgo: `ATORA_Student_Risk_Service`.** Combina early-warning (entregas vencidas) con el resumen de notas (nota acumulada, actividades pendientes): nivel `alto`/`medio`/`bajo` y motivos legibles ("2 entregas vencidas", "nota acumulada 48/100"). Sin notas no es riesgo por nota; un 0 sí. Lo usan SpeedGrader ("Riesgo académico") y `/teacher/*`.
+
+**Historial de entregas web.** Cada entrega por el formulario web escribe una fila nueva en `atora_assignment_submissions` (solo añadir, `source: web`, ids de tabla, marca de tardía); el post `clms_submission` sigue siendo el que califica SpeedGrader. Migración idempotente de las existentes como intento 1 (`web-migrated-{post}`), por lotes en segundo plano al actualizar y con `wp atora submissions migrate-web`; las copias grupales no se migran.
+
+**Todos los intentos en SpeedGrader.** Lista de intentos con su fecha (y "realizada sin conexión el…" si viene del dispositivo), origen (web o app) y tardía; se puede ver cada uno. Se califica el intento elegido, por defecto el último; queda en `_clms_submission_graded_attempt` y en la auditoría de la rúbrica.
+
+**Tareas grupales en la app.** `GET /assignments/{id}` devuelve el grupo, sus integrantes, quién entregó y cuándo, y los intentos del grupo; ya no "no disponible". La entrega desde la app vale para el grupo (entrega maestra, mismo camino que la web); los intentos se cuentan sobre la maestra. La nota de la maestra llega a todos con estado, rúbrica y ajustes individuales (6.30.1).
+
+**API del docente** (`atora-mobile/v1`, token + rol docente → si no 403; recurso fuera de alcance → 404; 503 ante error de base de datos; sin caché): `GET /teacher/today`, `GET /teacher/courses`, `GET /teacher/courses/{id}/students`, `GET /teacher/students/{id}?course=`, `GET /teacher/submissions` (sobre `get_submission_inbox_data()`, la más antigua primero, sin copias grupales, filtro de tardías), `GET /teacher/submissions/{id}` (intentos, archivos con enlace firmado y temporal, rúbrica con niveles y bandas, grupo, revisión), `POST /teacher/submissions/{id}/grade` (por el servicio de guardado; idempotente por `client_event_id`; 409 ante revisión vieja), `POST /teacher/announcements` (aviso al hilo Avisos de cada estudiante del curso o sección). `/discovery`: `teacher`, `teacher_grading`, `group_assignments`. Detalle en `docs/MOBILE-API-V1.md`.
+
+**TESTS** (fallan con 6.30.2): `TeacherScopeTest` (sección, autoría, extraño sin acceso; administrador de otra institución), `GradeRevisionConflictTest` (el segundo docente no pisa), `StudentRiskServiceTest`, `WebSubmissionHistoryTest` (fila por intento web; migración no duplica), `SpeedGraderAttemptsTest`, `GroupAssignmentMobileTest` (grupo, entrega por el grupo, borrador invisible, nota a todos con ajuste), `TeacherApiTest` (403/404, misma nota, auditoría y aviso por API y SpeedGrader, 409, decimales, borrador/publicada, idempotencia, aviso al curso).
+
 ## 6.30.2 (2026-10-06)
 
 Cierre pendiente antes de la Fase 4 (orden `docs/ordenes/ORDEN-FASE-4.md`, Bloque 1).

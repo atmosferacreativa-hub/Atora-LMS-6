@@ -51,6 +51,10 @@ class CLMS_Speedgrade_Context_Service {
 		$context['academic_status'] = $academic;
 		$context['improvement_plan'] = $plan;
 		$context['risk_level'] = isset( $academic['risk_level'] ) ? sanitize_key( (string) $academic['risk_level'] ) : 'normal';
+		// 6.31.0: riesgo combinado (early-warning + notas) con motivos, el mismo que ve la app.
+		$context['student_risk'] = class_exists( 'ATORA_Student_Risk_Service' ) && $student_id && $course_id
+			? ATORA_Student_Risk_Service::for_student( (int) $student_id, (int) $course_id, $academic )
+			: null;
 		$context['certificate_status'] = isset( $academic['certificate_status'] ) ? sanitize_key( (string) $academic['certificate_status'] ) : 'pending';
 		$context['last_feedback_previous'] = isset( $academic['last_feedback'] ) ? sanitize_textarea_field( (string) $academic['last_feedback'] ) : '';
 		$context['last_grade_previous'] = isset( $academic['last_grade'] ) && is_numeric( $academic['last_grade'] ) ? absint( $academic['last_grade'] ) : null;

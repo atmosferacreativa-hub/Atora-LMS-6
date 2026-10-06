@@ -277,7 +277,14 @@ final class CLMS_Agenda_Service {
 		if ( $to < $from || ( $to - $from ) > self::MAX_DAYS * DAY_IN_SECONDS ) {
 			return new WP_Error( 'atora_agenda_range', sprintf( __( 'El rango máximo es de %d días.', 'atora-lms' ), self::MAX_DAYS ), array( 'status' => 400 ) );
 		}
-		$courses = self::courses( $user_id );
+		return self::for_courses( $user_id, $from, $to, self::courses( $user_id ) );
+	}
+
+	/**
+	 * 6.31.0: agenda de unos cursos dados ([table_course_id => ['wp','title']]),
+	 * p. ej. los del docente. `done` se evalúa para `$user_id`.
+	 */
+	public static function for_courses( int $user_id, int $from, int $to, array $courses ): array {
 		$items   = array_merge(
 			self::calendar_events( $user_id, $from, $to, $courses ),
 			self::deadlines( $user_id, $from, $to, $courses ),
