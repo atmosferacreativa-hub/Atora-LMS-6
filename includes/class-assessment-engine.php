@@ -47,7 +47,7 @@ class CLMS_Assessment_Engine {
 		add_action( 'clms_peer_grades_aggregated', array( $this, 'capture_peer_review_assessment' ), 10, 3 );
 		add_action( self::AUTO_GRADE_CRON_HOOK, array( $this, 'process_scheduled_auto_grade' ), 10, 1 );
 		add_action( 'clms_submission_created', array( $this, 'invalidate_cache_from_submission' ), 10, 3 );
-		add_action( 'clms_submission_graded', array( $this, 'invalidate_cache_from_submission' ), 10, 5 );
+		add_action( 'clms_submission_graded', array( $this, 'invalidate_cache_from_graded_submission' ), 10, 2 );
 		add_action( 'clms_lesson_completed', array( $this, 'invalidate_cache_from_lesson' ), 10, 2 );
 		add_action( 'save_post_lm_course', array( $this, 'invalidate_cache_from_course' ), 10, 3 );
 		add_action( 'save_post_lm_program', array( $this, 'invalidate_cache_from_program' ), 10, 3 );
@@ -714,6 +714,16 @@ class CLMS_Assessment_Engine {
 		unset( $submission_id );
 		$course_id = class_exists( 'CLMS_Helper' ) ? CLMS_Helper::get_lesson_course_id( $lesson_id ) : 0;
 		$this->invalidate_cache_for_user_course( $user_id, $course_id );
+	}
+
+	/** `clms_submission_graded`: (submission_id, student_id, status, grade, feedback). 6.30.2. */
+	public function invalidate_cache_from_graded_submission( $submission_id, $student_id ) {
+		$submission_id = absint( $submission_id );
+		$course_id     = absint( get_post_meta( $submission_id, '_clms_submission_course_id', true ) );
+		if ( ! $course_id && class_exists( 'CLMS_Helper' ) ) {
+			$course_id = absint( CLMS_Helper::get_lesson_course_id( absint( get_post_meta( $submission_id, '_clms_submission_lesson_id', true ) ) ) );
+		}
+		$this->invalidate_cache_for_user_course( $student_id, $course_id );
 	}
 
 	public function invalidate_cache_from_course( $post_id, $post, $update ) {

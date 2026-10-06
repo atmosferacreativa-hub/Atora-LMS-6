@@ -17,6 +17,7 @@ class CLMS_Messaging {
 	public function __construct() {
 		add_action( 'init', array( $this, 'handle_mark_message_read' ) );
 		add_action( 'admin_post_clms_send_internal_message', array( $this, 'handle_send_internal_message' ) );
+		add_action( 'admin_post_atora_inbox_reply', array( $this, 'handle_inbox_reply' ) );
 		add_action( 'wp', array( $this, 'maybe_schedule_followup_cron' ) );
 		add_action( self::FOLLOWUP_CRON_HOOK, array( $this, 'run_scheduled_followups' ) );
 
@@ -431,6 +432,31 @@ class CLMS_Messaging {
 
 		$redirect = wp_get_referer() ? wp_get_referer() : admin_url( 'admin.php?page=clms-messages' );
 		wp_safe_redirect( $redirect );
+		exit;
+	}
+
+	/**
+	 * Respuesta desde la página web de mensajes (6.30.2). Pasa por el mismo envío
+	 * que la app (participante, avisos sin respuesta, límite, idempotencia).
+	 */
+	public function handle_inbox_reply() {
+		$thread_id = isset( $_POST['thread_id'] ) ? absint( wp_unslash( $_POST['thread_id'] ) ) : 0;
+		if ( ! is_user_logged_in() || ! class_exists( 'ATORA_Mobile_Messages_Controller' ) ) {
+			wp_die( esc_html__( 'No tienes permisos.', 'atora-lms' ) );
+		}
+		check_admin_referer( 'atora_inbox_reply_' . $thread_id );
+
+		$request = new WP_REST_Request( 'POST', '/atora-mobile/v1/messages' );
+		$request->set_header( 'content-type', 'application/json' );
+		$request->set_body( wp_json_encode( array(
+			'thread_id'       => $thread_id,
+			'body'            => isset( $_POST['body'] ) ? (string) wp_unslash( $_POST['body'] ) : '',
+			'client_event_id' => isset( $_POST['client_event_id'] ) ? sanitize_text_field( wp_unslash( $_POST['client_event_id'] ) ) : '',
+		) ) );
+		$result   = ATORA_Mobile_Messages_Controller::send( $request );
+		$redirect = add_query_arg( array( 'page' => 'clms-messages', 'thread' => $thread_id ), admin_url( 'admin.php' ) );
+
+		wp_safe_redirect( add_query_arg( is_wp_error( $result ) ? 'message_error' : 'message_sent', is_wp_error( $result ) ? 'send_failed' : '1', $redirect ) );
 		exit;
 	}
 

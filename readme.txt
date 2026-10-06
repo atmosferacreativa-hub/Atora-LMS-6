@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 6.30.1
+Stable tag: 6.30.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,9 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.30.2 =
+* Mensajes del docente en la web: conversaciones completas (lo enviado y lo recibido) con el mismo buzón y contador que la app, y respuesta desde la web. Caché del panel y analítica de notas: leían mal los datos del aviso de calificación. Comando `wp atora seed-e2e` para las pruebas de pantalla de la app.
+
 = 6.30.1 =
 * Notas: guardar una calificación como borrador ya no avisa al estudiante ni le muestra la nota (antes el aviso y el mensaje decían "Nota actual: X/100"); en tareas grupales, la copia de cada integrante queda también en borrador y lleva los puntajes por criterio. Script de solo lectura para saber si alguien vio una nota antes de tiempo.
 

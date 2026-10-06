@@ -740,7 +740,6 @@ trait CLMS_Admin_Menu_Main_Pages_Academic_Trait {
 
 		$user_id   = get_current_user_id();
 		$messaging = clms_core('CLMS_Messaging');
-		$selected_thread = isset( $_GET['thread'] ) ? sanitize_key( wp_unslash( $_GET['thread'] ) ) : '';
 		$items = array(
 			array(
 				'title'       => __( 'Panel del estudiante', 'atora-lms' ),
@@ -758,17 +757,6 @@ trait CLMS_Admin_Menu_Main_Pages_Academic_Trait {
 				'url'         => admin_url( 'admin.php?page=clms-ai-hub' ),
 			),
 		);
-		$threads  = ( $messaging && method_exists( $messaging, 'get_threads' ) ) ? $messaging->get_threads( $user_id, array( 'limit' => 12 ) ) : array();
-		if ( ! $selected_thread && ! empty( $threads[0]['thread_id'] ) ) {
-			$selected_thread = sanitize_key( (string) $threads[0]['thread_id'] );
-		}
-		$messages = ( $messaging && method_exists( $messaging, 'get_messages' ) ) ? $messaging->get_messages(
-			$user_id,
-			array(
-				'limit'     => 30,
-				'thread_id' => $selected_thread,
-			)
-		) : array();
 		$stats    = ( $messaging && method_exists( $messaging, 'get_message_stats' ) ) ? $messaging->get_message_stats( $user_id ) : array(
 			'total'           => 0,
 			'unread'          => 0,
@@ -815,34 +803,14 @@ trait CLMS_Admin_Menu_Main_Pages_Academic_Trait {
 
 		echo '<div class="clms-admin-metrics">';
 		echo '<div class="clms-admin-metric"><span>' . esc_html__( 'Total', 'atora-lms' ) . '</span><strong>' . esc_html( absint( $stats['total'] ) ) . '</strong></div>';
-		echo '<div class="clms-admin-metric"><span>' . esc_html__( 'No leídos', 'atora-lms' ) . '</span><strong>' . esc_html( absint( $stats['unread'] ) ) . '</strong></div>';
+		$unread = class_exists( 'ATORA_Inbox_Store' ) ? ATORA_Inbox_Store::unread_count( $user_id ) : absint( $stats['unread'] );
+		echo '<div class="clms-admin-metric"><span>' . esc_html__( 'No leídos', 'atora-lms' ) . '</span><strong>' . esc_html( $unread ) . '</strong></div>';
 		echo '<div class="clms-admin-metric"><span>' . esc_html__( 'Recomendaciones', 'atora-lms' ) . '</span><strong>' . esc_html( absint( $stats['recommendations'] ) ) . '</strong></div>';
 		echo '<div class="clms-admin-metric"><span>' . esc_html__( 'IA / Docente', 'atora-lms' ) . '</span><strong>' . esc_html( absint( $stats['from_ai'] ) ) . ' / ' . esc_html( absint( $stats['from_teacher'] ) ) . '</strong></div>';
 		echo '</div>';
 
-		if ( ! empty( $threads ) ) {
-			echo '<div class="clms-admin-card">';
-			echo '<div class="clms-admin-section-head"><div><span class="clms-admin-kicker">' . esc_html__( 'Conversaciones', 'atora-lms' ) . '</span><h2>' . esc_html__( 'Hilos por contexto', 'atora-lms' ) . '</h2></div></div>';
-			echo '<div class="clms-admin-thread-grid">';
-			foreach ( $threads as $thread ) {
-				$thread_id = sanitize_key( (string) $thread['thread_id'] );
-				$url       = add_query_arg(
-					array(
-						'page'   => 'clms-messages',
-						'thread' => $thread_id,
-					),
-					admin_url( 'admin.php' )
-				);
-				echo '<a class="clms-admin-thread-card' . ( $selected_thread === $thread_id ? ' is-active' : '' ) . '" href="' . esc_url( $url ) . '">';
-				echo '<span class="clms-admin-kicker">' . esc_html( $this->format_thread_type_label( $thread['thread_type'] ?? 'general' ) ) . '</span>';
-				echo '<strong>' . esc_html( $thread['thread_label'] ?? __( 'General', 'atora-lms' ) ) . '</strong>';
-				echo '<span>' . esc_html( $this->truncate_admin_text( (string) ( $thread['last_message']['title'] ?? '' ), 72 ) ) . '</span>';
-				echo '<small>' . esc_html( absint( $thread['message_count'] ) ) . ' ' . esc_html__( 'mensaje(s)', 'atora-lms' ) . ' · ' . esc_html( absint( $thread['unread_count'] ) ) . ' ' . esc_html__( 'sin leer', 'atora-lms' ) . '</small>';
-				echo '</a>';
-			}
-			echo '</div>';
-			echo '</div>';
-		}
+		// 6.30.2: hilos completos (enviados y recibidos) con el mismo servicio y contador que la app.
+		$this->render_inbox_threads( $user_id );
 
 		if ( $this->can_compose_messages() ) {
 			echo '<div class="clms-admin-card">';
@@ -883,68 +851,86 @@ trait CLMS_Admin_Menu_Main_Pages_Academic_Trait {
 			echo '</div>';
 		}
 
+		echo '</div>';
+	}
+
+	/**
+	 * Conversaciones del buzón (6.30.2): las mismas que ve la app, con lo enviado
+	 * y lo recibido. Lee y responde por ATORA_Mobile_Messages_Controller, así la
+	 * web y la app comparten reglas (participante, avisos sin respuesta, límite)
+	 * y el contador de no leídos.
+	 */
+	protected function render_inbox_threads( int $user_id ): void {
+		if ( ! class_exists( 'ATORA_Mobile_Messages_Controller' ) || ! class_exists( 'ATORA_Inbox_Store' ) || ! ATORA_Inbox_Store::tables_ready() ) {
+			return;
+		}
+		$list = ATORA_Mobile_Messages_Controller::threads( new WP_REST_Request( 'GET', '/atora-mobile/v1/messages/threads' ) );
+		if ( is_wp_error( $list ) ) {
+			return;
+		}
+		$list    = $list->get_data();
+		$threads = array_merge( array( $list['avisos'] ), (array) $list['threads'] );
+		$current = isset( $_GET['thread'] ) ? absint( wp_unslash( $_GET['thread'] ) ) : 0;
+		if ( ! $current ) {
+			$current = ! empty( $list['threads'][0]['id'] ) ? (int) $list['threads'][0]['id'] : (int) $list['avisos']['id'];
+		}
+
 		echo '<div class="clms-admin-card">';
-		echo '<div class="clms-admin-section-head"><div><span class="clms-admin-kicker">' . esc_html__( 'Bandeja ATORA', 'atora-lms' ) . '</span><h2>' . esc_html__( 'Mensajes recientes', 'atora-lms' ) . ( $selected_thread ? ' · ' . esc_html( $this->resolve_thread_title_from_messages( $messages, $threads, $selected_thread ) ) : '' ) . '</h2></div></div>';
-
-		if ( empty( $messages ) ) {
-			echo '<p>' . esc_html__( 'No hay mensajes todavía. Aquí aparecerán avisos del sistema, seguimiento docente, IA y recomendaciones.', 'atora-lms' ) . '</p>';
-		} else {
-			echo '<div class="clms-admin-message-list">';
-
-			foreach ( $messages as $message ) {
-				$mark_url = '';
-				if ( empty( $message['is_read'] ) ) {
-					$mark_url = wp_nonce_url(
-						add_query_arg(
-							array(
-								'page'              => 'clms-messages',
-								'thread'            => $selected_thread,
-								'clms_mark_message' => sanitize_text_field( (string) $message['id'] ),
-							),
-							admin_url( 'admin.php' )
-						),
-						'clms_mark_message_' . sanitize_text_field( (string) $message['id'] )
-					);
-				}
-
-				echo '<article class="clms-admin-message-card' . ( empty( $message['is_read'] ) ? ' is-unread' : '' ) . '">';
-				echo '<div class="clms-admin-message-head">';
-				echo '<div>';
-				echo '<div class="clms-admin-message-meta">';
-				echo '<span class="clms-admin-message-badge">' . esc_html( $this->format_message_sender_label( $message['sender_type'] ?? 'system', $message['sender_name'] ?? '' ) ) . '</span>';
-				if ( ! empty( $message['thread_label'] ) ) {
-					echo '<span class="clms-admin-message-badge clms-admin-message-badge--soft">' . esc_html( $this->format_thread_type_label( $message['thread_type'] ?? 'general' ) . ' · ' . $message['thread_label'] ) . '</span>';
-				}
-				if ( ! empty( $message['recommendation_type'] ) ) {
-					echo '<span class="clms-admin-message-badge clms-admin-message-badge--soft">' . esc_html( $this->format_recommendation_label( $message['recommendation_type'] ) ) . '</span>';
-				}
-				echo '<span class="clms-admin-message-date">' . esc_html( $this->format_admin_datetime( $message['created_at'] ?? '' ) ) . '</span>';
-				echo '</div>';
-				echo '<h3>' . esc_html( $message['title'] ?? '' ) . '</h3>';
-				echo '</div>';
-				if ( ! empty( $message['link'] ) ) {
-					echo '<a class="button button-small" href="' . esc_url( $message['link'] ) . '">' . esc_html__( 'Abrir', 'atora-lms' ) . '</a>';
-				}
-				echo '</div>';
-				echo '<p>' . esc_html( $message['message'] ?? '' ) . '</p>';
-				echo '<div class="clms-admin-message-foot">';
-				echo '<span>' . esc_html__( 'Tipo:', 'atora-lms' ) . ' ' . esc_html( $this->format_message_type_label( $message['message_type'] ?? '' ) ) . '</span>';
-				if ( ! empty( $message['course_id'] ) ) {
-					echo '<span>' . esc_html__( 'Curso:', 'atora-lms' ) . ' ' . esc_html( get_the_title( absint( $message['course_id'] ) ) ) . '</span>';
-				}
-				if ( ! empty( $message['lesson_id'] ) ) {
-					echo '<span>' . esc_html__( 'Lección:', 'atora-lms' ) . ' ' . esc_html( get_the_title( absint( $message['lesson_id'] ) ) ) . '</span>';
-				}
-				if ( $mark_url ) {
-					echo '<a href="' . esc_url( $mark_url ) . '">' . esc_html__( 'Marcar como leído', 'atora-lms' ) . '</a>';
-				}
-				echo '</div>';
-				echo '</article>';
-			}
-
-			echo '</div>';
+		echo '<div class="clms-admin-section-head"><div><span class="clms-admin-kicker">' . esc_html__( 'Conversaciones', 'atora-lms' ) . '</span><h2>' . esc_html__( 'Mensajes', 'atora-lms' ) . '</h2></div></div>';
+		echo '<div class="clms-admin-thread-grid">';
+		foreach ( $threads as $thread ) {
+			$url = add_query_arg( array( 'page' => 'clms-messages', 'thread' => (int) $thread['id'] ), admin_url( 'admin.php' ) );
+			echo '<a class="clms-admin-thread-card' . ( $current === (int) $thread['id'] ? ' is-active' : '' ) . '" href="' . esc_url( $url ) . '">';
+			echo '<span class="clms-admin-kicker">' . esc_html( 'system' === $thread['type'] ? __( 'Avisos', 'atora-lms' ) : $this->format_thread_type_label( $thread['type'] ) ) . '</span>';
+			echo '<strong>' . esc_html( (string) $thread['title'] ) . '</strong>';
+			echo '<span>' . esc_html( (string) ( $thread['last_message']['preview'] ?? '' ) ) . '</span>';
+			echo '<small>' . esc_html( absint( $thread['unread'] ) ) . ' ' . esc_html__( 'sin leer', 'atora-lms' ) . '</small>';
+			echo '</a>';
 		}
 		echo '</div>';
+
+		$request = new WP_REST_Request( 'GET', '/atora-mobile/v1/messages/threads/' . $current );
+		$request->set_url_params( array( 'thread_id' => $current ) );
+		$open = ATORA_Mobile_Messages_Controller::thread( $request );
+		if ( is_wp_error( $open ) ) {
+			echo '<p>' . esc_html__( 'Esta conversación no está disponible.', 'atora-lms' ) . '</p></div>';
+			return;
+		}
+		$open     = $open->get_data();
+		$messages = array_reverse( (array) $open['messages'] );
+		if ( $messages ) {
+			ATORA_Inbox_Store::mark_thread_read( $current, $user_id, (int) end( $messages )['id'] );
+		}
+
+		echo '<h3>' . esc_html( (string) $open['thread']['title'] ) . '</h3>';
+		echo '<div class="clms-admin-message-list">';
+		if ( ! $messages ) {
+			echo '<p>' . esc_html__( 'No hay mensajes todavía.', 'atora-lms' ) . '</p>';
+		}
+		foreach ( $messages as $message ) {
+			echo '<article class="clms-admin-message-card' . ( $message['mine'] ? ' is-mine' : '' ) . ( $message['read'] ? '' : ' is-unread' ) . '">';
+			echo '<div class="clms-admin-message-meta">';
+			echo '<span class="clms-admin-message-badge">' . esc_html( $message['mine'] ? __( 'Tú', 'atora-lms' ) : ( $message['author']['name'] ?? __( 'ATORA', 'atora-lms' ) ) ) . '</span>';
+			echo '<span class="clms-admin-message-date">' . esc_html( $this->format_admin_datetime( get_date_from_gmt( gmdate( 'Y-m-d H:i:s', strtotime( (string) $message['created_at'] ) ) ) ) ) . '</span>';
+			echo '</div>';
+			if ( '' !== (string) $message['title'] ) {
+				echo '<h4>' . esc_html( (string) $message['title'] ) . '</h4>';
+			}
+			echo '<p>' . nl2br( esc_html( (string) $message['body'] ) ) . '</p>';
+			echo '</article>';
+		}
+		echo '</div>';
+
+		if ( ! empty( $open['thread']['can_reply'] ) ) {
+			echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" class="clms-admin-message-form">';
+			wp_nonce_field( 'atora_inbox_reply_' . $current );
+			echo '<input type="hidden" name="action" value="atora_inbox_reply">';
+			echo '<input type="hidden" name="thread_id" value="' . esc_attr( $current ) . '">';
+			echo '<input type="hidden" name="client_event_id" value="' . esc_attr( wp_generate_uuid4() ) . '">';
+			echo '<p><label for="atora-inbox-reply"><strong>' . esc_html__( 'Responder', 'atora-lms' ) . '</strong></label><br><textarea id="atora-inbox-reply" name="body" rows="4" required></textarea></p>';
+			echo '<p><button type="submit" class="button button-primary">' . esc_html__( 'Enviar', 'atora-lms' ) . '</button></p>';
+			echo '</form>';
+		}
 		echo '</div>';
 	}
 
