@@ -86,11 +86,11 @@ final class GroupAssignmentMobileTest extends WP_UnitTestCase {
 		( new \ATORA\Groups\Group_Service() )->set_override( $this->group, $this->wp_lesson, $this->b, 60, 'Aportó menos', $this->admin );
 
 		wp_set_current_user( $this->admin );
-		$saved = ( new ATORA_Grading_Save_Service( new CLMS_Grading() ) )->save( $master, $this->admin, array( 'clms_sg_submit' => 'save_draft', 'grade' => '85', 'feedback' => 'Borrador' ) );
+		$saved = ( new ATORA_Grading_Save_Service( new CLMS_Grading() ) )->save( $master, $this->admin, array( 'clms_sg_submit' => 'save_draft', 'grade' => '85', 'feedback' => 'Borrador', 'expected_revision' => ATORA_Grading_Save_Service::revision( $master ) ) );
 		$this->assertIsArray( $saved );
 		$this->assertNull( $this->get_assignment( $this->a )['submissions'][0]['grade'], 'Borrador: nadie ve la nota.' );
 
-		( new ATORA_Grading_Save_Service( new CLMS_Grading() ) )->save( $master, $this->admin, array( 'clms_sg_submit' => 'publish', 'grade' => '85', 'feedback' => 'Muy bien' ) );
+		( new ATORA_Grading_Save_Service( new CLMS_Grading() ) )->save( $master, $this->admin, array( 'clms_sg_submit' => 'publish', 'grade' => '85', 'feedback' => 'Muy bien', 'expected_revision' => ATORA_Grading_Save_Service::revision( $master ) ) );
 		$this->assertEquals( 85, $this->get_assignment( $this->a )['submissions'][0]['grade'] );
 		$this->assertEquals( 60, $this->get_assignment( $this->b )['submissions'][0]['grade'], 'Ajuste individual respetado.' );
 	}

@@ -124,6 +124,11 @@ final class ATORA_E2E_Seed_CLI {
 				'_clms_due_time'   => '10:00',
 			) );
 		}
+		// 6.31.1: entrega propia para la prueba de concurrencia real (dos guardados a la vez).
+		$concurrency = self::lesson( $course, $teacher, 'leccion-e2e-concurrencia', 'Concurrencia', 9, array(
+			'lm_activity_type' => 'tarea',
+			'_clms_rubric_id'  => $rubric,
+		) );
 		update_post_meta( $course, '_clms_course_groups_enabled', '1' );
 		$group_task = self::lesson( $course, $teacher, 'leccion-e2e-grupal', 'Proyecto grupal', 8, array(
 			'lm_activity_type'      => 'tarea',
@@ -147,6 +152,7 @@ final class ATORA_E2E_Seed_CLI {
 		}
 		$submission  = self::submission( $student, $task, $course );
 		$submission2 = self::submission( $student2, $essay, $course, self::pdf( $student2 ) );
+		$submission3 = self::submission( $student2, $concurrency, $course );
 		$message     = self::message( $teacher, $student, $course );
 		$group       = self::group( $course, $teacher, array( $student, $student2 ) );
 		// Alertas de entregas vencidas (aunque el módulo no esté activo: el riesgo lee su tabla).
@@ -169,6 +175,7 @@ final class ATORA_E2E_Seed_CLI {
 			'group'      => $group,
 			'submission' => $submission,
 			'submission2' => $submission2,
+			'submission_concurrency' => $submission3,
 			'message'    => $message,
 		);
 	}

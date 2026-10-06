@@ -65,11 +65,71 @@ final class GradeRevisionConflictTest extends WP_UnitTestCase {
 		$this->assertEquals( 80, get_post_meta( $this->submission, '_clms_submission_grade', true ), 'La nota del primero queda.' );
 	}
 
-	public function test_every_save_bumps_the_revision_and_old_forms_still_save(): void {
-		$this->web_save( '70', null );
-		$this->web_save( '75', null );
+	/** 6.31.1: sin revisión no se guarda (web ni API); cada guardado la sube. */
+	public function test_revision_is_required_and_every_save_bumps_it(): void {
+		$missing = $this->web_save( '70', null );
+		$this->assertWPError( $missing );
+		$this->assertSame( 'atora_grade_revision_required', $missing->get_error_code() );
+		$this->assertSame( 400, $missing->get_error_data()['status'] );
+		$this->assertSame( 0, ATORA_Grading_Save_Service::revision( $this->submission ) );
+
+		$this->assertIsArray( $this->web_save( '70', 0 ) );
+		$this->assertIsArray( $this->web_save( '75', 1 ) );
 		$this->assertSame( 2, ATORA_Grading_Save_Service::revision( $this->submission ) );
-		$this->assertIsArray( $this->web_save( '90', 2 ) );
-		$this->assertSame( 3, ATORA_Grading_Save_Service::revision( $this->submission ) );
+	}
+
+	/** 6.31.1: una moderación que falla después del reclamo no consume la revisión. */
+	public function test_failed_moderation_does_not_consume_the_revision(): void {
+		$this->assertIsArray( $this->web_save( '70', 0 ) );
+		$_POST = array(
+			CLMS_Grading::SPEEDGRADE_NONCE => wp_create_nonce( CLMS_Grading::SPEEDGRADE_ACTION . '_' . $this->submission ),
+			'clms_sg_submit'          => 'approve_moderation',
+			'grade'                   => '88',
+			'expected_revision'       => '1',
+			'moderation_lock_version' => '999',
+		);
+		$grading = new CLMS_Grading();
+		$save    = new ReflectionMethod( $grading, 'handle_speedgrade_save' );
+		$save->setAccessible( true );
+		$out   = $save->invoke( $grading, $this->submission, $this->admin );
+		$_POST = array();
+		$this->assertWPError( $out, 'La moderación rechaza la decisión.' );
+		$this->assertSame( 1, ATORA_Grading_Save_Service::revision( $this->submission ), 'La revisión no cambia.' );
+		$this->assertIsArray( $this->web_save( '72', 1 ), 'Un reintento con la misma revisión funciona.' );
+	}
+
+	/** 6.31.1: un error de base de datos tras el reclamo no consume la revisión. */
+	public function test_db_error_after_claim_does_not_consume_the_revision(): void {
+		$this->assertIsArray( $this->web_save( '70', 0 ) );
+		$break = static function ( $query ) {
+			// Falla la escritura del estado de la entrega (después del reclamo).
+			return false !== strpos( $query, '_clms_submission_status' ) && preg_match( '/^\s*(UPDATE|INSERT)/i', $query ) ? 'SELECT * FROM atora_tabla_inexistente' : $query;
+		};
+		add_filter( 'query', $break );
+		$_POST = array(
+			CLMS_Grading::SPEEDGRADE_NONCE => wp_create_nonce( CLMS_Grading::SPEEDGRADE_ACTION . '_' . $this->submission ),
+			'clms_sg_submit'    => 'save_draft',
+			'grade'             => '55',
+			'expected_revision' => '1',
+		);
+		$grading = new CLMS_Grading();
+		$save    = new ReflectionMethod( $grading, 'handle_speedgrade_save' );
+		$save->setAccessible( true );
+		$out   = $save->invoke( $grading, $this->submission, $this->admin );
+		$_POST = array();
+		remove_filter( 'query', $break );
+		$this->assertWPError( $out );
+		$this->assertSame( 'atora_db_error', $out->get_error_code() );
+		$this->assertSame( 1, ATORA_Grading_Save_Service::revision( $this->submission ), 'La revisión no cambia.' );
+		$this->assertIsArray( $this->web_save( '72', 1 ), 'Un reintento con la misma revisión funciona.' );
+	}
+
+	/** 6.31.1: dos primeros guardados (sin meta, revisión 0): gana uno, el otro 409. */
+	public function test_first_save_without_meta_is_atomic(): void {
+		$this->assertSame( '', get_post_meta( $this->submission, ATORA_Grading_Save_Service::REVISION_META, true ) );
+		$this->assertSame( 1, ATORA_Grading_Save_Service::claim_revision( $this->submission, 0 ) );
+		$second = ATORA_Grading_Save_Service::claim_revision( $this->submission, 0 );
+		$this->assertWPError( $second );
+		$this->assertSame( 409, $second->get_error_data()['status'] );
 	}
 }

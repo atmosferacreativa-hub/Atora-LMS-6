@@ -98,6 +98,7 @@ namespace ATORA\Tests\SpeedGrade {
 
 			$_POST = array(
 				DummySpeedGrade::SPEEDGRADE_NONCE => wp_create_nonce( DummySpeedGrade::SPEEDGRADE_ACTION . '_' . 500 ),
+				'expected_revision'               => '0', // 6.31.1: obligatoria
 				'status'                          => 'in_review',
 				'feedback'                        => '',
 				'clms_sg_submit'                   => 'save_draft',

@@ -68,6 +68,7 @@ final class SpeedGraderRubricEvaluationTest extends WP_UnitTestCase {
 		$nonce = wp_create_nonce( CLMS_Grading::SPEEDGRADE_ACTION . '_' . $submission_id );
 		$_POST = array(
 			CLMS_Grading::SPEEDGRADE_NONCE => $nonce,
+			'expected_revision' => '0', // 6.31.1: obligatoria
 			'status'       => 'graded',
 			'feedback'     => 'OK',
 			'clms_sg_submit'=> 'save_draft',

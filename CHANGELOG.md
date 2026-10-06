@@ -1,5 +1,18 @@
 # CHANGELOG — ATORA LMS
 
+## 6.31.1 (2026-10-06)
+
+### Fix — control de revisión al calificar (auditoría externa de la Fase 4)
+
+Orden `docs/ordenes/ORDEN-FASE-5.md`, Bloque A.
+
+- **La revisión es obligatoria.** `POST /teacher/submissions/{id}/grade` sin `expected_revision` → **400** `atora_grade_revision_required`; SpeedGrader web siempre la envía y, sin ella (página vieja en caché), pide recargar. Se eliminó el camino sin revisión del servicio: no tenía llamadas internas legítimas (solo SpeedGrader y la API, que ahora la exigen).
+- **Un guardado fallido no consume la revisión.** Se reclama antes de moderar y publicar (como en 6.31.0), pero si cualquier paso posterior falla (moderación, publicación o la base no guardó el estado y la nota decididos), la revisión vuelve a la anterior con comparar y reemplazar: solo si sigue siendo la reclamada. Un reintento con la misma `expected_revision` funciona.
+- **Primer guardado atómico.** Leer, comparar y escribir la revisión se hace bajo un bloqueo de MySQL por entrega (`GET_LOCK`): dos primeros guardados simultáneos (revisión 0, sin meta) no pueden ganar ambos. Si el bloqueo está ocupado más de 10 s, 409 `atora_grade_busy`.
+- **Concurrencia real**: `scripts/e2e-concurrent-grade.sh` manda dos guardados por HTTP a la vez, con la misma revisión, contra el WordPress temporal del CI de la app: exactamente un 200 y un 409, la revisión sube una vez y queda una sola evaluación de rúbrica. `wp atora seed-e2e` siembra la entrega "Concurrencia" para esa prueba.
+
+**TESTS**: `GradeRevisionConflictTest` (sin revisión → 400; moderación que falla y error de base de datos tras el reclamo no cambian la revisión y el reintento funciona; primer guardado: gana uno) — fallan con 6.31.0. `TeacherApiTest` (la API sin revisión → 400). Las pruebas que guardaban por SpeedGrader envían ahora la revisión.
+
 ## 6.31.0 (2026-10-06)
 
 ### Fase 4 — Docente (plugin)
