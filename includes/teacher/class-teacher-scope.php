@@ -14,7 +14,8 @@
  * Inquilino: con más de una institución activa, el administrador y quien edita lo
  * ajeno solo alcanzan los cursos de su institución, resuelta desde el curso
  * (`atora_courses.institution_id`; si el curso no la tiene, la institución por
- * defecto). Con una sola institución no cambia nada.
+ * defecto; sin ninguna de las dos, no se restringe). Con una sola institución no
+ * cambia nada.
  *
  * @package ATORA_LMS
  * @since 6.31.0
@@ -74,11 +75,16 @@ final class ATORA_Teacher_Scope {
 		if ( ! class_exists( '\\ATORA\\LMS\\Tenant_Context' ) ) {
 			return false;
 		}
+		$course_inst = self::course_institution( $wp_course_id );
+		if ( $course_inst <= 0 ) {
+			// Curso sin institución (ni institución por defecto): no hay inquilino que aplicar.
+			return true;
+		}
 		$inst = \ATORA\LMS\Tenant_Context::resolve_institution_for_user( $user_id );
 		if ( is_wp_error( $inst ) || ! $inst ) {
 			$inst = absint( get_option( 'atora_default_institution', 0 ) );
 		}
-		return $inst > 0 && (int) $inst === self::course_institution( $wp_course_id );
+		return $inst > 0 && (int) $inst === $course_inst;
 	}
 
 	public static function is_section_teacher( int $user_id, int $wp_course_id ): bool {
