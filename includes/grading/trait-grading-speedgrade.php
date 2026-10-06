@@ -647,6 +647,11 @@ trait CLMS_Grading_SpeedGrade_Trait {
 		return $service->save( $submission_id, $user_id, (array) wp_unslash( $_POST ) );
 	}
 
+	/**
+	 * 6.31.0: una sola regla con la app del docente (`ATORA_Teacher_Scope`): sección
+	 * asignada, autoría, editar lo ajeno, delegación o la regla anterior; con
+	 * varias instituciones, solo la propia.
+	 */
 	public function current_user_can_grade_submission( $submission_id, $user_id = 0 ) {
 		$submission_id = absint( $submission_id );
 		$user_id       = $user_id ? absint( $user_id ) : get_current_user_id();
@@ -655,22 +660,7 @@ trait CLMS_Grading_SpeedGrade_Trait {
 			return false;
 		}
 
-		if ( current_user_can( 'manage_options' ) ) {
-			return true;
-		}
-
-		$lesson_id = absint( get_post_meta( $submission_id, '_clms_submission_lesson_id', true ) );
-		$course_id = absint( get_post_meta( $submission_id, '_clms_submission_course_id', true ) );
-
-		if ( ! $lesson_id && ! $course_id ) {
-			return false;
-		}
-
-		if ( $course_id && CLMS_Helper::user_can_manage_lms( $course_id ) ) {
-			return true;
-		}
-
-		return $lesson_id && CLMS_Helper::user_can_manage_lms( $lesson_id );
+		return ATORA_Teacher_Scope::can_grade_submission( $user_id, $submission_id );
 	}
 
 	/** Same legacy identity fallback used when publishing a grade. */
@@ -1464,6 +1454,9 @@ trait CLMS_Grading_SpeedGrade_Trait {
 				'author'         => $user_id,
 			)
 		);
+
+		// 6.31.0: también los cursos de las secciones asignadas.
+		$courses = array_unique( array_merge( (array) $courses, ATORA_Teacher_Scope::section_course_ids( $user_id ) ) );
 
 		foreach ( (array) $courses as $course_id ) {
 			$course_lessons = CLMS_Helper::get_course_lessons( $course_id );

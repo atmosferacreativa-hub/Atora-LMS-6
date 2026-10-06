@@ -992,6 +992,8 @@ add_action( 'init', static function () {
 	// 6.30.1: la regla de visibilidad decide qué hook dispara un guardado de nota;
 	// los módulos que arranca el loader se enganchan a su DRAFT_HOOK.
 	atora_lms_require_module( 'includes/grading/class-student-grade-visibility.php' );
+	// 6.31.0: alcance del docente (SpeedGrader web y /teacher/*).
+	atora_lms_require_module( 'includes/teacher/class-teacher-scope.php' );
 
 	atora_lms_require_module( 'includes/class-loader.php', static function() use ( &$clms_loader_instance ) {
 		if ( class_exists( 'CLMS_Loader' ) && method_exists( 'CLMS_Loader', 'boot' ) ) {
