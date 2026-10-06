@@ -33,6 +33,15 @@ final class TeacherScopeTest extends WP_UnitTestCase {
 		update_post_meta( $this->submission, '_clms_submission_course_id', $this->course );
 	}
 
+	protected function tearDown(): void {
+		// Las instituciones de prueba no deben quedar para otras pruebas (DDL de force_install confirma la transacción).
+		global $wpdb;
+		$wpdb->query( "DELETE FROM {$wpdb->prefix}atora_institutions WHERE slug IN ('a','b')" );
+		$wpdb->query( "DELETE FROM {$wpdb->prefix}atora_institution_members WHERE role = 'admin'" );
+		ATORA_Teacher_Scope::reset_cache();
+		parent::tearDown();
+	}
+
 	private function section_teacher(): int {
 		$teacher = self::factory()->user->create( array( 'role' => 'lms_instructor' ) );
 		$section = \ATORA\LMS\Section_Service::create( array( 'wp_course_id' => $this->course, 'title' => 'A' ) );
