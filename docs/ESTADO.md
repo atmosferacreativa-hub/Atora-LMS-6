@@ -7,7 +7,7 @@ Qué está comprobado y dónde. Se actualiza en cada versión del plugin o de la
 - **Integración**: PHPUnit con WordPress (`tests/integration`).
 - **Unitaria**: PHPUnit sin WordPress o Jest en la app.
 
-Última actualización: **plugin 6.31.0 · app 0.6.1**.
+Última actualización: **plugin 6.31.0 · app 0.8.0** (cierre de la Fase 4).
 
 > No hay registro escrito de qué se recorrió en teléfono antes de esta tabla: la columna "Teléfono" queda "por confirmar" hasta la prueba al cierre de la Fase 4, que incluye la lista acumulada de las fases 0 a 3.
 
@@ -15,17 +15,29 @@ Qué está comprobado y dónde. Se actualiza en cada versión del plugin o de la
 
 | Función | Desde | Teléfono | Pantalla (CI) | Integración (plugin) | Unitaria |
 |---|---|---|---|---|---|
-| Iniciar y cerrar sesión, sesión por usuario | 0.1–0.3 | por confirmar | pendiente (`login`, 0.6.1) | sí | Jest |
-| Cursos, currículo, lección con varios videos | 0.3–0.4.1 | por confirmar | pendiente (`leccion`, 0.6.1) | sí (`MobileAuditMultiVideoTest`) | Jest |
+| Iniciar y cerrar sesión, sesión por usuario | 0.1–0.3 | por confirmar | sí (`login`) | sí | Jest |
+| Cursos, currículo, lección con varios videos | 0.3–0.4.1 | por confirmar | sí (`leccion`) | sí (`MobileAuditMultiVideoTest`) | Jest |
 | Descargas y visor PDF / imágenes sin conexión | 0.4.0 | por confirmar | — | — | Jest |
-| Posición del video y cola sin conexión | 0.4.0 | por confirmar | pendiente (`sin-conexion`, 0.6.1) | sí | Jest |
+| Posición del video y cola sin conexión | 0.4.0 | por confirmar | sí (`sin-conexion`: aviso, curso desde la caché, mensaje en cola) | sí | Jest |
 | Sincronización incremental (`/sync/changes`) | 0.4.0–0.5.3 | por confirmar | — | sí (`MobileSyncChangesTest`) | Jest |
-| Entregas de tareas con cola sin conexión | 0.3.0 | por confirmar | pendiente (`tarea`, 0.6.1) | sí | Jest |
-| Quiz con borrador local y entrega | 0.5.0–0.5.2 | por confirmar | pendiente (`quiz`, 0.6.1) | sí | Jest |
+| Entregas de tareas con cola sin conexión | 0.3.0 | por confirmar | sí (`tarea`, con conexión) | sí | Jest |
+| Quiz con borrador local y entrega | 0.5.0–0.5.2 | por confirmar | sí (`quiz`) | sí | Jest |
 | Notas, rúbrica por criterio, Mi evolución, certificados | 0.5.0–0.5.3 | por confirmar | — | sí (`MobileGradesCertificatesTest`, `GradeZeroAverageTest`) | Jest |
-| Mensajes y Avisos | 0.6.0 | por confirmar | pendiente (`mensajes`, 0.6.1) | sí (`InboxTest`, `MobileOrganizeTest`) | Jest |
+| Mensajes y Avisos | 0.6.0 | por confirmar | sí (`mensajes`) | sí (`InboxTest`, `MobileOrganizeTest`) | Jest |
 | Agenda y Hoy del estudiante | 0.6.0 | por confirmar | — | sí (`MobileOrganizeTest`) | Jest |
 | Notificaciones al teléfono (Expo) | 0.6.0 | por confirmar | — (requiere servicio externo) | sí (cola y token) | Jest |
+
+## App (docente, Fase 4)
+
+| Función | Desde | Teléfono | Pantalla (CI) | Integración (plugin) | Unitaria |
+|---|---|---|---|---|---|
+| Hoy del docente | 0.7.0 | pendiente (cierre de fase) | sí (`docente-hoy`) | `TeacherApiTest` | — |
+| Cursos y estudiantes con riesgo y motivo, búsqueda, ficha, Escribir | 0.7.0 | pendiente (cierre de fase) | sí (`docente-estudiantes`) | `TeacherApiTest`, `StudentRiskServiceTest` | Jest (señal de riesgo) |
+| Aviso al grupo (y el estudiante lo recibe en Avisos) | 0.7.0 | pendiente (cierre de fase) | sí (`docente-aviso`) | `TeacherApiTest` | Jest (aviso y cola) |
+| Calificar con rúbrica: PDF, decimal, borrador, publicar, el estudiante ve la nota | 0.8.0 | pendiente (cierre de fase) | sí (`docente-calificar`) | `TeacherApiTest`, `GradeDraftNoLeakTest` | Jest (bandas y total = servidor; borrador local) |
+| Conflicto entre dos docentes (409) | 0.8.0 | pendiente (cierre de fase) | sí (`docente-calificar-409`) | `GradeRevisionConflictTest`, `TeacherApiTest` | — |
+| Tarea grupal calificada desde el teléfono da la nota a todos | 0.8.0 | pendiente (cierre de fase) | — (datos sembrados, sin recorrido propio) | `GroupAssignmentMobileTest` | — |
+| Borrador de calificación tras cerrar la app o perder señal | 0.8.0 | pendiente (cierre de fase) | — | — | Jest |
 
 ## Plugin (web)
 
