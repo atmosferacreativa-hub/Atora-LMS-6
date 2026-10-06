@@ -7,7 +7,7 @@ Qué está comprobado y dónde. Se actualiza en cada versión del plugin o de la
 - **Integración**: PHPUnit con WordPress (`tests/integration`).
 - **Unitaria**: PHPUnit sin WordPress o Jest en la app.
 
-Última actualización: **plugin 6.30.2 · app 0.6.0**.
+Última actualización: **plugin 6.31.0 · app 0.6.1**.
 
 > No hay registro escrito de qué se recorrió en teléfono antes de esta tabla: la columna "Teléfono" queda "por confirmar" hasta la prueba al cierre de la Fase 4, que incluye la lista acumulada de las fases 0 a 3.
 
@@ -35,6 +35,14 @@ Qué está comprobado y dónde. Se actualiza en cada versión del plugin o de la
 | Listeners de `clms_submission_graded` con argumentos en orden | 6.30.2 | `GradedHookListenersTest` | Ver "Datos históricos" |
 | Mensajes del docente en la web: hilos completos, mismo buzón y contador que la app | 6.30.2 | `TeacherWebMessagesTest` | |
 | `wp atora seed-e2e` (datos de las pruebas de pantalla) | 6.30.2 | probado a mano en WordPress local; lo usa el CI de la app | Se niega sin `--yes` o `ATORA_E2E` |
+| Servicio de guardado compartido (SpeedGrader y app) | 6.31.0 | `SpeedGraderRubricEvaluationTest`, `SpeedGraderDecimalScoreTest` (sin cambios), `TeacherApiTest` | |
+| Alcance docente (`ATORA_Teacher_Scope`) | 6.31.0 | `TeacherScopeTest`, `TeacherApiTest` | Auditoría de acceso: local 0; demo con una institución → 0 por construcción (sin correr en el demo) |
+| Conflicto entre docentes (revisión, 409) | 6.31.0 | `GradeRevisionConflictTest`, `TeacherApiTest` | |
+| Riesgo con motivos | 6.31.0 | `StudentRiskServiceTest` | |
+| Historial de entregas web y migración | 6.31.0 | `WebSubmissionHistoryTest` | Local: 1 entrega migrada; segunda pasada 0 |
+| Intentos en SpeedGrader | 6.31.0 | `SpeedGraderAttemptsTest` | |
+| Tareas grupales en la app (API) | 6.31.0 | `GroupAssignmentMobileTest` | |
+| API del docente `/teacher/*` | 6.31.0 | `TeacherApiTest` | Pantallas: app 0.7.0 y 0.8.0 |
 
 ## Datos históricos
 

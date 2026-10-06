@@ -13,6 +13,13 @@
  * - lección 3 "Quiz" con 3 preguntas;
  * - un mensaje del docente al estudiante.
  *
+ * 6.31.0 (recorridos del docente):
+ * - rúbrica de 2 criterios (Inicial 4 · Logrado 8 · Excelente 10) en "Tarea" y en "Ensayo";
+ * - lección "Ensayo" con una entrega de "Estudiante Dos E2E" con un PDF;
+ * - dos lecciones vencidas sin entregar → alerta de early-warning (riesgo);
+ * - un segundo docente en la misma sección (conflicto 409);
+ * - una tarea grupal ("Proyecto grupal", grupo con los dos estudiantes).
+ *
  *   wp atora seed-e2e --yes --video-dir=/tmp/e2e-media [--password=...]
  *
  * @package ATORA_LMS
@@ -66,8 +73,11 @@ final class ATORA_E2E_Seed_CLI {
 
 	/** @return array<string,mixed> */
 	public static function seed( string $video_dir, string $password ): array {
-		$teacher = self::user( 'docente_e2e', 'Docente E2E', 'lms_instructor', $password );
-		$student = self::user( 'estudiante_e2e', 'Estudiante E2E', get_role( 'student' ) ? 'student' : 'subscriber', $password );
+		$teacher  = self::user( 'docente_e2e', 'Docente E2E', 'lms_instructor', $password );
+		$teacher2 = self::user( 'docente2_e2e', 'Docente Dos E2E', 'lms_instructor', $password );
+		$role     = get_role( 'student' ) ? 'student' : 'subscriber';
+		$student  = self::user( 'estudiante_e2e', 'Estudiante E2E', $role, $password );
+		$student2 = self::user( 'estudiante2_e2e', 'Estudiante Dos E2E', $role, $password );
 
 		$existing = get_page_by_path( self::COURSE_SLUG, OBJECT, 'lm_course' );
 		$course   = $existing ? (int) $existing->ID : (int) wp_insert_post( array(
@@ -98,25 +108,67 @@ final class ATORA_E2E_Seed_CLI {
 			),
 		) );
 
-		if ( method_exists( 'CLMS_Helper', 'enroll_user_in_course' ) ) {
-			CLMS_Helper::enroll_user_in_course( $student, $course );
+		$rubric = self::rubric( $teacher );
+		update_post_meta( $task, '_clms_rubric_id', $rubric );
+		$essay = self::lesson( $course, $teacher, 'leccion-e2e-ensayo', 'Ensayo', 4, array(
+			'lm_activity_type' => 'tarea',
+			'_clms_rubric_id'  => $rubric,
+			'_clms_due_date'   => gmdate( 'Y-m-d', time() + 7 * DAY_IN_SECONDS ),
+			'_clms_due_time'   => '23:59',
+		) );
+		$overdue = array();
+		foreach ( array( 1 => 'Práctica vencida 1', 2 => 'Práctica vencida 2' ) as $n => $title ) {
+			$overdue[] = self::lesson( $course, $teacher, 'leccion-e2e-vencida-' . $n, $title, 4 + $n, array(
+				'lm_activity_type' => 'tarea',
+				'_clms_due_date'   => gmdate( 'Y-m-d', time() - ( 2 + $n ) * DAY_IN_SECONDS ),
+				'_clms_due_time'   => '10:00',
+			) );
 		}
+		update_post_meta( $course, '_clms_course_groups_enabled', '1' );
+		$group_task = self::lesson( $course, $teacher, 'leccion-e2e-grupal', 'Proyecto grupal', 8, array(
+			'lm_activity_type'      => 'tarea',
+			'_clms_evaluation_mode' => 'group',
+		) );
+
 		$table_course = class_exists( '\\ATORA\\LMS\\LMS_Course_Service' ) ? \ATORA\LMS\LMS_Course_Service::get_by_wp_post( $course ) : null;
-		if ( $table_course && class_exists( '\\ATORA\\LMS\\LMS_Enrollment_Service' ) ) {
-			\ATORA\LMS\LMS_Enrollment_Service::enroll( $student, (int) $table_course['id'] );
+		foreach ( array( $student, $student2 ) as $enrolled ) {
+			if ( method_exists( 'CLMS_Helper', 'enroll_user_in_course' ) ) {
+				CLMS_Helper::enroll_user_in_course( $enrolled, $course );
+			}
+			if ( $table_course && class_exists( '\\ATORA\\LMS\\LMS_Enrollment_Service' ) ) {
+				\ATORA\LMS\LMS_Enrollment_Service::enroll( $enrolled, (int) $table_course['id'] );
+			}
 		}
 
 		$section = self::section( $course, $teacher, $student );
-		$submission = self::submission( $student, $task, $course );
-		$message = self::message( $teacher, $student, $course );
+		if ( $section && class_exists( '\\ATORA\\LMS\\Section_Service' ) ) {
+			\ATORA\LMS\Section_Service::add_teacher( $section, $teacher2 );
+			\ATORA\LMS\Section_Service::add_student( $section, $student2 );
+		}
+		$submission  = self::submission( $student, $task, $course );
+		$submission2 = self::submission( $student2, $essay, $course, self::pdf( $student2 ) );
+		$message     = self::message( $teacher, $student, $course );
+		$group       = self::group( $course, $teacher, array( $student, $student2 ) );
+		// Alertas de entregas vencidas (aunque el módulo no esté activo: el riesgo lee su tabla).
+		if ( ! class_exists( '\\ATORA\\EarlyWarning\\Early_Warning_Service' ) && defined( 'ATORA_LMS_DIR' ) && is_readable( ATORA_LMS_DIR . 'modules/early-warning/class-early-warning-service.php' ) ) {
+			require_once ATORA_LMS_DIR . 'modules/early-warning/class-early-warning-service.php';
+		}
+		if ( class_exists( '\\ATORA\\EarlyWarning\\Early_Warning_Service' ) ) {
+			( new \ATORA\EarlyWarning\Early_Warning_Service() )->scan_course( $course, false );
+		}
 
 		return array(
 			'password'   => $password,
 			'teacher'    => array( 'id' => $teacher, 'login' => 'docente_e2e' ),
+			'teacher2'   => array( 'id' => $teacher2, 'login' => 'docente2_e2e' ),
 			'student'    => array( 'id' => $student, 'login' => 'estudiante_e2e' ),
+			'student2'   => array( 'id' => $student2, 'login' => 'estudiante2_e2e' ),
 			'course'     => array( 'wp_id' => $course, 'id' => $table_course ? (int) $table_course['id'] : 0, 'section_id' => $section ),
-			'lessons'    => array( 'videos' => $videos, 'task' => $task, 'quiz' => $quiz ),
+			'lessons'    => array( 'videos' => $videos, 'task' => $task, 'quiz' => $quiz, 'essay' => $essay, 'overdue' => $overdue, 'group' => $group_task ),
+			'rubric'     => $rubric,
+			'group'      => $group,
 			'submission' => $submission,
+			'submission2' => $submission2,
 			'message'    => $message,
 		);
 	}
@@ -182,7 +234,7 @@ final class ATORA_E2E_Seed_CLI {
 		if ( ! class_exists( $class ) ) {
 			return 0;
 		}
-		$sections = (array) $class::get_sections_by_course( $course );
+		$sections = array_values( (array) $class::get_sections_by_course( $course ) ); // indexado por id
 		$id       = ! empty( $sections[0]['id'] ) ? (int) $sections[0]['id'] : (int) $class::create( array( 'wp_course_id' => $course, 'title' => 'Sección E2E' ) );
 		if ( $id > 0 ) {
 			$class::add_teacher( $id, $teacher );
@@ -191,7 +243,83 @@ final class ATORA_E2E_Seed_CLI {
 		return $id;
 	}
 
-	private static function submission( int $student, int $lesson, int $course ): int {
+	/** Rúbrica de 2 criterios, migrada a tablas (como la usa SpeedGrader). */
+	private static function rubric( int $author ): int {
+		$existing = get_page_by_path( 'rubrica-e2e', OBJECT, 'clms_rubric' );
+		if ( $existing ) {
+			return (int) $existing->ID;
+		}
+		$id     = (int) wp_insert_post( array( 'post_type' => 'clms_rubric', 'post_status' => 'publish', 'post_name' => 'rubrica-e2e', 'post_title' => 'Rúbrica E2E', 'post_author' => $author ) );
+		$levels = array( array( 'label' => 'Inicial', 'points' => 4 ), array( 'label' => 'Logrado', 'points' => 8 ), array( 'label' => 'Excelente', 'points' => 10 ) );
+		update_post_meta( $id, '_clms_rubric_scale_type', '0_100' );
+		update_post_meta( $id, '_clms_rubric_is_holistic', '0' );
+		update_post_meta( $id, '_clms_rubric_criteria', array(
+			array( 'name' => 'Claridad', 'description' => 'Se entiende la idea principal.', 'max_points' => 10, 'weight' => 50, 'levels' => $levels ),
+			array( 'name' => 'Estructura', 'description' => 'Tiene orden lógico.', 'max_points' => 10, 'weight' => 50, 'levels' => $levels ),
+		) );
+		if ( class_exists( '\\ATORA\\LMS\\Rubrics_CLI' ) ) {
+			update_option( 'atora_rubric_source', 'tables', false );
+			\ATORA\LMS\Rubrics_CLI::migrate( array(), array( 'yes' => true, 'batch' => 50 ) );
+		}
+		return $id;
+	}
+
+	/** Un PDF mínimo válido de una página, como adjunto de la entrega. */
+	private static function pdf( int $author ): int {
+		$existing = get_page_by_path( 'ensayo-e2e', OBJECT, 'attachment' );
+		if ( $existing ) {
+			return (int) $existing->ID;
+		}
+		$text    = 'Ensayo de prueba E2E';
+		$stream  = "BT /F1 18 Tf 72 720 Td ({$text}) Tj ET";
+		$objects = array(
+			'<< /Type /Catalog /Pages 2 0 R >>',
+			'<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+			'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>',
+			'<< /Length ' . strlen( $stream ) . " >>\nstream\n{$stream}\nendstream",
+			'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+		);
+		$pdf     = "%PDF-1.4\n";
+		$offsets = array();
+		foreach ( $objects as $i => $object ) {
+			$offsets[] = strlen( $pdf );
+			$pdf      .= ( $i + 1 ) . " 0 obj\n{$object}\nendobj\n";
+		}
+		$xref = strlen( $pdf );
+		$pdf .= 'xref' . "\n0 " . ( count( $objects ) + 1 ) . "\n0000000000 65535 f \n";
+		foreach ( $offsets as $offset ) {
+			$pdf .= sprintf( "%010d 00000 n \n", $offset );
+		}
+		$pdf .= 'trailer << /Size ' . ( count( $objects ) + 1 ) . " /Root 1 0 R >>\nstartxref\n{$xref}\n%%EOF\n";
+
+		require_once ABSPATH . 'wp-admin/includes/file.php';
+		require_once ABSPATH . 'wp-admin/includes/media.php';
+		require_once ABSPATH . 'wp-admin/includes/image.php';
+		$tmp = wp_tempnam( 'ensayo-e2e.pdf' );
+		file_put_contents( $tmp, $pdf ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		$id = media_handle_sideload( array( 'name' => 'ensayo-e2e.pdf', 'tmp_name' => $tmp ), 0, 'Ensayo E2E', array( 'post_name' => 'ensayo-e2e', 'post_author' => $author ) );
+		return is_wp_error( $id ) ? 0 : (int) $id;
+	}
+
+	/** Grupo de la tarea grupal. */
+	private static function group( int $course, int $actor, array $members ): int {
+		if ( ! class_exists( '\\ATORA\\Groups\\Group_Service' ) ) {
+			return 0;
+		}
+		$service = new \ATORA\Groups\Group_Service();
+		foreach ( $service->list_groups( $course ) as $row ) {
+			if ( 'Equipo E2E' === (string) ( $row['name'] ?? '' ) ) {
+				return (int) $row['id'];
+			}
+		}
+		$id = $service->create_group( $course, 'Equipo E2E', $actor );
+		if ( $id ) {
+			$service->set_members( $id, $members, $actor );
+		}
+		return (int) $id;
+	}
+
+	private static function submission( int $student, int $lesson, int $course, int $attachment = 0 ): int {
 		$found = get_posts( array(
 			'post_type'      => 'clms_submission',
 			'post_status'    => array( 'publish', 'private' ),
@@ -217,6 +345,15 @@ final class ATORA_E2E_Seed_CLI {
 		update_post_meta( $id, '_clms_submission_comment', 'Mi entrega de prueba.' );
 		update_post_meta( $id, '_clms_submission_status', 'submitted' );
 		update_post_meta( $id, '_clms_submission_submitted_at', current_time( 'mysql' ) );
+		if ( $attachment > 0 ) {
+			wp_update_post( array( 'ID' => $attachment, 'post_parent' => $id ) );
+			update_post_meta( $id, '_clms_submission_files', array( $attachment ) );
+			update_post_meta( $id, '_clms_submission_attachments', array( $attachment ) );
+		}
+		// 6.31.0: el intento queda en el historial, como una entrega web.
+		if ( class_exists( 'ATORA_Web_Submission_History' ) ) {
+			ATORA_Web_Submission_History::record( $id, 'web-seed-' . $id );
+		}
 		return $id;
 	}
 

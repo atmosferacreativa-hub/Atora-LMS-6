@@ -461,7 +461,7 @@ final class ATORA_Mobile_Teacher_Controller {
 			$score    = isset( $scores[ $i ]['score'] ) ? CLMS_Rubric_Level_Bands::score_field_value( $scores[ $i ]['score'] ) : '';
 			$criteria[] = array(
 				'index'       => (int) $i,
-				'name'        => sanitize_text_field( (string) ( $criterion['name'] ?? '' ) ),
+				'name'        => sanitize_text_field( (string) ( $criterion['name'] ?? $criterion['title'] ?? '' ) ),
 				'description' => sanitize_textarea_field( (string) ( $criterion['description'] ?? '' ) ),
 				'max_points'  => $max,
 				'weight'      => (float) ( $criterion['weight'] ?? 0 ),
@@ -635,11 +635,11 @@ final class ATORA_Mobile_Teacher_Controller {
 		if ( is_wp_error( $result ) ) {
 			if ( 'atora_grade_revision_conflict' === $result->get_error_code() ) {
 				// Sin pisar: se devuelve la versión actual para que el docente la revise.
-				return new WP_REST_Response( array(
-					'code'       => 'atora_grade_revision_conflict',
-					'message'    => $result->get_error_message(),
-					'submission' => self::detail( $user_id, $submission_id ),
-				), 409 );
+				return new WP_Error(
+					'atora_grade_revision_conflict',
+					$result->get_error_message(),
+					array( 'status' => 409, 'current_revision' => ATORA_Grading_Save_Service::revision( $submission_id ), 'submission' => self::detail( $user_id, $submission_id ) )
+				);
 			}
 			$data   = (array) $result->get_error_data();
 			$status = isset( $data['status'] ) ? (int) $data['status'] : ( 'forbidden' === $result->get_error_code() ? 404 : 422 );

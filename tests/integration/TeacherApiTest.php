@@ -240,7 +240,8 @@ final class TeacherApiTest extends WP_UnitTestCase {
 
 		$stale = $this->call( $this->teacher, 'POST', "/teacher/submissions/{$sub}/grade", $this->grade_body( 'evt-stale', true, 0 ) );
 		$this->assertSame( 409, $stale->get_status() );
-		$this->assertSame( 1, $stale->get_data()['submission']['revision'], 'Devuelve la versión actual.' );
+		$this->assertSame( 'atora_grade_revision_conflict', $stale->get_data()['code'] );
+		$this->assertSame( 1, $stale->get_data()['data']['submission']['revision'], 'Devuelve la versión actual.' );
 		$this->assertSame( 'in_review', get_post_meta( $sub, '_clms_submission_status', true ), 'No pisa.' );
 
 		// Nota final opcional: la app la copia del % de la rúbrica (8,5 + 7,25 de 20 = 79).
