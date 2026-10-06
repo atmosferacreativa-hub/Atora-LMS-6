@@ -160,10 +160,33 @@ class CLMS_Gradebook_Audit_Service {
 	}
 
 	/**
+	 * Registro interno de un borrador de calificación (6.30.1): queda en la
+	 * auditoría del docente, sin publicar nada al estudiante.
+	 */
+	public static function on_grade_draft_saved( $submission_id, $student_id, $status = '', $grade = '', $feedback = '' ): void {
+		$submission_id = absint( $submission_id );
+		if ( ! $submission_id ) {
+			return;
+		}
+
+		self::log(
+			$submission_id,
+			array(
+				'action'     => 'grade_draft_saved',
+				'source'     => (string) get_post_meta( $submission_id, '_clms_submission_grade_source', true ) ?: 'system',
+				'grade_new'  => $grade,
+				'status_new' => $status,
+				'override'   => (bool) get_post_meta( $submission_id, '_clms_grade_manual_override', true ),
+			)
+		);
+	}
+
+	/**
 	 * Registra hooks de auditoría.
 	 */
 	public static function register_hooks(): void {
 		add_action( 'clms_submission_graded', array( __CLASS__, 'on_submission_graded' ), 99, 5 );
+		add_action( \CLMS_Student_Grade_Visibility::DRAFT_HOOK, array( __CLASS__, 'on_grade_draft_saved' ), 99, 5 );
 		add_action( 'clms_gradebook_batch_update_complete', array( __CLASS__, 'on_gradebook_batch_complete' ), 20, 3 );
 	}
 }

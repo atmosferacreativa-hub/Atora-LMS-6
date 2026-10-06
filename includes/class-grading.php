@@ -37,6 +37,7 @@ class CLMS_Grading {
 		add_action( 'wp_ajax_clms_generate_ai_review', array( $this, 'ajax_generate_ai_review' ) );
 		add_action( 'clms_submission_created', array( $this, 'invalidate_cache_from_submission' ), 10, 3 );
 		add_action( 'clms_submission_graded', array( $this, 'invalidate_cache_from_graded_submission' ), 10, 2 );
+		add_action( CLMS_Student_Grade_Visibility::DRAFT_HOOK, array( $this, 'invalidate_cache_from_graded_submission' ), 10, 2 );
 		add_action( 'clms_lesson_completed', array( $this, 'invalidate_cache_from_lesson' ), 10, 2 );
 	}
 }

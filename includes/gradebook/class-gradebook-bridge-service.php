@@ -108,7 +108,7 @@ class CLMS_Gradebook_Bridge_Service {
 
 			$status = (string) get_post_meta( $submission_id, '_clms_submission_status', true );
 
-			do_action( 'clms_submission_graded', $submission_id, $student_id, $status, $grade, '' );
+			do_action( CLMS_Student_Grade_Visibility::grade_saved_hook( $status ), $submission_id, $student_id, $status, $grade, '' );
 		}
 	}
 

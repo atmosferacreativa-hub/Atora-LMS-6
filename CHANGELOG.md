@@ -1,5 +1,18 @@
 # CHANGELOG — ATORA LMS
 
+## 6.30.1 (2026-10-05)
+
+### Fix — un borrador de calificación llegaba al estudiante (alta, académica)
+
+Contradecía la regla de 6.29.0 (la nota solo se ve publicada). Al pulsar "Guardar borrador" en SpeedGrader se disparaba `clms_submission_graded`: el estudiante recibía un aviso y un mensaje con la nota ("Nota actual: 85/100") y, en tareas grupales, la copia de cada integrante quedaba publicada (`graded`) sin puntajes por criterio.
+
+- Un guardado sin publicar (`in_review`, `submitted`, `pending`; también "enviar a moderación") dispara el hook nuevo **`clms_submission_grade_draft_saved`**, con los mismos argumentos. `clms_submission_graded` queda para la nota publicada o la entrega devuelta para corregir. Una sola regla elige el hook: `CLMS_Student_Grade_Visibility::grade_saved_hook()`, usada por el motor de evaluación, SpeedGrader, el puente del libro de notas por lotes y las copias grupales. La regla se carga antes que el loader.
+- Listeners que también reaccionan al borrador (internos, no publican nada al estudiante): grupos (pasa el borrador a las copias como borrador), auditoría del libro de notas (acción `grade_draft_saved`) y el borrado de caché de ruta de aprendizaje, `CLMS_Grading` y progreso (para que una nota que vuelve a borrador deje de verse). Solo a la publicación: avisos, mensajes, libro de notas, memoria del estudiante, analítica, gamificación, ciclo de retroalimentación, sincronización de quizzes, bloqueo de escala, certificados y puente académico.
+- **Grupales**: las copias de cada integrante heredan el estado de la maestra (borrador o publicada) y sus puntajes por criterio, con `clms_group_grade_overrides` aplicado.
+- **Script** `scripts/audit-draft-grade-leaks.php` (solo lectura): A) entregas en borrador cuyo estudiante recibió la nota; B) ya publicadas pero vistas antes como borrador; C) integrantes de grupo que hoy ven una nota no publicada.
+
+**TESTS**: `GradeDraftNoLeakTest` (falla con 6.30.0): un borrador no crea aviso ni mensaje ni cambia el promedio, publicar sí; copias grupales en borrador, luego publicadas con el ajuste individual y los puntajes por criterio.
+
 ## 6.30.0 (2026-10-05)
 
 ### Fase 3 — Organizarse (plugin)

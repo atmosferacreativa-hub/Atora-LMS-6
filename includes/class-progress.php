@@ -26,6 +26,7 @@ class CLMS_Progress {
 
 		add_action( 'clms_submission_saved', array( $this, 'on_submission_saved' ), 10, 4 );
 		add_action( 'clms_submission_graded', array( $this, 'on_submission_graded' ), 10, 5 );
+		add_action( CLMS_Student_Grade_Visibility::DRAFT_HOOK, array( $this, 'on_submission_graded' ), 10, 5 );
 
 		add_action( 'init', array( $this, 'handle_complete_lesson' ) );
 		add_action( 'init', array( $this, 'handle_read_evidence' ) );

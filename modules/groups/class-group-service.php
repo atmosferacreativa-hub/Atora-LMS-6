@@ -601,11 +601,12 @@ final class Group_Service {
 		return max( 0, min( 100, (int) round( (float) $override ) ) );
 	}
 
-	public function publish_shadow_grade( int $shadow_id, $grade, string $feedback ): void {
+	public function publish_shadow_grade( int $shadow_id, $grade, string $feedback, string $status = 'graded', array $rubric_scores = array() ): void {
 		$shadow_id = absint( $shadow_id );
 		if ( ! $shadow_id ) {
 			return;
 		}
+		$status = '' !== sanitize_key( $status ) ? sanitize_key( $status ) : 'graded';
 
 		$assessment = class_exists( 'CLMS_Helper' ) ? clms_core( 'CLMS_Assessment_Engine' ) : null;
 		if ( $assessment && method_exists( $assessment, 'publish_submission_grade' ) ) {
@@ -615,7 +616,8 @@ final class Group_Service {
 					'grade'           => '' !== (string) $grade && is_numeric( $grade ) ? max( 0, min( 100, (int) round( (float) $grade ) ) ) : '',
 					'feedback'        => wp_kses_post( $feedback ),
 					'source'          => 'system',
-					'status'          => 'graded',
+					'status'          => $status,
+					'rubric_scores'   => $rubric_scores,
 					'manual_override' => true,
 					'trigger'         => 'group_assessment',
 				)
@@ -629,10 +631,15 @@ final class Group_Service {
 			delete_post_meta( $shadow_id, '_clms_submission_grade' );
 		}
 		update_post_meta( $shadow_id, '_clms_submission_feedback', wp_kses_post( $feedback ) );
-		update_post_meta( $shadow_id, '_clms_submission_status', 'graded' );
+		update_post_meta( $shadow_id, '_clms_submission_status', $status );
+		if ( ! empty( $rubric_scores ) ) {
+			update_post_meta( $shadow_id, '_clms_submission_rubric_scores', $rubric_scores );
+		} else {
+			delete_post_meta( $shadow_id, '_clms_submission_rubric_scores' );
+		}
 
 		$student_id = absint( get_post_meta( $shadow_id, '_clms_submission_user_id', true ) );
-		do_action( 'clms_submission_graded', $shadow_id, $student_id, 'graded', $grade, $feedback );
+		do_action( \CLMS_Student_Grade_Visibility::grade_saved_hook( $status ), $shadow_id, $student_id, $status, $grade, $feedback );
 	}
 
 	/**

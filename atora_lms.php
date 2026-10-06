@@ -3,7 +3,7 @@
  * Plugin Name:       ATORA LMS
  * Plugin URI:        https://atora.studio
  * Description:       LMS modular para WordPress con IA, evaluaciones, certificados, CRM, mensajería multi-canal, afiliados, live streaming y más. Autor: Atora Studio.
- * Version:           6.30.0
+ * Version:           6.30.1
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Atora Studio
@@ -52,7 +52,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * - Limpieza automática de notificaciones >90 días
  */
 	if ( ! defined( 'ATORA_LMS_VERSION' ) ) {
-		define( 'ATORA_LMS_VERSION', '6.30.0' );
+		define( 'ATORA_LMS_VERSION', '6.30.1' );
 	}
 
 if ( ! defined( 'ATORA_LMS_FILE' ) ) {
@@ -983,6 +983,10 @@ add_action( 'init', static function () {
 		update_option( 'atora_lms_current_version', ATORA_LMS_VERSION, false );
 	}
 
+	// 6.30.1: la regla de visibilidad decide qué hook dispara un guardado de nota;
+	// los módulos que arranca el loader se enganchan a su DRAFT_HOOK.
+	atora_lms_require_module( 'includes/grading/class-student-grade-visibility.php' );
+
 	atora_lms_require_module( 'includes/class-loader.php', static function() use ( &$clms_loader_instance ) {
 		if ( class_exists( 'CLMS_Loader' ) && method_exists( 'CLMS_Loader', 'boot' ) ) {
 			$clms_loader_instance = CLMS_Loader::boot();
@@ -1256,8 +1260,7 @@ add_action( 'init', static function () {
 	}
 	// 6.28.2: API pública estable para el tema (atora_lms_get_progress).
 	atora_lms_require_module( 'includes/public-api.php' );
-	// 6.29.0: regla única de visibilidad de notas para el estudiante y servicio de notas.
-	atora_lms_require_module( 'includes/grading/class-student-grade-visibility.php' );
+	// 6.29.0: servicio de notas (la regla de visibilidad se carga antes del loader, 6.30.1).
 	atora_lms_require_module( 'includes/grading/class-rubric-level-bands.php' );
 	atora_lms_require_module( 'includes/grading/class-grade-average.php' );
 	// 6.30.0: buzón propio (mensajes y avisos en tablas).

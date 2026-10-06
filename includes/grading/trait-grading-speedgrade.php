@@ -1038,7 +1038,7 @@ trait CLMS_Grading_SpeedGrade_Trait {
 				$grading_engine->invalidate_grade_cache( $student_id, $course_id );
 			}
 
-			do_action( 'clms_submission_graded', $submission_id, $student_id > 0 ? $student_id : $user_id, $status, $grade, $feedback );
+			do_action( CLMS_Student_Grade_Visibility::grade_saved_hook( $status ), $submission_id, $student_id > 0 ? $student_id : $user_id, $status, $grade, $feedback );
 		}
 
 		// 6.26.5: registrar evaluación inmutable en tabla (atora_rubric_evaluations).

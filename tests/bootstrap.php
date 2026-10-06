@@ -800,6 +800,12 @@ foreach ( array(
 	}
 }
 
+// 6.30.1: la regla de visibilidad decide qué hook dispara un guardado de nota (núcleo de calificación).
+$grade_visibility_file = __DIR__ . '/../includes/grading/class-student-grade-visibility.php';
+if ( file_exists( $grade_visibility_file ) ) {
+	require_once $grade_visibility_file;
+}
+
 $learning_analytics_service_file = __DIR__ . '/../modules/learning-analytics/class-learning-analytics-service.php';
 if ( file_exists( $learning_analytics_service_file ) ) {
 	require_once $learning_analytics_service_file;

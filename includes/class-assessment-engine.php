@@ -1147,7 +1147,8 @@ class CLMS_Assessment_Engine {
 			$grading_engine->invalidate_grade_cache( $student_id, $course_id );
 		}
 
-		do_action( 'clms_submission_graded', $submission_id, $student_id, $status, $grade, $feedback );
+		// 6.30.1: un borrador no dispara clms_submission_graded (avisos, mensajes, grupos...).
+		do_action( CLMS_Student_Grade_Visibility::grade_saved_hook( $status ), $submission_id, $student_id, $status, $grade, $feedback );
 
 		$payload = array(
 			'submission_id' => $submission_id,
