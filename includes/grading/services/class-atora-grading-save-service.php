@@ -535,11 +535,14 @@ class ATORA_Grading_Save_Service {
 	 */
 	public static function claim_revision( int $submission_id, ?int $expected ) {
 		global $wpdb;
-		add_post_meta( $submission_id, self::REVISION_META, '0', true );
-		$where = $wpdb->prepare( 'post_id = %d AND meta_key = %s', $submission_id, self::REVISION_META );
-		if ( null !== $expected ) {
-			$where .= $wpdb->prepare( ' AND CAST(meta_value AS UNSIGNED) = %d', $expected );
+		if ( null === $expected ) {
+			// Sin revisión esperada (formularios anteriores): solo se cuenta el guardado.
+			$next = self::revision( $submission_id ) + 1;
+			update_post_meta( $submission_id, self::REVISION_META, (string) $next );
+			return $next;
 		}
+		add_post_meta( $submission_id, self::REVISION_META, '0', true );
+		$where   = $wpdb->prepare( 'post_id = %d AND meta_key = %s AND CAST(meta_value AS UNSIGNED) = %d', $submission_id, self::REVISION_META, $expected );
 		$updated = $wpdb->query( "UPDATE {$wpdb->postmeta} SET meta_value = CAST(meta_value AS UNSIGNED) + 1 WHERE {$where}" ); // phpcs:ignore WordPress.DB
 		wp_cache_delete( $submission_id, 'post_meta' );
 		if ( false === $updated ) {
