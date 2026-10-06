@@ -1,5 +1,27 @@
 # CHANGELOG — ATORA LMS
 
+## 6.30.2 (2026-10-06)
+
+Cierre pendiente antes de la Fase 4 (orden `docs/ordenes/ORDEN-FASE-4.md`, Bloque 1).
+
+### Fix — listeners de `clms_submission_graded` con argumentos cruzados (media)
+El hook pasa `(submission_id, student_id, status, grade, feedback)`.
+- `CLMS_Dashboard` y `CLMS_Assessment_Engine` lo escuchaban con el método de `clms_submission_created` `(submission_id, lesson_id, user_id)`: tomaban el estudiante como lección y el estado como usuario, y no borraban nada. Ahora usan `invalidate_cache_from_graded_submission( $submission_id, $student_id )`.
+- `CLMS_Analytics::record_submission_graded()` guardaba lección, usuario, estado y nota cruzados. Ahora lee el orden real y toma la lección de la entrega. **Los eventos de analítica son fiables desde 6.30.2**; los anteriores no se reescriben (ver `docs/ESTADO.md`).
+- Revisados también los listeners de `clms_submission_grade_draft_saved` y `clms_grade_published`: ya estaban en orden.
+
+### Mensajes del docente en la web
+- La página **Mensajes y seguimiento** muestra las conversaciones del buzón (incluido **Avisos**) con **lo enviado y lo recibido**, en orden cronológico, y permite responder. Lee y responde por `ATORA_Mobile_Messages_Controller` (mismas tablas, reglas de participante, avisos sin respuesta, límite e idempotencia que la app). Abrir un hilo lo marca leído: **un solo contador** con la app. Antes solo listaba lo recibido.
+
+### Pruebas de pantalla
+- **`wp atora seed-e2e`**: datos fijos para los recorridos de la app en un WordPress temporal del CI: curso con sección (docente asignado, estudiante matriculado), lección con 3 MP4 locales, tarea con una entrega sin calificar, quiz de 3 preguntas y un mensaje del docente. Reutiliza lo que ya existe (se puede correr dos veces). Se niega sin `--yes` o la constante `ATORA_E2E`.
+
+### Documentación
+- `docs/ESTADO.md`: por función, si está comprobada en teléfono, en pruebas de pantalla, de integración o unitarias. Datos históricos fiables desde qué versión. Las auditorías de borradores y de ceros no aplican al demo (solo cuentas de prueba); se corren antes de actualizar la primera instalación con estudiantes reales.
+- `docs/ordenes/ORDEN-FASE-4.md`: la orden de la Fase 4.
+
+**TESTS**: `GradedHookListenersTest` (panel y analítica fallan con 6.30.1), `TeacherWebMessagesTest` (falla con 6.30.1: el docente no veía lo que envió; respuesta web por el mismo envío que la app).
+
 ## 6.30.1 (2026-10-05)
 
 ### Fix — un borrador de calificación llegaba al estudiante (alta, académica)
