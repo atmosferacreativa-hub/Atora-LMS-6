@@ -111,6 +111,10 @@ final class ATORA_Web_Submission_History {
 			'web',
 			$received
 		) );
+		if ( $ok ) {
+			// La cola del docente filtra las tardías por esta marca (como las móviles).
+			update_post_meta( $post_id, '_clms_submission_is_late', ( $due_ts > 0 && strtotime( $received . ' UTC' ) > $due_ts ) ? 1 : 0 );
+		}
 		return $ok ? (int) $wpdb->insert_id : 0;
 	}
 

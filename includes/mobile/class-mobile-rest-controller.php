@@ -233,7 +233,7 @@ final class ATORA_Mobile_REST_Controller {
 			'authentication'   => 'opaque_bearer',
 			'access_ttl'       => ATORA_Mobile_Token_Service::ACCESS_TTL,
 			'refresh_ttl'      => ATORA_Mobile_Token_Service::REFRESH_TTL,
-			'features'         => array( 'profile', 'dashboard', 'courses', 'progress', 'lesson_completion', 'quizzes', 'assignments', 'sync_changes', 'playback_position', 'resource_downloads', 'multi_video', 'grades', 'certificates', 'messages', 'agenda', 'today', 'push_notifications' ),
+			'features'         => array( 'profile', 'dashboard', 'courses', 'progress', 'lesson_completion', 'quizzes', 'assignments', 'sync_changes', 'playback_position', 'resource_downloads', 'multi_video', 'grades', 'certificates', 'messages', 'agenda', 'today', 'push_notifications', 'teacher' ),
 			'capabilities'     => array(
 				'assignments'        => true,
 				'sync_changes'       => class_exists( '\\ATORA\\LMS\\LMS_Content_Changes' ),
@@ -247,6 +247,10 @@ final class ATORA_Mobile_REST_Controller {
 				'agenda'             => class_exists( 'CLMS_Agenda_Service' ),
 				'today'              => class_exists( 'ATORA_Mobile_Organize_Controller' ),
 				'push_notifications' => class_exists( 'ATORA_Mobile_Push_Service' ),
+				// 6.31.0: Fase 4 — docente (hoy, cursos, estudiantes, entregas, calificar, avisos).
+				'teacher'            => class_exists( 'ATORA_Mobile_Teacher_Controller' ) && class_exists( 'ATORA_Grading_Save_Service' ),
+				'teacher_grading'    => class_exists( 'ATORA_Grading_Save_Service' ),
+				'group_assignments'  => class_exists( '\\ATORA\\Groups\\Group_Service' ),
 			),
 		), 200 );
 	}
