@@ -1276,7 +1276,7 @@ final class ATORA_Mobile_REST_Controller {
 	/**
 	 * Fecha límite (no la de tolerancia) en la zona horaria del sitio, como timestamp UTC.
 	 */
-	private static function assignment_due_ts( int $wp_lesson_id ): int {
+	public static function assignment_due_ts( int $wp_lesson_id ): int {
 		$has_helper = class_exists( 'CLMS_Helper' ) && method_exists( 'CLMS_Helper', 'get_post_meta_first' );
 		$date = trim( (string) ( $has_helper ? CLMS_Helper::get_post_meta_first( $wp_lesson_id, array( 'lm_due_date', '_clms_due_date' ), '' ) : get_post_meta( $wp_lesson_id, 'lm_due_date', true ) ) );
 		$time = trim( (string) ( $has_helper ? CLMS_Helper::get_post_meta_first( $wp_lesson_id, array( 'lm_due_time', '_clms_due_time' ), '' ) : get_post_meta( $wp_lesson_id, 'lm_due_time', true ) ) );

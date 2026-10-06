@@ -506,6 +506,11 @@ trait CLMS_Submission_Core_Trait {
 			$this->redirect_back_with_submission_message( $lesson_id, 'error', $result->get_error_message() );
 		}
 
+		// 6.31.0: cada intento web queda en el historial (solo añadir), como los móviles.
+		if ( class_exists( 'ATORA_Web_Submission_History' ) ) {
+			ATORA_Web_Submission_History::record_web_attempt( absint( $result ) );
+		}
+
 			$notice = $this->build_submission_success_notice( $lesson_id, absint( $result ), $user_id );
 			$this->redirect_back_with_submission_message( $lesson_id, 'success', $notice );
 		}
