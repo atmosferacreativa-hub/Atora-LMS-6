@@ -88,6 +88,14 @@ class CLMS_AI_Manager {
 	 * @return string|array|WP_Error
 	 */
 	private function request_chat( array $messages, array $options, $return_meta ) {
+		// 6.32.0: proveedor simulado (pruebas y WordPress del CI): nunca se llama a uno real.
+		$pre = apply_filters( 'atora_ai_pre_chat', null, $messages, $options );
+		if ( null !== $pre ) {
+			if ( is_wp_error( $pre ) ) {
+				return $pre;
+			}
+			return $return_meta ? (array) $pre : (string) ( $pre['text'] ?? '' );
+		}
 		if ( empty( $messages ) ) {
 			$error = new WP_Error( 'clms_ai_manager_empty_messages', __( 'No se proporcionaron mensajes.', 'atora-lms' ) );
 			$this->report_ai_error( $error, '', array( 'source' => 'chat' ) );

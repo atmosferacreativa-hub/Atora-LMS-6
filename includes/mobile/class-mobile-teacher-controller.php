@@ -508,11 +508,13 @@ final class ATORA_Mobile_Teacher_Controller {
 			) : null,
 			'group'            => $group,
 			'moderated'        => ! empty( $context['moderation']['institutional'] ),
+			// 6.32.0: ¿se puede pedir sugerencia de IA? (función activa y tarea abierta, no quiz).
+			'ai_suggestion_available' => class_exists( 'ATORA_AI_Grading_Suggestion_Service' ) && ATORA_AI_Usage_Service::available( ATORA_AI_Usage_Service::SUGGESTION ) && ATORA_AI_Grading_Suggestion_Service::is_open_task( $submission_id ),
 		);
 	}
 
 	/** Criterios: la foto de la evaluación si existe; si no, la rúbrica vigente (como el guardado). */
-	private static function criteria( int $rubric_id, array $snapshot ): array {
+	public static function criteria( int $rubric_id, array $snapshot ): array {
 		if ( ! empty( $snapshot['criteria'] ) && $rubric_id === absint( $snapshot['rubric_id'] ?? 0 ) ) {
 			return (array) $snapshot['criteria'];
 		}

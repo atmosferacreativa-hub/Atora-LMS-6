@@ -233,7 +233,7 @@ final class ATORA_Mobile_REST_Controller {
 			'authentication'   => 'opaque_bearer',
 			'access_ttl'       => ATORA_Mobile_Token_Service::ACCESS_TTL,
 			'refresh_ttl'      => ATORA_Mobile_Token_Service::REFRESH_TTL,
-			'features'         => array( 'profile', 'dashboard', 'courses', 'progress', 'lesson_completion', 'quizzes', 'assignments', 'sync_changes', 'playback_position', 'resource_downloads', 'multi_video', 'grades', 'certificates', 'messages', 'agenda', 'today', 'push_notifications', 'teacher' ),
+			'features'         => array( 'profile', 'dashboard', 'courses', 'progress', 'lesson_completion', 'quizzes', 'assignments', 'sync_changes', 'playback_position', 'resource_downloads', 'multi_video', 'grades', 'certificates', 'messages', 'agenda', 'today', 'push_notifications', 'teacher', 'ai_assistant', 'ai_grading_suggestion' ),
 			'capabilities'     => array(
 				'assignments'        => true,
 				'sync_changes'       => class_exists( '\\ATORA\\LMS\\LMS_Content_Changes' ),
@@ -251,6 +251,9 @@ final class ATORA_Mobile_REST_Controller {
 				'teacher'            => class_exists( 'ATORA_Mobile_Teacher_Controller' ) && class_exists( 'ATORA_Grading_Save_Service' ),
 				'teacher_grading'    => class_exists( 'ATORA_Grading_Save_Service' ),
 				'group_assignments'  => class_exists( '\\ATORA\\Groups\\Group_Service' ),
+				// 6.32.0: Fase 5 — IA. Solo con la función activada y un proveedor configurado.
+				'ai_assistant'          => class_exists( 'ATORA_AI_Usage_Service' ) && ATORA_AI_Usage_Service::available( 'assistant' ),
+				'ai_grading_suggestion' => class_exists( 'ATORA_AI_Usage_Service' ) && ATORA_AI_Usage_Service::available( 'grading_suggestion' ),
 			),
 		), 200 );
 	}
@@ -1330,7 +1333,7 @@ final class ATORA_Mobile_REST_Controller {
 	}
 
 	/** Misma detección que la web: tipo de actividad "tarea" (o sus alias). */
-	private static function lesson_has_assignment( int $wp_lesson_id ): bool {
+	public static function lesson_has_assignment( int $wp_lesson_id ): bool {
 		$raw = class_exists( 'CLMS_Helper' ) && method_exists( 'CLMS_Helper', 'get_post_meta_first' )
 			? CLMS_Helper::get_post_meta_first( $wp_lesson_id, array( 'lm_activity_type', '_clms_activity_mode' ), '' )
 			: get_post_meta( $wp_lesson_id, 'lm_activity_type', true );
@@ -1873,7 +1876,7 @@ final class ATORA_Mobile_REST_Controller {
 		return $out;
 	}
 
-	private static function authorize_course_id( int $user_id, int $course_id ) {
+	public static function authorize_course_id( int $user_id, int $course_id ) {
 		$user_id   = absint( $user_id );
 		$course_id = absint( $course_id );
 		if ( $user_id <= 0 ) {

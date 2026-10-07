@@ -163,6 +163,18 @@ final class ATORA_E2E_Seed_CLI {
 			( new \ATORA\EarlyWarning\Early_Warning_Service() )->scan_course( $course, false );
 		}
 
+		// 6.32.0: IA activada para las pruebas de pantalla. Responde el proveedor
+		// simulado (constante ATORA_AI_FAKE en el wp-config del CI); sin proveedor
+		// configurado, /discovery no declara nada aunque estén activadas.
+		$modules = get_option( 'atora_active_modules', false );
+		if ( is_array( $modules ) && ! in_array( 'ai', $modules, true ) ) {
+			$modules[] = 'ai';
+			update_option( 'atora_active_modules', $modules );
+		}
+		if ( class_exists( 'ATORA_AI_Usage_Service' ) ) {
+			ATORA_AI_Usage_Service::set_features( array( ATORA_AI_Usage_Service::ASSISTANT => true, ATORA_AI_Usage_Service::SUGGESTION => true ) );
+		}
+
 		return array(
 			'password'   => $password,
 			'teacher'    => array( 'id' => $teacher, 'login' => 'docente_e2e' ),
