@@ -4,7 +4,7 @@ Orden: `docs/ordenes/ORDEN-FASE-6.md`. Reanudar: leer este archivo y la orden, c
 
 ## Paso actual
 
-**Ajustes pedidos por el titular (7 oct)** y luego la lista: (1) PDF: firmas y logo PNG con transparencia vía GD, sin recuadro blanco, sin Imagick; (2) eliminación: anonimizar por defecto; "eliminar por completo" con confirmación explícita y advertencia, y registro de quién y cuándo. Después: datos de prueba del certificado en el CI, rendimiento en gama baja, recorridos `cambio-idioma`, `eliminar-cuenta`, `certificado-pdf`, cuentas de revisión, ficha y capturas, compilaciones y cierre.
+**Cierre en curso.** Ajustes del titular hechos (PNG con transparencia vía GD sobre el color de la hoja; anonimizar por defecto, eliminar por completo con advertencia y registro). Plugin 6.33.0: PR #68, CI verde, docs y versión listos; falta fusionar, etiqueta y ZIP. App 1.0.0: código, docs de tiendas, versión y recorridos listos; CI en curso en tres modos (pantallas, gama-baja, tienda: runs 37692392322, 37692398806, 37692404780). Después: fusionar, etiquetas, capturas de tienda, APK preview, AAB de producción; IPA requiere la cuenta de Apple del titular.
 
 ## Bloques
 
@@ -19,8 +19,8 @@ Orden: `docs/ordenes/ORDEN-FASE-6.md`. Reanudar: leer este archivo y la orden, c
 
 | Repo | Rama | Estado |
 |---|---|---|
-| Atora-LMS-6 | `feat/6.33.0-publicacion` | WIP, sin PR |
-| atora-mobile | `feat/1.0.0-publicacion` | WIP, sin PR |
+| Atora-LMS-6 | `feat/6.33.0-publicacion` | PR #68, CI verde |
+| atora-mobile | `feat/1.0.0-publicacion` | CI de pantallas en curso; PR al cerrar |
 
 ## Decisiones menores
 
@@ -36,3 +36,8 @@ Orden: `docs/ordenes/ORDEN-FASE-6.md`. Reanudar: leer este archivo y la orden, c
 10. Se quitaron restos de desarrollo de la app publicada: la tarjeta de programa con "Diplomado en Comunicación" fijo y las direcciones internas (LAN/localhost) en la configuración de la academia (solo en desarrollo).
 11. Reporte de errores: sin saber aún si la academia lo permite (al arrancar), no se envía nada. Se activa al crear la cuenta de Sentry y poner `EXPO_PUBLIC_SENTRY_DSN` (acción del titular); la subida de mapas de código queda apagada (`SENTRY_DISABLE_AUTO_UPLOAD`).
 12. Accesibilidad: prueba estática con el compilador de TypeScript (botón sin texto → etiqueta; área táctil ≥ 44 pt estimada desde el `StyleSheet`, o `hitSlop`). El verde de "Calificación publicada" pasó a #17724A (contraste 5,9:1).
+13. Imágenes del certificado (reemplaza la decisión 2): PNG sin alfa aplanado con GD sobre el **color de fondo de la hoja** (nuevo campo de la plantilla); sin GD, Imagick dentro de try/catch. El QR conserva un margen blanco a propósito (lectura).
+14. Rendimiento: medido en el CI con un emulador de 2 GB y red 3G (`modo=gama-baja`): arranque en frío mediana 1,27 s (umbral 4 s). La lista de 100 lecciones tenía 16,8 % de cuadros lentos → el curso pasó a `FlatList` virtualizada; se vuelve a medir.
+15. Versiones: EAS con numeración remota (`appVersionSource: remote`), inicializada desde `versionCode` 15 / `buildNumber` 3; iOS solo teléfono (`supportsTablet: false`) para no exigir capturas de iPad.
+16. Cuentas de revisión: `wp atora review-accounts` (idempotente); el titular lo corre en el demo (no tengo acceso al servidor del demo).
+
