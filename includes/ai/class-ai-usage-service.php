@@ -30,6 +30,39 @@ final class ATORA_AI_Usage_Service {
 	const LIMITS_OPTION   = 'atora_ai_limits';
 	const ALERT_OPTION    = 'atora_ai_budget_alerted';
 
+	/**
+	 * 6.32.1: funciones de procesamiento masivo (indexar la base de conocimiento,
+	 * transcribir clases). Solo las frena el tope mensual: un límite diario por
+	 * persona cortaría una indexación a medias.
+	 */
+	const BULK_FEATURES = array( 'embeddings', 'knowledge_base', 'transcription' );
+
+	/** Nombres para el panel de consumo (lo no listado se muestra con su clave). */
+	const LABELS = array(
+		'assistant'          => 'Asistente del estudiante',
+		'grading_suggestion' => 'Sugerencia de calificación',
+		'ai_review'          => 'Revisión con IA (SpeedGrader)',
+		'ai_grading'         => 'Corrección con IA',
+		'alerts'             => 'Alertas',
+		'messaging'          => 'Mensajes automáticos',
+		'sentiment'          => 'Sentimiento',
+		'feedback_loop'      => 'Retroalimentación',
+		'improvement_plan'   => 'Plan de mejora',
+		'exams'              => 'Exámenes con IA',
+		'copilot'            => 'Copilotos',
+		'quick_wins'         => 'Quick wins',
+		'learning_path'      => 'Ruta de aprendizaje',
+		'teacher_assistant'  => 'Asistente docente',
+		'settings_test'      => 'Prueba de conexión (ajustes)',
+		'assessment'         => 'Motor de evaluación',
+		'analytics'          => 'Analítica',
+		'crm'                => 'CRM',
+		'embeddings'         => 'Base de conocimiento (indexación)',
+		'knowledge_base'     => 'Base de conocimiento (búsqueda)',
+		'transcription'      => 'Transcripción',
+		'other'              => 'Otras',
+	);
+
 	const DEFAULT_LIMITS = array(
 		'student_daily'    => 30,
 		'teacher_daily'    => 100,
@@ -141,15 +174,17 @@ final class ATORA_AI_Usage_Service {
 	public static function check( int $user_id, string $feature ) {
 		$limits = self::limits();
 		list( , , $reset_ts ) = self::windows();
-		$daily = self::SUGGESTION === $feature ? $limits['teacher_daily'] : $limits['student_daily'];
-		if ( self::used_today( $user_id, $feature ) >= $daily ) {
+		$daily = self::daily_limit( $user_id, $feature );
+		if ( null !== $daily && self::used_today( $user_id, $feature ) >= $daily ) {
 			self::record( $user_id, $feature, '', '', array(), 'limit' );
 			$reset = wp_date( 'H:i', $reset_ts );
 			return new WP_Error(
 				'atora_ai_limit',
 				self::SUGGESTION === $feature
 					? sprintf( __( 'Alcanzaste el límite de %1$d sugerencias por día. Se reinicia a las %2$s.', 'atora-lms' ), $daily, $reset )
-					: sprintf( __( 'Alcanzaste el límite de %1$d preguntas por día. Se reinicia a las %2$s.', 'atora-lms' ), $daily, $reset ),
+					: ( self::ASSISTANT === $feature
+						? sprintf( __( 'Alcanzaste el límite de %1$d preguntas por día. Se reinicia a las %2$s.', 'atora-lms' ), $daily, $reset )
+						: sprintf( __( 'Alcanzaste el límite diario de %1$d usos de IA en "%2$s". Se reinicia a las %3$s.', 'atora-lms' ), $daily, self::label( $feature ), $reset ) ),
 				array( 'status' => 429, 'reset_at' => gmdate( 'c', $reset_ts ) )
 			);
 		}
@@ -166,6 +201,42 @@ final class ATORA_AI_Usage_Service {
 		return true;
 	}
 
+	/**
+	 * Límite diario de una persona en una función (null = sin límite diario).
+	 * Asistente: el de estudiantes; sugerencia: el de docentes; el resto de los
+	 * módulos, según el rol de quien la usa. Las llamadas sin persona (tareas
+	 * programadas) y las masivas solo cuentan para el tope mensual.
+	 */
+	public static function daily_limit( int $user_id, string $feature ): ?int {
+		$limits = self::limits();
+		// Sin persona (visitante o tarea programada): solo el tope mensual. Los
+		// visitantes del asistente web conservan su límite por IP.
+		if ( $user_id <= 0 ) {
+			return null;
+		}
+		if ( self::ASSISTANT === $feature ) {
+			return $limits['student_daily'];
+		}
+		if ( self::SUGGESTION === $feature ) {
+			return $limits['teacher_daily'];
+		}
+		if ( in_array( $feature, self::BULK_FEATURES, true ) ) {
+			return null;
+		}
+		$teacher = user_can( $user_id, 'manage_options' ) || ( class_exists( 'ATORA_Teacher_Scope' ) && ATORA_Teacher_Scope::has_teacher_role( $user_id ) );
+		return $teacher ? $limits['teacher_daily'] : $limits['student_daily'];
+	}
+
+	public static function label( string $feature ): string {
+		return isset( self::LABELS[ $feature ] ) ? __( self::LABELS[ $feature ], 'atora-lms' ) : $feature; // phpcs:ignore WordPress.WP.I18n
+	}
+
+	/** Clave de función de una llamada: la que declara (`feature`), o su `source`, o "other". */
+	public static function feature_of( array $options, string $fallback = 'other' ): string {
+		$feature = sanitize_key( (string) ( $options['feature'] ?? $options['source'] ?? '' ) );
+		return '' !== $feature ? substr( $feature, 0, 40 ) : $fallback;
+	}
+
 	/** Tokens del proveedor (cada uno los llama distinto). @return array{0:int,1:int} */
 	public static function tokens( array $usage ): array {
 		$in  = (int) ( $usage['prompt_tokens'] ?? $usage['input_tokens'] ?? $usage['promptTokenCount'] ?? 0 );
@@ -178,7 +249,7 @@ final class ATORA_AI_Usage_Service {
 		return class_exists( 'CLMS_AI_Log' ) ? CLMS_AI_Log::estimate_usage_cost( $provider, $usage ) : 0.0;
 	}
 
-	public static function record( int $user_id, string $feature, string $provider, string $model, array $usage, string $result ): void {
+	public static function record( int $user_id, string $feature, string $provider, string $model, array $usage, string $result, ?float $cost = null ): void {
 		global $wpdb;
 		list( $in, $out ) = self::tokens( $usage );
 		$wpdb->insert( self::table(), array( // phpcs:ignore WordPress.DB
@@ -189,7 +260,7 @@ final class ATORA_AI_Usage_Service {
 			'model'          => substr( $model, 0, 100 ),
 			'tokens_in'      => $in,
 			'tokens_out'     => $out,
-			'cost'           => 'ok' === $result ? self::estimate_cost( $provider, $usage ) : 0,
+			'cost'           => 'ok' === $result ? ( null !== $cost ? $cost : self::estimate_cost( $provider, $usage ) ) : 0,
 			'result'         => $result,
 			'created_at'     => current_time( 'mysql', true ),
 		) );

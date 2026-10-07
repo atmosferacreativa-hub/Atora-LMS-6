@@ -450,12 +450,11 @@ class Contact_Actions_REST_Controller {
 		}
 
 		$prompt = sprintf(
-			"Eres un asistente de CRM. Resume en 3-4 líneas el perfil de este contacto:\n" .
-			"Nombre: %s\nEmail: %s\nEstado: %s\nTipo: %s\n" .
+			// 6.32.1: sin nombre ni correo: la IA se refiere al contacto como {{contacto}}.
+			"Eres un asistente de CRM. Resume en 3-4 líneas el perfil de este contacto (llámalo {{contacto}}):\n" .
+			"Estado: %s\nTipo: %s\n" .
 			"Puntos: %d\nLTV: $%s\nScore conversión: %d/100 (%s)\n" .
 			"Sé conciso, en español, enfocado en oportunidades de conversión.",
-			sanitize_text_field( (string) ( $contact['name']            ?? '' ) ),
-			sanitize_email(      (string) ( $contact['email']           ?? '' ) ),
 			sanitize_key(        (string) ( $contact['status']          ?? '' ) ),
 			sanitize_key(        (string) ( $contact['contact_type']    ?? '' ) ),
 			absint(                        $contact['total_points']     ?? 0 ),
@@ -470,8 +469,13 @@ class Contact_Actions_REST_Controller {
 				// PT-1 (6.5.10): CLMS_AI_Manager es global; este archivo vive
 				// bajo namespace ATORA\CRM_V2\Rest — sin backslash se
 				// resuelve a ATORA\CRM_V2\Rest\CLMS_AI_Manager (inexistente).
-				$ai      = new \CLMS_AI_Manager();
-				$summary = $ai->complete( $prompt );
+				// 6.32.1: `complete()` no existía (fallaba siempre); pasa por chat() y el control central.
+				$ai     = function_exists( 'clms_core' ) && clms_core( 'CLMS_AI_Manager' ) ? clms_core( 'CLMS_AI_Manager' ) : new \CLMS_AI_Manager();
+				$result = $ai->chat( array( array( 'role' => 'user', 'content' => $prompt ) ), array( 'max_tokens' => 250, 'temperature' => 0.3, 'feature' => 'crm' ) );
+				if ( is_wp_error( $result ) ) {
+					return self::fail( $result->get_error_message(), (int) ( $result->get_error_data()['status'] ?? 502 ) );
+				}
+				$summary = str_replace( '{{contacto}}', sanitize_text_field( (string) ( $contact['name'] ?? '' ) ) ?: __( 'el contacto', 'atora-lms' ), (string) $result );
 			} catch ( \Throwable $e ) {
 				return self::fail( __( 'Error IA: ', 'atora-lms' ) . esc_html( $e->getMessage() ), 500 );
 			}

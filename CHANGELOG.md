@@ -1,5 +1,27 @@
 # CHANGELOG — ATORA LMS
 
+## 6.32.1 (2026-10-07)
+
+### IA bajo control central (antes de la Fase 6)
+
+Orden `docs/ordenes/ORDEN-6.32.1.md`. Sin cambios en la app.
+
+**Todo pasa por `CLMS_AI_Manager`.** Cada salida hacia un proveedor —`chat`, `chat_with_meta`, embeddings (indexación y búsqueda), transcripción y `post_json` (revisión de entregas de SpeedGrader)— sigue el mismo camino: límite diario de la persona y tope mensual de la academia → filtro de datos personales → llamada → fila en `atora_ai_usage`. Antes solo el asistente y la sugerencia lo aplicaban. Cada llamada declara su función (`feature`) para el panel de consumo: `alerts`, `messaging`, `sentiment`, `feedback_loop`, `improvement_plan`, `exams`, `copilot`, `quick_wins`, `learning_path`, `teacher_assistant`, `settings_test`, `ai_grading`, `ai_review`, `crm`, `embeddings`, `knowledge_base`, `transcription`, `assistant`, `grading_suggestion`; sin declarar, `other`.
+
+**Límites.** Tope mensual: frena **toda** la IA de la academia con 429 `atora_ai_budget` ("La academia alcanzó el tope mensual de uso de IA. Se reinicia el…") y no sale nada hacia el proveedor; los copilotos dejan pasar ese mensaje tal cual. Límite diario por persona y función: asistente = el de estudiantes, sugerencia = el de docentes, el resto según el rol de quien la usa. Las llamadas sin persona (tareas programadas) y las masivas (indexar la base de conocimiento, transcribir) solo cuentan para el tope. El asistente y la sugerencia ya no registran por su cuenta (una fila por llamada, la del gestor). La transcripción registra su costo estimado por minuto cuando el proveedor informa la duración.
+
+**Datos personales.** Ningún prompt lleva nombre ni correo del estudiante:
+- Mensajes automáticos (`class-messaging.php`: recordatorio, refuerzo y recomendación) y alertas (inactividad y promedio bajo): el prompt pide el marcador `{{nombre}}`, que se reemplaza por el nombre de pila **después** de recibir la respuesta.
+- Revisión de entregas de SpeedGrader: se quitó la línea "Estudiante:" del prompt.
+- CRM (resumen de contacto): sin nombre ni correo (marcador `{{contacto}}`). Además llamaba a un método inexistente (`complete()`) y fallaba siempre: ahora usa `chat()`.
+- Red de seguridad en el gestor (`ATORA_AI_Privacy`): los correos se reemplazan por "[correo]" y los nombres de las personas de la petición (`subject_users` que declara cada módulo, y el usuario actual si no es docente) por `{{nombre}}`, que vuelve a ser el nombre de pila en la respuesta. Así, si el estudiante firma su entrega o escribe su nombre al asistente, tampoco sale.
+
+**Proveedor simulado**: nunca se activa si `wp_get_environment_type()` es `production`, ni con `ATORA_AI_FAKE` ni desde una prueba. Las pruebas de integración corren como `development`. También responde embeddings, transcripción y `post_json`, y guarda todo lo que se habría enviado.
+
+**Panel Uso de IA**: nombres de todas las funciones; los límites diarios se describen por función.
+
+**TESTS**: `AiCentralControlTest` — una llamada desde un módulo (mensajería) queda registrada con su función y suma al tope; con el tope alcanzado, chat, embeddings, búsqueda, transcripción, revisión, copiloto, mensajería, sentimiento y alertas se detienen con 429 y nada sale; ningún prompt de mensajería, alertas, sentimiento, corrección, revisión, sugerencia ni asistente contiene el nombre o el correo del estudiante (con el filtro apagado, la prueba falla); el simulado nunca en producción. Cualquier salida HTTP a un dominio de IA se bloquea y hace fallar la prueba.
+
 ## 6.32.0 (2026-10-06)
 
 ### Fase 5 — IA (plugin)

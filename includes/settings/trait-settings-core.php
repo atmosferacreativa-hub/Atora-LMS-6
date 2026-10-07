@@ -525,6 +525,7 @@ trait CLMS_Settings_Core_Trait {
 				'max_tokens'  => 20,
 				'temperature' => 0,
 				'timeout'     => 20,
+				'feature'     => 'settings_test',
 			)
 		);
 

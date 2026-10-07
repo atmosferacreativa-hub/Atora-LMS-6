@@ -267,6 +267,7 @@ class CLMS_Improvement_Plan_Service {
 			array(
 				'max_tokens'  => 120,
 				'temperature' => 0.3,
+				'feature'     => 'improvement_plan',
 			)
 		);
 

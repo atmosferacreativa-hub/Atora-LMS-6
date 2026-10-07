@@ -234,6 +234,7 @@ trait CLMS_Teacher_Assistant_Artifacts_Helpers_Trait {
 					'max_tokens'  => 3000,
 					'temperature' => 0.7,
 					'timeout'     => 120,
+					'feature'     => 'teacher_assistant',
 				),
 				array(
 					'lesson_id' => $lesson_id,
@@ -256,6 +257,7 @@ trait CLMS_Teacher_Assistant_Artifacts_Helpers_Trait {
 				'max_tokens'  => 3000,
 				'temperature' => 0.7,
 				'timeout'     => 120,
+				'feature'     => 'teacher_assistant',
 			)
 		);
 	}

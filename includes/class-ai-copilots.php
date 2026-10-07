@@ -87,6 +87,10 @@ class CLMS_AI_Copilots {
 		$this->log_event( $copilot, $action, $context, $result, is_array( $result ) ? $result : array(), $user_id );
 
 		if ( is_wp_error( $result ) ) {
+			// 6.32.1: límite o tope de IA: el mensaje claro llega tal cual (con la hora de reinicio).
+			if ( in_array( $result->get_error_code(), array( 'atora_ai_limit', 'atora_ai_budget' ), true ) ) {
+				return $result;
+			}
 			return new WP_Error( 'clms_ai_copilot_error', $this->human_error_message( $result ), $result->get_error_data() );
 		}
 
@@ -174,6 +178,10 @@ class CLMS_AI_Copilots {
 		}
 		if ( empty( $options['timeout'] ) ) {
 			$options['timeout'] = 60;
+		}
+		// 6.32.1: función para el panel de consumo (quien llama puede declarar la suya).
+		if ( empty( $options['feature'] ) ) {
+			$options['feature'] = 'copilot';
 		}
 
 		if ( ! empty( $options['system'] ) ) {

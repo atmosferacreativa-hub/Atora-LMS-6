@@ -6,6 +6,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 abstract class CLMS_AI_Provider_Base implements CLMS_AI_Provider_Interface {
 
+	/** @var array 6.32.1: función y personas de la petición, para el control central de la IA. */
+	protected $request_context = array();
+
+	public function set_request_context( array $context ): void {
+		$this->request_context = $context;
+	}
+
 	/**
 	 * Devuelve opción del plugin.
 	 *
@@ -60,7 +67,7 @@ abstract class CLMS_AI_Provider_Base implements CLMS_AI_Provider_Interface {
 				$headers,
 				$body,
 				$timeout,
-				array( 'source' => 'provider_base' )
+				array_merge( array( 'source' => 'provider_base', 'feature' => 'ai_review' ), $this->request_context )
 			);
 		}
 
@@ -108,7 +115,6 @@ abstract class CLMS_AI_Provider_Base implements CLMS_AI_Provider_Interface {
 		$parts[] = 'Contexto de revisión:';
 		$parts[] = 'Curso: ' . $course_title;
 		$parts[] = 'Lección: ' . $lesson_title;
-		$parts[] = 'Estudiante: ' . $student_name;
 		$parts[] = '';
 		$parts[] = 'Notas del profesor:';
 		$parts[] = $teacher_notes ? $teacher_notes : 'Sin notas del profesor.';

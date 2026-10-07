@@ -442,6 +442,7 @@ class CLMS_Learning_Path {
 				'max_tokens'  => 500,
 				'temperature' => 0.4,
 				'timeout'     => 30,
+				'feature'     => 'learning_path',
 			)
 		);
 	}

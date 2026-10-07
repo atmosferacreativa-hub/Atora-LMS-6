@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 6.32.0
+Stable tag: 6.32.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,9 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.32.1 =
+* IA bajo control central: todas las funciones de IA (alertas, mensajes, sentimiento, exámenes, copilotos, revisión de entregas, etc.) cuentan en el panel de uso, respetan los límites y el tope mensual de la academia, y no envían al proveedor nombres ni correos de estudiantes.
+
 = 6.32.0 =
 * Fase 5 — IA: asistente del estudiante en la app (sobre la lección, sin resolver evaluaciones) y sugerencia de calificación para el docente en la app y en SpeedGrader (la IA sugiere, el docente decide). Límites por usuario y tope mensual de costo, pantalla de uso de IA, funciones desactivadas por defecto y sin datos personales enviados al proveedor.
 

@@ -176,13 +176,15 @@ class CLMS_AI_Alerts {
 		$next_title  = $next_lesson ? get_the_title( $next_lesson ) : '';
 
 		$body = $this->generate_email_with_ai(
-			"Escribe un email breve y motivador (máx 3 párrafos) para un estudiante llamado {$name} " .
+			// 6.32.1: sin el nombre. El marcador {{nombre}} se reemplaza al recibir la respuesta.
+			'Escribe un email breve y motivador (máx 3 párrafos) para un estudiante; dirígete a él con el marcador {{nombre}} tal cual. ' .
 			"que lleva {$days} días sin actividad en el curso \"{$course_title}\". " .
 			( $next_title ? "Su próxima lección pendiente es \"{$next_title}\". " : '' ) .
 			'El tono debe ser cálido, empático y motivador. No uses lenguaje de ventas. ' .
 			'Incluye: (1) reconocer su ausencia sin juzgar, (2) recordar el valor del curso, ' .
 			'(3) un pequeño empujón para retomar hoy. No incluyas asunto ni firma.',
-			80
+			80,
+			(int) $user_id
 		);
 
 		if ( ! $body ) {
@@ -236,12 +238,13 @@ class CLMS_AI_Alerts {
 		$avg          = $student['average'];
 
 		$body = $this->generate_email_with_ai(
-			"Escribe un email de apoyo académico (máx 3 párrafos) para {$name}, " .
-			"estudiante del curso \"{$course_title}\" que tiene un promedio de {$avg}/100. " .
+			'Escribe un email de apoyo académico (máx 3 párrafos) para un estudiante (dirígete a él con el marcador {{nombre}} tal cual), ' .
+			"del curso \"{$course_title}\" que tiene un promedio de {$avg}/100. " .
 			'El tono debe ser alentador, no condescendiente. ' .
 			'Incluye: (1) reconocer el esfuerzo, (2) sugerir que pida ayuda al profesor o revise el material, ' .
 			'(3) recordar que mejorar es parte del proceso. No incluyas asunto ni firma.',
-			80
+			80,
+			(int) $user_id
 		);
 
 		if ( ! $body ) {
@@ -351,7 +354,9 @@ class CLMS_AI_Alerts {
 
 	// ── IA helper ─────────────────────────────────────────────────────────────────
 
-	protected function generate_email_with_ai( $prompt, $max_tokens = 200 ) {
+	protected function generate_email_with_ai( $prompt, $max_tokens = 200, int $student_id = 0 ) {
+		// 6.32.1: el estudiante va como persona de la petición (su nombre nunca sale).
+		$privacy = array( 'feature' => 'alerts', 'subject_users' => $student_id ? array( $student_id ) : array() );
 		$copilots = class_exists( 'CLMS_Helper' ) ? clms_core('CLMS_AI_Copilots') : null;
 		if ( $copilots && method_exists( $copilots, 'run_text' ) ) {
 			$result = $copilots->run_text(
@@ -362,7 +367,7 @@ class CLMS_AI_Alerts {
 					'max_tokens'  => absint( $max_tokens ),
 					'temperature' => 0.3,
 					'timeout'     => 30,
-				),
+				) + $privacy,
 				array(
 					'screen' => 'ai_alerts',
 				)
@@ -379,7 +384,7 @@ class CLMS_AI_Alerts {
 					'max_tokens'  => absint( $max_tokens ),
 					'temperature' => 0.3,
 					'timeout'     => 30,
-				)
+				) + $privacy
 			);
 
 			return is_wp_error( $result ) ? '' : trim( (string) $result );

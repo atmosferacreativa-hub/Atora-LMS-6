@@ -139,18 +139,20 @@ final class ATORA_AI_Grading_Suggestion_Service {
 		}
 		$result = $manager->chat_with_meta(
 			array( array( 'role' => 'user', 'content' => self::prompt( $submission_id, $criteria ) ) ),
-			array( 'max_tokens' => 900, 'temperature' => 0.2, 'timeout' => 60, 'source' => 'grading_suggestion' )
-		);
-		ATORA_AI_Usage_Service::record(
-			$teacher_id,
-			ATORA_AI_Usage_Service::SUGGESTION,
-			is_array( $result ) ? (string) ( $result['provider'] ?? '' ) : '',
-			is_array( $result ) ? (string) ( $result['model'] ?? '' ) : '',
-			is_array( $result ) ? (array) ( $result['usage'] ?? array() ) : array(),
-			is_wp_error( $result ) ? 'error' : 'ok'
+			array(
+				'max_tokens'    => 900,
+				'temperature'   => 0.2,
+				'timeout'       => 60,
+				'source'        => 'grading_suggestion',
+				'feature'       => ATORA_AI_Usage_Service::SUGGESTION,
+				'user_id'       => $teacher_id,
+				// Si el estudiante escribió su nombre en la entrega, tampoco sale.
+				'subject_users' => array( absint( get_post_meta( $submission_id, '_clms_submission_user_id', true ) ) ),
+			)
 		);
 		if ( is_wp_error( $result ) ) {
-			self::finish( $job_id, 'failed', null, __( 'La IA no pudo generar la sugerencia. Intenta más tarde.', 'atora-lms' ) );
+			$limited = in_array( $result->get_error_code(), array( 'atora_ai_limit', 'atora_ai_budget' ), true );
+			self::finish( $job_id, 'failed', null, $limited ? $result->get_error_message() : __( 'La IA no pudo generar la sugerencia. Intenta más tarde.', 'atora-lms' ) );
 			return;
 		}
 		$parsed = self::parse( (string) ( $result['text'] ?? '' ), $criteria );

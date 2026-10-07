@@ -1036,7 +1036,7 @@ class CLMS_Messaging {
 		$message = $this->generate_ai_followup_copy(
 			array(
 				'rule'          => 'reminder',
-				'student_name'  => $name,
+				'student_id'    => $user_id,
 				'course_title'  => get_the_title( $course_id ),
 				'lesson_title'  => get_the_title( $next_lesson_id ),
 				'days_inactive' => $days_inactive,
@@ -1084,7 +1084,7 @@ class CLMS_Messaging {
 		$message   = $this->generate_ai_followup_copy(
 			array(
 				'rule'         => 'reinforcement',
-				'student_name' => $name,
+				'student_id'   => $user_id,
 				'course_title' => get_the_title( $course_id ),
 				'lesson_title' => $next_lesson_id ? get_the_title( $next_lesson_id ) : '',
 				'average'      => $average,
@@ -1136,7 +1136,7 @@ class CLMS_Messaging {
 		$message = $this->generate_ai_followup_copy(
 			array(
 				'rule'          => 'upsell',
-				'student_name'  => $name,
+				'student_id'    => $user_id,
 				'course_title'  => get_the_title( $course_id ),
 				'related_title' => isset( $item['title'] ) ? sanitize_text_field( (string) $item['title'] ) : '',
 			)
@@ -1174,7 +1174,9 @@ class CLMS_Messaging {
 	protected function generate_ai_followup_copy( $args = array() ) {
 		$args       = is_array( $args ) ? $args : array();
 		$manager    = clms_core('CLMS_AI_Manager');
-		$student    = sanitize_text_field( (string) ( $args['student_name'] ?? 'estudiante' ) );
+		// 6.32.1: el nombre nunca va al proveedor. Se pide el marcador {{nombre}}, que
+		// CLMS_AI_Manager reemplaza por el nombre de pila al recibir la respuesta.
+		$student_id = absint( $args['student_id'] ?? 0 );
 		$course     = sanitize_text_field( (string) ( $args['course_title'] ?? '' ) );
 		$lesson     = sanitize_text_field( (string) ( $args['lesson_title'] ?? '' ) );
 		$rule       = sanitize_key( (string) ( $args['rule'] ?? 'reminder' ) );
@@ -1197,8 +1199,7 @@ class CLMS_Messaging {
 				array(
 					'role'    => 'user',
 					'content' => sprintf(
-						'Redacta un mensaje interno breve, empático y accionable para %1$s sobre su curso "%2$s". Contexto: %3$s',
-						$student,
+						'Redacta un mensaje interno breve, empático y accionable para un estudiante sobre su curso "%1$s"; dirígete a él con el marcador {{nombre}} tal cual. Contexto: %2$s',
 						$course,
 						$extra
 					),
@@ -1209,6 +1210,8 @@ class CLMS_Messaging {
 				'temperature' => 0.4,
 				'system'      => 'Eres un coach académico de ATORA. Escribe en español, con tono cercano, útil y sin vender agresivamente.',
 				'timeout'     => 20,
+				'feature'     => 'messaging',
+				'subject_users' => $student_id ? array( $student_id ) : array(),
 			)
 		);
 

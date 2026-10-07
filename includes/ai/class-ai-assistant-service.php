@@ -174,6 +174,7 @@ class ATORA_AI_Assistant_Service {
 					'temperature' => 0.7,
 					'timeout'     => 60,
 					'source'      => 'assistant',
+					'feature'     => 'assistant',
 				),
 				$context
 			);
@@ -194,23 +195,13 @@ class ATORA_AI_Assistant_Service {
 				'temperature' => 0.7,
 				'timeout'     => 60,
 				'source'      => 'assistant',
+				'feature'     => 'assistant',
 			)
 		) );
 	}
 
-	/** 6.32.0: registra el uso (con sesión) y devuelve solo el texto, como antes. @return string|WP_Error */
+	/** Solo el texto, como antes (6.32.1: el uso lo registra `CLMS_AI_Manager`). @return string|WP_Error */
 	private static function with_usage( $result ) {
-		$user_id = get_current_user_id();
-		if ( $user_id && class_exists( 'ATORA_AI_Usage_Service' ) ) {
-			ATORA_AI_Usage_Service::record(
-				$user_id,
-				ATORA_AI_Usage_Service::ASSISTANT,
-				is_array( $result ) ? (string) ( $result['provider'] ?? '' ) : '',
-				is_array( $result ) ? (string) ( $result['model'] ?? '' ) : '',
-				is_array( $result ) ? (array) ( $result['usage'] ?? array() ) : array(),
-				is_wp_error( $result ) ? 'error' : 'ok'
-			);
-		}
 		if ( is_wp_error( $result ) ) {
 			return $result;
 		}
@@ -297,16 +288,14 @@ class ATORA_AI_Assistant_Service {
 				'temperature' => 0.5,
 				'timeout'     => self::APP_TIMEOUT,
 				'source'      => 'assistant',
+				'feature'     => 'assistant',
+				'user_id'     => $user_id,
+				'subject_users' => array( $user_id ),
 			)
 		);
-		ATORA_AI_Usage_Service::record(
-			$user_id,
-			ATORA_AI_Usage_Service::ASSISTANT,
-			is_array( $result ) ? (string) ( $result['provider'] ?? '' ) : '',
-			is_array( $result ) ? (string) ( $result['model'] ?? '' ) : '',
-			is_array( $result ) ? (array) ( $result['usage'] ?? array() ) : array(),
-			is_wp_error( $result ) ? 'error' : 'ok'
-		);
+		if ( is_wp_error( $result ) && in_array( $result->get_error_code(), array( 'atora_ai_limit', 'atora_ai_budget' ), true ) ) {
+			return $result;
+		}
 		if ( is_wp_error( $result ) ) {
 			return self::timed_out( $result )
 				? new WP_Error( 'atora_ai_timeout', __( 'El asistente tardó demasiado en responder. Intenta de nuevo con una pregunta más corta.', 'atora-lms' ), array( 'status' => 504 ) )

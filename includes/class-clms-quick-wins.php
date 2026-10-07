@@ -400,7 +400,7 @@ class CLMS_Quick_Wins {
 			),
 		);
 
-		$response = $ai->chat( $messages, array( 'max_tokens' => 400, 'temperature' => 0.5 ) );
+		$response = $ai->chat( $messages, array( 'max_tokens' => 400, 'temperature' => 0.5, 'feature' => 'quick_wins', 'user_id' => absint( $user_id ), 'subject_users' => array( absint( $user_id ) ) ) );
 
 		if ( is_wp_error( $response ) ) {
 			return array();
