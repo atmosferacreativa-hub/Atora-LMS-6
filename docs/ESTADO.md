@@ -7,7 +7,7 @@ Qué está comprobado y dónde. Se actualiza en cada versión del plugin o de la
 - **Integración**: PHPUnit con WordPress (`tests/integration`).
 - **Unitaria**: PHPUnit sin WordPress o Jest en la app.
 
-Última actualización: **plugin 6.32.0 · app 0.8.1**.
+Última actualización: **plugin 6.32.0 · app 0.9.0**.
 
 > No hay registro escrito de qué se recorrió en teléfono antes de esta tabla: la columna "Teléfono" queda "por confirmar" hasta la prueba al cierre de la Fase 4, que incluye la lista acumulada de las fases 0 a 3.
 
@@ -26,6 +26,7 @@ Qué está comprobado y dónde. Se actualiza en cada versión del plugin o de la
 | Mensajes y Avisos | 0.6.0 | por confirmar | sí (`mensajes`) | sí (`InboxTest`, `MobileOrganizeTest`) | Jest |
 | Agenda y Hoy del estudiante | 0.6.0 | por confirmar | — | sí (`MobileOrganizeTest`) | Jest |
 | Notificaciones al teléfono (Expo) | 0.6.0 | por confirmar | — (requiere servicio externo) | sí (cola y token) | Jest |
+| Asistente de la lección ("Preguntar"), aviso de IA, sin conexión deshabilitado | 0.9.0 | pendiente (cierre de Fase 5, filas 31–33) | sí (`estudiante-asistente`, proveedor simulado) | `AiAssistantTest` | Jest (conversación solo en la sesión, límite; el indicio no está en pantallas del estudiante) |
 
 ## App (docente, Fase 4)
 
@@ -37,7 +38,8 @@ Qué está comprobado y dónde. Se actualiza en cada versión del plugin o de la
 | Calificar con rúbrica: PDF, decimal, borrador, publicar, el estudiante ve la nota | 0.8.0 | pendiente (cierre de fase) | sí (`docente-calificar`) | `TeacherApiTest`, `GradeDraftNoLeakTest` | Jest (bandas y total = servidor; borrador local) |
 | Conflicto entre dos docentes (409) | 0.8.0 | pendiente (cierre de fase) | sí (`docente-calificar-409`) | `GradeRevisionConflictTest`, `TeacherApiTest` | — |
 | Tarea grupal calificada desde el teléfono da la nota a todos | 0.8.0 | pendiente (cierre de fase) | — (datos sembrados, sin recorrido propio) | `GroupAssignmentMobileTest` | — |
-| Borrador de calificación tras cerrar la app o perder señal | 0.8.0 | pendiente (cierre de fase) | — | — | Jest |
+| Borrador de calificación tras cerrar la app o perder señal | 0.8.0 | pendiente (cierre de fase) | sí (`docente-borrador-recuperado`, 0.8.1) | — | Jest |
+| Sugerencia de calificación con IA: pedir, ver, "Usar todo"/"Usar", marca hasta editar | 0.9.0 | pendiente (cierre de Fase 5, filas 34–37) | sí (`docente-sugerencia-ia`, proveedor simulado) | `AiGradingSuggestionTest` | Jest (rellena sin enviar, consulta cada 3 s hasta 2 min) |
 
 ## Plugin (web)
 
