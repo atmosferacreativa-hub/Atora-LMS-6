@@ -59,6 +59,9 @@ final class ATORA_E2E_Seed_CLI {
 	 * [--password=<password>]
 	 * : Contraseña de las cuentas de prueba. Por defecto: atora-e2e-2026.
 	 *
+	 * [--perf]
+	 * : 6.33.0: además, "Curso grande E2E" con 100 lecciones (medición en gama baja).
+	 *
 	 * @param array $args
 	 * @param array $assoc_args
 	 */
@@ -71,7 +74,34 @@ final class ATORA_E2E_Seed_CLI {
 			(string) ( $assoc_args['video-dir'] ?? '' ),
 			(string) ( $assoc_args['password'] ?? 'atora-e2e-2026' )
 		);
+		if ( ! empty( $assoc_args['perf'] ) ) {
+			$out['large_course'] = self::large_course( (int) $out['student']['id'], (int) $out['teacher']['id'] );
+		}
 		\WP_CLI::line( (string) wp_json_encode( $out, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) );
+	}
+
+	/** 6.33.0: curso con 100 lecciones para medir listas largas en un teléfono de gama baja. */
+	public static function large_course( int $student, int $teacher ): int {
+		$existing = get_page_by_path( 'curso-e2e-grande', OBJECT, 'lm_course' );
+		$course   = $existing ? (int) $existing->ID : (int) wp_insert_post( array(
+			'post_type'    => 'lm_course',
+			'post_status'  => 'publish',
+			'post_name'    => 'curso-e2e-grande',
+			'post_title'   => 'Curso grande E2E',
+			'post_author'  => $teacher,
+			'post_content' => 'Curso con 100 lecciones para medir el rendimiento.',
+		) );
+		for ( $n = 1; $n <= 100; $n++ ) {
+			self::lesson( $course, $teacher, 'leccion-e2e-grande-' . $n, sprintf( 'Lección %03d', $n ), $n, array() );
+		}
+		if ( method_exists( 'CLMS_Helper', 'enroll_user_in_course' ) ) {
+			CLMS_Helper::enroll_user_in_course( $student, $course );
+		}
+		$table = class_exists( '\\ATORA\\LMS\\LMS_Course_Service' ) ? \ATORA\LMS\LMS_Course_Service::get_by_wp_post( $course ) : null;
+		if ( $table && class_exists( '\\ATORA\\LMS\\LMS_Enrollment_Service' ) ) {
+			\ATORA\LMS\LMS_Enrollment_Service::enroll( $student, (int) $table['id'] );
+		}
+		return $course;
 	}
 
 	/** @return array<string,mixed> */
