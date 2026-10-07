@@ -4,18 +4,18 @@ Orden: `docs/ordenes/ORDEN-FASE-5.md`. Al reanudar: leer este archivo, comprobar
 
 ## Paso actual
 
-**Bloque 1 — plugin 6.32.0: PR #65 en CI. Bloque 2 — app 0.9.0: código, Jest y recorridos listos en `feat/0.9.0-ia`, falta PR, CI completo (tras fusionar 6.32.0), etiqueta y APK.** Bloque A cerrado: plugin `v6.31.1` (ZIP sha256 b6efbf90…) y app `v0.8.1` (PR #25, sin APK). Bloque 0 (Paso 0) respondido.
+**Bloque 1 cerrado: 6.32.0 fusionado (PR #65), etiqueta `v6.32.0`, release con ZIP (sha256 7b07c128…). Bloque 2 — app 0.9.0: PR #26; CI completo 13/14 en el primer intento (el indicio estaba fuera de pantalla: el recorrido ahora se desplaza), segundo intento en curso; faltan fusionar, etiqueta y APK.** Bloque A cerrado: plugin `v6.31.1` (ZIP sha256 b6efbf90…) y app `v0.8.1` (PR #25, sin APK). Bloque 0 (Paso 0) respondido.
 
 ## Ramas y PR
 
 | Repo | Rama | Estado |
 |---|---|---|
-| Atora-LMS-6 | `feat/6.32.0-ia` | PR #65 (CI) → fusionar, etiqueta v6.32.0, ZIP |
-| atora-mobile | `feat/0.9.0-ia` | pusheada; PR tras fusionar 6.32.0 (el CI de la app usa el plugin de main) |
+| Atora-LMS-6 | `feat/6.32.0-ia` | fusionada (PR #65), `v6.32.0` |
+| atora-mobile | `feat/0.9.0-ia` | PR #26; CI completo en curso |
 
 ## Falta
 
-- [x] 6.32.0: pruebas (asistente con proveedor simulado y límite 429; no matriculado 404; estudiante en sugerencia 403; prompt sin nombre ni correo; sugerencia no cambia nota ni avisa; indicio fuera de rutas del estudiante; recorte de puntajes; función desactivada → 404 y sin capacidad); seed/CI con `ATORA_AI_FAKE`; changelog, MOBILE-API-V1, ESTADO; PR #65. **Falta**: CI verde, fusionar, etiqueta, ZIP.
+- [x] 6.32.0: pruebas (asistente con proveedor simulado y límite 429; no matriculado 404; estudiante en sugerencia 403; prompt sin nombre ni correo; sugerencia no cambia nota ni avisa; indicio fuera de rutas del estudiante; recorte de puntajes; función desactivada → 404 y sin capacidad); seed/CI con `ATORA_AI_FAKE`; changelog, MOBILE-API-V1, ESTADO; PR #65. Fusionado, etiqueta y ZIP hechos.
 - [ ] App 0.9.0 (código hecho): botón Preguntar en la lección; sugerencia al calificar; Jest; recorridos `estudiante-asistente` y `docente-sugerencia-ia`; changelog, README, PRUEBA-TELEFONO; etiqueta y **APK preview**.
 
 ## Respuestas del Paso 0 (Bloque 0)
@@ -36,4 +36,5 @@ Orden: `docs/ordenes/ORDEN-FASE-5.md`. Al reanudar: leer este archivo, comprobar
 6. Sin el módulo `ai` activo, las funciones no se declaran (no hay gestor que atienda); el seed E2E lo activa.
 7. `GET /teacher/submissions/{id}` suma `ai_suggestion_available` para que la app muestre el botón solo en tareas abiertas.
 8. En el CI de la app, el cron (sugerencia asíncrona) se dispara dentro del contenedor cada 3 s: el sitio vive en la URL del emulador y el cron por petición no llega.
+10. `AiGradingSuggestionTest` limpia las tablas de rúbricas al terminar (el DDL de `force_install` hace commit y `RubricsCliMigrationTest` esperaba tablas vacías).
 9. La conversación del asistente vive en memoria (no en disco) y se borra al cerrar sesión; el aviso de IA "primera vez" sí se recuerda en el teléfono.
