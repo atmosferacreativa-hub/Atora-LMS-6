@@ -7,7 +7,7 @@ Qué está comprobado y dónde. Se actualiza en cada versión del plugin o de la
 - **Integración**: PHPUnit con WordPress (`tests/integration`).
 - **Unitaria**: PHPUnit sin WordPress o Jest en la app.
 
-Última actualización: **plugin 6.31.1 · app 0.8.1**.
+Última actualización: **plugin 6.32.0 · app 0.8.1**.
 
 > No hay registro escrito de qué se recorrió en teléfono antes de esta tabla: la columna "Teléfono" queda "por confirmar" hasta la prueba al cierre de la Fase 4, que incluye la lista acumulada de las fases 0 a 3.
 
@@ -55,6 +55,9 @@ Qué está comprobado y dónde. Se actualiza en cada versión del plugin o de la
 | Intentos en SpeedGrader | 6.31.0 | `SpeedGraderAttemptsTest` | |
 | Tareas grupales en la app (API) | 6.31.0 | `GroupAssignmentMobileTest` | |
 | API del docente `/teacher/*` | 6.31.0 | `TeacherApiTest` | Pantallas: app 0.7.0 y 0.8.0 |
+| Uso y límites de IA (tabla, 429, tope mensual, aviso 80 %, pantalla de uso) | 6.32.0 | `AiAssistantTest`, `AiGradingSuggestionTest` | Web y app comparten el contador |
+| Asistente del estudiante `POST /ai/assistant` | 6.32.0 | `AiAssistantTest` | Proveedor simulado; pantalla: app 0.9.0 |
+| Sugerencia de calificación con IA (API y SpeedGrader) | 6.32.0 | `AiGradingSuggestionTest` | Proveedor simulado; botón web "Usar sugerencia" probado a mano en local; pantalla: app 0.9.0 |
 
 ## Datos históricos
 

@@ -1,5 +1,27 @@
 # CHANGELOG — ATORA LMS
 
+## 6.32.0 (2026-10-06)
+
+### Fase 5 — IA (plugin)
+
+Orden `docs/ordenes/ORDEN-FASE-5.md`, Bloques 0 y 1. La IA sugiere; nunca califica ni avisa al estudiante.
+
+**Extracción (commit propio, sin cambio de comportamiento).** La lógica del asistente web salió de la acción AJAX a `ATORA_AI_Assistant_Service` (`chat()`, prompt, llamada, historial, límite); `CLMS_Student_Assistant::ajax_chat()` queda como envoltura. La revisión con IA de SpeedGrader ya vivía fuera del AJAX (`CLMS_AI`).
+
+**Uso y límites desde el primer día.** Tabla `atora_ai_usage` (usuario, función, proveedor, modelo, tokens, costo estimado, resultado). Límite diario por usuario: estudiante 30 preguntas, docente 100 sugerencias; tope mensual de costo por academia (vacío = sin tope). Al pasarlo: **429** `atora_ai_limit` / `atora_ai_budget` con la hora de reinicio (`data.reset_at`). Al llegar al 80 % del tope, aviso a los administradores por el buzón (una vez al mes). El límite por IP del asistente web se reemplazó por el límite por usuario: la web y la app comparten el contador (los visitantes sin sesión conservan el límite por IP). Pantalla **ATORA LMS → Uso de IA**: uso del mes por función y resultado, los 10 usuarios con más consumo, funciones y límites.
+
+**Privacidad.** Al proveedor no se envían nombre, correo ni identificadores del estudiante: el asistente le habla "al estudiante" y la sugerencia solo manda consigna, rúbrica y texto de la entrega. La revisión con IA existente de SpeedGrader dejó de mandar el nombre. Las dos funciones nuevas están **desactivadas por defecto** por academia. Aviso visible en la web y en la app: "Las respuestas las genera una IA y pueden contener errores. No compartas datos personales."
+
+**Asistente del estudiante** — `POST /ai/assistant` `{ lesson_id | course_id, message, history (máx. 6), client_event_id }`: exige matrícula y lección publicada (si no, 404); contexto: contenido de la lección, fragmentos del curso y los enunciados de sus evaluaciones con la instrucción de no resolverlas; sin streaming, 30 s (504 `atora_ai_timeout`); registra el uso; no guarda la conversación. Idempotente por `client_event_id` (10 min).
+
+**Sugerencia de calificación** — asíncrona. `POST /teacher/submissions/{id}/ai-suggestion` → **202** `{ job_id }`; `GET /teacher/ai-suggestions/{job_id}` → `pending | done | failed`. Mismo alcance que calificar (`ATORA_Teacher_Scope`); solo entregas de tareas abiertas, no quizzes (422). Por criterio: puntaje (decimales, recortado al rango), nivel según las bandas de la web y justificación; devolución general; indicio de texto generado por IA `bajo | medio | alto` con su nota y siempre "Indicio no concluyente. Verifica con el estudiante antes de decidir.". Se guarda aparte de la nota (`_atora_ai_grading_suggestion`: modelo, fecha, docente); no cambia nota, estado ni avisos y nunca aparece en rutas del estudiante. Guardar sigue pasando solo por `ATORA_Grading_Save_Service`, y la auditoría de la rúbrica anota si había sugerencia y la diferencia por criterio. SpeedGrader web muestra la misma sugerencia con **Usar sugerencia** (rellena el formulario, no guarda).
+
+**`/discovery`**: `ai_assistant` y `ai_grading_suggestion` solo si hay proveedor configurado **y** la función está activada; si no, sus rutas responden 404.
+
+**Proveedor simulado para pruebas**: filtro `atora_ai_pre_chat` en `CLMS_AI_Manager::request_chat()`; `ATORA_AI_Fake_Provider` (constante `ATORA_AI_FAKE` o `enable()`) responde con `includes/ai/fixtures/fake-responses.json`. Las pruebas nunca llaman a un proveedor real.
+
+**TESTS**: `AiAssistantTest` (responde con el contexto de la lección y sin nombre ni correo, registra uso, reintento sin cobrar, 429 con hora de reinicio, no matriculado 404, función desactivada → 404 y fuera de `/discovery`). `AiGradingSuggestionTest` (puntaje recortado, decimales, indicio y aviso; no cambia nota ni avisa al estudiante; prompt sin identificadores; indicio ausente de las rutas del estudiante; guardado auditado con y sin sugerencia y su diferencia; estudiante 403, docente ajeno 404, 429; desactivada → 404).
+
 ## 6.31.1 (2026-10-06)
 
 ### Fix — control de revisión al calificar (auditoría externa de la Fase 4)
