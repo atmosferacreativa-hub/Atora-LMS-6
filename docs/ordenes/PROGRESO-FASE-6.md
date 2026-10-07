@@ -4,7 +4,7 @@ Orden: `docs/ordenes/ORDEN-FASE-6.md`. Reanudar: leer este archivo y la orden, c
 
 ## Paso actual
 
-**Compilaciones.** Plugin `v6.33.0` publicado (PR #68, release con ZIP sha256 ea8a5468…). App `v1.0.0` fusionada (PR #27, CI completo 17/17 run 37696518678). En curso: APK `preview`, AAB `production` e IPA en EAS; luego el reporte final.
+**FASE 6 COMPLETA (lo que depende del agente).** Plugin `v6.33.0` (release con ZIP sha256 ea8a5468…). App `v1.0.0` (CI 17/17). APK preview (vc 15): https://expo.dev/artifacts/eas/cKX39slavDwMnqCq-OBE-FeUXl8GFNZygWU1XiWsJjM.apk · AAB producción (vc 16): https://expo.dev/artifacts/eas/1gJpOEtKuOYXpCxp2Hjfg0Jcp61aeB8L7EHdv94fkIo.aab · IPA: falta la cuenta de Apple Developer del titular (EAS pide las credenciales). Nada se envió a ninguna tienda.
 
 ## Bloques
 
@@ -13,7 +13,7 @@ Orden: `docs/ordenes/ORDEN-FASE-6.md`. Reanudar: leer este archivo y la orden, c
 - [x] **C** (plugin) — `POST /account/deletion-request`, aviso al administrador, pantalla de solicitudes (anonimizar / eliminar), página pública `/eliminar-cuenta/` con enlace por correo. `AccountDeletionTest` (5).
 - [x] **C** (app y docs) — Yo → Eliminar mi cuenta; `docs/POLITICA-PRIVACIDAD-APP.md` y `docs/TIENDAS-DATOS.md` (app); permisos: se bloquean `READ/WRITE_EXTERNAL_STORAGE` y `SYSTEM_ALERT_WINDOW`; iOS sin textos de permiso (no usa cámara, fotos, ubicación…), cifrado exento.
 - [x] **D** — app 1.0.0. Hecho: i18n es/en (535 textos, prueba de catálogo), idioma en Yo, certificado PDF en la app, accesibilidad (etiquetas, 58 objetivos llevados a 44 pt, prueba de contraste, títulos sin cortes), errores con Sentry (sin datos personales, desactivable por academia en "App móvil" del plugin; apagado sin DSN). Falta: rendimiento, compilación de producción, cuentas de revisión, ficha y capturas, recorridos nuevos.
-- [ ] Cierre: 6.33.0 + 1.0.0, changelog, ESTADO, PRUEBA-TELEFONO, etiquetas, ZIP, compilación de prueba y de producción (AAB, IPA) sin enviar.
+- [x] Cierre (IPA pendiente de la cuenta de Apple): 6.33.0 + 1.0.0, changelog, ESTADO, PRUEBA-TELEFONO, etiquetas, ZIP, compilación de prueba y de producción (AAB, IPA) sin enviar.
 
 ## Ramas y PR
 
