@@ -1330,6 +1330,7 @@ add_action( 'init', static function () {
 	atora_lms_require_module( 'includes/certificates/class-certificate-pdf.php' );
 	atora_lms_require_module( 'includes/certificates/class-certificate-verify.php', static function () { ATORA_Certificate_Verify::boot(); } );
 	// 6.33.0: eliminación de cuenta (app, página pública y administración).
+	atora_lms_require_module( 'includes/account/class-privacy-erasers.php', static function () { ATORA_Privacy_Erasers::boot(); } );
 	atora_lms_require_module( 'includes/account/class-account-deletion.php', static function () { ATORA_Account_Deletion::boot(); } );
 	atora_lms_require_module( 'includes/mobile/class-mobile-settings-admin.php', static function () { ATORA_Mobile_Settings_Admin::boot(); } );
 	// 6.33.0: ayudas de las pruebas de pantalla; solo con ATORA_E2E (WordPress temporal del CI).

@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class V5_Installer {
 
 	/** Versión del esquema. Incrementar para forzar re-instalación. */
-	const SCHEMA_VERSION = '6.33.0-account';
+	const SCHEMA_VERSION = '6.33.1-privacy';
 
 	/** Option key que almacena la versión instalada. */
 	const OPTION_KEY = 'atora_v5_schema_version';
@@ -2367,6 +2367,7 @@ class V5_Installer {
 			source           VARCHAR(10)     NOT NULL DEFAULT 'web',
 			mode             VARCHAR(20)     NOT NULL DEFAULT '',
 			note             VARCHAR(500)    NOT NULL DEFAULT '',
+			detail           TEXT                     DEFAULT NULL,
 			requested_at     DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			processed_at     DATETIME                 DEFAULT NULL,
 			processed_by     BIGINT UNSIGNED NOT NULL DEFAULT 0,
