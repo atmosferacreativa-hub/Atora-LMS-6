@@ -171,6 +171,28 @@ final class CertificatePdfTest extends WP_UnitTestCase {
 		$this->assertFileExists( $uploads['basedir'] . '/atora-private/.htaccess', 'Carpeta privada.' );
 	}
 
+	public function test_transparent_signature_on_colored_background_has_no_box(): void {
+		// La firma de prueba es una elipse de color sobre fondo transparente.
+		$background = '#F4E9D8';
+		ATORA_Certificate_Template::save( array_merge( ATORA_Certificate_Template::get(), array( 'background_color' => $background ) ) );
+		$png   = ATORA_Certificate_PDF::flatten( get_attached_file( $this->images[0] ), $background );
+		$image = imagecreatefromstring( $png );
+		$this->assertNotFalse( $image );
+		$corner = imagecolorsforindex( $image, imagecolorat( $image, 0, 0 ) );
+		$this->assertSame( array( 0xF4, 0xE9, 0xD8, 0 ), array( $corner['red'], $corner['green'], $corner['blue'], $corner['alpha'] ), 'Lo transparente toma el color de la hoja: sin recuadro blanco.' );
+		$center = imagecolorsforindex( $image, imagecolorat( $image, 80, 30 ) );
+		$this->assertSame( array( 30, 60, 200 ), array( $center['red'], $center['green'], $center['blue'] ), 'La firma conserva su color.' );
+		$this->assertSame( "\x89PNG", substr( $png, 0, 4 ), 'Sigue siendo PNG (sin pérdida).' );
+
+		// El PDF se genera (este servidor tiene Imagick, que antes fallaba con PNG transparentes) y sin máscaras de transparencia.
+		$pdf = ATORA_Certificate_PDF::for_user( $this->student, $this->resolved() );
+		$this->assertIsString( $pdf );
+		$this->assertStringStartsWith( '%PDF-', $pdf );
+		$this->assertStringNotContainsString( '/SMask', $pdf );
+		$html = ATORA_Certificate_PDF::html( ATORA_Certificate_PDF::data( $this->student, 'course', $this->course, $this->resolved()['record'], wp_generate_uuid4() ) );
+		$this->assertStringContainsString( 'background-color: #F4E9D8', $html, 'La hoja usa el color de la plantilla.' );
+	}
+
 	public function test_discovery_declares_certificate_pdf(): void {
 		$this->assertTrue( ATORA_Mobile_REST_Controller::discovery()->get_data()['capabilities']['certificate_pdf'] );
 	}

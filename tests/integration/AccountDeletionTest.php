@@ -100,12 +100,31 @@ final class AccountDeletionTest extends WP_UnitTestCase {
 
 	public function test_full_deletion_removes_the_account_and_admins_are_protected(): void {
 		$request_id = $this->request_from_app()->get_data()['request_id'];
-		$this->assertTrue( ATORA_Account_Deletion::process( $request_id, 'delete', $this->admin ) );
+		// Sin aceptar la advertencia, no se elimina nada.
+		$refused = ATORA_Account_Deletion::process( $request_id, 'delete', $this->admin );
+		$this->assertSame( 'atora_account_deletion_confirm', $refused->get_error_code() );
+		$this->assertStringContainsString( 'Se borrarán también notas y actas; la institución puede estar obligada a conservarlas', $refused->get_error_message() );
+		$this->assertNotFalse( get_userdata( $this->student ) );
+		$this->assertSame( 'Julia Rojas', get_userdata( $this->student )->display_name, 'Tampoco se anonimiza.' );
+
+		$before = time();
+		$this->assertTrue( ATORA_Account_Deletion::process( $request_id, 'delete', $this->admin, true ) );
 		$this->assertFalse( get_userdata( $this->student ) );
+		global $wpdb;
+		$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}atora_account_deletions WHERE id = %d", $request_id ), ARRAY_A );
+		$this->assertSame( 'delete', $row['mode'] );
+		$this->assertSame( (string) $this->admin, (string) $row['processed_by'], 'Queda quién la ejecutó.' );
+		$this->assertGreaterThanOrEqual( $before - 1, strtotime( $row['processed_at'] . ' UTC' ), 'Y cuándo.' );
 
 		$other_admin = self::factory()->user->create( array( 'role' => 'administrator' ) );
 		$admin_req   = ATORA_Account_Deletion::request( $other_admin, 'web' );
-		$this->assertSame( 'atora_account_deletion_admin', ATORA_Account_Deletion::process( $admin_req['request_id'], 'delete', $this->admin )->get_error_code() );
+		$this->assertSame( 'atora_account_deletion_admin', ATORA_Account_Deletion::process( $admin_req['request_id'], 'delete', $this->admin, true )->get_error_code() );
+	}
+
+	public function test_default_action_is_anonymize(): void {
+		$request_id = $this->request_from_app()->get_data()['request_id'];
+		$this->assertTrue( ATORA_Account_Deletion::process( $request_id ) );
+		$this->assertSame( 'Usuario eliminado', get_userdata( $this->student )->display_name, 'Por defecto se anonimiza: la cuenta sigue y lo académico se conserva.' );
 	}
 
 	public function test_public_page_by_email_link_without_revealing_accounts(): void {

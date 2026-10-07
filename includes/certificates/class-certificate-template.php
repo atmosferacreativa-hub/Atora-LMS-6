@@ -28,6 +28,8 @@ final class ATORA_Certificate_Template {
 			'logo_id'         => 0,
 			'primary_color'   => '#1B3A8C',
 			'accent_color'    => '#E0A100',
+			// 6.33.0: color de la hoja; las imágenes se aplanan sobre él.
+			'background_color' => '#FFFFFF',
 			'title'           => __( 'Certificado', 'atora-lms' ),
 			'intro'           => __( 'Se certifica que', 'atora-lms' ),
 			'body'            => __( 'completó satisfactoriamente', 'atora-lms' ),
@@ -63,6 +65,7 @@ final class ATORA_Certificate_Template {
 			'logo_id'       => absint( $input['logo_id'] ?? 0 ),
 			'primary_color' => sanitize_hex_color( (string) ( $input['primary_color'] ?? '' ) ) ?: $defaults['primary_color'],
 			'accent_color'  => sanitize_hex_color( (string) ( $input['accent_color'] ?? '' ) ) ?: $defaults['accent_color'],
+			'background_color' => sanitize_hex_color( (string) ( $input['background_color'] ?? '' ) ) ?: $defaults['background_color'],
 			'title'         => sanitize_text_field( (string) ( $input['title'] ?? $defaults['title'] ) ),
 			'intro'         => sanitize_text_field( (string) ( $input['intro'] ?? $defaults['intro'] ) ),
 			'body'          => sanitize_text_field( (string) ( $input['body'] ?? $defaults['body'] ) ),
@@ -146,7 +149,7 @@ final class ATORA_Certificate_Template {
 		wp_nonce_field( 'atora_certificate_template' );
 		echo '<input type="hidden" name="action" value="atora_certificate_template"><table class="form-table" role="presentation">';
 		echo '<tr><th>' . esc_html__( 'Logo', 'atora-lms' ) . '</th><td>' . self::image_field( 'logo_id', (int) $t['logo_id'], __( 'Elegir logo', 'atora-lms' ) ) . '</td></tr>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-		printf( '<tr><th>%s</th><td><input type="color" name="primary_color" value="%s"> <input type="color" name="accent_color" value="%s"></td></tr>', esc_html__( 'Colores (principal y acento)', 'atora-lms' ), esc_attr( $t['primary_color'] ), esc_attr( $t['accent_color'] ) );
+		printf( '<tr><th>%s</th><td><input type="color" name="primary_color" value="%s"> <input type="color" name="accent_color" value="%s"> <input type="color" name="background_color" value="%s"></td></tr>', esc_html__( 'Colores (principal, acento y fondo de la hoja)', 'atora-lms' ), esc_attr( $t['primary_color'] ), esc_attr( $t['accent_color'] ), esc_attr( $t['background_color'] ) );
 		foreach ( array( 'title' => __( 'Título', 'atora-lms' ), 'intro' => __( 'Texto antes del nombre', 'atora-lms' ), 'body' => __( 'Texto antes del curso o programa', 'atora-lms' ) ) as $key => $label ) {
 			printf( '<tr><th>%s</th><td><input type="text" class="regular-text" name="%s" value="%s"></td></tr>', esc_html( $label ), esc_attr( $key ), esc_attr( (string) $t[ $key ] ) );
 		}

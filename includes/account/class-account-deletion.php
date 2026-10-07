@@ -130,12 +130,19 @@ final class ATORA_Account_Deletion {
 		}
 	}
 
+	/** Advertencia que se acepta antes de eliminar por completo (6.33.0). */
+	public static function full_delete_warning(): string {
+		return __( 'Se borrarán también notas y actas; la institución puede estar obligada a conservarlas.', 'atora-lms' );
+	}
+
 	/**
-	 * Procesa una solicitud: `anonymize` o `delete`.
+	 * Procesa una solicitud. Por defecto **anonimiza**; eliminar por completo
+	 * (`delete`) exige `$confirmed_full = true`, es decir, que el administrador
+	 * aceptó la advertencia. Queda registrado quién la ejecutó y cuándo.
 	 *
 	 * @return true|WP_Error
 	 */
-	public static function process( int $request_id, string $mode, int $actor_id ) {
+	public static function process( int $request_id, string $mode = 'anonymize', int $actor_id = 0, bool $confirmed_full = false ) {
 		global $wpdb;
 		$row = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . self::table() . ' WHERE id = %d', $request_id ), ARRAY_A ); // phpcs:ignore WordPress.DB
 		if ( ! $row || 'pending' !== $row['status'] ) {
@@ -143,6 +150,9 @@ final class ATORA_Account_Deletion {
 		}
 		if ( ! in_array( $mode, array( 'anonymize', 'delete' ), true ) ) {
 			return new WP_Error( 'atora_account_deletion_mode', __( 'Acción no válida.', 'atora-lms' ), array( 'status' => 400 ) );
+		}
+		if ( 'delete' === $mode && ! $confirmed_full ) {
+			return new WP_Error( 'atora_account_deletion_confirm', self::full_delete_warning() . ' ' . __( 'Confirma expresamente para eliminar por completo, o anonimiza.', 'atora-lms' ), array( 'status' => 400 ) );
 		}
 		$user_id = (int) $row['user_id'];
 		if ( user_can( $user_id, 'manage_options' ) ) {
@@ -206,8 +216,9 @@ final class ATORA_Account_Deletion {
 		}
 		$request_id = isset( $_POST['request_id'] ) ? absint( $_POST['request_id'] ) : 0;
 		check_admin_referer( 'atora_account_deletion_' . $request_id );
-		$mode   = isset( $_POST['mode'] ) ? sanitize_key( wp_unslash( $_POST['mode'] ) ) : '';
-		$result = self::process( $request_id, $mode, get_current_user_id() );
+		$mode      = isset( $_POST['mode'] ) ? sanitize_key( wp_unslash( $_POST['mode'] ) ) : 'anonymize';
+		$confirmed = ! empty( $_POST['confirm_full_delete'] );
+		$result    = self::process( $request_id, '' === $mode ? 'anonymize' : $mode, get_current_user_id(), $confirmed );
 		$args   = array( 'page' => self::PAGE, 'done' => is_wp_error( $result ) ? 0 : 1 );
 		if ( is_wp_error( $result ) ) {
 			$args['error'] = rawurlencode( $result->get_error_message() );
@@ -241,14 +252,22 @@ final class ATORA_Account_Deletion {
 			$user = get_userdata( (int) $row['user_id'] );
 			echo '<tr><td>' . esc_html( $user ? $user->display_name . ' <' . $user->user_email . '>' : '#' . $row['user_id'] ) . ( '' !== (string) $row['note'] ? '<br><em>' . esc_html( $row['note'] ) . '</em>' : '' ) . '</td>';
 			echo '<td>' . esc_html( get_date_from_gmt( (string) $row['requested_at'], 'Y-m-d H:i' ) ) . '</td><td>' . esc_html( self::deadline( (string) $row['requested_at'] ) ) . '</td><td>' . esc_html( 'app' === $row['source'] ? 'App' : 'Web' ) . '</td>';
-			echo '<td>' . esc_html( 'pending' === $row['status'] ? __( 'Pendiente', 'atora-lms' ) : ( 'delete' === $row['mode'] ? __( 'Eliminada', 'atora-lms' ) : __( 'Anonimizada', 'atora-lms' ) ) ) . '</td><td>';
+			$state = 'pending' === $row['status'] ? __( 'Pendiente', 'atora-lms' ) : ( 'delete' === $row['mode'] ? __( 'Eliminada por completo', 'atora-lms' ) : __( 'Anonimizada', 'atora-lms' ) );
+			if ( 'pending' !== $row['status'] ) {
+				$actor = get_userdata( (int) $row['processed_by'] );
+				/* translators: 1: estado, 2: administrador, 3: fecha */
+				$state = sprintf( __( '%1$s por %2$s el %3$s', 'atora-lms' ), $state, $actor ? $actor->display_name : '#' . (int) $row['processed_by'], get_date_from_gmt( (string) $row['processed_at'], 'Y-m-d H:i' ) );
+			}
+			echo '<td>' . esc_html( $state ) . '</td><td>';
 			if ( 'pending' === $row['status'] ) {
-				foreach ( array( 'anonymize' => __( 'Anonimizar', 'atora-lms' ), 'delete' => __( 'Eliminar por completo', 'atora-lms' ) ) as $mode => $label ) {
-					echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" style="display:inline" onsubmit="return confirm(\'' . esc_js( __( '¿Confirmas? No se puede deshacer.', 'atora-lms' ) ) . '\')">';
-					wp_nonce_field( 'atora_account_deletion_' . (int) $row['id'] );
-					echo '<input type="hidden" name="action" value="atora_account_deletion_process"><input type="hidden" name="request_id" value="' . (int) $row['id'] . '"><input type="hidden" name="mode" value="' . esc_attr( $mode ) . '">';
-					echo '<button class="button' . ( 'anonymize' === $mode ? ' button-primary' : '' ) . '">' . esc_html( $label ) . '</button> </form>';
-				}
+				$form = '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" style="display:inline">' . wp_nonce_field( 'atora_account_deletion_' . (int) $row['id'], '_wpnonce', true, false )
+					. '<input type="hidden" name="action" value="atora_account_deletion_process"><input type="hidden" name="request_id" value="' . (int) $row['id'] . '">';
+				// Acción por defecto: anonimizar.
+				echo $form . '<input type="hidden" name="mode" value="anonymize"><button class="button button-primary" onclick="return confirm(\'' . esc_js( __( '¿Anonimizar la cuenta? No se puede deshacer.', 'atora-lms' ) ) . '\')">' . esc_html__( 'Anonimizar', 'atora-lms' ) . '</button></form>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- formulario armado con valores escapados.
+				// Eliminar por completo: aparte, con la advertencia aceptada expresamente.
+				echo '<details style="margin-top:6px"><summary>' . esc_html__( 'Eliminar por completo…', 'atora-lms' ) . '</summary>' . $form // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+					. '<input type="hidden" name="mode" value="delete"><p style="color:#a11d1d;max-width:420px"><label><input type="checkbox" name="confirm_full_delete" value="1" required> ' . esc_html( self::full_delete_warning() ) . '</label></p>'
+					. '<button class="button" onclick="return confirm(\'' . esc_js( self::full_delete_warning() . ' ' . __( '¿Eliminar por completo?', 'atora-lms' ) ) . '\')">' . esc_html__( 'Eliminar por completo', 'atora-lms' ) . '</button></form></details>';
 			}
 			echo '</td></tr>';
 		}

@@ -116,44 +116,60 @@ final class ATORA_Certificate_PDF {
 	}
 
 	/**
-	 * Imagen como JPEG sobre fondo blanco. Dompdf procesa los PNG con Imagick o GD
-	 * y algunas instalaciones de Imagick fallan con un error fatal; el JPEG entra
-	 * al PDF sin procesar. Sin GD ni Imagick, la imagen se omite (el resto del
-	 * certificado sale igual).
+	 * Imagen lista para el PDF: PNG sin canal alfa, aplanado sobre el color de
+	 * fondo real de la plantilla. Así una firma o un logo transparentes no dejan
+	 * recuadro sobre fondos de color, y Dompdf incrusta el PNG sin procesarlo
+	 * (con alfa, Dompdf usa Imagick, que en algunos servidores falla con un error
+	 * fatal). Se hace con GD; si no hay GD, con Imagick en un try/catch; sin
+	 * ninguno, la imagen se omite (el resto del certificado sale igual).
 	 */
-	private static function image_data_uri( int $attachment_id ): string {
+	private static function image_data_uri( int $attachment_id, string $background ): string {
 		$path = $attachment_id ? get_attached_file( $attachment_id ) : '';
 		if ( ! $path || ! is_readable( $path ) ) {
 			return '';
 		}
-		$jpeg = self::flatten_to_jpeg( $path );
-		return '' !== $jpeg ? 'data:image/jpeg;base64,' . base64_encode( $jpeg ) : '';
+		$png = self::flatten( $path, $background );
+		return '' !== $png ? 'data:image/png;base64,' . base64_encode( $png ) : '';
 	}
 
-	public static function flatten_to_jpeg( string $path ): string {
+	/** @return int[] RGB de un color #rrggbb. */
+	private static function rgb( string $hex ): array {
+		$hex = ltrim( (string) sanitize_hex_color( $hex ) ?: '#ffffff', '#' );
+		if ( 3 === strlen( $hex ) ) {
+			$hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
+		}
+		return array( hexdec( substr( $hex, 0, 2 ) ), hexdec( substr( $hex, 2, 2 ) ), hexdec( substr( $hex, 4, 2 ) ) );
+	}
+
+	/** PNG truecolor sin alfa, con lo transparente pintado del color de fondo. */
+	public static function flatten( string $path, string $background = '#ffffff' ): string {
 		$mime = (string) wp_check_filetype( $path )['type'];
 		if ( ! in_array( $mime, array( 'image/png', 'image/jpeg', 'image/gif', 'image/webp' ), true ) ) {
 			return '';
 		}
-		if ( function_exists( 'imagecreatefromstring' ) && function_exists( 'imagejpeg' ) ) {
+		list( $r, $g, $b ) = self::rgb( $background );
+		if ( function_exists( 'imagecreatefromstring' ) && function_exists( 'imagepng' ) ) {
 			$source = @imagecreatefromstring( (string) file_get_contents( $path ) ); // phpcs:ignore WordPress.PHP.NoSilencedErrors, WordPress.WP.AlternativeFunctions
 			if ( $source ) {
 				$width  = imagesx( $source );
 				$height = imagesy( $source );
 				$canvas = imagecreatetruecolor( $width, $height );
-				imagefill( $canvas, 0, 0, imagecolorallocate( $canvas, 255, 255, 255 ) );
+				imagealphablending( $canvas, true );
+				imagefill( $canvas, 0, 0, imagecolorallocate( $canvas, $r, $g, $b ) );
 				imagecopy( $canvas, $source, 0, 0, 0, 0, $width, $height );
+				imagesavealpha( $canvas, false );
 				ob_start();
-				imagejpeg( $canvas, null, 90 );
+				imagepng( $canvas, null, 6 );
 				return (string) ob_get_clean();
 			}
 		}
 		if ( class_exists( 'Imagick' ) ) {
 			try {
 				$image = new Imagick( $path );
-				$image->setImageBackgroundColor( 'white' );
+				$image->setImageBackgroundColor( sprintf( 'rgb(%d,%d,%d)', $r, $g, $b ) );
 				$image = $image->mergeImageLayers( Imagick::LAYERMETHOD_FLATTEN );
-				$image->setImageFormat( 'jpeg' );
+				$image->setImageAlphaChannel( Imagick::ALPHACHANNEL_REMOVE );
+				$image->setImageFormat( 'png24' );
 				return (string) $image->getImageBlob();
 			} catch ( Throwable $e ) {
 				return '';
@@ -167,7 +183,8 @@ final class ATORA_Certificate_PDF {
 		$t       = $d['template'];
 		$primary = esc_attr( $t['primary_color'] );
 		$accent  = esc_attr( $t['accent_color'] );
-		$logo    = self::image_data_uri( (int) $t['logo_id'] );
+		$paper   = esc_attr( $t['background_color'] );
+		$logo    = self::image_data_uri( (int) $t['logo_id'], $t['background_color'] );
 		$qr      = self::qr_data_uri( $d['verify_url'] );
 		$facts   = array();
 		if ( ! empty( $t['show_hours'] ) && $d['hours'] ) {
@@ -185,7 +202,7 @@ final class ATORA_Certificate_PDF {
 		$signatures = '';
 		$count      = max( 1, count( $t['signatures'] ) );
 		foreach ( $t['signatures'] as $signature ) {
-			$image       = self::image_data_uri( (int) $signature['image_id'] );
+			$image       = self::image_data_uri( (int) $signature['image_id'], $t['background_color'] );
 			$signatures .= '<td class="signature" style="width:' . floor( 100 / $count ) . '%">'
 				. ( $image ? '<img class="signature-image" src="' . esc_attr( $image ) . '">' : '<div class="signature-space"></div>' )
 				. '<div class="signature-line"></div><div class="signature-name">' . esc_html( $signature['name'] ) . '</div><div class="signature-role">' . esc_html( $signature['role'] ) . '</div></td>';
@@ -196,6 +213,7 @@ final class ATORA_Certificate_PDF {
 <!doctype html>
 <html lang="es"><head><meta charset="utf-8"><style>
 @page { margin: 0; size: A4 landscape; }
+html, body { background-color: <?php echo $paper; // phpcs:ignore ?>; }
 body { margin: 0; font-family: "DejaVu Sans", sans-serif; color: #1f2937; }
 .frame { position: absolute; top: 18px; left: 18px; right: 18px; bottom: 18px; border: 6px solid <?php echo $primary; // phpcs:ignore ?>; }
 .inner { position: absolute; top: 30px; left: 30px; right: 30px; bottom: 30px; border: 1.5px solid <?php echo $accent; // phpcs:ignore ?>; padding: 34px 44px 0; text-align: center; }
@@ -219,7 +237,7 @@ body { margin: 0; font-family: "DejaVu Sans", sans-serif; color: #1f2937; }
 .code { text-align: left; }
 .verify { text-align: right; }
 .qr { width: 84px; padding-left: 8px; }
-.qr img { width: 84px; height: 84px; }
+.qr img { width: 84px; height: 84px; background-color: #ffffff; padding: 3px; }
 .footer { font-size: 10px; color: #6b7280; margin-top: 8px; }
 </style></head><body>
 <div class="frame"></div>
