@@ -189,7 +189,8 @@ class CLMS_AI {
 		return array(
 			'submission_id'   => $submission_id,
 			'student_id'      => $student_id,
-			'student_name'    => $student ? ( $student->display_name ? $student->display_name : $student->user_login ) : '',
+			// 6.32.0: al proveedor no se envía el nombre del estudiante.
+			'student_name'    => 'el estudiante',
 			'course_id'       => $course_id,
 			'course_title'    => $course_id ? get_the_title( $course_id ) : '',
 			'lesson_id'       => $lesson_id,

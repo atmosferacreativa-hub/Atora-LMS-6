@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class V5_Installer {
 
 	/** Versión del esquema. Incrementar para forzar re-instalación. */
-	const SCHEMA_VERSION = '6.30.0-inbox';
+	const SCHEMA_VERSION = '6.32.0-ai';
 
 	/** Option key que almacena la versión instalada. */
 	const OPTION_KEY = 'atora_v5_schema_version';
@@ -2325,6 +2325,38 @@ class V5_Installer {
 			PRIMARY KEY (id),
 			UNIQUE KEY token (token),
 			KEY user_id (user_id)
+		) $charset_collate;" );
+
+		// ── IA (6.32.0): uso por usuario y función, y trabajos de sugerencia ─
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_ai_usage (
+			id               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			institution_id   BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			user_id          BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			feature          VARCHAR(40)     NOT NULL DEFAULT '',
+			provider         VARCHAR(40)     NOT NULL DEFAULT '',
+			model            VARCHAR(100)    NOT NULL DEFAULT '',
+			tokens_in        INT UNSIGNED    NOT NULL DEFAULT 0,
+			tokens_out       INT UNSIGNED    NOT NULL DEFAULT 0,
+			cost             DECIMAL(12,6)   NOT NULL DEFAULT 0,
+			result           VARCHAR(20)     NOT NULL DEFAULT 'ok',
+			created_at       DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			KEY user_feature_day (user_id, feature, created_at),
+			KEY inst_month (institution_id, created_at)
+		) $charset_collate;" );
+
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_ai_jobs (
+			id               VARCHAR(36)     NOT NULL,
+			institution_id   BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			submission_id    BIGINT UNSIGNED NOT NULL,
+			user_id          BIGINT UNSIGNED NOT NULL,
+			status           VARCHAR(20)     NOT NULL DEFAULT 'pending',
+			result           LONGTEXT                 DEFAULT NULL,
+			error            VARCHAR(255)    NOT NULL DEFAULT '',
+			created_at       DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at       DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			KEY submission_id (submission_id)
 		) $charset_collate;" );
 
 		// ── Sesiones móviles fuera de usermeta (6.26.5) ─────────────────────

@@ -36,11 +36,14 @@ class ATORA_AI_Assistant_Service {
 			return new WP_Error( 'clms_sa_empty_message', __( 'Mensaje vacío.', 'atora-lms' ), array( 'status' => 400 ) );
 		}
 
-		// Rate limiting
-		$rate_key = is_user_logged_in()
-			? 'clms_sa_rate_u_' . get_current_user_id()
-			: 'clms_sa_rate_g_' . $this->get_client_ip();
-		if ( ! $this->check_rate_limit( $rate_key ) ) {
+		// 6.32.0: con sesión, el límite diario por usuario (el mismo contador que la app);
+		// sin sesión (modo ventas), el límite por IP de siempre.
+		if ( is_user_logged_in() ) {
+			$allowed = class_exists( 'ATORA_AI_Usage_Service' ) ? ATORA_AI_Usage_Service::check( get_current_user_id(), ATORA_AI_Usage_Service::ASSISTANT ) : true;
+			if ( is_wp_error( $allowed ) ) {
+				return $allowed;
+			}
+		} elseif ( ! $this->check_rate_limit( 'clms_sa_rate_g_' . $this->get_client_ip() ) ) {
 			return new WP_Error( 'clms_sa_rate_limited', __( 'Demasiadas preguntas seguidas. Espera un momento.', 'atora-lms' ), array( 'status' => 429 ) );
 		}
 
@@ -82,8 +85,6 @@ class ATORA_AI_Assistant_Service {
 			$lines[] = 'Si el visitante pregunta sobre precio, inscripción o requisitos, da la información disponible y ofrece el enlace de inscripción si lo tienes.';
 		} else {
 			$user_id      = get_current_user_id();
-			$user         = get_user_by( 'id', $user_id );
-			$user_name    = $user ? ( $user->display_name ?: $user->user_login ) : 'estudiante';
 			$completed    = (array) get_user_meta( $user_id, '_clms_completed_lessons', true );
 			$lesson_ids   = class_exists( 'CLMS_Helper' ) ? CLMS_Helper::get_course_lessons( $course_id ) : array();
 			$total        = count( $lesson_ids );
@@ -91,7 +92,8 @@ class ATORA_AI_Assistant_Service {
 			$progress     = $total > 0 ? round( $done / $total * 100 ) : 0;
 
 			$lines[] = "Eres el Asistente Académico del curso \"{$course_title}\".";
-			$lines[] = "Estás hablando con {$user_name}, quien lleva un {$progress}% del curso completado ({$done} de {$total} lecciones).";
+			// 6.32.0: al proveedor no se envía el nombre ni ningún dato que identifique al estudiante.
+			$lines[] = "Estás hablando con el estudiante, que lleva un {$progress}% del curso completado ({$done} de {$total} lecciones).";
 			$lines[] = 'Tu misión es ayudar al estudiante a comprender el contenido del curso, resolver dudas conceptuales y motivarlo a seguir avanzando.';
 			$lines[] = 'Respondes siempre en español, con tono pedagógico, paciente y motivador.';
 			$lines[] = 'Cuando expliques conceptos, usa ejemplos prácticos del contexto del curso.';
@@ -159,9 +161,10 @@ class ATORA_AI_Assistant_Service {
 		$context  = is_array( $context ) ? $context : array();
 		$context['screen'] = 'student_assistant';
 
-		if ( $copilots && method_exists( $copilots, 'run_text' ) ) {
+		if ( $copilots && method_exists( $copilots, 'run_with_meta' ) ) {
 			$copilot_type = ( 'sales' === sanitize_key( (string) $mode ) ) ? 'commercial' : 'student';
-			return $copilots->run_text(
+			// 6.32.0: con metadatos, para registrar el uso por usuario.
+			$result = $copilots->run_with_meta(
 				$copilot_type,
 				'chat',
 				(array) $messages,
@@ -170,9 +173,11 @@ class ATORA_AI_Assistant_Service {
 					'max_tokens'  => 800,
 					'temperature' => 0.7,
 					'timeout'     => 60,
+					'source'      => 'assistant',
 				),
 				$context
 			);
+			return self::with_usage( $result );
 		}
 
 		$manager = class_exists( 'CLMS_Helper' ) ? clms_core('CLMS_AI_Manager') : null;
@@ -181,15 +186,35 @@ class ATORA_AI_Assistant_Service {
 			return new WP_Error( 'clms_ai_manager_missing', __( 'CLMS_AI_Manager no está disponible.', 'atora-lms' ) );
 		}
 
-		return $manager->chat(
+		return self::with_usage( $manager->chat_with_meta(
 			(array) $messages,
 			array(
 				'system'      => (string) $system,
 				'max_tokens'  => 800,
 				'temperature' => 0.7,
 				'timeout'     => 60,
+				'source'      => 'assistant',
 			)
-		);
+		) );
+	}
+
+	/** 6.32.0: registra el uso (con sesión) y devuelve solo el texto, como antes. @return string|WP_Error */
+	private static function with_usage( $result ) {
+		$user_id = get_current_user_id();
+		if ( $user_id && class_exists( 'ATORA_AI_Usage_Service' ) ) {
+			ATORA_AI_Usage_Service::record(
+				$user_id,
+				ATORA_AI_Usage_Service::ASSISTANT,
+				is_array( $result ) ? (string) ( $result['provider'] ?? '' ) : '',
+				is_array( $result ) ? (string) ( $result['model'] ?? '' ) : '',
+				is_array( $result ) ? (array) ( $result['usage'] ?? array() ) : array(),
+				is_wp_error( $result ) ? 'error' : 'ok'
+			);
+		}
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+		return is_array( $result ) ? (string) ( $result['text'] ?? '' ) : (string) $result;
 	}
 
 	public function build_messages( $history, $message ) {
@@ -238,4 +263,106 @@ class ATORA_AI_Assistant_Service {
 		return \ATORA_Client_IP::get_hashed();
 	}
 
+
+	// ── App (6.32.0): preguntar sobre una lección ─────────────────────────────
+
+	const APP_HISTORY = 6;
+	const APP_TIMEOUT = 30;
+
+	/**
+	 * Pregunta del estudiante sobre una lección (la app). Sin datos que lo
+	 * identifiquen; no se guarda la conversación (solo el registro de uso).
+	 *
+	 * @return array|WP_Error {reply}
+	 */
+	public function ask_lesson( int $user_id, int $wp_course, int $wp_lesson, string $message, array $history ) {
+		$message = trim( $message );
+		if ( '' === $message ) {
+			return new WP_Error( 'atora_ai_empty', __( 'Escribe tu pregunta.', 'atora-lms' ), array( 'status' => 400 ) );
+		}
+		$allowed = ATORA_AI_Usage_Service::check( $user_id, ATORA_AI_Usage_Service::ASSISTANT );
+		if ( is_wp_error( $allowed ) ) {
+			return $allowed;
+		}
+		$manager = function_exists( 'clms_core' ) ? clms_core( 'CLMS_AI_Manager' ) : null;
+		if ( ! $manager || ! method_exists( $manager, 'chat_with_meta' ) ) {
+			return new WP_Error( 'atora_ai_unavailable', __( 'El asistente no está disponible.', 'atora-lms' ), array( 'status' => 503 ) );
+		}
+		$turns  = array_slice( array_values( $history ), -self::APP_HISTORY );
+		$result = $manager->chat_with_meta(
+			$this->build_messages( $turns, $message ),
+			array(
+				'system'      => $this->lesson_system_prompt( $wp_course, $wp_lesson, $message ),
+				'max_tokens'  => 700,
+				'temperature' => 0.5,
+				'timeout'     => self::APP_TIMEOUT,
+				'source'      => 'assistant',
+			)
+		);
+		ATORA_AI_Usage_Service::record(
+			$user_id,
+			ATORA_AI_Usage_Service::ASSISTANT,
+			is_array( $result ) ? (string) ( $result['provider'] ?? '' ) : '',
+			is_array( $result ) ? (string) ( $result['model'] ?? '' ) : '',
+			is_array( $result ) ? (array) ( $result['usage'] ?? array() ) : array(),
+			is_wp_error( $result ) ? 'error' : 'ok'
+		);
+		if ( is_wp_error( $result ) ) {
+			return self::timed_out( $result )
+				? new WP_Error( 'atora_ai_timeout', __( 'El asistente tardó demasiado en responder. Intenta de nuevo con una pregunta más corta.', 'atora-lms' ), array( 'status' => 504 ) )
+				: new WP_Error( 'atora_ai_error', __( 'El asistente no pudo responder ahora. Intenta más tarde.', 'atora-lms' ), array( 'status' => 502 ) );
+		}
+		return array( 'reply' => trim( (string) ( $result['text'] ?? '' ) ) );
+	}
+
+	private static function timed_out( WP_Error $error ): bool {
+		$text = strtolower( $error->get_error_message() . ' ' . wp_json_encode( $error->get_error_data() ) );
+		return false !== strpos( $text, 'timed out' ) || false !== strpos( $text, 'curl error 28' ) || false !== strpos( $text, 'timeout' );
+	}
+
+	/** Instrucciones y contexto de una lección: contenido, base de conocimiento y enunciados (sin resolverlos). */
+	public function lesson_system_prompt( int $wp_course, int $wp_lesson, string $query ): string {
+		$course  = (string) get_the_title( $wp_course );
+		$lesson  = (string) get_the_title( $wp_lesson );
+		$content = trim( wp_strip_all_tags( (string) get_post_field( 'post_content', $wp_lesson ) ) );
+		$lines   = array(
+			"Eres el Asistente Académico del curso \"{$course}\". Estás ayudando al estudiante con la lección \"{$lesson}\".",
+			'Respondes en español, con tono pedagógico y claro, basándote en el contenido de la lección y del curso.',
+			'No inventes información: si el contenido no lo cubre, dilo y sugiere a quién o dónde preguntar.',
+			'IMPORTANTE: no resuelvas evaluaciones (quizzes) ni tareas del curso. Si la pregunta pide la respuesta de una evaluación o tarea, no la des: orienta con pistas, explica el concepto y remite al contenido para que el estudiante llegue solo a la respuesta.',
+		);
+		if ( '' !== $content ) {
+			$lines[] = '';
+			$lines[] = '--- CONTENIDO DE LA LECCIÓN ---';
+			$lines[] = function_exists( 'mb_substr' ) ? mb_substr( $content, 0, 6000 ) : substr( $content, 0, 6000 );
+			$lines[] = '--- FIN DE LA LECCIÓN ---';
+		}
+		if ( class_exists( 'CLMS_AI_Knowledge_Base' ) ) {
+			$context = (string) CLMS_AI_Knowledge_Base::instance()->get_context_for_query( $wp_course, $query, 4 );
+			if ( '' !== $context ) {
+				$lines[] = '';
+				$lines[] = '--- CONTENIDO DEL CURSO (fragmentos relevantes) ---';
+				$lines[] = $context;
+				$lines[] = '--- FIN DEL CONTENIDO ---';
+			}
+		}
+		// Enunciados de la evaluación o la tarea de esta lección: para reconocerlos y no resolverlos.
+		$statements = array();
+		foreach ( (array) get_post_meta( $wp_lesson, '_clms_quiz_questions', true ) as $question ) {
+			$text = is_array( $question ) ? (string) ( $question['question'] ?? $question['text'] ?? '' ) : '';
+			if ( '' !== trim( $text ) ) {
+				$statements[] = '- ' . sanitize_text_field( $text );
+			}
+		}
+		$type = sanitize_key( (string) get_post_meta( $wp_lesson, 'lm_activity_type', true ) );
+		if ( in_array( $type, array( 'tarea', 'task', 'assignment' ), true ) && '' !== $content ) {
+			$statements[] = '- La lección es una tarea: su consigna es el contenido de la lección.';
+		}
+		if ( $statements ) {
+			$lines[] = '';
+			$lines[] = '--- ENUNCIADOS DE EVALUACIÓN DE ESTA LECCIÓN (no los resuelvas) ---';
+			$lines   = array_merge( $lines, $statements );
+		}
+		return implode( "\n", $lines );
+	}
 }

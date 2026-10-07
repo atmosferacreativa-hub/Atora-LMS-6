@@ -512,7 +512,7 @@ final class ATORA_Mobile_Teacher_Controller {
 	}
 
 	/** Criterios: la foto de la evaluación si existe; si no, la rúbrica vigente (como el guardado). */
-	private static function criteria( int $rubric_id, array $snapshot ): array {
+	public static function criteria( int $rubric_id, array $snapshot ): array {
 		if ( ! empty( $snapshot['criteria'] ) && $rubric_id === absint( $snapshot['rubric_id'] ?? 0 ) ) {
 			return (array) $snapshot['criteria'];
 		}

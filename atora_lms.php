@@ -1311,13 +1311,20 @@ add_action( 'init', static function () {
 	atora_lms_require_module( 'includes/mobile/class-mobile-push-service.php', static function () { ATORA_Mobile_Push_Service::boot(); } );
 	atora_lms_require_module( 'includes/mobile/class-mobile-organize-controller.php' );
 	atora_lms_require_module( 'includes/mobile/class-mobile-teacher-controller.php' );
+	atora_lms_require_module( 'includes/mobile/class-mobile-ai-controller.php' );
 	// 6.32.0: Fase 5 — IA (asistente y sugerencia de calificación, sin AJAX).
 	atora_lms_require_module( 'includes/ai/class-ai-assistant-service.php' );
+	atora_lms_require_module( 'includes/ai/class-ai-usage-service.php' );
+	atora_lms_require_module( 'includes/ai/class-ai-usage-admin.php', static function () { ATORA_AI_Usage_Admin::boot(); } );
+	atora_lms_require_module( 'includes/ai/class-ai-grading-suggestion-service.php', static function () { ATORA_AI_Grading_Suggestion_Service::boot(); } );
+	atora_lms_require_module( 'includes/ai/class-ai-fake-provider.php', static function () { ATORA_AI_Fake_Provider::boot(); } );
 	if ( class_exists( 'ATORA_Mobile_Messages_Controller' ) ) {
 		add_action( 'rest_api_init', array( 'ATORA_Mobile_Messages_Controller', 'register_routes' ) );
 		add_action( 'rest_api_init', array( 'ATORA_Mobile_Organize_Controller', 'register_routes' ) );
 		// 6.31.0: Fase 4 — docente.
 		add_action( 'rest_api_init', array( 'ATORA_Mobile_Teacher_Controller', 'register_routes' ) );
+		// 6.32.0: Fase 5 — IA.
+		add_action( 'rest_api_init', array( 'ATORA_Mobile_AI_Controller', 'register_routes' ) );
 	}
 	if ( class_exists( 'ATORA_Mobile_REST_Controller' ) ) {
 		add_action( 'rest_api_init', array( 'ATORA_Mobile_REST_Controller', 'register_routes' ) );

@@ -323,6 +323,7 @@ trait CLMS_Grading_SpeedGrade_Trait {
 
 					<aside class="clms-sg-side">
 						<?php echo $this->render_ai_review_panel( $context ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+						<?php echo $this->render_ai_suggestion_panel( $context ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 						<?php echo $this->render_assessment_audit_panel( $context ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 
 						<section class="clms-sg-card clms-sg-card--accent">
@@ -657,6 +658,76 @@ trait CLMS_Grading_SpeedGrade_Trait {
 	 * @param array $context Contexto completo de la entrega.
 	 * @return string
 	 */
+	/**
+	 * 6.32.0: sugerencia de IA por criterio (el mismo servicio que la app). "Usar
+	 * sugerencia" rellena el formulario sin guardar; el indicio de IA es solo para
+	 * el docente y siempre lleva su aviso.
+	 */
+	protected function render_ai_suggestion_panel( $context ) {
+		if ( ! class_exists( 'ATORA_AI_Usage_Service' ) || ! ATORA_AI_Usage_Service::available( ATORA_AI_Usage_Service::SUGGESTION ) ) {
+			return '';
+		}
+		$submission_id = (int) ( $context['submission_id'] ?? 0 );
+		if ( ! ATORA_AI_Grading_Suggestion_Service::is_open_task( $submission_id ) ) {
+			return '';
+		}
+		$suggestion = ATORA_AI_Grading_Suggestion_Service::suggestion( $submission_id );
+		$job        = isset( $_GET['ai_job'] ) ? ATORA_AI_Grading_Suggestion_Service::job( sanitize_text_field( wp_unslash( $_GET['ai_job'] ) ) ) : null; // phpcs:ignore WordPress.Security.NonceVerification
+		$pending    = $job && 'pending' === $job['status'];
+		$levels     = array( 'bajo' => __( 'bajo', 'atora-lms' ), 'medio' => __( 'medio', 'atora-lms' ), 'alto' => __( 'alto', 'atora-lms' ) );
+		ob_start();
+		?>
+		<div class="clms-sg-card clms-sg-ai-suggestion" id="atora-ai-suggestion">
+			<h3><?php esc_html_e( 'Sugerencia de IA por criterio', 'atora-lms' ); ?></h3>
+			<?php if ( $pending ) : ?>
+				<p><?php esc_html_e( 'Generando… se actualiza sola.', 'atora-lms' ); ?></p>
+				<meta http-equiv="refresh" content="5">
+			<?php elseif ( $job && 'failed' === $job['status'] ) : ?>
+				<p class="clms-sg-copy"><?php echo esc_html( (string) $job['error'] ); ?></p>
+			<?php endif; ?>
+			<?php if ( $suggestion ) : ?>
+				<ul>
+					<?php foreach ( (array) $suggestion['criteria'] as $row ) : ?>
+						<li><strong><?php echo esc_html( $row['name'] ); ?>:</strong> <?php echo esc_html( null === $row['score'] ? '—' : (string) $row['score'] ); ?> / <?php echo esc_html( (string) $row['max_points'] ); ?><?php echo $row['level'] ? ' · ' . esc_html( $row['level'] ) : ''; ?> — <?php echo esc_html( $row['justification'] ); ?></li>
+					<?php endforeach; ?>
+				</ul>
+				<p class="clms-sg-copy"><strong><?php esc_html_e( 'Devolución sugerida:', 'atora-lms' ); ?></strong> <?php echo esc_html( (string) $suggestion['feedback'] ); ?></p>
+				<p class="clms-sg-copy"><strong><?php echo esc_html( sprintf( __( 'Indicio de texto generado por IA: %s', 'atora-lms' ), $levels[ $suggestion['ai_likelihood'] ] ?? $suggestion['ai_likelihood'] ) ); ?></strong> — <?php echo esc_html( (string) $suggestion['ai_likelihood_note'] ); ?><br><em><?php echo esc_html( ATORA_AI_Grading_Suggestion_Service::DISCLAIMER ); ?></em></p>
+				<button type="button" class="clms-sg-btn clms-sg-btn--secondary" id="atora-ai-use-suggestion"><?php esc_html_e( 'Usar sugerencia', 'atora-lms' ); ?></button>
+				<script>
+				(function(){
+					var data = <?php echo wp_json_encode( array( 'criteria' => array_map( static fn( $r ) => array( 'index' => $r['index'], 'score' => $r['score'], 'justification' => $r['justification'] ), (array) $suggestion['criteria'] ), 'feedback' => (string) $suggestion['feedback'] ) ); ?>;
+					var button = document.getElementById('atora-ai-use-suggestion');
+					if (!button) { return; }
+					button.addEventListener('click', function(){
+						// Rellena el formulario; no guarda ni publica.
+						data.criteria.forEach(function(c){
+							if (c.score === null) { return; }
+							var input = document.querySelector('[name="rubric_scores[' + c.index + ']"]');
+							if (input) { input.value = c.score; input.dispatchEvent(new Event('input', { bubbles: true })); input.dispatchEvent(new Event('change', { bubbles: true })); }
+							var note = document.querySelector('[name="rubric_feedback[' + c.index + ']"]');
+							if (note && !note.value) { note.value = c.justification; }
+						});
+						var feedback = document.getElementById('clms_sg_feedback');
+						if (feedback && !feedback.value) { feedback.value = data.feedback; }
+					});
+				})();
+				</script>
+			<?php endif; ?>
+			<?php if ( ! $pending ) : ?>
+				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+					<?php wp_nonce_field( 'atora_ai_suggestion_' . $submission_id ); ?>
+					<input type="hidden" name="action" value="atora_ai_suggestion_request">
+					<input type="hidden" name="submission_id" value="<?php echo esc_attr( (string) $submission_id ); ?>">
+					<input type="hidden" name="return" value="<?php echo esc_attr( remove_query_arg( 'ai_job' ) ); ?>">
+					<button type="submit" class="clms-sg-btn"><?php echo $suggestion ? esc_html__( 'Pedir otra sugerencia', 'atora-lms' ) : esc_html__( 'Pedir sugerencia de IA', 'atora-lms' ); ?></button>
+				</form>
+			<?php endif; ?>
+		</div>
+		<?php
+		return (string) ob_get_clean();
+	}
+
 	protected function render_speedgrade_rubric_panel( $context ) {
 		if ( class_exists( 'CLMS_Rubric_Panel_Renderer' ) && method_exists( 'CLMS_Rubric_Panel_Renderer', 'render' ) ) {
 			return CLMS_Rubric_Panel_Renderer::render( $context );

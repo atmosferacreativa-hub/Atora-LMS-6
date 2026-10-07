@@ -138,6 +138,11 @@ class CLMS_AI_Log {
 	}
 
 	private function estimate_cost( $provider, array $usage ) {
+		return self::estimate_usage_cost( (string) $provider, $usage );
+	}
+
+	/** 6.32.0: la misma estimación, para el registro de uso por usuario (`ATORA_AI_Usage_Service`). */
+	public static function estimate_usage_cost( string $provider, array $usage ): float {
 		$provider = sanitize_key( (string) $provider );
 		$input = isset( $usage['prompt_tokens'] ) ? (int) $usage['prompt_tokens'] : ( isset( $usage['input_tokens'] ) ? (int) $usage['input_tokens'] : 0 );
 		$output = isset( $usage['completion_tokens'] ) ? (int) $usage['completion_tokens'] : ( isset( $usage['output_tokens'] ) ? (int) $usage['output_tokens'] : 0 );

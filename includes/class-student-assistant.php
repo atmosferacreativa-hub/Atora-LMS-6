@@ -391,6 +391,7 @@ class CLMS_Student_Assistant {
 					</div>
 					<p class="clms-sa-disclaimer">Respuestas generadas por IA. Verifica información importante.</p>
 				</form>
+				<p class="clms-sa-disclaimer" style="font-size:11px;opacity:.75;margin:0;padding:0 16px 10px"><?php esc_html_e( 'Las respuestas las genera una IA y pueden contener errores. No compartas datos personales.', 'atora-lms' ); ?></p>
 			</div>
 		</div>
 

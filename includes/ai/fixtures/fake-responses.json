@@ -1,0 +1,10 @@
+{
+  "assistant": {
+    "text": "Buena pregunta. En esta lección se explica que el contenido se organiza en pasos. Te sugiero repasar la sección principal y, si se trata de una tarea o evaluación, intentar responderla tú mismo: puedo darte pistas, pero no la respuesta.",
+    "usage": { "prompt_tokens": 1200, "completion_tokens": 180 }
+  },
+  "grading_suggestion": {
+    "text": "{\"criteria\":[{\"index\":0,\"score\":8.5,\"justification\":\"Las ideas principales se entienden con claridad.\"},{\"index\":1,\"score\":11,\"justification\":\"El orden es lógico, aunque la conclusión es breve.\"}],\"feedback\":\"Buen trabajo: la idea central es clara. Refuerza la conclusión con un ejemplo.\",\"ai_likelihood\":\"medio\",\"ai_likelihood_note\":\"Frases muy uniformes y sin errores típicos de un borrador.\"}",
+    "usage": { "prompt_tokens": 1600, "completion_tokens": 260 }
+  }
+}
