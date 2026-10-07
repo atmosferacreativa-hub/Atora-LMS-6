@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 6.32.1
+Stable tag: 6.33.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,9 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.33.0 =
+* Fase 6 — Publicación: certificado institucional en PDF con plantilla (logo, colores, hasta tres firmas) y QR a la verificación pública /verificar/{codigo}; eliminación de cuenta desde la app y desde la web (/eliminar-cuenta/) con pantalla de solicitudes para el administrador; ajustes de la app móvil (reporte de errores desactivable).
+
 = 6.32.1 =
 * IA bajo control central: todas las funciones de IA (alertas, mensajes, sentimiento, exámenes, copilotos, revisión de entregas, etc.) cuentan en el panel de uso, respetan los límites y el tope mensual de la academia, y no envían al proveedor nombres ni correos de estudiantes.
 

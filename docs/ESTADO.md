@@ -7,7 +7,7 @@ Qué está comprobado y dónde. Se actualiza en cada versión del plugin o de la
 - **Integración**: PHPUnit con WordPress (`tests/integration`).
 - **Unitaria**: PHPUnit sin WordPress o Jest en la app.
 
-Última actualización: **plugin 6.32.1 · app 0.9.0**.
+Última actualización: **plugin 6.33.0 · app 1.0.0**.
 
 > No hay registro escrito de qué se recorrió en teléfono antes de esta tabla: la columna "Teléfono" queda "por confirmar" hasta la prueba al cierre de la Fase 4, que incluye la lista acumulada de las fases 0 a 3.
 
@@ -63,6 +63,10 @@ Qué está comprobado y dónde. Se actualiza en cada versión del plugin o de la
 | Control central de la IA: toda llamada (chat, embeddings, transcripción, revisión) registrada por función, con límites y tope mensual | 6.32.1 | `AiCentralControlTest` | Con el tope alcanzado, ningún módulo envía nada (429 `atora_ai_budget`) |
 | Sin datos personales hacia el proveedor (nombre y correo del estudiante; marcador `{{nombre}}`) | 6.32.1 | `AiCentralControlTest` | Revisa los prompts de mensajería, alertas, sentimiento, corrección, revisión de SpeedGrader, sugerencia y asistente |
 | Proveedor simulado nunca activo en producción | 6.32.1 | `AiCentralControlTest` | |
+| Certificado institucional en PDF (plantilla, 3 firmas, QR, regeneración con fecha original) | 6.33.0 | `CertificatePdfTest` | Pantalla: `certificado-pdf` (app 1.0.0) |
+| Verificación pública `/verificar/{codigo}` (válido, revocado, no encontrado; sin correo) | 6.33.0 | `CertificatePdfTest` | Probado también en local por HTTP (404 con código inventado) |
+| Eliminación de cuenta (app, página pública, solicitudes; anonimizar por defecto) | 6.33.0 | `AccountDeletionTest` | Pantalla: `eliminar-cuenta` (app 1.0.0) |
+| Ajustes de la app móvil (reporte de errores desactivable) | 6.33.0 | `AccountDeletionTest` (`crash_reports`) | |
 
 ## Datos históricos
 

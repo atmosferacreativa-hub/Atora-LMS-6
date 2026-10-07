@@ -210,3 +210,10 @@ Las dos funciones están **desactivadas por defecto** (ATORA LMS → Uso de IA).
 - `GET /teacher/ai-suggestions/{job_id}` → `{ job_id, submission_id, status: pending | done | failed, suggestion, error }`. `suggestion`: `criteria[]` {`index`, `name`, `max_points`, `score` (decimal, recortado al rango, o `null`), `level`, `justification`}, `feedback`, `ai_likelihood` (`bajo` / `medio` / `alto`), `ai_likelihood_note`, `disclaimer` ("Indicio no concluyente. Verifica con el estudiante antes de decidir."), `model`, `created_at`, `requested_by`. La app consulta cada 3 s, hasta 2 minutos.
 
 La sugerencia **no califica**: no cambia nota, estado ni avisos, y nunca aparece en rutas del estudiante. Para usarla, el docente rellena su borrador y guarda con `POST /teacher/submissions/{id}/grade` como siempre; la auditoría de la rúbrica anota si había sugerencia y la diferencia por criterio.
+
+## Publicación (6.33.0)
+
+- `GET /certificates/{type}/{id}/document?expires=&sig=&format=pdf` → el certificado institucional en **PDF** (`application/pdf`); sin `format`, el HTML de siempre. Revocado: **410**. Servidor sin `mbstring`/`dom`: **503**. `/discovery` declara `capabilities.certificate_pdf`.
+- `POST /account/deletion-request` `{ note? }` → `200 { request_id, status: pending, requested_at, deadline (Y-m-d, +30 días), message, replayed }`. Una sola solicitud pendiente por usuario (repetir devuelve la misma con `replayed: true`). `/discovery`: `capabilities.account_deletion`. Página web equivalente: `/eliminar-cuenta/`.
+- `/discovery`: `capabilities.crash_reports` (la academia permite el reporte de cierres de la app, sin datos personales; ATORA LMS → App móvil).
+- Verificación pública: `/verificar/{codigo}` (página HTML, no API).
