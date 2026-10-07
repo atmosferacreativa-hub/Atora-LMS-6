@@ -56,6 +56,11 @@ final class AccountDeletionTest extends WP_UnitTestCase {
 
 	public function test_app_request_is_registered_notifies_admin_and_returns_deadline(): void {
 		$this->assertTrue( ATORA_Mobile_REST_Controller::discovery()->get_data()['capabilities']['account_deletion'] );
+		// Reporte de errores de la app: activo por defecto, la academia lo puede apagar.
+		$this->assertTrue( ATORA_Mobile_REST_Controller::discovery()->get_data()['capabilities']['crash_reports'] );
+		update_option( ATORA_Mobile_Settings_Admin::CRASH_OPTION, '0' );
+		$this->assertFalse( ATORA_Mobile_REST_Controller::discovery()->get_data()['capabilities']['crash_reports'] );
+		delete_option( ATORA_Mobile_Settings_Admin::CRASH_OPTION );
 		$response = $this->request_from_app();
 		$this->assertSame( 200, $response->get_status() );
 		$data = $response->get_data();

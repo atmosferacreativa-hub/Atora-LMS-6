@@ -239,7 +239,7 @@ final class ATORA_Mobile_REST_Controller {
 			'authentication'   => 'opaque_bearer',
 			'access_ttl'       => ATORA_Mobile_Token_Service::ACCESS_TTL,
 			'refresh_ttl'      => ATORA_Mobile_Token_Service::REFRESH_TTL,
-			'features'         => array( 'profile', 'dashboard', 'courses', 'progress', 'lesson_completion', 'quizzes', 'assignments', 'sync_changes', 'playback_position', 'resource_downloads', 'multi_video', 'grades', 'certificates', 'messages', 'agenda', 'today', 'push_notifications', 'teacher', 'ai_assistant', 'ai_grading_suggestion', 'certificate_pdf', 'account_deletion' ),
+			'features'         => array( 'profile', 'dashboard', 'courses', 'progress', 'lesson_completion', 'quizzes', 'assignments', 'sync_changes', 'playback_position', 'resource_downloads', 'multi_video', 'grades', 'certificates', 'messages', 'agenda', 'today', 'push_notifications', 'teacher', 'ai_assistant', 'ai_grading_suggestion', 'certificate_pdf', 'account_deletion', 'crash_reports' ),
 			'capabilities'     => array(
 				'assignments'        => true,
 				'sync_changes'       => class_exists( '\\ATORA\\LMS\\LMS_Content_Changes' ),
@@ -252,6 +252,8 @@ final class ATORA_Mobile_REST_Controller {
 				'certificate_pdf'    => class_exists( 'ATORA_Certificate_PDF' ) && ATORA_Certificate_PDF::available(),
 				// 6.33.0: el usuario puede pedir la eliminación de su cuenta (`POST /account/deletion-request`).
 				'account_deletion'   => class_exists( 'ATORA_Account_Deletion' ),
+				// 6.33.0: la academia permite el reporte de cierres de la app (sin datos personales).
+				'crash_reports'      => class_exists( 'ATORA_Mobile_Settings_Admin' ) && ATORA_Mobile_Settings_Admin::crash_reports_enabled(),
 				// 6.30.0: Fase 3 — buzón, agenda, Hoy y notificaciones al teléfono.
 				'messages'           => class_exists( 'ATORA_Mobile_Messages_Controller' ) && class_exists( 'ATORA_Inbox_Store' ),
 				'agenda'             => class_exists( 'CLMS_Agenda_Service' ),
