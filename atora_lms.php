@@ -1323,6 +1323,8 @@ add_action( 'init', static function () {
 	atora_lms_require_module( 'includes/certificates/class-certificate-template.php', static function () { ATORA_Certificate_Template::boot(); } );
 	atora_lms_require_module( 'includes/certificates/class-certificate-pdf.php' );
 	atora_lms_require_module( 'includes/certificates/class-certificate-verify.php', static function () { ATORA_Certificate_Verify::boot(); } );
+	// 6.33.0: eliminación de cuenta (app, página pública y administración).
+	atora_lms_require_module( 'includes/account/class-account-deletion.php', static function () { ATORA_Account_Deletion::boot(); } );
 	if ( class_exists( 'ATORA_Mobile_Messages_Controller' ) ) {
 		add_action( 'rest_api_init', array( 'ATORA_Mobile_Messages_Controller', 'register_routes' ) );
 		add_action( 'rest_api_init', array( 'ATORA_Mobile_Organize_Controller', 'register_routes' ) );

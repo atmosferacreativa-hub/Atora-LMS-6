@@ -125,6 +125,12 @@ final class ATORA_Mobile_REST_Controller {
 			'callback'            => array( __CLASS__, 'course_grades' ),
 			'permission_callback' => array( __CLASS__, 'authorize' ),
 		) );
+		// 6.33.0: eliminación de cuenta (exigida por las tiendas).
+		register_rest_route( self::REST_NAMESPACE, '/account/deletion-request', array(
+			'methods'             => WP_REST_Server::CREATABLE,
+			'callback'            => array( __CLASS__, 'account_deletion_request' ),
+			'permission_callback' => array( __CLASS__, 'authorize' ),
+		) );
 		register_rest_route( self::REST_NAMESPACE, '/certificates', array(
 			'methods'             => WP_REST_Server::READABLE,
 			'callback'            => array( __CLASS__, 'certificates' ),
@@ -233,7 +239,7 @@ final class ATORA_Mobile_REST_Controller {
 			'authentication'   => 'opaque_bearer',
 			'access_ttl'       => ATORA_Mobile_Token_Service::ACCESS_TTL,
 			'refresh_ttl'      => ATORA_Mobile_Token_Service::REFRESH_TTL,
-			'features'         => array( 'profile', 'dashboard', 'courses', 'progress', 'lesson_completion', 'quizzes', 'assignments', 'sync_changes', 'playback_position', 'resource_downloads', 'multi_video', 'grades', 'certificates', 'messages', 'agenda', 'today', 'push_notifications', 'teacher', 'ai_assistant', 'ai_grading_suggestion', 'certificate_pdf' ),
+			'features'         => array( 'profile', 'dashboard', 'courses', 'progress', 'lesson_completion', 'quizzes', 'assignments', 'sync_changes', 'playback_position', 'resource_downloads', 'multi_video', 'grades', 'certificates', 'messages', 'agenda', 'today', 'push_notifications', 'teacher', 'ai_assistant', 'ai_grading_suggestion', 'certificate_pdf', 'account_deletion' ),
 			'capabilities'     => array(
 				'assignments'        => true,
 				'sync_changes'       => class_exists( '\\ATORA\\LMS\\LMS_Content_Changes' ),
@@ -244,6 +250,8 @@ final class ATORA_Mobile_REST_Controller {
 				'certificates'       => class_exists( 'CLMS_Certificates' ) || ( function_exists( 'clms_core' ) && (bool) clms_core( 'CLMS_Certificates' ) ),
 				// 6.33.0: el documento del certificado se puede pedir en PDF (`format=pdf`).
 				'certificate_pdf'    => class_exists( 'ATORA_Certificate_PDF' ) && ATORA_Certificate_PDF::available(),
+				// 6.33.0: el usuario puede pedir la eliminación de su cuenta (`POST /account/deletion-request`).
+				'account_deletion'   => class_exists( 'ATORA_Account_Deletion' ),
 				// 6.30.0: Fase 3 — buzón, agenda, Hoy y notificaciones al teléfono.
 				'messages'           => class_exists( 'ATORA_Mobile_Messages_Controller' ) && class_exists( 'ATORA_Inbox_Store' ),
 				'agenda'             => class_exists( 'CLMS_Agenda_Service' ),
@@ -1553,6 +1561,16 @@ final class ATORA_Mobile_REST_Controller {
 			return true;
 		} );
 		return new WP_REST_Response( null, 200 );
+	}
+
+	/** 6.33.0: POST /account/deletion-request { note? } → la solicitud y su plazo. */
+	public static function account_deletion_request( WP_REST_Request $request ) {
+		if ( ! class_exists( 'ATORA_Account_Deletion' ) ) {
+			return new WP_Error( 'atora_mobile_not_found', __( 'No encontrado.', 'atora-lms' ), array( 'status' => 404 ) );
+		}
+		$params = (array) $request->get_json_params();
+		$result = ATORA_Account_Deletion::request( get_current_user_id(), 'app', (string) ( $params['note'] ?? '' ) );
+		return is_wp_error( $result ) ? $result : new WP_REST_Response( $result, 200 );
 	}
 
 	/** 6.28.0: cambios desde el cursor, solo de los cursos matriculados del usuario. */

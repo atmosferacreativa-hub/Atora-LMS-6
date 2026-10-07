@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class V5_Installer {
 
 	/** Versión del esquema. Incrementar para forzar re-instalación. */
-	const SCHEMA_VERSION = '6.32.0-ai';
+	const SCHEMA_VERSION = '6.33.0-account';
 
 	/** Option key que almacena la versión instalada. */
 	const OPTION_KEY = 'atora_v5_schema_version';
@@ -2357,6 +2357,21 @@ class V5_Installer {
 			updated_at       DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 			PRIMARY KEY (id),
 			KEY submission_id (submission_id)
+		) $charset_collate;" );
+
+		// 6.33.0: solicitudes de eliminación de cuenta.
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_account_deletions (
+			id               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			user_id          BIGINT UNSIGNED NOT NULL,
+			status           VARCHAR(20)     NOT NULL DEFAULT 'pending',
+			source           VARCHAR(10)     NOT NULL DEFAULT 'web',
+			mode             VARCHAR(20)     NOT NULL DEFAULT '',
+			note             VARCHAR(500)    NOT NULL DEFAULT '',
+			requested_at     DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			processed_at     DATETIME                 DEFAULT NULL,
+			processed_by     BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			PRIMARY KEY (id),
+			KEY user_status (user_id, status)
 		) $charset_collate;" );
 
 		// ── Sesiones móviles fuera de usermeta (6.26.5) ─────────────────────
