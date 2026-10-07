@@ -74,6 +74,10 @@ final class ATORA_AI_Usage_Service {
 
 	/** ¿Hay un proveedor de IA utilizable? (en pruebas, el simulado). */
 	public static function provider_configured(): bool {
+		// Sin el módulo de IA activo no hay gestor que atienda las llamadas.
+		if ( class_exists( 'CLMS_Module_Registry' ) && ! CLMS_Module_Registry::is_active( 'ai' ) ) {
+			return false;
+		}
 		if ( class_exists( 'ATORA_AI_Fake_Provider' ) && ATORA_AI_Fake_Provider::enabled() ) {
 			return true;
 		}

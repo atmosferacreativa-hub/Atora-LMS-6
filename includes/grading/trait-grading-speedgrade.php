@@ -684,6 +684,8 @@ trait CLMS_Grading_SpeedGrade_Trait {
 				<meta http-equiv="refresh" content="5">
 			<?php elseif ( $job && 'failed' === $job['status'] ) : ?>
 				<p class="clms-sg-copy"><?php echo esc_html( (string) $job['error'] ); ?></p>
+			<?php elseif ( isset( $_GET['ai_error'] ) ) : // phpcs:ignore WordPress.Security.NonceVerification ?>
+				<p class="clms-sg-copy"><?php echo esc_html( sanitize_text_field( wp_unslash( $_GET['ai_error'] ) ) ); // phpcs:ignore WordPress.Security.NonceVerification ?></p>
 			<?php endif; ?>
 			<?php if ( $suggestion ) : ?>
 				<ul>

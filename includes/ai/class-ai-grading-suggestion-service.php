@@ -46,7 +46,7 @@ final class ATORA_AI_Grading_Suggestion_Service {
 		$job    = self::request( $submission_id, $user_id );
 		$return = isset( $_POST['return'] ) ? esc_url_raw( wp_unslash( $_POST['return'] ) ) : admin_url();
 		if ( is_wp_error( $job ) ) {
-			wp_safe_redirect( add_query_arg( 'ai_error', rawurlencode( $job->get_error_message() ), $return ) );
+			wp_safe_redirect( add_query_arg( 'ai_error', rawurlencode( $job->get_error_message() ), remove_query_arg( 'ai_job', $return ) ) . '#atora-ai-suggestion' );
 			exit;
 		}
 		wp_safe_redirect( add_query_arg( 'ai_job', $job['job_id'], $return ) . '#atora-ai-suggestion' );
