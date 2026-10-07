@@ -107,6 +107,14 @@ final class AiGradingSuggestionTest extends WP_UnitTestCase {
 
 	protected function tearDown(): void {
 		ATORA_AI_Fake_Provider::disable();
+		// force_install() hace DDL (commit implícito): lo migrado sobrevive a la reversión y
+		// RubricsCliMigrationTest, que corre después, espera las tablas de rúbricas vacías.
+		global $wpdb;
+		foreach ( (array) $wpdb->get_col( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $wpdb->prefix . 'atora_rubric' ) . '%' ) ) as $table ) {
+			$wpdb->query( "DELETE FROM {$table}" ); // phpcs:ignore WordPress.DB
+		}
+		$wpdb->query( "DELETE FROM {$wpdb->prefix}atora_ai_jobs" );
+		$wpdb->query( "DELETE FROM {$wpdb->prefix}atora_ai_usage" );
 		parent::tearDown();
 	}
 
