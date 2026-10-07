@@ -28,6 +28,17 @@ Qué está comprobado y dónde. Se actualiza en cada versión del plugin o de la
 | Notificaciones al teléfono (Expo) | 0.6.0 | por confirmar | — (requiere servicio externo) | sí (cola y token) | Jest |
 | Asistente de la lección ("Preguntar"), aviso de IA, sin conexión deshabilitado | 0.9.0 | pendiente (cierre de Fase 5, filas 31–33) | sí (`estudiante-asistente`, proveedor simulado) | `AiAssistantTest` | Jest (conversación solo en la sesión, límite; el indicio no está en pantallas del estudiante) |
 
+## App 1.0.0 (Fase 6, publicación)
+
+| Función | Desde | Teléfono | Pantalla (CI) | Integración (plugin) | Unitaria |
+|---|---|---|---|---|---|
+| Español e inglés completos; idioma del teléfono o de Yo | 1.0.0 | pendiente (filas 38) | sí (`cambio-idioma`) | — | Jest (catálogo: falla si queda un texto sin traducir o sin inglés) |
+| Accesibilidad: etiquetas, áreas táctiles ≥ 44 pt, contraste AA, sin textos cortados | 1.0.0 | pendiente (fila 39) | — | — | Jest (botones y contraste del tema) |
+| Certificado en PDF, también sin conexión | 1.0.0 | pendiente (fila 40) | sí (`certificado-pdf`) | `CertificatePdfTest` | Jest (pedido del PDF) |
+| Eliminar mi cuenta | 1.0.0 | pendiente (fila 41) | sí (`eliminar-cuenta`) | `AccountDeletionTest` | — |
+| Rendimiento en gama baja (2 GB de RAM, red 3G simulada) | 1.0.0 | pendiente (fila 42) | sí (`modo=gama-baja`): arranque en frío 1,2–2,5 s (umbral 4 s); lección con 3 videos 478 ms; lista de 100 lecciones virtualizada | — | — |
+| Reporte de cierres sin datos personales, desactivable por academia | 1.0.0 | sin cuenta de Sentry todavía (apagado) | — | `AccountDeletionTest` (`crash_reports`) | Jest (limpieza del reporte) |
+
 ## App (docente, Fase 4)
 
 | Función | Desde | Teléfono | Pantalla (CI) | Integración (plugin) | Unitaria |
