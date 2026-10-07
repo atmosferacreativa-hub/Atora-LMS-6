@@ -4,19 +4,19 @@ Orden: `docs/ordenes/ORDEN-FASE-5.md`. Al reanudar: leer este archivo, comprobar
 
 ## Paso actual
 
-**Bloque 1 cerrado: 6.32.0 fusionado (PR #65), etiqueta `v6.32.0`, release con ZIP (sha256 7b07c128…). Bloque 2 — app 0.9.0: PR #26; CI completo 13/14 en el primer intento (el indicio estaba fuera de pantalla: el recorrido ahora se desplaza), segundo intento en curso; faltan fusionar, etiqueta y APK.** Bloque A cerrado: plugin `v6.31.1` (ZIP sha256 b6efbf90…) y app `v0.8.1` (PR #25, sin APK). Bloque 0 (Paso 0) respondido.
+**FASE 5 COMPLETA.** Plugin `v6.32.0` (PR #65, release con ZIP sha256 7b07c128…). App `v0.9.0` (PR #26, versionCode 15), CI completo 14/14 (run 37570648668). Única APK preview: https://expo.dev/artifacts/eas/UYvMO1gOnupDXudRbV71xlAAlyGdnRQHmoLQ8ZF2I3k.apk. Pendiente solo la prueba en teléfono (filas 31–37). Bloque A cerrado: plugin `v6.31.1` (ZIP sha256 b6efbf90…) y app `v0.8.1` (PR #25, sin APK). Bloque 0 (Paso 0) respondido.
 
 ## Ramas y PR
 
 | Repo | Rama | Estado |
 |---|---|---|
 | Atora-LMS-6 | `feat/6.32.0-ia` | fusionada (PR #65), `v6.32.0` |
-| atora-mobile | `feat/0.9.0-ia` | PR #26; CI completo en curso |
+| atora-mobile | `feat/0.9.0-ia` | fusionada (PR #26), `v0.9.0`, APK |
 
 ## Falta
 
 - [x] 6.32.0: pruebas (asistente con proveedor simulado y límite 429; no matriculado 404; estudiante en sugerencia 403; prompt sin nombre ni correo; sugerencia no cambia nota ni avisa; indicio fuera de rutas del estudiante; recorte de puntajes; función desactivada → 404 y sin capacidad); seed/CI con `ATORA_AI_FAKE`; changelog, MOBILE-API-V1, ESTADO; PR #65. Fusionado, etiqueta y ZIP hechos.
-- [ ] App 0.9.0 (código hecho): botón Preguntar en la lección; sugerencia al calificar; Jest; recorridos `estudiante-asistente` y `docente-sugerencia-ia`; changelog, README, PRUEBA-TELEFONO; etiqueta y **APK preview**.
+- [x] App 0.9.0: botón Preguntar en la lección; sugerencia al calificar; Jest; recorridos `estudiante-asistente` y `docente-sugerencia-ia`; changelog, README, PRUEBA-TELEFONO; etiqueta y **APK preview**.
 
 ## Respuestas del Paso 0 (Bloque 0)
 
