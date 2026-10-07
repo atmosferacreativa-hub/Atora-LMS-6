@@ -14,6 +14,8 @@ Orden `docs/ordenes/ORDEN-FASE-6.md`, Bloques B y C (el A ya era 6.32.1).
 
 **ATORA LMS → App móvil.** Reporte de cierres inesperados de la app (sin datos personales), activo por defecto y desactivable por academia (`/discovery`: `crash_reports`), y los enlaces públicos que piden las tiendas.
 
+**Sugerencia de IA sin depender de WP-Cron.** Si la cola no toma el trabajo en 15 s (cron desactivado o sin visitas), lo ejecuta la propia consulta (`GET /teacher/ai-suggestions/{job_id}` o la recarga de SpeedGrader). Un reclamo atómico (`pending` → `running`) evita que corra o cobre dos veces. Prueba: `AiGradingSuggestionTest`.
+
 **Herramientas.** `wp atora review-accounts --yes --password=… [--courses=…]` crea las cuentas de revisión de las tiendas (estudiante y docente) sobre cursos reales; repetirlo no duplica. `wp atora seed-e2e --perf` agrega un curso de 100 lecciones para medir la app en gama baja; en el WordPress del CI (`ATORA_E2E`) el curso E2E es certificable para el recorrido `certificado-pdf`.
 
 **TESTS**: `CertificatePdfTest` (PDF con logo y tres firmas; el QR —leído— lleva a `/verificar/{codigo}` y esa ruta resuelve; código inventado; revocado sin datos; nombre congelado, sin correo y fecha original; regeneración al cambiar la plantilla; firma PNG transparente sobre fondo de color sin recuadro y sin máscaras en el PDF). `AccountDeletionTest` (solicitud desde la app con plazo, idempotencia y aviso; anonimizar conserva lo académico; anonimizar por defecto; eliminar por completo exige confirmación y registra quién y cuándo; administradores protegidos; página pública con enlace por correo y con sesión; `crash_reports` en `/discovery`).
