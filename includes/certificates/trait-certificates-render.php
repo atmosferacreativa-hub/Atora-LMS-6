@@ -367,6 +367,18 @@ trait CLMS_Certificates_Render_Trait {
 		}
 
 		nocache_headers();
+		// 6.33.0: el certificado es el PDF institucional; el HTML queda solo si el servidor no puede generar PDF.
+		if ( class_exists( 'ATORA_Certificate_PDF' ) && ATORA_Certificate_PDF::available() ) {
+			$pdf = ATORA_Certificate_PDF::for_user( $user_id, $resolved );
+			if ( is_wp_error( $pdf ) ) {
+				wp_die( esc_html( $pdf->get_error_message() ) );
+			}
+			header( 'Content-Type: application/pdf' );
+			header( 'Content-Disposition: inline; filename="certificado.pdf"' );
+			header( 'Content-Length: ' . strlen( $pdf ) );
+			echo $pdf; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- binario PDF.
+			exit;
+		}
 		echo $this->render_certificate_document( $user_id, $resolved ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- documento ya escapado al generarse.
 		exit;
 	}

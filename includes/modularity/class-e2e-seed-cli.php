@@ -13,6 +13,9 @@
  * - lección 3 "Quiz" con 3 preguntas;
  * - un mensaje del docente al estudiante.
  *
+ * 6.33.0: el curso es certificable (recorrido `certificado-pdf`, ver
+ * `ATORA_E2E_Runtime`) y la plantilla del certificado lleva tres firmas.
+ *
  * 6.31.0 (recorridos del docente):
  * - rúbrica de 2 criterios (Inicial 4 · Logrado 8 · Excelente 10) en "Tarea" y en "Ensayo";
  * - lección "Ensayo" con una entrega de "Estudiante Dos E2E" con un PDF;
@@ -56,6 +59,9 @@ final class ATORA_E2E_Seed_CLI {
 	 * [--password=<password>]
 	 * : Contraseña de las cuentas de prueba. Por defecto: atora-e2e-2026.
 	 *
+	 * [--perf]
+	 * : 6.33.0: además, "Curso grande E2E" con 100 lecciones (medición en gama baja).
+	 *
 	 * @param array $args
 	 * @param array $assoc_args
 	 */
@@ -68,7 +74,34 @@ final class ATORA_E2E_Seed_CLI {
 			(string) ( $assoc_args['video-dir'] ?? '' ),
 			(string) ( $assoc_args['password'] ?? 'atora-e2e-2026' )
 		);
+		if ( ! empty( $assoc_args['perf'] ) ) {
+			$out['large_course'] = self::large_course( (int) $out['student']['id'], (int) $out['teacher']['id'] );
+		}
 		\WP_CLI::line( (string) wp_json_encode( $out, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) );
+	}
+
+	/** 6.33.0: curso con 100 lecciones para medir listas largas en un teléfono de gama baja. */
+	public static function large_course( int $student, int $teacher ): int {
+		$existing = get_page_by_path( 'curso-e2e-grande', OBJECT, 'lm_course' );
+		$course   = $existing ? (int) $existing->ID : (int) wp_insert_post( array(
+			'post_type'    => 'lm_course',
+			'post_status'  => 'publish',
+			'post_name'    => 'curso-e2e-grande',
+			'post_title'   => 'Curso grande E2E',
+			'post_author'  => $teacher,
+			'post_content' => 'Curso con 100 lecciones para medir el rendimiento.',
+		) );
+		for ( $n = 1; $n <= 100; $n++ ) {
+			self::lesson( $course, $teacher, 'leccion-e2e-grande-' . $n, sprintf( 'Lección %03d', $n ), $n, array() );
+		}
+		if ( method_exists( 'CLMS_Helper', 'enroll_user_in_course' ) ) {
+			CLMS_Helper::enroll_user_in_course( $student, $course );
+		}
+		$table = class_exists( '\\ATORA\\LMS\\LMS_Course_Service' ) ? \ATORA\LMS\LMS_Course_Service::get_by_wp_post( $course ) : null;
+		if ( $table && class_exists( '\\ATORA\\LMS\\LMS_Enrollment_Service' ) ) {
+			\ATORA\LMS\LMS_Enrollment_Service::enroll( $student, (int) $table['id'] );
+		}
+		return $course;
 	}
 
 	/** @return array<string,mixed> */
@@ -161,6 +194,22 @@ final class ATORA_E2E_Seed_CLI {
 		}
 		if ( class_exists( '\\ATORA\\EarlyWarning\\Early_Warning_Service' ) ) {
 			( new \ATORA\EarlyWarning\Early_Warning_Service() )->scan_course( $course, false );
+		}
+
+		// 6.33.0: certificado institucional en PDF para el recorrido `certificado-pdf`.
+		update_option( 'clms_certificates_enabled', '1' );
+		update_post_meta( $course, '_atora_e2e_certificate', '1' );
+		update_post_meta( $course, '_clms_course_certificate_enabled', '1' );
+		if ( class_exists( 'ATORA_Certificate_Template' ) ) {
+			ATORA_Certificate_Template::save( array(
+				'show_hours' => 1,
+				'show_date'  => 1,
+				'signatures' => array(
+					array( 'image_id' => 0, 'name' => 'Ana Ruiz', 'role' => 'Directora académica' ),
+					array( 'image_id' => 0, 'name' => 'Luis Paz', 'role' => 'Coordinador' ),
+					array( 'image_id' => 0, 'name' => 'Eva Sol', 'role' => 'Secretaria general' ),
+				),
+			) );
 		}
 
 		// 6.32.0: IA activada para las pruebas de pantalla. Responde el proveedor

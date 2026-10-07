@@ -1,5 +1,25 @@
 # CHANGELOG — ATORA LMS
 
+## 6.33.0 (2026-10-07)
+
+### Fase 6 — Publicación (plugin)
+
+Orden `docs/ordenes/ORDEN-FASE-6.md`, Bloques B y C (el A ya era 6.32.1).
+
+**Certificado institucional en PDF.** Reemplaza el certificado HTML provisional. Se genera en el servidor con **Dompdf 3** (PHP puro: solo `mbstring` y `dom`, sin dependencias de sistema) y el QR con **chillerlan/php-qrcode 5** (SVG, sin GD); las dos librerías van empaquetadas en `lib/packages` (Composer propio en `lib/`). Plantilla por academia en **ATORA LMS → Plantilla de certificado**: logo, colores (principal, acento y fondo de la hoja), textos, campos visibles (horas, fecha, nota) y hasta **tres firmas** (imagen, nombre y cargo). Las imágenes PNG con transparencia se aplanan con GD sobre el color de fondo de la hoja y se incrustan como PNG sin alfa: sin recuadro sobre fondos de color y sin pasar por Imagick (que en algunos servidores fallaba con error fatal). El PDF se guarda en `uploads/atora-private/certificates` (acceso directo denegado) y se regenera si cambia la plantilla. Los certificados ya emitidos se generan en PDF la primera vez que se piden, **conservando su fecha de emisión**. La vista web del certificado entrega el PDF; la API móvil lo entrega con `format=pdf` (`/discovery`: `certificate_pdf`); las versiones anteriores de la app siguen recibiendo el HTML.
+
+**Verificación pública `/verificar/{codigo}`.** El código es el UUID de la credencial institucional (no adivinable; los certificados anteriores reciben su credencial al generarse el PDF). Válido: nombre tal como figura en el certificado, curso o programa, institución y fecha. Revocado: solo "Revocado". Sustituido: solo "Sustituido". Código inventado: "No encontrado" (404). Nunca muestra correo ni otros datos. Límite de consultas por IP (sin guardarla). Los códigos anteriores (20 caracteres) siguen verificando; el shortcode `[clms_verify_certificate]` muestra lo mismo que la página (antes mostraba el nombre actual y los datos de certificados revocados).
+
+**Eliminación de cuenta** (exigida por Google Play y Apple). `POST /account/deletion-request` (`/discovery`: `account_deletion`) registra la solicitud en `atora_account_deletions`, avisa a los administradores por el buzón y responde con el plazo (30 días); es idempotente. Página pública **`/eliminar-cuenta/`** para pedirla sin la app: con sesión, un botón; sin sesión, un enlace firmado por correo (24 h) sin revelar si el correo existe. **ATORA LMS → Solicitudes de eliminación**: la acción por defecto es **anonimizar** (borra nombre, correo, usuario, datos de contacto, sesiones y dispositivos; conserva entregas, notas y actas sin datos personales). **Eliminar por completo** exige aceptar la advertencia "Se borrarán también notas y actas; la institución puede estar obligada a conservarlas" (validada también en el servidor). Queda registrado quién ejecutó cada acción y cuándo. Las cuentas de administrador no se procesan desde ahí.
+
+**ATORA LMS → App móvil.** Reporte de cierres inesperados de la app (sin datos personales), activo por defecto y desactivable por academia (`/discovery`: `crash_reports`), y los enlaces públicos que piden las tiendas.
+
+**Sugerencia de IA sin depender de WP-Cron.** Si la cola no toma el trabajo en 15 s (cron desactivado o sin visitas), lo ejecuta la propia consulta (`GET /teacher/ai-suggestions/{job_id}` o la recarga de SpeedGrader). Un reclamo atómico (`pending` → `running`) evita que corra o cobre dos veces. Prueba: `AiGradingSuggestionTest`.
+
+**Herramientas.** `wp atora review-accounts --yes --password=… [--courses=…]` crea las cuentas de revisión de las tiendas (estudiante y docente) sobre cursos reales; repetirlo no duplica. `wp atora seed-e2e --perf` agrega un curso de 100 lecciones para medir la app en gama baja; en el WordPress del CI (`ATORA_E2E`) el curso E2E es certificable para el recorrido `certificado-pdf`.
+
+**TESTS**: `CertificatePdfTest` (PDF con logo y tres firmas; el QR —leído— lleva a `/verificar/{codigo}` y esa ruta resuelve; código inventado; revocado sin datos; nombre congelado, sin correo y fecha original; regeneración al cambiar la plantilla; firma PNG transparente sobre fondo de color sin recuadro y sin máscaras en el PDF). `AccountDeletionTest` (solicitud desde la app con plazo, idempotencia y aviso; anonimizar conserva lo académico; anonimizar por defecto; eliminar por completo exige confirmación y registra quién y cuándo; administradores protegidos; página pública con enlace por correo y con sesión; `crash_reports` en `/discovery`).
+
 ## 6.32.1 (2026-10-07)
 
 ### IA bajo control central (antes de la Fase 6)

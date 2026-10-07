@@ -5,6 +5,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 trait CLMS_Certificates_Helpers_Assets_Trait {
+	/** 6.33.0: búsqueda de un código de verificación anterior, para `/verificar/{codigo}`. */
+	public function verification_lookup( $code ) {
+		return $this->find_certificate_by_verification_code( $code );
+	}
+
 	protected function find_certificate_by_verification_code( $code ) {
 		$code = sanitize_text_field( (string) $code );
 		if ( '' === $code ) {

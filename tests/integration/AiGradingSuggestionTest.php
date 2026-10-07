@@ -200,6 +200,22 @@ final class AiGradingSuggestionTest extends WP_UnitTestCase {
 		$this->assertFalse( $snap['ai_suggestion']['present'], 'Guardado sin sugerencia.' );
 	}
 
+	public function test_stalled_job_is_resolved_by_the_poll_and_never_runs_twice(): void {
+		$sub   = $this->submission( $this->student );
+		$job   = $this->call( $this->teacher, 'POST', "/teacher/submissions/{$sub}/ai-suggestion" )->get_data()['job_id'];
+		// Recién pedido: se espera a la cola.
+		$this->assertSame( 'pending', $this->call( $this->teacher, 'GET', "/teacher/ai-suggestions/{$job}" )->get_data()['status'] );
+		// La cola no lo tomó (WP-Cron desactivado): pasados 15 s, la consulta lo resuelve.
+		global $wpdb;
+		$wpdb->update( $wpdb->prefix . 'atora_ai_jobs', array( 'created_at' => gmdate( 'Y-m-d H:i:s', time() - 30 ) ), array( 'id' => $job ) );
+		$done = $this->call( $this->teacher, 'GET', "/teacher/ai-suggestions/{$job}" )->get_data();
+		$this->assertSame( 'done', $done['status'] );
+		$this->assertEquals( 8.5, $done['suggestion']['criteria'][0]['score'] );
+		// La cola llega tarde: no vuelve a generar ni a cobrar.
+		ATORA_AI_Grading_Suggestion_Service::run( $job );
+		$this->assertSame( '1', $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}atora_ai_usage WHERE user_id = %d AND feature = 'grading_suggestion'", $this->teacher ) ) );
+	}
+
 	public function test_student_403_stranger_404_and_limit_429(): void {
 		$sub = $this->submission( $this->student );
 		$this->assertSame( 403, $this->call( $this->student, 'POST', "/teacher/submissions/{$sub}/ai-suggestion" )->get_status() );

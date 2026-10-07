@@ -258,6 +258,10 @@ trait CLMS_Certificates_Issuance_Verification_Trait {
 	}
 
 	protected function get_public_verification_url( $verification_code ) {
+		// 6.33.0: página pública `/verificar/{codigo}`.
+		if ( class_exists( 'ATORA_Certificate_Verify' ) && '' !== (string) $verification_code ) {
+			return ATORA_Certificate_Verify::url( (string) $verification_code );
+		}
 		if ( ! $this->is_public_verification_enabled() ) {
 			return '';
 		}
@@ -315,54 +319,9 @@ trait CLMS_Certificates_Issuance_Verification_Trait {
 			return ob_get_clean();
 		}
 
-		$result = $this->find_certificate_by_verification_code( $code );
-		if ( empty( $result ) ) {
-			return '<p>' . esc_html__( 'Certificado no encontrado.', 'atora-lms' ) . '</p>';
-		}
-
-		$record   = $result['record'];
-		$user_id  = absint( $result['user_id'] );
-		$course_id = absint( $result['course_id'] );
-		$program_id = isset( $result['program_id'] ) ? absint( $result['program_id'] ) : 0;
-		$target_type = isset( $record['target_type'] ) ? sanitize_key( (string) $record['target_type'] ) : 'course';
-		$user     = get_userdata( $user_id );
-		$status    = isset( $record['status'] ) ? sanitize_key( (string) $record['status'] ) : 'valid';
-		$status_labels = array(
-			'issued'  => __( 'Emitido', 'atora-lms' ),
-			'valid'   => __( 'Válido', 'atora-lms' ),
-			'revoked' => __( 'Revocado', 'atora-lms' ),
-		);
-		$target_title = 'program' === $target_type ? get_the_title( $program_id ) : $this->get_certificate_target_title( $course_id );
-		$academy_name = sanitize_text_field( (string) ( $record['academy'] ?? get_bloginfo( 'name' ) ) );
-		$view_url     = '';
-		if ( 'program' !== $target_type ) {
-			$view_url = $this->get_view_certificate_url( $user_id, $course_id );
-		}
-
-		ob_start();
-		?>
-		<div class="clms-certificate-wrap">
-			<div class="clms-certificate-card">
-				<h3 class="clms-certificate-title"><?php esc_html_e( 'Verificación de certificado', 'atora-lms' ); ?></h3>
-				<p><strong><?php esc_html_e( 'Código:', 'atora-lms' ); ?></strong> <?php echo esc_html( (string) $record['certificate_code'] ); ?></p>
-				<p><strong><?php esc_html_e( 'Estado:', 'atora-lms' ); ?></strong> <?php echo esc_html( isset( $status_labels[ $status ] ) ? $status_labels[ $status ] : $status ); ?></p>
-				<p><strong><?php esc_html_e( 'Estudiante:', 'atora-lms' ); ?></strong> <?php echo esc_html( $user ? $user->display_name : '' ); ?></p>
-				<p><strong><?php echo esc_html( 'program' === $target_type ? __( 'Programa:', 'atora-lms' ) : __( 'Curso:', 'atora-lms' ) ); ?></strong> <?php echo esc_html( $target_title ); ?></p>
-				<p><strong><?php esc_html_e( 'Institución emisora:', 'atora-lms' ); ?></strong> <?php echo esc_html( $academy_name ); ?></p>
-				<p><strong><?php esc_html_e( 'Fecha de emisión:', 'atora-lms' ); ?></strong> <?php echo esc_html( (string) $record['issued_at'] ); ?></p>
-				<?php if ( ! empty( $record['competencies_certified'] ) && is_array( $record['competencies_certified'] ) ) : ?>
-					<p><strong><?php esc_html_e( 'Competencias certificadas:', 'atora-lms' ); ?></strong> <?php echo esc_html( implode( ', ', array_slice( array_map( 'sanitize_text_field', (array) $record['competencies_certified'] ), 0, 6 ) ) ); ?></p>
-				<?php endif; ?>
-				<div class="clms-certificate-card__actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
-					<a class="clms-certificate-btn" href="<?php echo esc_url( $this->get_public_verification_url( (string) ( $record['verification_code'] ?? '' ) ) ); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Abrir verificación pública', 'atora-lms' ); ?></a>
-					<?php if ( $view_url ) : ?>
-						<a class="clms-certificate-btn" href="<?php echo esc_url( $view_url ); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Ver certificado', 'atora-lms' ); ?></a>
-					<?php endif; ?>
-				</div>
-			</div>
-		</div>
-		<?php
-		return ob_get_clean();
+		// 6.33.0: la misma verificación que `/verificar/{codigo}`: nombre congelado,
+		// revocado sin datos y nunca el correo.
+		return '<div class="clms-certificate-wrap"><div class="clms-certificate-card">' . ATORA_Certificate_Verify::content( ATORA_Certificate_Verify::lookup( $code ) ) . '</div></div>';
 	}
 
 	public function handle_verify_certificate() {
