@@ -78,7 +78,10 @@ class CLMS_Sentiment {
 		$text = wp_strip_all_tags( apply_filters( 'the_content', $post->post_content ) );
 		if ( ! trim( $text ) ) { return; }
 
-		$result = $this->analyze( $text );
+		// 6.32.1: el autor va como persona de la petición: si firmó con su nombre, no sale.
+		$this->subject_id = (int) $post->post_author;
+		$result           = $this->analyze( $text );
+		$this->subject_id = 0;
 		update_post_meta( $post_id, self::META_SUBMISSION, $result );
 
 		// Notificar si el estado es negativo
@@ -331,6 +334,9 @@ PROMPT;
 		return false;
 	}
 
+	/** @var int Estudiante del texto que se analiza (6.32.1). */
+	private $subject_id = 0;
+
 	private function call_provider( $provider, $options, $prompt, $max_tokens = 150 ) {
 		unset( $options );
 
@@ -347,6 +353,8 @@ PROMPT;
 				'max_tokens'  => $max_tokens,
 				'temperature' => 0.0,
 				'timeout'     => 20,
+				'feature'     => 'sentiment',
+				'subject_users' => $this->subject_id ? array( $this->subject_id ) : array(),
 			)
 		);
 	}

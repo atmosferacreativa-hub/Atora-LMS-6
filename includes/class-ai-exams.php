@@ -170,6 +170,7 @@ class CLMS_AI_Exams {
                     'temperature' => 0.7,
                     'max_tokens'  => 2000,
                     'timeout'     => 30,
+                    'feature'     => 'exams',
                 ),
                 array(
                     'course_id' => $course_id,
@@ -188,6 +189,7 @@ class CLMS_AI_Exams {
                     'temperature' => 0.7,
                     'max_tokens'  => 2000,
                     'timeout'     => 30,
+                    'feature'     => 'exams',
                 )
             );
         }

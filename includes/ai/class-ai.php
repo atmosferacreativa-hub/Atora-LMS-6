@@ -75,6 +75,10 @@ class CLMS_AI {
 		$provider = $this->get_active_provider();
 
 		if ( $provider instanceof CLMS_AI_Provider_Interface && $provider->is_configured() ) {
+			if ( method_exists( $provider, 'set_request_context' ) ) {
+				// 6.32.1: el estudiante de la entrega como persona de la petición.
+				$provider->set_request_context( array( 'feature' => 'ai_review', 'subject_users' => array( absint( $payload['student_id'] ?? 0 ) ) ) );
+			}
 			$response = $provider->generate_review( $payload );
 
 			if ( is_wp_error( $response ) ) {

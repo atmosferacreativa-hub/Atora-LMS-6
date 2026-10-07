@@ -7,7 +7,7 @@ Qué está comprobado y dónde. Se actualiza en cada versión del plugin o de la
 - **Integración**: PHPUnit con WordPress (`tests/integration`).
 - **Unitaria**: PHPUnit sin WordPress o Jest en la app.
 
-Última actualización: **plugin 6.32.0 · app 0.9.0**.
+Última actualización: **plugin 6.32.1 · app 0.9.0**.
 
 > No hay registro escrito de qué se recorrió en teléfono antes de esta tabla: la columna "Teléfono" queda "por confirmar" hasta la prueba al cierre de la Fase 4, que incluye la lista acumulada de las fases 0 a 3.
 
@@ -60,6 +60,9 @@ Qué está comprobado y dónde. Se actualiza en cada versión del plugin o de la
 | Uso y límites de IA (tabla, 429, tope mensual, aviso 80 %, pantalla de uso) | 6.32.0 | `AiAssistantTest`, `AiGradingSuggestionTest` | Web y app comparten el contador |
 | Asistente del estudiante `POST /ai/assistant` | 6.32.0 | `AiAssistantTest` | Proveedor simulado; pantalla: app 0.9.0 |
 | Sugerencia de calificación con IA (API y SpeedGrader) | 6.32.0 | `AiGradingSuggestionTest` | Proveedor simulado; botón web "Usar sugerencia" probado a mano en local; pantalla: app 0.9.0 |
+| Control central de la IA: toda llamada (chat, embeddings, transcripción, revisión) registrada por función, con límites y tope mensual | 6.32.1 | `AiCentralControlTest` | Con el tope alcanzado, ningún módulo envía nada (429 `atora_ai_budget`) |
+| Sin datos personales hacia el proveedor (nombre y correo del estudiante; marcador `{{nombre}}`) | 6.32.1 | `AiCentralControlTest` | Revisa los prompts de mensajería, alertas, sentimiento, corrección, revisión de SpeedGrader, sugerencia y asistente |
+| Proveedor simulado nunca activo en producción | 6.32.1 | `AiCentralControlTest` | |
 
 ## Datos históricos
 

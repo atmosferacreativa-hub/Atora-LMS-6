@@ -26,6 +26,16 @@ if ( ! defined( 'ABSPATH' ) ) {
  *   ]);
  *
  * Retorna: string con el texto generado | WP_Error en caso de fallo.
+ *
+ * 6.32.1 — control central: toda salida hacia un proveedor (chat, embeddings,
+ * transcripción y `post_json`) pasa por el mismo camino:
+ *   1. Límite diario de la persona y tope mensual de la academia
+ *      (`ATORA_AI_Usage_Service::check`): si se alcanzó, WP_Error 429 y no sale nada.
+ *   2. Filtro de datos personales (`ATORA_AI_Privacy`): sin correos ni nombres;
+ *      el marcador "{{nombre}}" se reemplaza al recibir la respuesta.
+ *   3. Registro en `atora_ai_usage` con la función que declara quien llama
+ *      (`feature` en las opciones; si no, `source`; si no, "other"), la persona
+ *      (`user_id` en las opciones o el usuario actual), tokens y costo estimado.
  */
 class CLMS_AI_Manager {
 
@@ -88,13 +98,27 @@ class CLMS_AI_Manager {
 	 * @return string|array|WP_Error
 	 */
 	private function request_chat( array $messages, array $options, $return_meta ) {
+		$gate = $this->open_request( $options, 'other' );
+		if ( is_wp_error( $gate ) ) {
+			return $gate;
+		}
+		$plan     = $gate['plan'];
+		$messages = ATORA_AI_Privacy::scrub_deep( $messages, $plan );
+		if ( isset( $options['system'] ) ) {
+			$options['system'] = ATORA_AI_Privacy::scrub( (string) $options['system'], $plan );
+		}
+		$options['feature'] = $gate['feature'];
+
 		// 6.32.0: proveedor simulado (pruebas y WordPress del CI): nunca se llama a uno real.
 		$pre = apply_filters( 'atora_ai_pre_chat', null, $messages, $options );
 		if ( null !== $pre ) {
 			if ( is_wp_error( $pre ) ) {
+				$this->close_request( $gate, '', '', array(), 'error' );
 				return $pre;
 			}
-			return $return_meta ? (array) $pre : (string) ( $pre['text'] ?? '' );
+			$pre = ATORA_AI_Privacy::restore_deep( (array) $pre, $plan );
+			$this->close_request( $gate, (string) ( $pre['provider'] ?? '' ), (string) ( $pre['model'] ?? '' ), (array) ( $pre['usage'] ?? array() ), 'ok' );
+			return $return_meta ? $pre : (string) ( $pre['text'] ?? '' );
 		}
 		if ( empty( $messages ) ) {
 			$error = new WP_Error( 'clms_ai_manager_empty_messages', __( 'No se proporcionaron mensajes.', 'atora-lms' ) );
@@ -131,13 +155,15 @@ class CLMS_AI_Manager {
 		$timeout    = isset( $options['timeout'] ) ? absint( $options['timeout'] ) : self::DEFAULT_TIMEOUT;
 		$system     = isset( $options['system'] ) ? (string) $options['system'] : '';
 
-		$result = $this->call_provider( $provider, $api_key, $model, $messages, $system, $max_tokens, $temp, $timeout, $return_meta );
+		// Siempre con metadatos: los tokens hacen falta para el registro de uso.
+		$result = $this->call_provider( $provider, $api_key, $model, $messages, $system, $max_tokens, $temp, $timeout, true );
 		if ( is_wp_error( $result ) && $this->should_retry( $result ) ) {
 			usleep( 200000 );
-			$result = $this->call_provider( $provider, $api_key, $model, $messages, $system, $max_tokens, $temp, $timeout, $return_meta );
+			$result = $this->call_provider( $provider, $api_key, $model, $messages, $system, $max_tokens, $temp, $timeout, true );
 		}
 
 		if ( is_wp_error( $result ) ) {
+			$this->close_request( $gate, $provider, $model, array(), 'error' );
 			$this->report_ai_error(
 				$result,
 				$provider,
@@ -147,31 +173,55 @@ class CLMS_AI_Manager {
 					'message_count' => count( $messages ),
 				)
 			);
+			return $result;
 		}
 
-		if ( ! is_wp_error( $result ) ) {
-			$usage = array();
-			if ( $return_meta && is_array( $result ) && isset( $result['usage'] ) && is_array( $result['usage'] ) ) {
-				$usage = $result['usage'];
+		$usage = is_array( $result ) && isset( $result['usage'] ) && is_array( $result['usage'] ) ? $result['usage'] : array();
+		$this->close_request( $gate, $provider, $model, $usage, 'ok' );
+		do_action(
+			'clms_ai_request_completed',
+			array(
+				'provider'      => $provider,
+				'model'         => $model,
+				'message_count' => count( $messages ),
+				'usage'         => $usage,
+				'source'        => isset( $options['source'] ) ? sanitize_key( (string) $options['source'] ) : 'chat',
+				'feature'       => $gate['feature'],
+			)
+		);
+
+		$result             = ATORA_AI_Privacy::restore_deep( (array) $result, $plan );
+		$result['provider'] = $provider;
+		$result['model']    = $model;
+
+		return $return_meta ? $result : (string) ( $result['text'] ?? '' );
+	}
+
+	// ── Control central (6.32.1) ─────────────────────────────────────────────────
+
+	/**
+	 * Antes de salir hacia el proveedor: función, persona, límites y plan de filtro.
+	 *
+	 * @return array{feature:string,user_id:int,plan:array}|WP_Error 429 si se alcanzó un límite o el tope.
+	 */
+	private function open_request( array $options, string $fallback_feature ) {
+		$feature = class_exists( 'ATORA_AI_Usage_Service' ) ? ATORA_AI_Usage_Service::feature_of( $options, $fallback_feature ) : $fallback_feature;
+		$user_id = isset( $options['user_id'] ) ? absint( $options['user_id'] ) : get_current_user_id();
+		if ( class_exists( 'ATORA_AI_Usage_Service' ) && empty( $options['skip_limits'] ) ) {
+			$allowed = ATORA_AI_Usage_Service::check( $user_id, $feature );
+			if ( is_wp_error( $allowed ) ) {
+				return $allowed;
 			}
-			do_action(
-				'clms_ai_request_completed',
-				array(
-					'provider'      => $provider,
-					'model'         => $model,
-					'message_count' => count( $messages ),
-					'usage'         => $usage,
-					'source'        => isset( $options['source'] ) ? sanitize_key( (string) $options['source'] ) : 'chat',
-				)
-			);
 		}
+		$plan = class_exists( 'ATORA_AI_Privacy' ) ? ATORA_AI_Privacy::plan( ATORA_AI_Privacy::subjects( $options ) ) : array( 'mask' => array(), 'restore' => array() );
+		return array( 'feature' => $feature, 'user_id' => $user_id, 'plan' => $plan );
+	}
 
-		if ( $return_meta && is_array( $result ) ) {
-			$result['provider'] = $provider;
-			$result['model']    = $model;
+	/** Después de la respuesta (o del error): una fila en `atora_ai_usage`. */
+	private function close_request( array $gate, string $provider, string $model, array $usage, string $result, ?float $cost = null ): void {
+		if ( class_exists( 'ATORA_AI_Usage_Service' ) ) {
+			ATORA_AI_Usage_Service::record( (int) $gate['user_id'], (string) $gate['feature'], $provider, $model, $usage, $result, $cost );
 		}
-
-		return $result;
 	}
 
 	/**
@@ -294,6 +344,25 @@ class CLMS_AI_Manager {
 	 * @return array|WP_Error
 	 */
 	public function post_json( $url, $headers, $body, $timeout = 60, $context = array() ) {
+		$context = is_array( $context ) ? $context : array();
+		$gate    = $this->open_request( $context, 'other' );
+		if ( is_wp_error( $gate ) ) {
+			return $gate;
+		}
+		$body = ATORA_AI_Privacy::scrub_deep( is_array( $body ) ? $body : array(), $gate['plan'] );
+		$pre  = apply_filters( 'atora_ai_pre_request', null, 'post_json', $body, $context );
+		if ( null !== $pre ) {
+			$this->close_request( $gate, (string) ( $context['provider'] ?? '' ), (string) ( $context['model'] ?? '' ), is_array( $pre ) ? (array) ( $pre['body']['usage'] ?? array() ) : array(), is_wp_error( $pre ) ? 'error' : 'ok' );
+			return is_wp_error( $pre ) ? $pre : ATORA_AI_Privacy::restore_deep( (array) $pre, $gate['plan'] );
+		}
+		$result = $this->raw_post_json( $url, $headers, $body, $timeout, $context );
+		$usage  = ! is_wp_error( $result ) ? (array) ( $result['body']['usage'] ?? $result['body']['usageMetadata'] ?? array() ) : array();
+		$this->close_request( $gate, (string) ( $context['provider'] ?? '' ), (string) ( $context['model'] ?? '' ), $usage, is_wp_error( $result ) ? 'error' : 'ok' );
+		return is_wp_error( $result ) ? $result : ATORA_AI_Privacy::restore_deep( $result, $gate['plan'] );
+	}
+
+	/** POST JSON sin control: solo lo usan los métodos de este gestor, que ya pasaron por él. */
+	private function raw_post_json( $url, $headers, $body, $timeout = 60, $context = array() ) {
 		$url     = esc_url_raw( (string) $url );
 		$headers = is_array( $headers ) ? $headers : array();
 		$body    = is_array( $body ) ? $body : array();
@@ -383,6 +452,23 @@ class CLMS_AI_Manager {
 		if ( empty( $inputs ) ) {
 			return array();
 		}
+		$gate = $this->open_request( $options, 'embeddings' );
+		if ( is_wp_error( $gate ) ) {
+			return $gate;
+		}
+		$inputs = ATORA_AI_Privacy::scrub_deep( array_values( $inputs ), $gate['plan'] );
+		$pre    = apply_filters( 'atora_ai_pre_request', null, 'embeddings', $inputs, $options );
+		if ( null !== $pre ) {
+			$this->close_request( $gate, 'openai', (string) ( $options['model'] ?? self::DEFAULT_EMBED_MODEL ), is_array( $pre ) ? (array) ( $pre['usage'] ?? array() ) : array(), is_wp_error( $pre ) ? 'error' : 'ok' );
+			return is_wp_error( $pre ) ? $pre : (array) ( $pre['embeddings'] ?? array() );
+		}
+		$result = $this->embeddings_request( $inputs, $options );
+		$this->close_request( $gate, 'openai', (string) ( $options['model'] ?? self::DEFAULT_EMBED_MODEL ), is_wp_error( $result ) ? array() : $result['usage'], is_wp_error( $result ) ? 'error' : 'ok' );
+		return is_wp_error( $result ) ? $result : $result['embeddings'];
+	}
+
+	/** @return array{embeddings:array,usage:array}|WP_Error */
+	private function embeddings_request( array $inputs, array $options ) {
 
 		$api_key = ! empty( $options['api_key'] ) ? trim( (string) $options['api_key'] ) : $this->get_api_key( 'openai' );
 		if ( ! $api_key ) {
@@ -394,7 +480,7 @@ class CLMS_AI_Manager {
 		$model   = ! empty( $options['model'] ) ? sanitize_text_field( (string) $options['model'] ) : self::DEFAULT_EMBED_MODEL;
 		$timeout = isset( $options['timeout'] ) ? absint( $options['timeout'] ) : 60;
 
-		$result = $this->post_json(
+		$result = $this->raw_post_json(
 			self::EMBEDDINGS_ENDPOINT,
 			array( 'Authorization' => 'Bearer ' . $api_key ),
 			array(
@@ -425,7 +511,7 @@ class CLMS_AI_Manager {
 			}
 		}
 
-		return $embeddings;
+		return array( 'embeddings' => $embeddings, 'usage' => isset( $body['usage'] ) && is_array( $body['usage'] ) ? $body['usage'] : array() );
 	}
 
 	/**
@@ -441,7 +527,7 @@ class CLMS_AI_Manager {
 			return new WP_Error( 'clms_ai_manager_empty_query', __( 'Consulta vacía para embeddings.', 'atora-lms' ) );
 		}
 
-		$result = $this->create_embeddings( array( mb_substr( $text, 0, 8000 ) ), $options );
+		$result = $this->create_embeddings( array( mb_substr( $text, 0, 8000 ) ), $options + array( 'feature' => 'knowledge_base' ) );
 		if ( is_wp_error( $result ) ) {
 			return $result;
 		}
@@ -457,6 +543,24 @@ class CLMS_AI_Manager {
 	 * @return array|WP_Error
 	 */
 	public function transcribe_audio( $file_path, array $options = array() ) {
+		$gate = $this->open_request( $options, 'transcription' );
+		if ( is_wp_error( $gate ) ) {
+			return $gate;
+		}
+		$pre = apply_filters( 'atora_ai_pre_request', null, 'transcription', (string) $file_path, $options );
+		if ( null !== $pre ) {
+			$this->close_request( $gate, 'openai', 'whisper-1', array(), is_wp_error( $pre ) ? 'error' : 'ok', 0.0 );
+			return $pre;
+		}
+		$result = $this->transcription_request( $file_path, $options );
+		// Whisper cobra por minuto: con la duración informada, 0,006 por minuto.
+		$minutes = is_array( $result ) && isset( $result['duration'] ) ? (float) $result['duration'] / 60 : 0.0;
+		$this->close_request( $gate, 'openai', (string) ( $options['model'] ?? 'whisper-1' ), array(), is_wp_error( $result ) ? 'error' : 'ok', round( $minutes * 0.006, 6 ) );
+		return $result;
+	}
+
+	/** @return array|WP_Error */
+	private function transcription_request( $file_path, array $options ) {
 		$file_path = (string) $file_path;
 
 		if ( ! $file_path || ! file_exists( $file_path ) ) {
@@ -872,6 +976,7 @@ class CLMS_AI_Manager {
 		return array(
 			'text'     => $text,
 			'language' => isset( $data['language'] ) ? sanitize_text_field( (string) $data['language'] ) : '',
+			'duration' => isset( $data['duration'] ) ? (float) $data['duration'] : null,
 			'raw'      => $data,
 		);
 	}

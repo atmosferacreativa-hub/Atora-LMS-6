@@ -247,6 +247,12 @@ PROMPT;
 
 	protected function call_provider( $provider, $options, $prompt, $context = array() ) {
 		unset( $options );
+		// 6.32.1: función y estudiante de la entrega (si firmó con su nombre, no sale).
+		$submission_id = absint( is_array( $context ) ? ( $context['submission_id'] ?? 0 ) : 0 );
+		$privacy       = array(
+			'feature'       => 'ai_grading',
+			'subject_users' => $submission_id ? array( absint( get_post_meta( $submission_id, '_clms_submission_user_id', true ) ) ?: absint( get_post_field( 'post_author', $submission_id ) ) ) : array(),
+		);
 
 		$copilots = class_exists( 'CLMS_Helper' ) ? clms_core('CLMS_AI_Copilots') : null;
 		if ( $copilots && method_exists( $copilots, 'run_text' ) ) {
@@ -259,7 +265,7 @@ PROMPT;
 					'max_tokens'  => 600,
 					'temperature' => 0.2,
 					'timeout'     => 60,
-				),
+				) + $privacy,
 				is_array( $context ) ? $context : array()
 			);
 		}
@@ -276,7 +282,7 @@ PROMPT;
 				'max_tokens'  => 600,
 				'temperature' => 0.2,
 				'timeout'     => 60,
-			)
+			) + $privacy
 		);
 	}
 

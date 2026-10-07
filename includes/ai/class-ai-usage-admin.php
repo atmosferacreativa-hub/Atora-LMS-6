@@ -50,7 +50,6 @@ final class ATORA_AI_Usage_Admin {
 		$features = ATORA_AI_Usage_Service::features();
 		$limits   = ATORA_AI_Usage_Service::limits();
 		$report   = ATORA_AI_Usage_Service::month_report();
-		$labels   = array( 'assistant' => __( 'Asistente del estudiante', 'atora-lms' ), 'grading_suggestion' => __( 'Sugerencia de calificación', 'atora-lms' ) );
 		$results  = array( 'ok' => __( 'respondidas', 'atora-lms' ), 'error' => __( 'con error', 'atora-lms' ), 'limit' => __( 'frenadas por límite', 'atora-lms' ) );
 		echo '<div class="wrap"><h1>' . esc_html__( 'Uso de IA', 'atora-lms' ) . '</h1>';
 		if ( ! empty( $_GET['saved'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
@@ -68,7 +67,7 @@ final class ATORA_AI_Usage_Admin {
 		foreach ( $report['features'] as $row ) {
 			printf(
 				'<tr><td>%s</td><td>%s</td><td>%d</td><td>%s / %s</td><td>%s</td></tr>',
-				esc_html( $labels[ $row['feature'] ] ?? $row['feature'] ),
+				esc_html( ATORA_AI_Usage_Service::label( (string) $row['feature'] ) ),
 				esc_html( $results[ $row['result'] ] ?? $row['result'] ),
 				(int) $row['calls'],
 				esc_html( number_format_i18n( (int) $row['tokens_in'] ) ),
@@ -91,9 +90,9 @@ final class ATORA_AI_Usage_Admin {
 		echo '<input type="hidden" name="action" value="atora_ai_settings">';
 		printf( '<p><label><input type="checkbox" name="feature_assistant" value="1" %s> %s</label></p>', checked( $features['assistant'], true, false ), esc_html__( 'Asistente del estudiante en la app', 'atora-lms' ) );
 		printf( '<p><label><input type="checkbox" name="feature_suggestion" value="1" %s> %s</label></p>', checked( $features['grading_suggestion'], true, false ), esc_html__( 'Sugerencia de calificación para el docente (app y SpeedGrader)', 'atora-lms' ) );
-		printf( '<p><label>%s <input type="number" min="0" name="student_daily" value="%d"></label></p>', esc_html__( 'Preguntas por estudiante y día', 'atora-lms' ), (int) $limits['student_daily'] );
-		printf( '<p><label>%s <input type="number" min="0" name="teacher_daily" value="%d"></label></p>', esc_html__( 'Sugerencias por docente y día', 'atora-lms' ), (int) $limits['teacher_daily'] );
-		printf( '<p><label>%s <input type="text" name="monthly_cost_cap" value="%s" placeholder="%s"></label></p>', esc_html__( 'Tope mensual de costo estimado (vacío = sin tope)', 'atora-lms' ), esc_attr( (string) $limits['monthly_cost_cap'] ), esc_attr__( 'sin tope', 'atora-lms' ) );
+		printf( '<p><label>%s <input type="number" min="0" name="student_daily" value="%d"></label></p>', esc_html__( 'Usos de IA por estudiante y día, en cada función (en el asistente: preguntas)', 'atora-lms' ), (int) $limits['student_daily'] );
+		printf( '<p><label>%s <input type="number" min="0" name="teacher_daily" value="%d"></label></p>', esc_html__( 'Usos de IA por docente y día, en cada función (en la sugerencia: sugerencias)', 'atora-lms' ), (int) $limits['teacher_daily'] );
+		printf( '<p><label>%s <input type="text" name="monthly_cost_cap" value="%s" placeholder="%s"></label></p>', esc_html__( 'Tope mensual de costo estimado de toda la IA de la academia (vacío = sin tope)', 'atora-lms' ), esc_attr( (string) $limits['monthly_cost_cap'] ), esc_attr__( 'sin tope', 'atora-lms' ) );
 		submit_button( __( 'Guardar', 'atora-lms' ) );
 		echo '</form></div>';
 	}

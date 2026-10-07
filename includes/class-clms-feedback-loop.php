@@ -274,7 +274,7 @@ class CLMS_Feedback_Loop {
 			),
 		);
 
-		$response = $ai->chat( $messages, array( 'max_tokens' => 150, 'temperature' => 0.7 ) );
+		$response = $ai->chat( $messages, array( 'max_tokens' => 150, 'temperature' => 0.7, 'feature' => 'feedback_loop', 'subject_users' => array( absint( $student_id ) ) ) );
 
 		return is_wp_error( $response ) ? $this->fallback_plan_overview( $gaps ) : trim( $response );
 	}
@@ -392,7 +392,7 @@ class CLMS_Feedback_Loop {
 			),
 		);
 
-		$response = $ai->chat( $messages, array( 'max_tokens' => 400, 'temperature' => 0.3 ) );
+		$response = $ai->chat( $messages, array( 'max_tokens' => 400, 'temperature' => 0.3, 'feature' => 'feedback_loop', 'subject_users' => array( absint( $student_id ) ) ) );
 
 		if ( is_wp_error( $response ) ) {
 			return array();
@@ -470,7 +470,7 @@ class CLMS_Feedback_Loop {
 			),
 		);
 
-		$response = $ai->chat( $messages, array( 'max_tokens' => 1000, 'temperature' => 0.7 ) );
+		$response = $ai->chat( $messages, array( 'max_tokens' => 1000, 'temperature' => 0.7, 'feature' => 'feedback_loop' ) );
 
 		if ( is_wp_error( $response ) ) {
 			return array();

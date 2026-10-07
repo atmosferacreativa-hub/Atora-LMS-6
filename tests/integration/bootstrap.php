@@ -76,6 +76,12 @@ tests_add_filter( 'muplugins_loaded', static function () {
 	require_once $plugin;
 } );
 
+// 6.32.1: el proveedor de IA simulado nunca se activa en producción (el valor
+// por defecto de WordPress); las pruebas corren como entorno de desarrollo.
+if ( ! defined( 'WP_ENVIRONMENT_TYPE' ) ) {
+	define( 'WP_ENVIRONMENT_TYPE', 'development' );
+}
+
 require $_tests_dir . '/includes/bootstrap.php';
 
 }

@@ -3,7 +3,7 @@
  * Plugin Name:       ATORA LMS
  * Plugin URI:        https://atora.studio
  * Description:       LMS modular para WordPress con IA, evaluaciones, certificados, CRM, mensajería multi-canal, afiliados, live streaming y más. Autor: Atora Studio.
- * Version:           6.32.0
+ * Version:           6.32.1
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Atora Studio
@@ -52,7 +52,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * - Limpieza automática de notificaciones >90 días
  */
 	if ( ! defined( 'ATORA_LMS_VERSION' ) ) {
-		define( 'ATORA_LMS_VERSION', '6.32.0' );
+		define( 'ATORA_LMS_VERSION', '6.32.1' );
 	}
 
 if ( ! defined( 'ATORA_LMS_FILE' ) ) {
@@ -1315,6 +1315,7 @@ add_action( 'init', static function () {
 	// 6.32.0: Fase 5 — IA (asistente y sugerencia de calificación, sin AJAX).
 	atora_lms_require_module( 'includes/ai/class-ai-assistant-service.php' );
 	atora_lms_require_module( 'includes/ai/class-ai-usage-service.php' );
+	atora_lms_require_module( 'includes/ai/class-ai-privacy.php' );
 	atora_lms_require_module( 'includes/ai/class-ai-usage-admin.php', static function () { ATORA_AI_Usage_Admin::boot(); } );
 	atora_lms_require_module( 'includes/ai/class-ai-grading-suggestion-service.php', static function () { ATORA_AI_Grading_Suggestion_Service::boot(); } );
 	atora_lms_require_module( 'includes/ai/class-ai-fake-provider.php', static function () { ATORA_AI_Fake_Provider::boot(); } );
