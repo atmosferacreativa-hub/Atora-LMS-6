@@ -117,6 +117,11 @@ final class ATORA_Mobile_AI_Controller {
 		if ( ! ATORA_AI_Usage_Service::available( ATORA_AI_Usage_Service::SUGGESTION ) || ! $job || ! ATORA_Teacher_Scope::can_grade_submission( $user_id, (int) $job['submission_id'] ) ) {
 			return self::not_found();
 		}
+		// 6.33.0: sin cola que lo tome a tiempo, lo resuelve esta consulta.
+		if ( 'pending' === $job['status'] ) {
+			ATORA_AI_Grading_Suggestion_Service::run_if_stalled( (string) $job['id'] );
+			$job = ATORA_AI_Grading_Suggestion_Service::job( (string) $job['id'] );
+		}
 		return new WP_REST_Response( array(
 			'job_id'        => (string) $job['id'],
 			'submission_id' => (int) $job['submission_id'],

@@ -673,7 +673,13 @@ trait CLMS_Grading_SpeedGrade_Trait {
 		}
 		$suggestion = ATORA_AI_Grading_Suggestion_Service::suggestion( $submission_id );
 		$job        = isset( $_GET['ai_job'] ) ? ATORA_AI_Grading_Suggestion_Service::job( sanitize_text_field( wp_unslash( $_GET['ai_job'] ) ) ) : null; // phpcs:ignore WordPress.Security.NonceVerification
-		$pending    = $job && 'pending' === $job['status'];
+		if ( $job && 'pending' === $job['status'] ) {
+			// 6.33.0: sin cola que lo tome a tiempo, lo resuelve esta recarga.
+			ATORA_AI_Grading_Suggestion_Service::run_if_stalled( (string) $job['id'] );
+			$job        = ATORA_AI_Grading_Suggestion_Service::job( (string) $job['id'] );
+			$suggestion = ATORA_AI_Grading_Suggestion_Service::suggestion( $submission_id );
+		}
+		$pending    = $job && in_array( $job['status'], array( 'pending', 'running' ), true );
 		$levels     = array( 'bajo' => __( 'bajo', 'atora-lms' ), 'medio' => __( 'medio', 'atora-lms' ), 'alto' => __( 'alto', 'atora-lms' ) );
 		ob_start();
 		?>

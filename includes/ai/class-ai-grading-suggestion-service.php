@@ -124,9 +124,29 @@ final class ATORA_AI_Grading_Suggestion_Service {
 	}
 
 	/** Resuelve un trabajo (lo llama la cola). */
+	/** 6.33.0: segundos que un trabajo puede esperar a la cola antes de que la consulta lo ejecute. */
+	const INLINE_AFTER = 15;
+
+	/**
+	 * Si la cola no tomó el trabajo a tiempo (WP-Cron desactivado o sin visitas),
+	 * lo ejecuta quien consulta. El reclamo atómico evita que corra dos veces.
+	 */
+	public static function run_if_stalled( string $job_id ): void {
+		$job = self::job( $job_id );
+		if ( $job && 'pending' === $job['status'] && strtotime( $job['created_at'] . ' UTC' ) <= time() - self::INLINE_AFTER ) {
+			self::run( $job_id );
+		}
+	}
+
 	public static function run( string $job_id ): void {
 		$job = self::job( $job_id );
 		if ( ! $job || 'pending' !== $job['status'] ) {
+			return;
+		}
+		// 6.33.0: reclamo atómico (cola y consulta pueden intentar a la vez): solo uno pasa.
+		global $wpdb;
+		$claimed = $wpdb->query( $wpdb->prepare( 'UPDATE ' . self::jobs_table() . " SET status = 'running', updated_at = %s WHERE id = %s AND status = 'pending'", current_time( 'mysql', true ), $job_id ) ); // phpcs:ignore WordPress.DB
+		if ( 1 !== (int) $claimed ) {
 			return;
 		}
 		$submission_id = (int) $job['submission_id'];
