@@ -81,6 +81,46 @@ Reemplaza el certificado HTML provisional de la 0.5.0.
 7. **Ficha de tienda:** borradores en `docs/TIENDAS-FICHA.md` (nombre, descripción corta y larga en español e inglés, categoría, novedades) y capturas generadas desde los recorridos de pantalla en los tamaños que piden ambas tiendas.
 8. Pruebas de pantalla: sumar `cambio-idioma`, `eliminar-cuenta` y `certificado-pdf`.
 
+## Bloque E — Correcciones de la auditoría de la Fase 6 (antes del cierre)
+
+Verificado en el código de las ramas `feat/6.33.0-publicacion` y `main`. Todo entra en la 6.33.0 y la 1.0.0, con una prueba que falla antes de cada arreglo.
+
+### E.1 Eliminación de cuenta completa (alta)
+`class-account-deletion.php::process()` solo anonimiza el usuario de WordPress o llama a `wp_delete_user()`. Las tablas propias y la cola de correo quedan intactas.
+1. Registrar un borrador por módulo con el mecanismo estándar de WordPress (`wp_privacy_personal_data_erasers`), para que también funcione desde Herramientas → Borrar datos personales. Cada módulo declara qué borra y qué anonimiza: mensajes y avisos, tokens de notificaciones, sesiones y tokens móviles, sesiones y fragmentos de subida, registro de uso de IA (usuario → 0), cola y registro de mensajes y correos, CRM y contactos, gamificación, analítica y lo que encuentres al recorrer las tablas con `user_id` o correo.
+2. **Cancelar los correos y mensajes pendientes** del usuario y de su dirección antes de anonimizar.
+3. En modo **anonimizar**, las notas, actas, entregas y certificados se conservan sin datos personales. En modo **eliminar**, se borran también, con la confirmación y advertencia ya acordadas.
+4. **Verificación antes de marcar la solicitud como procesada:** recorrer las tablas registradas y comprobar que no queda nombre, correo ni `user_id` del usuario, salvo los registros académicos permitidos en modo anonimizar. Si algo queda, la solicitud pasa a "incompleta" con el detalle, y no a "procesada".
+5. Pruebas: tras procesar no queda ningún dato personal en ninguna tabla registrada; un correo pendiente no se envía; con una tabla que falla, la solicitud queda "incompleta".
+
+### E.2 El bloqueo de calificación cubre todo el guardado (alta)
+Hoy el bloqueo vive solo dentro de `claim_revision()`; las escrituras de nota, comentarios y rúbrica (cerca de las líneas 377–436) ocurren fuera de él.
+1. El bloqueo por entrega se toma al inicio de `save()` y se libera en un `finally` al terminar, incluidos moderación y publicación.
+2. La revisión nueva se escribe **al final**, cuando todo lo demás ya se guardó, para que nadie lea una revisión nueva con datos a medias.
+3. Prueba: una lectura concurrente durante un guardado ve la revisión vieja con los datos viejos, o la nueva con los nuevos, nunca una mezcla.
+
+### E.3 La sugerencia de IA va atada al intento (alta)
+`class-ai-grading-suggestion-service.php` toma siempre el último intento (cerca de la línea 224).
+1. La solicitud lleva el intento a evaluar; por defecto, el seleccionado por el docente.
+2. El trabajo, el resultado y la auditoría guardan el intento y una huella del contenido evaluado.
+3. Si el docente cambia de intento o llega uno nuevo, la sugerencia anterior se marca "de otro intento" y no se puede usar sin pedir una nueva.
+4. En la app y en SpeedGrader se muestra a qué intento corresponde la sugerencia.
+
+### E.4 La consulta de la sugerencia no genera ni se rinde antes de tiempo (media)
+1. `GET /teacher/ai-suggestions/{job_id}` nunca ejecuta la generación. Si la cola está detenida, el trabajo se dispara por una vía asíncrona aparte.
+2. En la app, un tiempo de espera de red no cancela el trabajo: se sigue consultando el mismo `job_id` hasta 3 minutos en total; después se muestra "Sigue generándose" y, al volver a la pantalla, se retoma el mismo trabajo.
+
+### E.5 Los límites de IA reservan consumo (media)
+1. Antes de llamar al proveedor, reservar el uso de forma atómica (bloqueo por usuario o transacción): se cuentan los usos completados **y los que están en curso**.
+2. Al terminar, la reserva pasa a "ok" o "error". Las reservas de más de 5 minutos sin terminar caducan.
+3. El tope mensual reserva el costo estimado de la misma forma.
+4. Prueba: diez llamadas simultáneas con límite 3 → exactamente 3 pasan.
+
+### E.6 Cierre de sesión sin conexión y tokens de notificación (media)
+1. En el servidor, revocar la sesión móvil borra también los tokens de notificación de ese dispositivo, y una sesión caducada o revocada deja de recibir avisos.
+2. En la app (`src/api/push.ts`), si la baja del dispositivo falla sin conexión, queda como baja pendiente en la cola y se envía en cuanto haya red, aunque ya no haya sesión.
+3. Prueba: cerrar sesión en modo avión y reconectar → el servidor ya no tiene el token ni envía avisos a ese teléfono.
+
 Cierre: app **1.0.0**, plugin 6.33.0, changelog, `docs/ESTADO.md`, `PRUEBA-TELEFONO.md` con las filas de la Fase 6, etiquetas, ZIP, y las compilaciones `production` (AAB e IPA) sin enviar.
 
 ---
