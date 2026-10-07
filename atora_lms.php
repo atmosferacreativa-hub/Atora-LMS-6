@@ -967,6 +967,12 @@ add_action( 'init', static function () {
 				ATORA_E2E_Seed_CLI::init();
 			}
 		} );
+		// 6.33.0: cuentas para la revisión de las tiendas (`wp atora review-accounts`).
+		atora_lms_require_module( 'includes/modularity/class-review-accounts-cli.php', static function() {
+			if ( class_exists( 'ATORA_Review_Accounts_CLI' ) ) {
+				ATORA_Review_Accounts_CLI::init();
+			}
+		} );
 	}
 	// PT-1 (6.12.0): migra perfiles de instalación 6.3.0–6.11.0 (academia/
 	// institucional/corporativo) a los cuatro perfiles nuevos, una sola vez.
@@ -1326,6 +1332,8 @@ add_action( 'init', static function () {
 	// 6.33.0: eliminación de cuenta (app, página pública y administración).
 	atora_lms_require_module( 'includes/account/class-account-deletion.php', static function () { ATORA_Account_Deletion::boot(); } );
 	atora_lms_require_module( 'includes/mobile/class-mobile-settings-admin.php', static function () { ATORA_Mobile_Settings_Admin::boot(); } );
+	// 6.33.0: ayudas de las pruebas de pantalla; solo con ATORA_E2E (WordPress temporal del CI).
+	atora_lms_require_module( 'includes/modularity/class-e2e-runtime.php', static function () { ATORA_E2E_Runtime::boot(); } );
 	if ( class_exists( 'ATORA_Mobile_Messages_Controller' ) ) {
 		add_action( 'rest_api_init', array( 'ATORA_Mobile_Messages_Controller', 'register_routes' ) );
 		add_action( 'rest_api_init', array( 'ATORA_Mobile_Organize_Controller', 'register_routes' ) );
