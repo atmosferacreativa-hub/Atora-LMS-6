@@ -4,12 +4,12 @@ Orden: `docs/ordenes/ORDEN-FASE-6.md`. Reanudar: leer este archivo y la orden, c
 
 ## Paso actual
 
-**Bloque B — certificado en PDF (6.33.0)**, rama `feat/6.33.0-publicacion` (Atora-LMS-6). Código escrito (plantilla, PDF, verificación, API `format=pdf`); faltan pruebas.
+**Bloque C — eliminación de cuenta y requisitos de tiendas (plugin)**, rama `feat/6.33.0-publicacion`. Bloque B (plugin) hecho con `CertificatePdfTest`; la parte de la app (descargar PDF) va con el Bloque D.
 
 ## Bloques
 
 - [x] **A** — 6.32.1 ya publicado (v6.32.1, PR #67): control central en `CLMS_AI_Manager` (chat, chat_with_meta, embeddings, transcripción, post_json) con registro por `feature`, límites, tope mensual y filtro de datos personales; marcador `{{nombre}}`; simulado nunca en `production`; `AiCentralControlTest`. Comprobado contra la lista del Bloque A: cumple.
-- [ ] **B** — certificado PDF, plantilla, QR, `/verificar/{codigo}`, regeneración, app descarga PDF.
+- [x] **B** (plugin) — certificado PDF, plantilla con 3 firmas, QR, `/verificar/{codigo}`, regeneración con fecha original, API `format=pdf` + `certificate_pdf`. `CertificatePdfTest` (6). Pendiente app: descargar y abrir el PDF (Bloque D).
 - [ ] **C** — eliminación de cuenta (API, admin, página pública), política de privacidad, datos de tiendas, permisos.
 - [ ] **D** — app 1.0.0: i18n es/en, accesibilidad, rendimiento, errores, compilación de producción, cuentas de revisión, ficha de tienda, recorridos nuevos.
 - [ ] Cierre: 6.33.0 + 1.0.0, changelog, ESTADO, PRUEBA-TELEFONO, etiquetas, ZIP, compilación de prueba y de producción (AAB, IPA) sin enviar.
