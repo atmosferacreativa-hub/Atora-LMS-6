@@ -233,7 +233,7 @@ final class ATORA_Mobile_REST_Controller {
 			'authentication'   => 'opaque_bearer',
 			'access_ttl'       => ATORA_Mobile_Token_Service::ACCESS_TTL,
 			'refresh_ttl'      => ATORA_Mobile_Token_Service::REFRESH_TTL,
-			'features'         => array( 'profile', 'dashboard', 'courses', 'progress', 'lesson_completion', 'quizzes', 'assignments', 'sync_changes', 'playback_position', 'resource_downloads', 'multi_video', 'grades', 'certificates', 'messages', 'agenda', 'today', 'push_notifications', 'teacher', 'ai_assistant', 'ai_grading_suggestion' ),
+			'features'         => array( 'profile', 'dashboard', 'courses', 'progress', 'lesson_completion', 'quizzes', 'assignments', 'sync_changes', 'playback_position', 'resource_downloads', 'multi_video', 'grades', 'certificates', 'messages', 'agenda', 'today', 'push_notifications', 'teacher', 'ai_assistant', 'ai_grading_suggestion', 'certificate_pdf' ),
 			'capabilities'     => array(
 				'assignments'        => true,
 				'sync_changes'       => class_exists( '\\ATORA\\LMS\\LMS_Content_Changes' ),
@@ -242,6 +242,8 @@ final class ATORA_Mobile_REST_Controller {
 				'multi_video'        => class_exists( 'ATORA_Lesson_Videos' ),
 				'grades'             => class_exists( 'CLMS_Student_Grades_Service' ),
 				'certificates'       => class_exists( 'CLMS_Certificates' ) || ( function_exists( 'clms_core' ) && (bool) clms_core( 'CLMS_Certificates' ) ),
+				// 6.33.0: el documento del certificado se puede pedir en PDF (`format=pdf`).
+				'certificate_pdf'    => class_exists( 'ATORA_Certificate_PDF' ) && ATORA_Certificate_PDF::available(),
 				// 6.30.0: Fase 3 — buzón, agenda, Hoy y notificaciones al teléfono.
 				'messages'           => class_exists( 'ATORA_Mobile_Messages_Controller' ) && class_exists( 'ATORA_Inbox_Store' ),
 				'agenda'             => class_exists( 'CLMS_Agenda_Service' ),
@@ -1524,6 +1526,22 @@ final class ATORA_Mobile_REST_Controller {
 		$resolved = $certs->resolve_certificate_for_user( $user_id, $type, $target_id );
 		if ( is_wp_error( $resolved ) ) {
 			return $resolved;
+		}
+		// 6.33.0: `format=pdf` entrega el PDF institucional (la app 1.0.0 lo pide; versiones anteriores, HTML).
+		if ( 'pdf' === (string) $request->get_param( 'format' ) ) {
+			$pdf = class_exists( 'ATORA_Certificate_PDF' ) ? ATORA_Certificate_PDF::for_user( $user_id, $resolved ) : new WP_Error( 'atora_certificate_pdf_unavailable', __( 'Este servidor no puede generar el certificado en PDF.', 'atora-lms' ), array( 'status' => 503 ) );
+			if ( is_wp_error( $pdf ) ) {
+				return $pdf;
+			}
+			add_filter( 'rest_pre_serve_request', static function ( $served ) use ( $pdf ) {
+				if ( ! headers_sent() ) {
+					header( 'Content-Type: application/pdf' );
+					header( 'Content-Length: ' . strlen( $pdf ) );
+				}
+				echo $pdf; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- binario PDF.
+				return true;
+			} );
+			return new WP_REST_Response( null, 200 );
 		}
 		$html = $certs->render_certificate_document( $user_id, $resolved );
 		// Se entrega el documento tal cual (no JSON) para guardarlo y verlo sin conexión.

@@ -1319,6 +1319,10 @@ add_action( 'init', static function () {
 	atora_lms_require_module( 'includes/ai/class-ai-usage-admin.php', static function () { ATORA_AI_Usage_Admin::boot(); } );
 	atora_lms_require_module( 'includes/ai/class-ai-grading-suggestion-service.php', static function () { ATORA_AI_Grading_Suggestion_Service::boot(); } );
 	atora_lms_require_module( 'includes/ai/class-ai-fake-provider.php', static function () { ATORA_AI_Fake_Provider::boot(); } );
+	// 6.33.0: Fase 6 — certificado institucional en PDF y verificación pública.
+	atora_lms_require_module( 'includes/certificates/class-certificate-template.php', static function () { ATORA_Certificate_Template::boot(); } );
+	atora_lms_require_module( 'includes/certificates/class-certificate-pdf.php' );
+	atora_lms_require_module( 'includes/certificates/class-certificate-verify.php', static function () { ATORA_Certificate_Verify::boot(); } );
 	if ( class_exists( 'ATORA_Mobile_Messages_Controller' ) ) {
 		add_action( 'rest_api_init', array( 'ATORA_Mobile_Messages_Controller', 'register_routes' ) );
 		add_action( 'rest_api_init', array( 'ATORA_Mobile_Organize_Controller', 'register_routes' ) );
