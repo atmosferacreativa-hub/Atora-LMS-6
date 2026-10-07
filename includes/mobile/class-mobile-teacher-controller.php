@@ -418,7 +418,8 @@ final class ATORA_Mobile_Teacher_Controller {
 		if ( ! ATORA_Teacher_Scope::can_grade_submission( $user_id, $submission_id ) ) {
 			return self::not_found();
 		}
-		$detail = self::detail( $user_id, $submission_id );
+		// 6.33.1 (E.2): espera a un guardado en curso: revisión y datos siempre del mismo momento.
+		$detail = ATORA_Grading_Save_Service::read_consistent( $submission_id, static fn() => self::detail( $user_id, $submission_id ) );
 		$failed = self::db_failed();
 		return $failed ? $failed : new WP_REST_Response( array( 'submission' => $detail ), 200 );
 	}
