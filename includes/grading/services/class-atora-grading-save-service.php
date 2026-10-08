@@ -529,7 +529,7 @@ class ATORA_Grading_Save_Service {
 				'rubric_percent'      => ( '' !== (string) $rubric_pct_ref ) ? absint( $rubric_pct_ref ) : '',
 				'attempt'             => $graded_attempt,
 				// 6.32.0: ¿se guardó con o sin sugerencia de IA previa, y cuánto difiere?
-				'ai_suggestion'       => class_exists( 'ATORA_AI_Grading_Suggestion_Service' ) ? ATORA_AI_Grading_Suggestion_Service::audit( $submission_id, $rubric_scores ) : array( 'present' => false ),
+				'ai_suggestion'       => class_exists( 'ATORA_AI_Grading_Suggestion_Service' ) ? ATORA_AI_Grading_Suggestion_Service::audit( $submission_id, $rubric_scores, $graded_attempt ) : array( 'present' => false ),
 			);
 
 			\ATORA\LMS\Rubric_Service::record_evaluation( array(

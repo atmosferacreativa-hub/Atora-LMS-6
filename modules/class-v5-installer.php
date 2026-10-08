@@ -2350,6 +2350,8 @@ class V5_Installer {
 			institution_id   BIGINT UNSIGNED NOT NULL DEFAULT 0,
 			submission_id    BIGINT UNSIGNED NOT NULL,
 			user_id          BIGINT UNSIGNED NOT NULL,
+			attempt          INT UNSIGNED    NOT NULL DEFAULT 0,
+			content_hash     VARCHAR(64)     NOT NULL DEFAULT '',
 			status           VARCHAR(20)     NOT NULL DEFAULT 'pending',
 			result           LONGTEXT                 DEFAULT NULL,
 			error            VARCHAR(255)    NOT NULL DEFAULT '',

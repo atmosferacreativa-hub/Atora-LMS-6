@@ -200,6 +200,84 @@ final class AiGradingSuggestionTest extends WP_UnitTestCase {
 		$this->assertFalse( $snap['ai_suggestion']['present'], 'Guardado sin sugerencia.' );
 	}
 
+	/** 6.33.1 (E.3): la sugerencia queda atada al intento y al contenido con que se pidió. */
+	public function test_suggestion_is_tied_to_the_attempt_and_goes_stale(): void {
+		global $wpdb;
+		$sub = $this->submission( $this->student );
+		$this->assertGreaterThan( 0, ATORA_Web_Submission_History::record( $sub, 'web-e3-1', null, 1 ) );
+
+		$this->assertSame( 422, $this->call( $this->teacher, 'POST', "/teacher/submissions/{$sub}/ai-suggestion", array( 'attempt' => 9 ) )->get_status(), 'Intento inexistente.' );
+
+		$data = $this->suggest( $sub );
+		$this->assertSame( 1, $data['attempt'] );
+		$this->assertSame( 1, $data['suggestion']['attempt'] );
+		$this->assertFalse( $data['suggestion']['stale'] );
+		$row = $wpdb->get_row( $wpdb->prepare( "SELECT attempt, content_hash FROM {$wpdb->prefix}atora_ai_jobs WHERE id = %s", $data['job_id'] ), ARRAY_A );
+		$this->assertSame( '1', (string) $row['attempt'] );
+		$this->assertSame( ATORA_AI_Grading_Suggestion_Service::content_hash( $sub, 1 ), $row['content_hash'] );
+
+		// Llega un intento nuevo: la sugerencia es "de otro intento" y no se puede usar.
+		update_post_meta( $sub, '_clms_submission_comment', 'Mi ensayo corregido' );
+		$this->assertGreaterThan( 0, ATORA_Web_Submission_History::record( $sub, 'web-e3-2', null, 2 ) );
+		$job = $data['job_id'];
+		$now = $this->call( $this->teacher, 'GET', "/teacher/ai-suggestions/{$job}" )->get_data();
+		$this->assertTrue( $now['suggestion']['stale'], 'Intento nuevo: sugerencia vieja.' );
+		$this->assertArrayNotHasKey( 'content_hash', $now['suggestion'] );
+		$this->assertFalse( $this->call( $this->teacher, 'GET', "/teacher/ai-suggestions/{$job}", array(), array( 'attempt' => 1 ) )->get_data()['suggestion']['stale'], 'Mirando el intento 1 sigue valiendo.' );
+		$this->assertTrue( $this->call( $this->teacher, 'GET', "/teacher/ai-suggestions/{$job}", array(), array( 'attempt' => 2 ) )->get_data()['suggestion']['stale'] );
+
+		// El contenido del intento cambia: también queda vieja.
+		$wpdb->query( $wpdb->prepare( "UPDATE {$wpdb->prefix}atora_assignment_submissions SET body_text = 'Otro texto' WHERE wp_post_id = %d AND attempt = 1", $sub ) );
+		$this->assertTrue( $this->call( $this->teacher, 'GET', "/teacher/ai-suggestions/{$job}", array(), array( 'attempt' => 1 ) )->get_data()['suggestion']['stale'] );
+
+		// La auditoría del guardado registra de qué intento era y que no correspondía.
+		$body = array(
+			'client_event_id'   => 'evt-e3',
+			'publish'           => false,
+			'expected_revision' => 0,
+			'attempt'           => 2,
+			'feedback'          => 'Revisado',
+			'scores'            => array( array( 'index' => 0, 'score' => 9, 'feedback' => '' ), array( 'index' => 1, 'score' => 10, 'feedback' => '' ) ),
+		);
+		$this->assertSame( 200, $this->call( $this->teacher, 'POST', "/teacher/submissions/{$sub}/grade", $body )->get_status() );
+		$audit = json_decode( (string) \ATORA\LMS\Rubric_Service::get_evaluation( $sub )['snapshot_json'], true )['ai_suggestion'];
+		$this->assertSame( 1, $audit['attempt'] );
+		$this->assertSame( 2, $audit['graded_attempt'] );
+		$this->assertTrue( $audit['stale'] );
+		$this->assertSame( $row['content_hash'], $audit['content_hash'] );
+
+		// Una nueva, pedida para el intento 2, sí sirve.
+		$fresh = $this->call( $this->teacher, 'POST', "/teacher/submissions/{$sub}/ai-suggestion", array( 'attempt' => 2 ) )->get_data();
+		$this->assertSame( 2, $fresh['attempt'] );
+		ATORA_AI_Grading_Suggestion_Service::run( $fresh['job_id'] );
+		$got = $this->call( $this->teacher, 'GET', "/teacher/ai-suggestions/{$fresh['job_id']}", array(), array( 'attempt' => 2 ) )->get_data();
+		$this->assertSame( 2, $got['suggestion']['attempt'] );
+		$this->assertFalse( $got['suggestion']['stale'] );
+	}
+
+	/** 6.33.1 (E.3): SpeedGrader dice de qué intento es y oculta "Usar sugerencia" si es de otro. */
+	public function test_speedgrader_shows_attempt_and_hides_use_when_stale(): void {
+		$sub = $this->submission( $this->student );
+		ATORA_Web_Submission_History::record( $sub, 'web-e3sg-1', null, 1 );
+		$this->suggest( $sub );
+		ATORA_Web_Submission_History::record( $sub, 'web-e3sg-2', null, 2 );
+		$panel = static function ( int $attempt ) use ( $sub ): string {
+			$grader = new class() {
+				use CLMS_Grading_SpeedGrade_Trait { render_ai_suggestion_panel as public; }
+			};
+			return $grader->render_ai_suggestion_panel( array( 'submission_id' => $sub, 'selected_attempt' => $attempt ) );
+		};
+		wp_set_current_user( $this->teacher );
+		$old = $panel( 1 );
+		$this->assertStringContainsString( 'Sugerencia del intento 1', $old );
+		$this->assertStringContainsString( 'atora-ai-use-suggestion', $old );
+		$this->assertStringContainsString( 'name="attempt" value="1"', $old );
+		$new = $panel( 2 );
+		$this->assertStringContainsString( 'atora-ai-suggestion-stale', $new );
+		$this->assertStringNotContainsString( 'atora-ai-use-suggestion', $new );
+		$this->assertStringContainsString( 'name="attempt" value="2"', $new );
+	}
+
 	public function test_stalled_job_is_resolved_by_the_poll_and_never_runs_twice(): void {
 		$sub   = $this->submission( $this->student );
 		$job   = $this->call( $this->teacher, 'POST', "/teacher/submissions/{$sub}/ai-suggestion" )->get_data()['job_id'];
