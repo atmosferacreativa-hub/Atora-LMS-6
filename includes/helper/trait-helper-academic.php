@@ -251,6 +251,10 @@ trait CLMS_Helper_Academic_Trait {
 			return false;
 		}
 
+		// 6.33.2: matrícula directa o inscripción vigente en un programa que lo contenga.
+		if ( class_exists( 'ATORA_Course_Access_Service' ) ) {
+			return ATORA_Course_Access_Service::can_access( $user_id, $course_id );
+		}
 		return self::user_is_enrolled_in_course( $user_id, $course_id );
 	}
 
@@ -497,7 +501,7 @@ trait CLMS_Helper_Academic_Trait {
 
 		$course_id = self::get_course_id_from_lesson( $lesson_id );
 
-		if ( ! $course_id || ! self::user_is_enrolled_in_course( $user_id, $course_id ) ) {
+		if ( ! $course_id || ! self::user_can_access_course( $user_id, $course_id ) ) {
 			return false;
 		}
 
@@ -1105,7 +1109,7 @@ trait CLMS_Helper_Academic_Trait {
 		foreach ( self::get_program_courses( $program_id ) as $course_id ) {
 			$lesson_ids         = self::get_course_lessons( $course_id );
 			$prerequisite_ids   = self::get_course_prerequisite_ids( $course_id );
-			$is_enrolled        = $user_id ? self::user_is_enrolled_in_course( $user_id, $course_id ) : false;
+			$is_enrolled        = $user_id ? self::user_can_access_course( $user_id, $course_id ) : false;
 			$is_completed       = $user_id ? self::is_course_completed( $user_id, $course_id ) : false;
 			$prerequisites_met  = $user_id ? self::are_course_prerequisites_met( $user_id, $course_id ) : empty( $prerequisite_ids );
 			$progress_percent   = 0;

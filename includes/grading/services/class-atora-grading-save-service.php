@@ -596,23 +596,26 @@ class ATORA_Grading_Save_Service {
 	 * @return T
 	 */
 	public static function read_consistent( int $submission_id, callable $read ) {
-		$locked = ! is_wp_error( self::lock( $submission_id ) );
+		// 6.33.2: sin el bloqueo no se lee (podría ver un guardado a medias): 409 reintentable, como el guardado.
+		$locked = self::lock( $submission_id );
+		if ( is_wp_error( $locked ) ) {
+			return $locked;
+		}
 		try {
 			wp_cache_delete( $submission_id, 'post_meta' );
 			return $read();
 		} finally {
-			if ( $locked ) {
-				self::unlock( $submission_id );
-			}
+			self::unlock( $submission_id );
 		}
 	}
 
 	/** Bloqueo por entrega (MySQL GET_LOCK, reentrante en la misma conexión). */
 	private static function lock( int $submission_id ) {
 		global $wpdb;
-		$got = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 10)', 'atora_grade_rev_' . $submission_id ) );
+		$wait = max( 1, (int) apply_filters( 'atora_grade_lock_wait', 10 ) );
+		$got  = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, %d)', 'atora_grade_rev_' . $submission_id, $wait ) );
 		if ( '0' === (string) $got ) {
-			return new WP_Error( 'atora_grade_busy', __( 'Otro guardado de esta entrega está en curso. Intenta de nuevo.', 'atora-lms' ), array( 'status' => 409 ) );
+			return new WP_Error( 'atora_grade_busy', __( 'Otro guardado de esta entrega está en curso. Intenta de nuevo.', 'atora-lms' ), array( 'status' => 409, 'retryable' => true ) );
 		}
 		if ( null === $got && ! empty( $wpdb->last_error ) ) {
 			return new WP_Error( 'atora_db_error', __( 'No se pudo guardar la calificación. Intenta de nuevo.', 'atora-lms' ), array( 'status' => 503 ) );

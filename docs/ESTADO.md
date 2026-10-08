@@ -7,7 +7,7 @@ Qué está comprobado y dónde. Se actualiza en cada versión del plugin o de la
 - **Integración**: PHPUnit con WordPress (`tests/integration`).
 - **Unitaria**: PHPUnit sin WordPress o Jest en la app.
 
-Última actualización: **plugin 6.33.1 · app 1.0.0**.
+Última actualización: **plugin 6.33.2 · app 1.0.1**.
 
 > No hay registro escrito de qué se recorrió en teléfono antes de esta tabla: la columna "Teléfono" queda "por confirmar" hasta la prueba al cierre de la Fase 4, que incluye la lista acumulada de las fases 0 a 3.
 
@@ -44,6 +44,12 @@ Qué está comprobado y dónde. Se actualiza en cada versión del plugin o de la
 | Límites de IA con llamadas simultáneas (reserva atómica) | 6.33.1 | — | sí (`scripts/e2e-concurrent-ai.sh`: 10 a la vez, límite 3 → 3) | `AiUsageReservationTest` | — |
 | Cerrar sesión (también sin red) deja de enviar avisos a ese teléfono | 6.33.1 · 1.0.0 | pendiente (fila 47) | — (requiere servicio externo) | `MobileOrganizeTest` | Jest (cierre en modo avión y reconexión) |
 | Calificar: el bloqueo cubre todo el guardado | 6.33.1 | — | sí (`scripts/e2e-concurrent-grade.sh`) | `GradeRevisionConflictTest` | — |
+| Acceso a cursos por la inscripción a un programa (web y app) | 6.33.2 | pendiente (fila 48) | sí (`programa-acceso`) | `ProgramCourseAccessTest` | — |
+| Teclado: el campo con el foco siempre visible (login, academia, tarea, mensajes, asistente, calificar, quiz, aviso) | 1.0.1 | pendiente (fila 49) | sí (recorridos sin ocultar el teclado; comprueban el campo visible) | — | — |
+| Video de Google Drive dentro de la app | 1.0.1 | pendiente (fila 50) | sí (`leccion-drive`, video público real) | — | Jest (dominios del reproductor) |
+| URL de la academia mal escrita se corrige; si no es una academia, no se guarda | 1.0.1 | pendiente (fila 51) | sí (`academia-url`) | — | Jest (21 casos) |
+| Login sin quedar apagado tras cerrar la ventana de academia; inicio en blanco | 1.0.1 | pendiente (fila 52) | sí (`academia-url`, capturas antes y después) | — | Jest (colores de la marca) |
+| Bajas de sesión pendientes solo a su academia; lectura ocupada (409) se reintenta | 1.0.1 · 6.33.2 | — | — | `GradeRevisionConflictTest` | Jest (dos academias; reintento único) |
 
 ## App (docente, Fase 4)
 

@@ -656,7 +656,7 @@ trait CLMS_Submission_Storage_Review_Trait {
 		}
 
 		if ( method_exists( 'CLMS_Helper', 'user_is_enrolled_in_course' ) ) {
-			return (bool) CLMS_Helper::user_is_enrolled_in_course( $user_id, $course_id );
+			return (bool) CLMS_Helper::user_can_access_course( $user_id, $course_id );
 		}
 
 		return false;

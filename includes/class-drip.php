@@ -181,7 +181,7 @@ class CLMS_Drip {
 
 		$course_id = self::get_course_id( $lesson_id );
 
-		if ( $course_id && ! self::user_is_enrolled_in_course( $user_id, $course_id ) ) {
+		if ( $course_id && ! self::user_is_enrolled_in_course( $user_id, $course_id ) && ! ( class_exists( 'ATORA_Course_Access_Service' ) && ATORA_Course_Access_Service::can_access( (int) $user_id, (int) $course_id ) ) ) {
 			return array(
 				'available'    => false,
 				'reason'       => 'not_enrolled',

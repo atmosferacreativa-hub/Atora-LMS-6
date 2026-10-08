@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 6.33.1
+Stable tag: 6.33.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,9 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.33.2 =
+* Correcciones antes de las tiendas: el estudiante inscrito en un programa entra a todos sus cursos (también a los agregados después; `wp atora reconcile-program-access`); leer una entrega mientras otro la guarda responde 409 reintentable; una reserva de IA que no se pudo registrar no llama al proveedor.
+
 = 6.33.1 =
 * Auditoría externa: la eliminación de cuenta borra los datos personales de todas las tablas (también correos y mensajes en cola) y no se marca hecha si queda algo; calificar bloquea todo el guardado; la sugerencia de IA queda atada al intento que se califica; consultar una sugerencia nunca la genera; los límites de IA cuentan lo que está en curso; cerrar sesión deja de enviar avisos a ese teléfono.
 

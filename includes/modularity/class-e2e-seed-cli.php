@@ -168,6 +168,13 @@ final class ATORA_E2E_Seed_CLI {
 			'_clms_evaluation_mode' => 'group',
 		) );
 
+		// 6.33.2 (orden 1.0.1, punto 4): video público real de Google Drive (recorrido leccion-drive).
+		$drive = self::lesson( $course, $teacher, 'leccion-e2e-drive', 'Video de Drive', 10, array(
+			'_clms_lesson_extra_videos' => array( array( 'source' => 'drive', 'url' => self::DRIVE_VIDEO, 'title' => 'Video de Drive' ) ),
+		) );
+		// 6.33.2 (orden 1.0.1, punto 1): estudiante inscrito SOLO en un programa (recorrido programa-acceso).
+		$program_access = self::program_only( $teacher, $password );
+
 		$table_course = class_exists( '\\ATORA\\LMS\\LMS_Course_Service' ) ? \ATORA\LMS\LMS_Course_Service::get_by_wp_post( $course ) : null;
 		foreach ( array( $student, $student2 ) as $enrolled ) {
 			if ( method_exists( 'CLMS_Helper', 'enroll_user_in_course' ) ) {
@@ -238,7 +245,55 @@ final class ATORA_E2E_Seed_CLI {
 			'submission2' => $submission2,
 			'submission_concurrency' => $submission3,
 			'message'    => $message,
+			'drive_lesson' => $drive,
+			'program_access' => $program_access,
 		);
+	}
+
+	/** Video público de Drive del titular ("cualquiera con el enlace"), liviano (3,7 MB). */
+	const DRIVE_VIDEO = 'https://drive.google.com/file/d/1iMeTyedNEB_hv2iF4GavRGfmROAVtPUq/view';
+
+	/**
+	 * Programa con un curso propio y `estudiante3_e2e` inscrito solo en el programa,
+	 * sin matrícula al curso (como queda tras una compra o migración, o un curso
+	 * agregado después sin pasar por la pantalla del programa).
+	 *
+	 * @return array<string,int>
+	 */
+	private static function program_only( int $teacher, string $password ): array {
+		$role    = get_role( 'student' ) ? 'student' : 'subscriber';
+		$student = self::user( 'estudiante3_e2e', 'Estudiante Programa E2E', $role, $password );
+		$existing = get_page_by_path( 'curso-e2e-programa', OBJECT, 'lm_course' );
+		$course   = $existing ? (int) $existing->ID : (int) wp_insert_post( array(
+			'post_type'    => 'lm_course',
+			'post_status'  => 'publish',
+			'post_name'    => 'curso-e2e-programa',
+			'post_title'   => 'Curso del programa E2E',
+			'post_author'  => $teacher,
+			'post_content' => 'Curso al que se entra solo por el programa.',
+		) );
+		$lesson   = self::lesson( $course, $teacher, 'leccion-e2e-programa', 'Bienvenida al programa', 1, array() );
+		$existing = get_page_by_path( 'programa-e2e', OBJECT, 'lm_program' );
+		$program  = $existing ? (int) $existing->ID : (int) wp_insert_post( array(
+			'post_type'   => 'lm_program',
+			'post_status' => 'publish',
+			'post_name'   => 'programa-e2e',
+			'post_title'  => 'Diplomado E2E',
+			'post_author' => $teacher,
+		) );
+		if ( method_exists( 'CLMS_Helper', 'enroll_user_in_program' ) && ! CLMS_Helper::user_is_enrolled_in_course( $student, $course ) ) {
+			// Inscripción al programa cuando aún no tenía cursos; el curso se agrega sin el gancho que matricula.
+			delete_post_meta( $program, CLMS_Helper::PROGRAM_COURSES_META );
+			CLMS_Helper::enroll_user_in_program( $student, $program );
+			remove_action( 'added_post_meta', array( 'ATORA_Course_Access_Service', 'on_program_courses_changed' ), 10 );
+			remove_action( 'updated_post_meta', array( 'ATORA_Course_Access_Service', 'on_program_courses_changed' ), 10 );
+			update_post_meta( $program, CLMS_Helper::PROGRAM_COURSES_META, array( $course ) );
+		}
+		if ( class_exists( '\\ATORA\\LMS\\LMS_Course_Service' ) ) {
+			\ATORA\LMS\LMS_Course_Service::get_by_wp_post( $course );
+			\ATORA\LMS\LMS_Course_Service::get_lesson_by_wp_post( $lesson );
+		}
+		return array( 'student' => $student, 'program' => $program, 'course' => $course, 'lesson' => $lesson );
 	}
 
 	private static function user( string $login, string $name, string $role, string $password ): int {

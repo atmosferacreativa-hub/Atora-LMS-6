@@ -1925,6 +1925,25 @@ final class ATORA_Mobile_REST_Controller {
 			}
 		}
 
+		// 2b) 6.33.2: cursos de programas con inscripción vigente (mismo criterio que el acceso).
+		if ( class_exists( 'ATORA_Course_Access_Service' ) && class_exists( '\\ATORA\\LMS\\LMS_Course_Service' ) ) {
+			foreach ( ATORA_Course_Access_Service::program_courses( $user_id ) as $wp_course_id => $wp_program_id ) {
+				$course    = \ATORA\LMS\LMS_Course_Service::get_by_wp_post( (int) $wp_course_id );
+				$course_id = absint( is_array( $course ) ? ( $course['id'] ?? 0 ) : 0 );
+				if ( $course_id <= 0 || isset( $by_course[ $course_id ] ) ) {
+					continue;
+				}
+				$is_completed = class_exists( 'CLMS_Helper' ) && method_exists( 'CLMS_Helper', 'is_course_completed' ) && \CLMS_Helper::is_course_completed( $user_id, (int) $wp_course_id );
+				$by_course[ $course_id ] = array(
+					'course_id'  => $course_id,
+					'status'     => $is_completed ? 'completed' : 'active',
+					'source'     => 'program',
+					'program_id' => (int) $wp_program_id,
+				);
+				$ordered[] = $course_id;
+			}
+		}
+
 		// 3) Salida ordenada y deduplicada.
 		$out = array();
 		foreach ( array_values( array_unique( array_filter( array_map( 'absint', $ordered ) ) ) ) as $course_id ) {
@@ -1968,6 +1987,14 @@ final class ATORA_Mobile_REST_Controller {
 			if ( $wp_course_id > 0
 				&& \ATORA\LMS\LMS_Course_Service::legacy_wp_course_post_is_public( $wp_course_id )
 				&& \CLMS_Helper::user_is_enrolled_in_course( $user_id, $wp_course_id ) ) {
+				return true;
+			}
+		}
+
+		// 6.33.2: inscripción vigente en un programa que contiene el curso.
+		if ( class_exists( 'ATORA_Course_Access_Service' ) && ATORA_Course_Access_Service::can_access_course_id( $user_id, $course_id ) ) {
+			$course = \ATORA\LMS\LMS_Course_Service::get( $course_id );
+			if ( $course && self::course_is_student_visible( $course ) ) {
 				return true;
 			}
 		}

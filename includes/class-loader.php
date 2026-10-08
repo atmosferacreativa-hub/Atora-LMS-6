@@ -42,6 +42,11 @@ class CLMS_Loader {
 			'file'  => 'includes/class-helper.php',
 			'class' => 'CLMS_Helper',
 		),
+		// 6.33.2: acceso a cursos (matrícula directa o programa vigente).
+		array(
+			'file'  => 'includes/access/class-course-access-service.php',
+			'class' => 'ATORA_Course_Access_Service',
+		),
 		array(
 			'file'  => 'includes/class-ai-settings-service.php',
 			'class' => 'CLMS_AI_Settings_Service',

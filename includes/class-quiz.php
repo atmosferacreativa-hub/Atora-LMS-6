@@ -521,7 +521,7 @@ class CLMS_Quiz {
 			if ( ! $wp_course_id ) {
 				$wp_course_id = absint( get_post_meta( $lesson_id, '_clms_course_id', true ) );
 			}
-			if ( $wp_course_id && \ATORA\LMS\LMS_Enrollment_Service::is_enrolled_by_wp_id( $user_id, $wp_course_id ) ) {
+			if ( $wp_course_id && ( \ATORA\LMS\LMS_Enrollment_Service::is_enrolled_by_wp_id( $user_id, $wp_course_id ) || ( class_exists( 'ATORA_Course_Access_Service' ) && ATORA_Course_Access_Service::can_access( $user_id, $wp_course_id ) ) ) ) {
 				return true;
 			}
 		}

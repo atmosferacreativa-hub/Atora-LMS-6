@@ -117,4 +117,33 @@ final class AiUsageReservationTest extends WP_UnitTestCase {
 		$this->assertSame( array( 'reserved' ), $seen, 'Durante la llamada, el uso ya está reservado.' );
 		$this->assertSame( array( 'ok' ), $wpdb->get_col( "SELECT result FROM {$wpdb->prefix}atora_ai_usage" ), 'Una sola fila, cerrada en ok.' );
 	}
+
+	/** 6.33.2 (orden 1.0.1, punto 8): si la reserva no se pudo escribir, 503 y no se llama al proveedor. */
+	public function test_failed_reservation_insert_is_503_and_provider_is_not_called(): void {
+		global $wpdb;
+		ATORA_AI_Fake_Provider::enable();
+		$break = static function ( $sql ) use ( $wpdb ) {
+			return ( 0 === stripos( ltrim( $sql ), 'INSERT INTO `' . $wpdb->prefix . 'atora_ai_usage`' ) && false !== strpos( $sql, "'reserved'" ) ) ? 'INSERT INTO tabla_que_no_existe_e8 VALUES (1)' : $sql;
+		};
+		add_filter( 'query', $break );
+		$suppress = $wpdb->suppress_errors( true );
+		$reserved = ATORA_AI_Usage_Service::reserve( $this->student, ATORA_AI_Usage_Service::ASSISTANT );
+		$called   = false;
+		$spy      = static function ( $pre ) use ( &$called ) {
+			$called = true;
+			return $pre;
+		};
+		add_filter( 'atora_ai_pre_chat', $spy, 1 );
+		$out = clms_core( 'CLMS_AI_Manager' )->chat_with_meta( array( array( 'role' => 'user', 'content' => 'Hola' ) ), array( 'feature' => 'assistant', 'user_id' => $this->student ) );
+		remove_filter( 'atora_ai_pre_chat', $spy, 1 );
+		remove_filter( 'query', $break );
+		$wpdb->suppress_errors( $suppress );
+
+		$this->assertWPError( $reserved );
+		$this->assertSame( 503, $reserved->get_error_data()['status'] );
+		$this->assertWPError( $out );
+		$this->assertSame( 503, $out->get_error_data()['status'] );
+		$this->assertFalse( $called, 'No se llamó al proveedor.' );
+	}
 }
+

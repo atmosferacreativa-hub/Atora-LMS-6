@@ -62,3 +62,17 @@ node scripts/demo-audit.mjs --base https://tu-demo.com --forbid Meridian WooComm
 
 Salida por defecto: `demo-audit-report.md`.
 
+
+## Acceso a cursos por programa (6.33.2)
+
+Estudiantes inscritos en un programa sin matrícula a alguno de sus cursos (antes de 6.33.2 veían el curso y recibían "no disponible"):
+
+```bash
+# Solo lectura, funciona también con 6.31/6.33 (copiar el archivo del repositorio al servidor):
+wp eval-file program-access-report.php
+# Con 6.33.2 instalado: informe (solo lectura) y corrección
+wp atora reconcile-program-access
+wp atora reconcile-program-access --yes
+```
+
+Con 6.33.2 el acceso ya funciona sin corregir nada (se mira el programa vigente); `--yes` crea además las matrículas (como al inscribirse en el programa, con la caducidad del programa) para que el curso cuente en notas, progreso y listas del docente.

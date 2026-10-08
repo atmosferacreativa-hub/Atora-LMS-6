@@ -111,7 +111,7 @@ trait CLMS_Shortcodes_Listings_Trait {
 						}
 					}
 
-					$is_enrolled = $logged_in ? CLMS_Helper::user_is_enrolled_in_course( $user_id, $course_id ) : false;
+					$is_enrolled = $logged_in ? CLMS_Helper::user_can_access_course( $user_id, $course_id ) : false;
 					$can_manage  = CLMS_Helper::user_can_manage_lms( $course_id );
 
 					$progress_percent = 0;

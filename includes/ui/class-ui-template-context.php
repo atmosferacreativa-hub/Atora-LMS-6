@@ -65,7 +65,7 @@ class CLMS_UI_Template_Context {
 
 		if ( $ctx->user_id && ! $ctx->is_admin && class_exists( 'CLMS_Helper' ) ) {
 			if ( 'course' === $ctx->entity_type ) {
-				$ctx->is_enrolled = (bool) CLMS_Helper::user_is_enrolled_in_course( $ctx->user_id, $entity_id );
+				$ctx->is_enrolled = (bool) CLMS_Helper::user_can_access_course( $ctx->user_id, $entity_id );
 			} elseif ( 'program' === $ctx->entity_type ) {
 				$ctx->is_enrolled = (bool) CLMS_Helper::user_is_enrolled_in_program( $ctx->user_id, $entity_id );
 			} elseif ( 'lesson' === $ctx->entity_type ) {

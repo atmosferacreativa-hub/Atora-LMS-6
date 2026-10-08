@@ -216,7 +216,7 @@ final class ATORA_AI_Usage_Service {
 			if ( is_wp_error( $allowed ) ) {
 				return $allowed;
 			}
-			$wpdb->insert( self::table(), array( // phpcs:ignore WordPress.DB
+			$ok = $wpdb->insert( self::table(), array( // phpcs:ignore WordPress.DB
 				'institution_id' => self::institution(),
 				'user_id'        => $user_id,
 				'feature'        => $feature,
@@ -228,6 +228,10 @@ final class ATORA_AI_Usage_Service {
 				'result'         => 'reserved',
 				'created_at'     => current_time( 'mysql', true ),
 			) );
+			// 6.33.2: sin reserva escrita no hay llamada (no contaría para los límites).
+			if ( 1 !== (int) $ok || (int) $wpdb->insert_id <= 0 ) {
+				return new WP_Error( 'atora_ai_unavailable', __( 'El servicio de IA no está disponible en este momento. Intenta de nuevo.', 'atora-lms' ), array( 'status' => 503 ) );
+			}
 			return (int) $wpdb->insert_id;
 		} finally {
 			$wpdb->query( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock ) );

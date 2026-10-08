@@ -258,7 +258,7 @@ class CLMS_Student_Assistant {
 		if ( 'commercial' === $commercial_mode ) {
 			$is_admin    = current_user_can( 'manage_options' ) || current_user_can( 'clms_manage_courses' );
 			$is_enrolled = class_exists( 'CLMS_Helper' )
-				? CLMS_Helper::user_is_enrolled_in_course( $user_id, $course_id )
+				? CLMS_Helper::user_can_access_course( $user_id, $course_id )
 				: false;
 
 			if ( ! $is_admin && ! $is_enrolled ) {
