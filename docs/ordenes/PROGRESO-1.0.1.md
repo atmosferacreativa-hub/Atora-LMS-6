@@ -4,7 +4,7 @@ Orden: `docs/ordenes/ORDEN-1.0.1.md`. Reanudar: leer este archivo y la orden, co
 
 ## Paso actual
 
-Todos los puntos con código y pruebas; e2e completo de la app en curso (run 37728138080, contra `fix/6.33.2-correcciones`). Falta: revisar capturas (Drive, gris), PR de ambos, versiones 6.33.2 / 1.0.1, ZIP, etiquetas, APK y AAB. Ramas `fix/6.33.2-correcciones` (plugin) y `fix/1.0.1-correcciones` (app).
+Todos los puntos con código y pruebas. CI del plugin (PR #71) en verde. e2e de la app: 1.ª y 2.ª vuelta fallaron en el login (la contraseña quedaba bajo el teclado: la prueba detectó un fallo real); 3.ª vuelta (run 37732637362) con `KeyboardScroll` rehecho. Falta: revisar capturas (Drive, gris), PR de ambos, versiones 6.33.2 / 1.0.1, ZIP, etiquetas, APK y AAB. Ramas `fix/6.33.2-correcciones` (plugin) y `fix/1.0.1-correcciones` (app).
 
 ## Puntos
 
@@ -36,4 +36,5 @@ Todos los puntos con código y pruebas; e2e completo de la app en curso (run 377
 5. Punto 3: `react-native-keyboard-controller` 1.18.5 necesita `react-native-reanimated`; se instalaron las versiones de SDK 54 (`~4.1.1`, `react-native-worklets` 0.5.1). Búsqueda de estudiantes (campo arriba) y el quiz también usan el contenedor nuevo.
 6. Punto 4: la configuración del WebView y las dependencias son idénticas en 0.3.1, 0.6.0, 0.9.0 y 1.0.0: no hubo un cambio de la app que lo rompiera. Cambió el reproductor de Drive (ahora un iframe de `youtube.googleapis.com`), y la lista de dominios de la app, que nunca incluyó `googleapis.com`, lo bloqueó. Video de prueba: "Taller-Derecho-Constitucional.mp4" del Drive del titular (público, 3,7 MB).
 7. Punto 6: no se reprodujo en el emulador (Android 14); probable en Android 15 con borde a borde obligatorio. Queda la fila del teléfono.
+8. Punto 3, teclado: en el emulador del CI `KeyboardAwareScrollView` (y los eventos de campo enfocado de la librería) no movían la pantalla al pasar de usuario a contraseña; `KeyboardAvoidingView` sí funciona. `KeyboardScroll` se rehízo con `KeyboardAvoidingView` + `ScrollView` + medición del campo enfocado (`TextInput.State`), con el cálculo en un módulo puro probado con Jest.
 
