@@ -184,6 +184,71 @@ final class MobileOrganizeTest extends WP_UnitTestCase {
 		$this->assertSame( array(), ATORA_Mobile_Push_Service::tokens_for( $this->teacher ), 'DeviceNotRegistered borra el token.' );
 	}
 
+	/**
+	 * 6.33.1 (E.6): el token de notificaciones queda atado a la sesión que lo
+	 * registró. Al revocarla (cerrar sesión) se borra; a una sesión revocada o
+	 * vencida no se le envía nada.
+	 */
+	public function test_push_tokens_follow_the_session(): void {
+		global $wpdb;
+		$s1 = ATORA_Mobile_Token_Service::issue( $this->teacher, 'teléfono 1' );
+		$s2 = ATORA_Mobile_Token_Service::issue( $this->teacher, 'teléfono 2' );
+		$this->call( $this->teacher, 'ATORA_Mobile_Organize_Controller', 'register_device', array(), array( 'token' => 'ExponentPushToken[uno]', 'platform' => 'android' ), array( '_atora_mobile_session_id' => $s1['session_id'] ) );
+		$this->call( $this->teacher, 'ATORA_Mobile_Organize_Controller', 'register_device', array(), array( 'token' => 'ExponentPushToken[dos]', 'platform' => 'ios' ), array( '_atora_mobile_session_id' => $s2['session_id'] ) );
+		$this->assertCount( 2, ATORA_Mobile_Push_Service::tokens_for( $this->teacher ) );
+
+		// Cerrar sesión en el teléfono 1 (también la revocación pendiente que llega al volver la red).
+		$this->assertTrue( ATORA_Mobile_Token_Service::revoke_token( $s1['access_token'] ) );
+		$this->assertSame( array( 'ExponentPushToken[dos]' ), wp_list_pluck( ATORA_Mobile_Push_Service::tokens_for( $this->teacher ), 'token' ) );
+		$this->assertSame( '0', (string) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}atora_mobile_push_tokens WHERE token = 'ExponentPushToken[uno]'" ), 'El token del teléfono 1 ya no está en el servidor.' );
+
+		// La sesión del teléfono 2 vence: no se le envía y su token se borra.
+		$wpdb->update( $wpdb->prefix . 'atora_mobile_sessions', array( 'refresh_expires' => gmdate( 'Y-m-d H:i:s', time() - 60 ) ), array( 'session_id' => $s2['session_id'] ) );
+		$sent = $this->send( $this->student, array( 'recipient_id' => $this->teacher, 'body' => 'Hola', 'client_event_id' => 'evt-e6' ) );
+		$this->assertSame( 'skipped', ATORA_Mobile_Push_Service::send_job( $this->teacher, (int) $sent['message']['id'], 0 ) );
+		$this->assertSame( array(), $this->http, 'Nada sale hacia Expo.' );
+		$this->assertSame( array(), ATORA_Mobile_Push_Service::tokens_for( $this->teacher ) );
+
+		// El mismo teléfono inicia otra sesión: el token pasa a la nueva.
+		$s3 = ATORA_Mobile_Token_Service::issue( $this->teacher, 'teléfono 1' );
+		$this->call( $this->teacher, 'ATORA_Mobile_Organize_Controller', 'register_device', array(), array( 'token' => 'ExponentPushToken[uno]', 'platform' => 'android' ), array( '_atora_mobile_session_id' => $s1['session_id'] ) );
+		$this->call( $this->teacher, 'ATORA_Mobile_Organize_Controller', 'register_device', array(), array( 'token' => 'ExponentPushToken[uno]', 'platform' => 'android' ), array( '_atora_mobile_session_id' => $s3['session_id'] ) );
+		$this->assertSame( $s3['session_id'], $wpdb->get_var( "SELECT session_id FROM {$wpdb->prefix}atora_mobile_push_tokens WHERE token = 'ExponentPushToken[uno]'" ) );
+		$this->assertSame( array( 'ExponentPushToken[uno]' ), wp_list_pluck( ATORA_Mobile_Push_Service::tokens_for( $this->teacher ), 'token' ) );
+	}
+
+	/**
+	 * 6.33.1 (E.6): cerrar sesión en modo avión y reconectar cuando el token de
+	 * acceso (15 min) ya venció: la app revoca con el token de renovación y el
+	 * servidor borra el token de notificaciones.
+	 */
+	public function test_pending_logout_with_refresh_token_after_access_expired(): void {
+		global $wpdb;
+		do_action( 'rest_api_init', rest_get_server() );
+		$session = ATORA_Mobile_Token_Service::issue( $this->teacher, 'teléfono' );
+		$this->call( $this->teacher, 'ATORA_Mobile_Organize_Controller', 'register_device', array(), array( 'token' => 'ExponentPushToken[avion]', 'platform' => 'android' ), array( '_atora_mobile_session_id' => $session['session_id'] ) );
+		$wpdb->update( $wpdb->prefix . 'atora_mobile_sessions', array( 'access_expires' => gmdate( 'Y-m-d H:i:s', time() - 60 ) ), array( 'session_id' => $session['session_id'] ) );
+		wp_set_current_user( 0 );
+
+		$logout = static function ( array $headers, array $body ) {
+			$request = new WP_REST_Request( 'POST', '/atora-mobile/v1/auth/logout' );
+			foreach ( $headers as $key => $value ) {
+				$request->set_header( $key, $value );
+			}
+			$request->set_header( 'content-type', 'application/json' );
+			$request->set_body( wp_json_encode( $body ) );
+			return rest_get_server()->dispatch( $request );
+		};
+		$this->assertSame( 401, $logout( array( 'Authorization' => 'Bearer ' . $session['access_token'] ), array() )->get_status(), 'El acceso vencido no sirve.' );
+		$this->assertSame( 401, $logout( array(), array( 'refresh_token' => 'basura' ) )->get_status() );
+		$ok = $logout( array(), array( 'refresh_token' => $session['refresh_token'] ) );
+		$this->assertSame( 200, $ok->get_status() );
+		$this->assertTrue( $ok->get_data()['revoked'] );
+		$this->assertNotNull( $wpdb->get_var( $wpdb->prepare( "SELECT revoked_at FROM {$wpdb->prefix}atora_mobile_sessions WHERE session_id = %s", $session['session_id'] ) ) );
+		$this->assertSame( array(), ATORA_Mobile_Push_Service::tokens_for( $this->teacher ), 'El servidor ya no tiene el token.' );
+		$this->assertTrue( is_wp_error( ATORA_Mobile_Token_Service::validate( $session['refresh_token'], 'refresh' ) ), 'Ya no se puede renovar.' );
+	}
+
 	public function test_preferences_by_type_silence_pushes(): void {
 		$this->call( $this->student, 'ATORA_Mobile_Organize_Controller', 'register_device', array(), array( 'token' => 'ExponentPushToken[st1]', 'platform' => 'android' ) );
 		$this->call( $this->student, 'ATORA_Mobile_Organize_Controller', 'put_preferences', array(), array( 'preferences' => array( 'grades' => false ) ) );

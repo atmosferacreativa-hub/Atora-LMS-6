@@ -2318,6 +2318,7 @@ class V5_Installer {
 			institution_id   BIGINT UNSIGNED NOT NULL DEFAULT 0,
 			user_id          BIGINT UNSIGNED NOT NULL,
 			token            VARCHAR(255)    NOT NULL,
+			session_id       VARCHAR(32)     NOT NULL DEFAULT '',
 			platform         VARCHAR(20)     NOT NULL DEFAULT '',
 			academy          VARCHAR(190)    NOT NULL DEFAULT '',
 			created_at       DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
