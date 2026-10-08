@@ -1,5 +1,21 @@
 # CHANGELOG — ATORA LMS
 
+## 6.33.2 (2026-10-08)
+
+### Correcciones antes de las tiendas (orden `docs/ordenes/ORDEN-1.0.1.md`)
+
+Junto con la app 1.0.1. Cada arreglo con su prueba, que fallaba antes.
+
+**1 — Acceso a cursos por la inscripción al programa.** Un estudiante inscrito en un programa veía sus cursos, pero al abrir uno recibía "no disponible": la lista usaba los cursos del programa y el acceso solo miraba la matrícula al curso. Nuevo servicio único `ATORA_Course_Access_Service::can_access( user_id, course )`: tiene acceso quien tenga matrícula vigente en el curso o una inscripción vigente (no caducada) en un programa que lo contenga. Lo usan la web (`CLMS_Helper::user_can_access_course()`, lección, drip, quiz, entregas, certificados, plantillas, catálogo, Drive, asistente), la API móvil (cursos, lecciones, tareas, quizzes, notas, certificados, sincronización: el índice de matrículas incluye los cursos de los programas vigentes) y los docentes del estudiante en mensajes. `user_is_enrolled_in_course()` sigue siendo la matrícula directa (comercio e inscripción). Al agregar un curso a un programa, sus inscritos vigentes quedan matriculados (con la caducidad del programa). `wp atora reconcile-program-access` informa (solo lectura) y, con `--yes`, crea las matrículas que faltan; `scripts/program-access-report.php` es el informe de solo lectura para sitios con versiones anteriores (`wp eval-file`).
+
+**7 — Lectura sin bloqueo.** `ATORA_Grading_Save_Service::read_consistent()` ya no lee si no obtiene el bloqueo de la entrega: responde **409 `atora_grade_busy`** con `retryable: true`, como el guardado (la app reintenta una vez tras 1 s). Espera del bloqueo filtrable (`atora_grade_lock_wait`, 10 s).
+
+**8 — Reserva de IA comprobada.** `ATORA_AI_Usage_Service::reserve()` comprueba que la fila de reserva se escribió; si no, **503** y no se llama al proveedor (una llamada sin reserva no contaría para los límites).
+
+**Pruebas de pantalla.** `wp atora seed-e2e` agrega una lección con un video público real de Google Drive (recorrido `leccion-drive` de la app) y un estudiante inscrito solo en un programa (`programa-acceso`).
+
+**TESTS**: `ProgramCourseAccessTest` (inscrito en el programa entra en web y app, también a un curso agregado después; programa caducado o sin inscripción no entra; reconciliación de solo lectura y corrección). `GradeRevisionConflictTest` (lectura sin bloqueo → 409 reintentable, sin leer). `AiUsageReservationTest` (insert fallido → 503, sin llamar al proveedor).
+
 ## 6.33.1 (2026-10-08)
 
 ### Fase 6 — Bloque E (auditoría externa)
