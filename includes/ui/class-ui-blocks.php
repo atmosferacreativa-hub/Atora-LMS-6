@@ -671,7 +671,7 @@ HTML;
 		$is_enrolled = $is_admin;
 
 		if ( ! $is_enrolled && $user_id && class_exists( 'CLMS_Helper' ) ) {
-			$is_enrolled = (bool) CLMS_Helper::user_is_enrolled_in_course( $user_id, $post_id );
+			$is_enrolled = (bool) CLMS_Helper::user_can_access_course( $user_id, $post_id );
 		}
 
 		if ( 'commercial' === $mode && ! $is_enrolled ) {

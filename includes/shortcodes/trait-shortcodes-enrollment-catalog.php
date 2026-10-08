@@ -100,7 +100,7 @@ trait CLMS_Shortcodes_Enrollment_Catalog_Trait {
 			$user_id = get_current_user_id();
 		}
 
-		if ( CLMS_Helper::user_is_enrolled_in_course( $user_id, $course_id ) || CLMS_Helper::user_can_manage_lms( $course_id ) ) {
+		if ( CLMS_Helper::user_can_access_course( $user_id, $course_id ) || CLMS_Helper::user_can_manage_lms( $course_id ) ) {
 			$continue_url = $this->get_continue_course_url( $user_id, $course_id );
 
 			return '<a class="clms-course-continue-btn" href="' . esc_url( $continue_url ) . '">Continuar</a>';

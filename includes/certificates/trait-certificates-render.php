@@ -30,7 +30,7 @@ trait CLMS_Certificates_Render_Trait {
 
 		$user_id = get_current_user_id();
 
-		if ( ! $this->user_is_enrolled_in_course( $user_id, $course_id ) && ! CLMS_Helper::user_can_manage_lms( $course_id ) ) {
+		if ( ! CLMS_Helper::user_can_access_course( $user_id, $course_id ) && ! CLMS_Helper::user_can_manage_lms( $course_id ) ) {
 			return '<div class="clms-certificate-wrap"><p>' . esc_html__( 'No estás inscrito en este curso.', 'atora-lms' ) . '</p></div>';
 		}
 
@@ -317,7 +317,7 @@ trait CLMS_Certificates_Render_Trait {
 
 			$is_admin_view = CLMS_Helper::user_can_manage_lms( $course_id );
 
-			if ( ! $is_admin_view && ! $this->user_is_enrolled_in_course( $user_id, $course_id ) ) {
+			if ( ! $is_admin_view && ! CLMS_Helper::user_can_access_course( $user_id, $course_id ) ) {
 				return new WP_Error( 'clms_certificate_forbidden', __( 'No tienes permiso para ver este certificado.', 'atora-lms' ), array( 'status' => 403 ) );
 			}
 

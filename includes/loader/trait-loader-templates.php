@@ -128,7 +128,7 @@ trait CLMS_Loader_Templates_Trait {
 			? CLMS_Access::can_manage_courses()
 			: ( current_user_can( 'manage_options' ) || current_user_can( 'clms_manage_courses' ) );
 		$enrolled  = $user_id && ! $is_admin && class_exists( 'CLMS_Helper' )
-			? CLMS_Helper::user_is_enrolled_in_course( $user_id, $course_id )
+			? CLMS_Helper::user_can_access_course( $user_id, $course_id )
 			: false;
 
 		// Mostrar la landing comercial para cualquier usuario no inscrito (incluye admins).

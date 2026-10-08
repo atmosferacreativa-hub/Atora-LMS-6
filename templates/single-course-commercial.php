@@ -233,7 +233,7 @@ the_post();
 		$_ctx_admin_c = current_user_can( 'manage_options' ) || current_user_can( 'clms_manage_courses' );
 		$_ctx_enr_c   = false;
 		if ( $_ctx_uid_c && ! $_ctx_admin_c && class_exists( 'CLMS_Helper' ) ) {
-			$_ctx_enr_c = (bool) CLMS_Helper::user_is_enrolled_in_course( $_ctx_uid_c, $course_id );
+			$_ctx_enr_c = (bool) CLMS_Helper::user_can_access_course( $_ctx_uid_c, $course_id );
 		}
 		$_cc_schema_context = ( $_ctx_enr_c && ! $_ctx_admin_c ) ? 'course_overview' : 'course_commercial';
 

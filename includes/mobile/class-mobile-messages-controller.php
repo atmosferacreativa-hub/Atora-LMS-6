@@ -223,6 +223,10 @@ final class ATORA_Mobile_Messages_Controller {
 	public static function teachers_of_student( int $student_id ): array {
 		$out = array();
 		$courses = class_exists( 'CLMS_Helper' ) ? array_filter( array_map( 'absint', (array) CLMS_Helper::get_user_enrolled_courses( $student_id ) ) ) : array();
+		// 6.33.2: también los cursos de sus programas vigentes.
+		if ( class_exists( 'ATORA_Course_Access_Service' ) ) {
+			$courses = array_values( array_unique( array_merge( $courses, array_keys( ATORA_Course_Access_Service::program_courses( $student_id ) ) ) ) );
+		}
 		foreach ( $courses as $wp_course ) {
 			$ids = get_post_meta( $wp_course, '_clms_course_teacher_ids', true );
 			$ids = is_string( $ids ) ? preg_split( '/\s*,\s*/', trim( $ids ) ) : (array) $ids;

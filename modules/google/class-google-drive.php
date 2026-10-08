@@ -65,7 +65,7 @@ class Google_Drive {
 				if ( ! class_exists( 'CLMS_Helper' ) ) {
 					return false;
 				}
-				return \CLMS_Helper::user_is_enrolled_in_course( $user_id, $context_id )
+				return \CLMS_Helper::user_can_access_course( $user_id, $context_id )
 					|| \CLMS_Helper::user_can_manage_lms( $context_id );
 
 			default:
