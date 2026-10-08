@@ -4,7 +4,7 @@ Orden: `docs/ordenes/ORDEN-1.0.1.md`. Reanudar: leer este archivo y la orden, co
 
 ## Paso actual
 
-Todos los puntos con código y pruebas. CI del plugin (PR #71) en verde. e2e de la app: 1.ª y 2.ª vuelta fallaron en el login (la contraseña quedaba bajo el teclado: la prueba detectó un fallo real); 3.ª vuelta (run 37732637362) con `KeyboardScroll` rehecho. Falta: revisar capturas (Drive, gris), PR de ambos, versiones 6.33.2 / 1.0.1, ZIP, etiquetas, APK y AAB. Ramas `fix/6.33.2-correcciones` (plugin) y `fix/1.0.1-correcciones` (app).
+Todos los puntos con código y pruebas. CI del plugin (PR #71) en verde. e2e de la app: 6.ª vuelta 19/20 (solo faltaba un desplazamiento en `programa-acceso`); 7.ª vuelta (run 37745840067) en curso. Después: PR de la app, fusión, etiquetas `v6.33.2` y `v1.0.1`, ZIP, APK y AAB. Falta: revisar capturas (Drive, gris), PR de ambos, versiones 6.33.2 / 1.0.1, ZIP, etiquetas, APK y AAB. Ramas `fix/6.33.2-correcciones` (plugin) y `fix/1.0.1-correcciones` (app).
 
 ## Puntos
 
@@ -17,7 +17,7 @@ Todos los puntos con código y pruebas. CI del plugin (PR #71) en verde. e2e de 
 - [x] 7 — Lectura sin bloqueo → 409 `atora_grade_busy` reintentable (`GradeRevisionConflictTest`); la app reintenta una vez tras 1 s (`busyRetry`, Jest)
 - [x] 8 — Reserva de IA comprobada: insert fallido → 503, sin llamar al proveedor (`AiUsageReservationTest`)
 - [x] 9 — Inicio blanco (`expo-splash-screen` #FFFFFF; Jest lee app.json).
-- [~] Pruebas de pantalla: escritas (sin hideKeyboard; foco visible; academia-url, leccion-drive, programa-acceso); CI en curso.
+- [~] Pruebas de pantalla: sin hideKeyboard (cada campo comprobado visible); academia-url, leccion-drive y programa-acceso; 6.ª vuelta 19/20.
 - [ ] Cierre (6.33.2, 1.0.1, etiquetas, ZIP, APK, AAB)
 
 ## Ramas y PR
@@ -37,4 +37,5 @@ Todos los puntos con código y pruebas. CI del plugin (PR #71) en verde. e2e de 
 6. Punto 4: la configuración del WebView y las dependencias son idénticas en 0.3.1, 0.6.0, 0.9.0 y 1.0.0: no hubo un cambio de la app que lo rompiera. Cambió el reproductor de Drive (ahora un iframe de `youtube.googleapis.com`), y la lista de dominios de la app, que nunca incluyó `googleapis.com`, lo bloqueó. Video de prueba: "Taller-Derecho-Constitucional.mp4" del Drive del titular (público, 3,7 MB).
 7. Punto 6: no se reprodujo en el emulador (Android 14); probable en Android 15 con borde a borde obligatorio. Queda la fila del teléfono.
 8. Punto 3, teclado: en el emulador del CI `KeyboardAwareScrollView` (y los eventos de campo enfocado de la librería) no movían la pantalla al pasar de usuario a contraseña; `KeyboardAvoidingView` sí funciona. `KeyboardScroll` se rehízo con `KeyboardAvoidingView` + `ScrollView` + medición del campo enfocado (`TextInput.State`), con el cálculo en un módulo puro probado con Jest.
+9. Teclado, lo que mostraron las vueltas del e2e (cada falla, un arreglo de la app, nunca de la prueba): (1–2) la contraseña quedaba bajo el teclado tras "Siguiente" → `KeyboardScroll` mide el campo enfocado; (3) el aviso y el asistente seguían tapados (KeyboardAvoidingView de la librería no acomodaba pantallas dentro de la navegación) → `useKeyboardInset` (margen = lo que el teclado tapa de la vista); además conflicto de calificación cierra el teclado y la búsqueda de estudiantes abre al primer toque; (4–5) intermitencias: el evento de React Native no siempre llegaba y una segunda medición caía entre "cerrado" y "abierto" (margen 616) → dos fuentes de eventos y nunca medir con el teclado cerrado. El registro del dispositivo confirmó el borde del teclado en 405 por ambas fuentes.
 
