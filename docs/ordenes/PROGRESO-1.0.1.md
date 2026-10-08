@@ -4,7 +4,7 @@ Orden: `docs/ordenes/ORDEN-1.0.1.md`. Reanudar: leer este archivo y la orden, co
 
 ## Paso actual
 
-Punto 7 (lectura sin bloqueo) y 8 (reserva de IA), luego la app (2, 3, 4, 5, 6, 9). Ramas `fix/6.33.2-correcciones` (plugin) y `fix/1.0.1-correcciones` (app).
+App: 7 (reintento), 2, 3, 4, 5, 6, 9. Ramas `fix/6.33.2-correcciones` (plugin) y `fix/1.0.1-correcciones` (app).
 
 ## Puntos
 
@@ -14,8 +14,8 @@ Punto 7 (lectura sin bloqueo) y 8 (reserva de IA), luego la app (2, 3, 4, 5, 6, 
 - [ ] 4 — Videos de Drive (app)
 - [ ] 5 — URL de la academia (app)
 - [ ] 6 — Pantalla gris (app)
-- [ ] 7 — Lectura sin bloqueo → 409 (plugin + app)
-- [ ] 8 — Reserva de IA comprobada (plugin)
+- [~] 7 — Lectura sin bloqueo → 409: plugin hecho (`read_consistent` devuelve 409 `atora_grade_busy` reintentable; `GradeRevisionConflictTest`); falta el reintento de la app
+- [x] 8 — Reserva de IA comprobada: insert fallido → 503, sin llamar al proveedor (`AiUsageReservationTest`)
 - [ ] 9 — Pantalla de inicio blanca (app)
 - [ ] Pruebas de pantalla (sin hideKeyboard; foco visible; academia-url, leccion-drive, programa-acceso)
 - [ ] Cierre (6.33.2, 1.0.1, etiquetas, ZIP, APK, AAB)

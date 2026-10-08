@@ -180,4 +180,27 @@ final class GradeRevisionConflictTest extends WP_UnitTestCase {
 		$other->get_var( $other->prepare( 'SELECT RELEASE_LOCK(%s)', $lock ) );
 		$this->assertSame( '88', get_post_meta( $this->submission, '_clms_submission_grade', true ) );
 	}
+
+	/** 6.33.2 (orden 1.0.1, punto 7): sin el bloqueo, la lectura no se hace: 409 reintentable. */
+	public function test_consistent_read_without_the_lock_is_a_retryable_409(): void {
+		$other = new wpdb( DB_USER, DB_PASSWORD, DB_NAME, DB_HOST );
+		$lock  = 'atora_grade_rev_' . $this->submission;
+		$wait  = static fn() => 1;
+		add_filter( 'atora_grade_lock_wait', $wait );
+		$other->get_var( $other->prepare( 'SELECT GET_LOCK(%s, 0)', $lock ) );
+		$read = false;
+		$out  = ATORA_Grading_Save_Service::read_consistent( $this->submission, static function () use ( &$read ) {
+			$read = true;
+			return array( 'grade' => 'a medias' );
+		} );
+		$other->get_var( $other->prepare( 'SELECT RELEASE_LOCK(%s)', $lock ) );
+		remove_filter( 'atora_grade_lock_wait', $wait );
+		$this->assertWPError( $out, 'No lee sin el bloqueo.' );
+		$this->assertFalse( $read );
+		$this->assertSame( 'atora_grade_busy', $out->get_error_code() );
+		$this->assertSame( 409, $out->get_error_data()['status'] );
+		$this->assertTrue( $out->get_error_data()['retryable'] );
+
+		$this->assertSame( array( 'grade' => 'ok' ), ATORA_Grading_Save_Service::read_consistent( $this->submission, static fn() => array( 'grade' => 'ok' ) ), 'Libre: lee.' );
+	}
 }

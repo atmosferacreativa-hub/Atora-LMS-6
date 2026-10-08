@@ -420,6 +420,9 @@ final class ATORA_Mobile_Teacher_Controller {
 		}
 		// 6.33.1 (E.2): espera a un guardado en curso: revisión y datos siempre del mismo momento.
 		$detail = ATORA_Grading_Save_Service::read_consistent( $submission_id, static fn() => self::detail( $user_id, $submission_id ) );
+		if ( is_wp_error( $detail ) ) {
+			return $detail; // 6.33.2: 409 atora_grade_busy, reintentable (la app reintenta una vez tras 1 s).
+		}
 		$failed = self::db_failed();
 		return $failed ? $failed : new WP_REST_Response( array( 'submission' => $detail ), 200 );
 	}
