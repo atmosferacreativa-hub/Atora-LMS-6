@@ -4,7 +4,7 @@ Orden: `docs/ordenes/ORDEN-1.0.1.md`. Reanudar: leer este archivo y la orden, co
 
 ## Paso actual
 
-Todos los puntos con código y pruebas. CI del plugin (PR #71) en verde. e2e de la app: 6.ª vuelta 19/20 (solo faltaba un desplazamiento en `programa-acceso`); 7.ª vuelta (run 37745840067) en curso. Después: PR de la app, fusión, etiquetas `v6.33.2` y `v1.0.1`, ZIP, APK y AAB. Falta: revisar capturas (Drive, gris), PR de ambos, versiones 6.33.2 / 1.0.1, ZIP, etiquetas, APK y AAB. Ramas `fix/6.33.2-correcciones` (plugin) y `fix/1.0.1-correcciones` (app).
+**Orden cerrada (2026-10-08).** Plugin **v6.33.2** (PR #71, release con ZIP, SHA-256 `d6ee6ac3d45a18befeb9c7ac2231c026549db8d483cc1be24e087b54786b375d`); app **v1.0.1** (PR #29). CI: plugin 11/11; e2e de la app 20/20 + concurrencia (run 37745840067, capturas: artefacto `capturas-70`) y otra vez en el PR contra el plugin publicado. APK `preview` (versionCode 17) https://expo.dev/artifacts/eas/_nKWKXOZK6rKN7iEpNi12EZrcCJK4HWhFeHF08bIxzI.apk · AAB `production` (versionCode 18) https://expo.dev/artifacts/eas/U_VqbVf4gqLUYOpeY-p-A50SOkKPq7YLWb70rEHRTf0.aab, sin enviar. Pendiente del titular: filas 48–52 de `PRUEBA-TELEFONO.md` (la 50, video de Drive, obligatoria) y correr `scripts/program-access-report.php` en el demo (6.31.0).
 
 ## Puntos
 
@@ -17,15 +17,15 @@ Todos los puntos con código y pruebas. CI del plugin (PR #71) en verde. e2e de 
 - [x] 7 — Lectura sin bloqueo → 409 `atora_grade_busy` reintentable (`GradeRevisionConflictTest`); la app reintenta una vez tras 1 s (`busyRetry`, Jest)
 - [x] 8 — Reserva de IA comprobada: insert fallido → 503, sin llamar al proveedor (`AiUsageReservationTest`)
 - [x] 9 — Inicio blanco (`expo-splash-screen` #FFFFFF; Jest lee app.json).
-- [~] Pruebas de pantalla: sin hideKeyboard (cada campo comprobado visible); academia-url, leccion-drive y programa-acceso; 6.ª vuelta 19/20.
-- [ ] Cierre (6.33.2, 1.0.1, etiquetas, ZIP, APK, AAB)
+- [x] Pruebas de pantalla: sin hideKeyboard (cada campo comprobado visible); academia-url, leccion-drive y programa-acceso; 20/20.
+- [x] Cierre (6.33.2, 1.0.1, etiquetas, ZIP, APK, AAB)
 
 ## Ramas y PR
 
 | Repo | Rama | Estado |
 |---|---|---|
-| Atora-LMS-6 | `fix/6.33.2-correcciones` | en curso |
-| atora-mobile | `fix/1.0.1-correcciones` | en curso |
+| Atora-LMS-6 | `fix/6.33.2-correcciones` | fusionada (PR #71), `v6.33.2` |
+| atora-mobile | `fix/1.0.1-correcciones` | fusionada (PR #29), `v1.0.1` |
 
 ## Decisiones menores
 
