@@ -33,6 +33,7 @@ final class ATORA_Account_Deletion {
 	public static function boot(): void {
 		add_action( 'atora_lms_admin_menu', array( __CLASS__, 'menu' ) );
 		add_action( 'admin_post_atora_account_deletion_process', array( __CLASS__, 'process_from_admin' ) );
+		add_action( 'admin_init', array( __CLASS__, 'ensure_schema' ) );
 		add_action( 'init', array( __CLASS__, 'rewrite' ) );
 		add_filter( 'query_vars', static function ( $vars ) {
 			$vars[] = self::QUERY_VAR;
@@ -44,6 +45,19 @@ final class ATORA_Account_Deletion {
 	private static function table(): string {
 		global $wpdb;
 		return $wpdb->prefix . self::TABLE;
+	}
+
+	/** 6.33.1: columna `detail` en instalaciones de 6.33.0 (dbDelta con IF NOT EXISTS no altera tablas). */
+	public static function ensure_schema(): void {
+		global $wpdb;
+		if ( get_option( 'atora_account_deletions_schema' ) === '6.33.1' ) {
+			return;
+		}
+		$table = self::table();
+		if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) && ! $wpdb->get_var( $wpdb->prepare( "SHOW COLUMNS FROM {$table} LIKE %s", 'detail' ) ) ) { // phpcs:ignore WordPress.DB
+			$wpdb->query( "ALTER TABLE {$table} ADD COLUMN detail TEXT DEFAULT NULL AFTER note" ); // phpcs:ignore WordPress.DB
+		}
+		update_option( 'atora_account_deletions_schema', '6.33.1', false );
 	}
 
 	public static function rewrite(): void {
@@ -144,8 +158,10 @@ final class ATORA_Account_Deletion {
 	 */
 	public static function process( int $request_id, string $mode = 'anonymize', int $actor_id = 0, bool $confirmed_full = false ) {
 		global $wpdb;
+		self::ensure_schema();
 		$row = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . self::table() . ' WHERE id = %d', $request_id ), ARRAY_A ); // phpcs:ignore WordPress.DB
-		if ( ! $row || 'pending' !== $row['status'] ) {
+		// 6.33.1: una solicitud incompleta se puede reintentar.
+		if ( ! $row || ! in_array( $row['status'], array( 'pending', 'incomplete' ), true ) ) {
 			return new WP_Error( 'atora_account_deletion_state', __( 'La solicitud no existe o ya se procesó.', 'atora-lms' ), array( 'status' => 409 ) );
 		}
 		if ( ! in_array( $mode, array( 'anonymize', 'delete' ), true ) ) {
@@ -155,15 +171,58 @@ final class ATORA_Account_Deletion {
 			return new WP_Error( 'atora_account_deletion_confirm', self::full_delete_warning() . ' ' . __( 'Confirma expresamente para eliminar por completo, o anonimiza.', 'atora-lms' ), array( 'status' => 400 ) );
 		}
 		$user_id = (int) $row['user_id'];
-		if ( user_can( $user_id, 'manage_options' ) ) {
+		$user    = get_userdata( $user_id );
+		if ( $user && user_can( $user_id, 'manage_options' ) ) {
 			return new WP_Error( 'atora_account_deletion_admin', __( 'Una cuenta de administrador no se elimina desde aquí.', 'atora-lms' ), array( 'status' => 403 ) );
 		}
-		self::anonymize( $user_id );
-		if ( 'delete' === $mode ) {
-			require_once ABSPATH . 'wp-admin/includes/user.php';
-			wp_delete_user( $user_id );
+		// Correo y nombre originales (en un reintento, guardados en el detalle del primer intento).
+		$previous = json_decode( (string) ( $row['detail'] ?? '' ), true );
+		$email    = $user && false === strpos( $user->user_email, '@anonimo.invalid' ) ? (string) $user->user_email : (string) ( $previous['email'] ?? '' );
+		$name     = $user && __( 'Usuario eliminado', 'atora-lms' ) !== $user->display_name ? (string) $user->display_name : (string) ( $previous['name'] ?? '' );
+
+		// 1) Colas canceladas y datos de todos los módulos (borradores de WordPress, incluidos los de ATORA).
+		$errors = array();
+		ATORA_Privacy_Erasers::with_mode( $mode, static function () use ( $user_id, $email, $name, &$errors ) {
+			$result = ATORA_Privacy_Erasers::erase( $user_id, $email, $name );
+			$errors = $result['errors'];
+			foreach ( (array) apply_filters( 'wp_privacy_personal_data_erasers', array() ) as $key => $eraser ) {
+				if ( 'atora-lms' === $key || '' === $email || ! is_callable( $eraser['callback'] ?? null ) ) {
+					continue;
+				}
+				for ( $page = 1; $page <= 50; $page++ ) {
+					$response = call_user_func( $eraser['callback'], $email, $page );
+					if ( ! is_array( $response ) || ! empty( $response['done'] ) ) {
+						break;
+					}
+				}
+			}
+		} );
+
+		// 2) La cuenta: anonimizada (por defecto) o eliminada.
+		if ( $user ) {
+			self::anonymize( $user_id );
+			if ( 'delete' === $mode ) {
+				require_once ABSPATH . 'wp-admin/includes/user.php';
+				wp_delete_user( $user_id );
+			}
 		}
-		$wpdb->update( self::table(), array( 'status' => 'processed', 'mode' => $mode, 'note' => '', 'processed_at' => current_time( 'mysql', true ), 'processed_by' => $actor_id ), array( 'id' => $request_id ) ); // phpcs:ignore WordPress.DB
+
+		// 3) Verificación: no queda nombre, correo ni id (salvo lo académico al anonimizar).
+		$left   = ATORA_Privacy_Erasers::verify( 'delete' === $mode ? $user_id : $user_id, $email, $name, $mode );
+		$issues = array_merge( $errors, $left );
+		$status = $issues ? 'incomplete' : 'processed';
+		$wpdb->update( self::table(), array( // phpcs:ignore WordPress.DB
+			'status'       => $status,
+			'mode'         => $mode,
+			'note'         => '',
+			'detail'       => wp_json_encode( array( 'email' => $issues ? $email : '', 'name' => $issues ? $name : '', 'issues' => $issues ) ),
+			'processed_at' => current_time( 'mysql', true ),
+			'processed_by' => $actor_id,
+		), array( 'id' => $request_id ) );
+		if ( $issues ) {
+			do_action( 'atora_account_deletion_incomplete', $user_id, $mode, $request_id, $issues );
+			return new WP_Error( 'atora_account_deletion_incomplete', __( 'La eliminación quedó incompleta. Detalle:', 'atora-lms' ) . ' ' . implode( '; ', array_slice( $issues, 0, 10 ) ), array( 'status' => 500, 'issues' => $issues ) );
+		}
 		do_action( 'atora_account_deletion_processed', $user_id, $mode, $request_id );
 		return true;
 	}
@@ -180,6 +239,9 @@ final class ATORA_Account_Deletion {
 		delete_user_meta( $user_id, 'atora_mobile_sessions' );
 
 		$label = __( 'Usuario eliminado', 'atora-lms' );
+		// Sin los avisos automáticos de WordPress ("tu correo/contraseña cambió") a la dirección vieja.
+		add_filter( 'send_email_change_email', '__return_false', 99 );
+		add_filter( 'send_password_change_email', '__return_false', 99 );
 		wp_update_user( array(
 			'ID'           => $user_id,
 			'display_name' => $label,
@@ -191,6 +253,8 @@ final class ATORA_Account_Deletion {
 			'user_email'   => 'eliminado-' . $user_id . '-' . wp_generate_password( 8, false, false ) . '@anonimo.invalid',
 			'user_pass'    => wp_generate_password( 32, true, true ),
 		) );
+		remove_filter( 'send_email_change_email', '__return_false', 99 );
+		remove_filter( 'send_password_change_email', '__return_false', 99 );
 		$wpdb->update( $wpdb->users, array( 'user_login' => 'eliminado_' . $user_id, 'user_nicename' => 'eliminado-' . $user_id ), array( 'ID' => $user_id ) ); // phpcs:ignore WordPress.DB
 		// Datos de contacto y perfil (las metas académicas se conservan).
 		$keys = (array) $wpdb->get_col( $wpdb->prepare( "SELECT DISTINCT meta_key FROM {$wpdb->usermeta} WHERE user_id = %d", $user_id ) ); // phpcs:ignore WordPress.DB
@@ -243,7 +307,7 @@ final class ATORA_Account_Deletion {
 		// phpcs:enable
 		/* translators: %s: URL pública */
 		echo '<p>' . wp_kses_post( sprintf( __( 'Página pública para pedir la eliminación sin la app (la que se informa a Google Play): <a href="%1$s">%1$s</a>', 'atora-lms' ), esc_url( self::public_url() ) ) ) . '</p>';
-		echo '<p>' . esc_html__( 'Anonimizar borra nombre, correo, usuario, datos de contacto, sesiones y dispositivos; las notas, entregas y actas se conservan sin datos personales. Eliminar por completo borra también lo académico (entregas y notas). Los certificados ya emitidos siguen siendo verificables con el nombre impreso en ellos, porque son el registro del título otorgado.', 'atora-lms' ) . '</p>';
+		echo '<p>' . esc_html__( 'Anonimizar borra nombre, correo, usuario y datos de contacto, cancela los correos y mensajes pendientes, y limpia mensajes, CRM, sesiones, dispositivos y registros de todos los módulos; las notas, entregas, actas y certificados se conservan sin datos personales (el certificado queda a nombre de un titular anonimizado). Eliminar por completo borra también lo académico. Antes de marcarla como procesada se verifica que no quede nada; si algo queda, la solicitud queda incompleta con el detalle y se puede reintentar.', 'atora-lms' ) . '</p>';
 		echo '<table class="widefat striped"><thead><tr><th>' . esc_html__( 'Usuario', 'atora-lms' ) . '</th><th>' . esc_html__( 'Pedida', 'atora-lms' ) . '</th><th>' . esc_html__( 'Plazo', 'atora-lms' ) . '</th><th>' . esc_html__( 'Origen', 'atora-lms' ) . '</th><th>' . esc_html__( 'Estado', 'atora-lms' ) . '</th><th></th></tr></thead><tbody>';
 		if ( ! $rows ) {
 			echo '<tr><td colspan="6">' . esc_html__( 'No hay solicitudes.', 'atora-lms' ) . '</td></tr>';
@@ -252,14 +316,16 @@ final class ATORA_Account_Deletion {
 			$user = get_userdata( (int) $row['user_id'] );
 			echo '<tr><td>' . esc_html( $user ? $user->display_name . ' <' . $user->user_email . '>' : '#' . $row['user_id'] ) . ( '' !== (string) $row['note'] ? '<br><em>' . esc_html( $row['note'] ) . '</em>' : '' ) . '</td>';
 			echo '<td>' . esc_html( get_date_from_gmt( (string) $row['requested_at'], 'Y-m-d H:i' ) ) . '</td><td>' . esc_html( self::deadline( (string) $row['requested_at'] ) ) . '</td><td>' . esc_html( 'app' === $row['source'] ? 'App' : 'Web' ) . '</td>';
-			$state = 'pending' === $row['status'] ? __( 'Pendiente', 'atora-lms' ) : ( 'delete' === $row['mode'] ? __( 'Eliminada por completo', 'atora-lms' ) : __( 'Anonimizada', 'atora-lms' ) );
+			$state = 'pending' === $row['status'] ? __( 'Pendiente', 'atora-lms' ) : ( 'incomplete' === $row['status'] ? __( 'Incompleta', 'atora-lms' ) : ( 'delete' === $row['mode'] ? __( 'Eliminada por completo', 'atora-lms' ) : __( 'Anonimizada', 'atora-lms' ) ) );
 			if ( 'pending' !== $row['status'] ) {
 				$actor = get_userdata( (int) $row['processed_by'] );
 				/* translators: 1: estado, 2: administrador, 3: fecha */
 				$state = sprintf( __( '%1$s por %2$s el %3$s', 'atora-lms' ), $state, $actor ? $actor->display_name : '#' . (int) $row['processed_by'], get_date_from_gmt( (string) $row['processed_at'], 'Y-m-d H:i' ) );
 			}
-			echo '<td>' . esc_html( $state ) . '</td><td>';
-			if ( 'pending' === $row['status'] ) {
+			$detail = json_decode( (string) ( $row['detail'] ?? '' ), true );
+			$issues = is_array( $detail ) ? (array) ( $detail['issues'] ?? array() ) : array();
+			echo '<td>' . esc_html( $state ) . ( $issues ? '<br><small style="color:#a11d1d">' . esc_html( implode( '; ', array_slice( $issues, 0, 8 ) ) ) . '</small>' : '' ) . '</td><td>';
+			if ( in_array( $row['status'], array( 'pending', 'incomplete' ), true ) ) {
 				$form = '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" style="display:inline">' . wp_nonce_field( 'atora_account_deletion_' . (int) $row['id'], '_wpnonce', true, false )
 					. '<input type="hidden" name="action" value="atora_account_deletion_process"><input type="hidden" name="request_id" value="' . (int) $row['id'] . '">';
 				// Acción por defecto: anonimizar.

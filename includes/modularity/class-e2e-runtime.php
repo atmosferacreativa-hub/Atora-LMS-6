@@ -24,6 +24,9 @@ final class ATORA_E2E_Runtime {
 			return;
 		}
 		add_filter( 'clms_certificate_course_eligibility', array( __CLASS__, 'eligibility' ), 99, 3 );
+		// 6.33.1: el sitio vive en la URL del emulador (10.0.2.2), inalcanzable desde el contenedor;
+		// el disparo de la sugerencia de IA va a sí mismo por localhost.
+		add_filter( 'atora_ai_kick_url', static fn() => 'http://localhost/wp-admin/admin-post.php' );
 	}
 
 	/** @param array $result Elegibilidad calculada por las reglas. */

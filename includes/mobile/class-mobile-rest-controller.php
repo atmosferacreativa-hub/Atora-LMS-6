@@ -38,10 +38,11 @@ final class ATORA_Mobile_REST_Controller {
 			'callback'            => array( __CLASS__, 'refresh' ),
 			'permission_callback' => array( __CLASS__, 'allow_public_auth' ),
 		) );
+		// 6.33.1 (E.6): también con el token de renovación (cierre sin red que se envía más tarde).
 		register_rest_route( self::REST_NAMESPACE, '/auth/logout', array(
 			'methods'             => WP_REST_Server::CREATABLE,
 			'callback'            => array( __CLASS__, 'logout' ),
-			'permission_callback' => array( __CLASS__, 'authorize' ),
+			'permission_callback' => array( __CLASS__, 'allow_public_auth' ),
 		) );
 		register_rest_route( self::REST_NAMESPACE, '/me', array(
 			'methods'             => WP_REST_Server::READABLE,
@@ -318,9 +319,31 @@ final class ATORA_Mobile_REST_Controller {
 		return new WP_REST_Response( array( 'session' => $session ), 200 );
 	}
 
-	public static function logout( WP_REST_Request $request ): WP_REST_Response {
-		$token   = ATORA_Mobile_Token_Service::bearer_from_request( $request );
-		$revoked = ATORA_Mobile_Token_Service::revoke_token( $token );
+	/**
+	 * Cierra la sesión con el token de acceso (Bearer) o, si ya venció, con el de
+	 * renovación (`refresh_token` en el cuerpo): la revocación pendiente de un
+	 * cierre sin red puede llegar horas después. Revocar borra los tokens de
+	 * notificaciones de la sesión (6.33.1).
+	 *
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function logout( WP_REST_Request $request ) {
+		$session = null;
+		$bearer  = ATORA_Mobile_Token_Service::bearer_from_request( $request );
+		if ( '' !== $bearer ) {
+			$valid   = ATORA_Mobile_Token_Service::validate( $bearer, 'access' );
+			$session = is_wp_error( $valid ) ? null : $valid;
+		}
+		if ( ! $session ) {
+			$params  = (array) $request->get_json_params();
+			$refresh = trim( (string) ( $params['refresh_token'] ?? '' ) );
+			$valid   = '' !== $refresh ? ATORA_Mobile_Token_Service::validate( $refresh, 'refresh' ) : null;
+			$session = $valid && ! is_wp_error( $valid ) ? $valid : null;
+		}
+		if ( ! $session ) {
+			return new WP_Error( 'atora_mobile_auth_required', __( 'Se requiere autenticación móvil.', 'atora-lms' ), array( 'status' => 401 ) );
+		}
+		$revoked = ATORA_Mobile_Token_Service::revoke_session( (int) $session['user_id'], (string) $session['session_id'] );
 		wp_set_current_user( 0 );
 		return new WP_REST_Response( array( 'revoked' => $revoked ), 200 );
 	}

@@ -12,6 +12,10 @@
  * - Registro en `atora_ai_usage`: institución, usuario, función, proveedor,
  *   modelo, tokens, costo estimado y resultado (ok, error, límite). La web y la
  *   app comparten el mismo contador.
+ * - 6.33.1 (E.5): cada llamada reserva su consumo antes de salir (fila
+ *   `reserved`, creada bajo un bloqueo por academia) y lo cierra en ok o error.
+ *   Lo reservado cuenta para el límite diario y, con su costo estimado, para el
+ *   tope mensual; una reserva sin cerrar caduca a los 5 minutos.
  *
  * @package ATORA_LMS
  * @since 6.32.0
@@ -62,6 +66,9 @@ final class ATORA_AI_Usage_Service {
 		'transcription'      => 'Transcripción',
 		'other'              => 'Otras',
 	);
+
+	/** Segundos que vive una reserva sin cerrar. */
+	const RESERVATION_TTL = 300;
 
 	const DEFAULT_LIMITS = array(
 		'student_daily'    => 30,
@@ -145,25 +152,113 @@ final class ATORA_AI_Usage_Service {
 		);
 	}
 
+	/** Desde cuándo una reserva sigue viva (UTC). */
+	private static function live_since(): string {
+		return gmdate( 'Y-m-d H:i:s', time() - self::RESERVATION_TTL );
+	}
+
+	/** Usos del día: los terminados bien y los que están en curso. */
 	public static function used_today( int $user_id, string $feature ): int {
 		global $wpdb;
 		list( $day ) = self::windows();
 		return (int) $wpdb->get_var( $wpdb->prepare( // phpcs:ignore WordPress.DB
-			'SELECT COUNT(*) FROM ' . self::table() . " WHERE user_id = %d AND feature = %s AND result = 'ok' AND created_at >= %s",
+			'SELECT COUNT(*) FROM ' . self::table() . " WHERE user_id = %d AND feature = %s AND created_at >= %s AND ( result = 'ok' OR ( result = 'reserved' AND created_at >= %s ) )",
 			$user_id,
 			$feature,
-			$day
+			$day,
+			self::live_since()
 		) );
 	}
 
+	/** Costo del mes: el real de lo terminado más el estimado de lo que está en curso. */
 	public static function month_cost(): float {
 		global $wpdb;
 		list( , $month ) = self::windows();
 		return (float) $wpdb->get_var( $wpdb->prepare( // phpcs:ignore WordPress.DB
-			'SELECT COALESCE(SUM(cost), 0) FROM ' . self::table() . ' WHERE institution_id = %d AND created_at >= %s',
+			'SELECT COALESCE(SUM(cost), 0) FROM ' . self::table() . " WHERE institution_id = %d AND created_at >= %s AND ( result <> 'reserved' OR created_at >= %s )",
 			self::institution(),
-			$month
+			$month,
+			self::live_since()
 		) );
+	}
+
+	/**
+	 * Costo estimado de una llamada, para reservarlo contra el tope mensual: el
+	 * promedio de las últimas 20 terminadas bien de esa función (0 sin historial).
+	 */
+	public static function estimate( string $feature ): float {
+		global $wpdb;
+		$avg = (float) $wpdb->get_var( $wpdb->prepare( // phpcs:ignore WordPress.DB
+			'SELECT COALESCE(AVG(cost), 0) FROM ( SELECT cost FROM ' . self::table() . " WHERE feature = %s AND result = 'ok' ORDER BY id DESC LIMIT 20 ) AS recent",
+			$feature
+		) );
+		return max( 0.0, (float) apply_filters( 'atora_ai_reservation_estimate', $avg, $feature ) );
+	}
+
+	/**
+	 * 6.33.1 (E.5): reserva una llamada de forma atómica. Bajo un bloqueo por
+	 * academia, comprueba los límites contando lo que está en curso y deja una
+	 * fila `reserved` con el costo estimado. Se cierra con finish().
+	 *
+	 * @return int|WP_Error Id de la reserva, o 429 si se alcanzó un límite.
+	 */
+	public static function reserve( int $user_id, string $feature ) {
+		global $wpdb;
+		$lock = 'atora_ai_quota_' . self::institution();
+		if ( 1 !== (int) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 10)', $lock ) ) ) {
+			return new WP_Error( 'atora_ai_busy', __( 'El servicio de IA está ocupado. Intenta de nuevo en unos segundos.', 'atora-lms' ), array( 'status' => 503 ) );
+		}
+		try {
+			// Las colgadas (el proceso murió) dejan de contar y quedan marcadas.
+			$wpdb->query( $wpdb->prepare( 'UPDATE ' . self::table() . " SET result = 'expired', cost = 0 WHERE result = 'reserved' AND created_at < %s", self::live_since() ) ); // phpcs:ignore WordPress.DB
+			$estimate = self::estimate( $feature );
+			$allowed  = self::check( $user_id, $feature, $estimate );
+			if ( is_wp_error( $allowed ) ) {
+				return $allowed;
+			}
+			$wpdb->insert( self::table(), array( // phpcs:ignore WordPress.DB
+				'institution_id' => self::institution(),
+				'user_id'        => $user_id,
+				'feature'        => $feature,
+				'provider'       => '',
+				'model'          => '',
+				'tokens_in'      => 0,
+				'tokens_out'     => 0,
+				'cost'           => $estimate,
+				'result'         => 'reserved',
+				'created_at'     => current_time( 'mysql', true ),
+			) );
+			return (int) $wpdb->insert_id;
+		} finally {
+			$wpdb->query( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock ) );
+		}
+	}
+
+	/** Cierra una reserva: ok (cuenta con su costo real) o error (libera el cupo). */
+	public static function finish( int $reservation_id, string $provider, string $model, array $usage, string $result, ?float $cost = null ): void {
+		global $wpdb;
+		list( $in, $out ) = self::tokens( $usage );
+		$updated = $reservation_id > 0 ? $wpdb->query( $wpdb->prepare( // phpcs:ignore WordPress.DB
+			'UPDATE ' . self::table() . " SET provider = %s, model = %s, tokens_in = %d, tokens_out = %d, cost = %f, result = %s WHERE id = %d AND result IN ('reserved', 'expired')",
+			substr( $provider, 0, 40 ),
+			substr( $model, 0, 100 ),
+			$in,
+			$out,
+			'ok' === $result ? ( null !== $cost ? $cost : self::estimate_cost( $provider, $usage ) ) : 0,
+			$result,
+			$reservation_id
+		) ) : 0;
+		if ( ! $updated ) {
+			$row = $reservation_id > 0 ? $wpdb->get_row( $wpdb->prepare( 'SELECT user_id, feature FROM ' . self::table() . ' WHERE id = %d', $reservation_id ), ARRAY_A ) : null; // phpcs:ignore WordPress.DB
+			if ( ! $row ) {
+				return;
+			}
+			self::record( (int) $row['user_id'], (string) $row['feature'], $provider, $model, $usage, $result, $cost );
+			return;
+		}
+		if ( 'ok' === $result ) {
+			self::maybe_alert_budget();
+		}
 	}
 
 	/**
@@ -171,7 +266,7 @@ final class ATORA_AI_Usage_Service {
 	 *
 	 * @return true|WP_Error
 	 */
-	public static function check( int $user_id, string $feature ) {
+	public static function check( int $user_id, string $feature, float $estimate = 0.0 ) {
 		$limits = self::limits();
 		list( , , $reset_ts ) = self::windows();
 		$daily = self::daily_limit( $user_id, $feature );
@@ -189,7 +284,8 @@ final class ATORA_AI_Usage_Service {
 			);
 		}
 		$cap = $limits['monthly_cost_cap'];
-		if ( '' !== $cap && self::month_cost() >= (float) $cap ) {
+		$spent = '' !== $cap ? self::month_cost() : 0.0;
+		if ( '' !== $cap && ( $spent >= (float) $cap || ( $estimate > 0 && $spent + $estimate > (float) $cap ) ) ) {
 			self::record( $user_id, $feature, '', '', array(), 'limit' );
 			$next = ( new DateTimeImmutable( 'first day of next month', wp_timezone() ) )->setTime( 0, 0 );
 			return new WP_Error(

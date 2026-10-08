@@ -106,7 +106,9 @@ final class ATORA_Mobile_AI_Controller {
 		if ( ! ATORA_AI_Usage_Service::available( ATORA_AI_Usage_Service::SUGGESTION ) || ! ATORA_Teacher_Scope::can_grade_submission( $user_id, $submission_id ) ) {
 			return self::not_found();
 		}
-		$job = ATORA_AI_Grading_Suggestion_Service::request( $submission_id, $user_id );
+		// 6.33.1 (E.3): el intento que el docente está calificando.
+		$params = (array) $request->get_json_params();
+		$job    = ATORA_AI_Grading_Suggestion_Service::request( $submission_id, $user_id, absint( $params['attempt'] ?? $request->get_param( 'attempt' ) ?? 0 ) );
 		return is_wp_error( $job ) ? $job : new WP_REST_Response( $job, 202 );
 	}
 
@@ -117,16 +119,25 @@ final class ATORA_Mobile_AI_Controller {
 		if ( ! ATORA_AI_Usage_Service::available( ATORA_AI_Usage_Service::SUGGESTION ) || ! $job || ! ATORA_Teacher_Scope::can_grade_submission( $user_id, (int) $job['submission_id'] ) ) {
 			return self::not_found();
 		}
-		// 6.33.0: sin cola que lo tome a tiempo, lo resuelve esta consulta.
+		// 6.33.1 (E.4): la consulta nunca genera; si la cola no lo tomó, lo dispara aparte y responde ya.
 		if ( 'pending' === $job['status'] ) {
-			ATORA_AI_Grading_Suggestion_Service::run_if_stalled( (string) $job['id'] );
-			$job = ATORA_AI_Grading_Suggestion_Service::job( (string) $job['id'] );
+			ATORA_AI_Grading_Suggestion_Service::kick_if_stalled( (string) $job['id'] );
+		}
+		// 6.33.1 (E.3): ¿sirve para el intento que el docente tiene abierto (`?attempt=`)?
+		$suggestion = 'done' === $job['status'] ? (array) $job['result'] : null;
+		$viewing    = absint( $request->get_param( 'attempt' ) ) ?: ATORA_AI_Grading_Suggestion_Service::current_attempt( (int) $job['submission_id'] );
+		if ( $suggestion ) {
+			$fresh                    = ATORA_AI_Grading_Suggestion_Service::freshness( $suggestion, (int) $job['submission_id'], $viewing );
+			$suggestion['attempt']    = $fresh['attempt'];
+			$suggestion['stale']      = $fresh['stale'];
+			unset( $suggestion['content_hash'] );
 		}
 		return new WP_REST_Response( array(
 			'job_id'        => (string) $job['id'],
 			'submission_id' => (int) $job['submission_id'],
+			'attempt'       => (int) ( $job['attempt'] ?? 0 ),
 			'status'        => (string) $job['status'],
-			'suggestion'    => 'done' === $job['status'] ? $job['result'] : null,
+			'suggestion'    => $suggestion,
 			'error'         => 'failed' === $job['status'] ? (string) $job['error'] : null,
 		), 200 );
 	}

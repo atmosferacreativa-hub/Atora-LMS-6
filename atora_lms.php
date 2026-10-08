@@ -3,7 +3,7 @@
  * Plugin Name:       ATORA LMS
  * Plugin URI:        https://atora.studio
  * Description:       LMS modular para WordPress con IA, evaluaciones, certificados, CRM, mensajería multi-canal, afiliados, live streaming y más. Autor: Atora Studio.
- * Version:           6.33.0
+ * Version:           6.33.1
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Atora Studio
@@ -52,7 +52,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * - Limpieza automática de notificaciones >90 días
  */
 	if ( ! defined( 'ATORA_LMS_VERSION' ) ) {
-		define( 'ATORA_LMS_VERSION', '6.33.0' );
+		define( 'ATORA_LMS_VERSION', '6.33.1' );
 	}
 
 if ( ! defined( 'ATORA_LMS_FILE' ) ) {
@@ -1330,6 +1330,7 @@ add_action( 'init', static function () {
 	atora_lms_require_module( 'includes/certificates/class-certificate-pdf.php' );
 	atora_lms_require_module( 'includes/certificates/class-certificate-verify.php', static function () { ATORA_Certificate_Verify::boot(); } );
 	// 6.33.0: eliminación de cuenta (app, página pública y administración).
+	atora_lms_require_module( 'includes/account/class-privacy-erasers.php', static function () { ATORA_Privacy_Erasers::boot(); } );
 	atora_lms_require_module( 'includes/account/class-account-deletion.php', static function () { ATORA_Account_Deletion::boot(); } );
 	atora_lms_require_module( 'includes/mobile/class-mobile-settings-admin.php', static function () { ATORA_Mobile_Settings_Admin::boot(); } );
 	// 6.33.0: ayudas de las pruebas de pantalla; solo con ATORA_E2E (WordPress temporal del CI).

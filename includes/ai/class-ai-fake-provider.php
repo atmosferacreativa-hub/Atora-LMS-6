@@ -79,6 +79,11 @@ final class ATORA_AI_Fake_Provider {
 		if ( null !== $pre || ! self::enabled() ) {
 			return $pre;
 		}
+		// 6.33.1 (E.5): retardo opcional para probar llamadas simultáneas (solo el simulado, máx. 5 s).
+		$delay = min( 5000, absint( get_option( 'atora_ai_fake_delay_ms', 0 ) ) );
+		if ( $delay > 0 ) {
+			usleep( $delay * 1000 );
+		}
 		self::$last  = array( 'messages' => $messages, 'options' => $options );
 		self::$log[] = array( 'kind' => 'chat', 'payload' => $messages, 'options' => $options );
 		$source     = sanitize_key( (string) ( $options['source'] ?? $options['feature'] ?? 'assistant' ) );

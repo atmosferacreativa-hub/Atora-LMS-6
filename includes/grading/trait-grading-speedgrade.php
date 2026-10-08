@@ -674,12 +674,13 @@ trait CLMS_Grading_SpeedGrade_Trait {
 		$suggestion = ATORA_AI_Grading_Suggestion_Service::suggestion( $submission_id );
 		$job        = isset( $_GET['ai_job'] ) ? ATORA_AI_Grading_Suggestion_Service::job( sanitize_text_field( wp_unslash( $_GET['ai_job'] ) ) ) : null; // phpcs:ignore WordPress.Security.NonceVerification
 		if ( $job && 'pending' === $job['status'] ) {
-			// 6.33.0: sin cola que lo tome a tiempo, lo resuelve esta recarga.
-			ATORA_AI_Grading_Suggestion_Service::run_if_stalled( (string) $job['id'] );
-			$job        = ATORA_AI_Grading_Suggestion_Service::job( (string) $job['id'] );
-			$suggestion = ATORA_AI_Grading_Suggestion_Service::suggestion( $submission_id );
+			// 6.33.1 (E.4): la recarga no genera; si la cola no lo tomó, lo dispara aparte.
+			ATORA_AI_Grading_Suggestion_Service::kick_if_stalled( (string) $job['id'] );
 		}
 		$pending    = $job && in_array( $job['status'], array( 'pending', 'running' ), true );
+		// 6.33.1 (E.3): la sugerencia es del intento con que se pidió; si se mira otro o cambió, no se usa.
+		$viewing = (int) ( $context['selected_attempt'] ?? 0 ) ?: ATORA_AI_Grading_Suggestion_Service::current_attempt( $submission_id );
+		$fresh   = $suggestion ? ATORA_AI_Grading_Suggestion_Service::freshness( $suggestion, $submission_id, $viewing ) : array( 'attempt' => 0, 'stale' => false );
 		$levels     = array( 'bajo' => __( 'bajo', 'atora-lms' ), 'medio' => __( 'medio', 'atora-lms' ), 'alto' => __( 'alto', 'atora-lms' ) );
 		ob_start();
 		?>
@@ -694,6 +695,10 @@ trait CLMS_Grading_SpeedGrade_Trait {
 				<p class="clms-sg-copy"><?php echo esc_html( sanitize_text_field( wp_unslash( $_GET['ai_error'] ) ) ); // phpcs:ignore WordPress.Security.NonceVerification ?></p>
 			<?php endif; ?>
 			<?php if ( $suggestion ) : ?>
+				<p class="clms-sg-copy" id="atora-ai-suggestion-attempt"><strong><?php echo esc_html( sprintf( __( 'Sugerencia del intento %d', 'atora-lms' ), (int) $fresh['attempt'] ) ); ?></strong></p>
+				<?php if ( $fresh['stale'] ) : ?>
+					<p class="clms-sg-copy" id="atora-ai-suggestion-stale"><?php esc_html_e( 'Esta sugerencia es de otro intento o de un contenido que cambió. Pide una nueva para usarla.', 'atora-lms' ); ?></p>
+				<?php endif; ?>
 				<ul>
 					<?php foreach ( (array) $suggestion['criteria'] as $row ) : ?>
 						<li><strong><?php echo esc_html( $row['name'] ); ?>:</strong> <?php echo esc_html( null === $row['score'] ? '—' : (string) $row['score'] ); ?> / <?php echo esc_html( (string) $row['max_points'] ); ?><?php echo $row['level'] ? ' · ' . esc_html( $row['level'] ) : ''; ?> — <?php echo esc_html( $row['justification'] ); ?></li>
@@ -701,6 +706,7 @@ trait CLMS_Grading_SpeedGrade_Trait {
 				</ul>
 				<p class="clms-sg-copy"><strong><?php esc_html_e( 'Devolución sugerida:', 'atora-lms' ); ?></strong> <?php echo esc_html( (string) $suggestion['feedback'] ); ?></p>
 				<p class="clms-sg-copy"><strong><?php echo esc_html( sprintf( __( 'Indicio de texto generado por IA: %s', 'atora-lms' ), $levels[ $suggestion['ai_likelihood'] ] ?? $suggestion['ai_likelihood'] ) ); ?></strong> — <?php echo esc_html( (string) $suggestion['ai_likelihood_note'] ); ?><br><em><?php echo esc_html( ATORA_AI_Grading_Suggestion_Service::DISCLAIMER ); ?></em></p>
+				<?php if ( ! $fresh['stale'] ) : ?>
 				<button type="button" class="clms-sg-btn clms-sg-btn--secondary" id="atora-ai-use-suggestion"><?php esc_html_e( 'Usar sugerencia', 'atora-lms' ); ?></button>
 				<script>
 				(function(){
@@ -721,12 +727,14 @@ trait CLMS_Grading_SpeedGrade_Trait {
 					});
 				})();
 				</script>
+				<?php endif; ?>
 			<?php endif; ?>
 			<?php if ( ! $pending ) : ?>
 				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 					<?php wp_nonce_field( 'atora_ai_suggestion_' . $submission_id ); ?>
 					<input type="hidden" name="action" value="atora_ai_suggestion_request">
 					<input type="hidden" name="submission_id" value="<?php echo esc_attr( (string) $submission_id ); ?>">
+					<input type="hidden" name="attempt" value="<?php echo esc_attr( (string) $viewing ); ?>">
 					<input type="hidden" name="return" value="<?php echo esc_attr( remove_query_arg( 'ai_job' ) ); ?>">
 					<button type="submit" class="clms-sg-btn"><?php echo $suggestion ? esc_html__( 'Pedir otra sugerencia', 'atora-lms' ) : esc_html__( 'Pedir sugerencia de IA', 'atora-lms' ); ?></button>
 				</form>

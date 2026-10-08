@@ -33,6 +33,9 @@ final class ATORA_AI_Grading_Suggestion_Service {
 	public static function boot(): void {
 		add_action( self::RUN_HOOK, array( __CLASS__, 'run' ) );
 		add_action( 'admin_post_atora_ai_suggestion_request', array( __CLASS__, 'handle_web_request' ) );
+		add_action( 'admin_init', array( __CLASS__, 'ensure_schema' ) );
+		add_action( 'admin_post_atora_ai_run_job', array( __CLASS__, 'handle_kick' ) );
+		add_action( 'admin_post_nopriv_atora_ai_run_job', array( __CLASS__, 'handle_kick' ) );
 	}
 
 	/** SpeedGrader web: pedir la sugerencia (el mismo servicio que la app). */
@@ -43,8 +46,9 @@ final class ATORA_AI_Grading_Suggestion_Service {
 		if ( ! ATORA_AI_Usage_Service::available( ATORA_AI_Usage_Service::SUGGESTION ) || ! ATORA_Teacher_Scope::can_grade_submission( $user_id, $submission_id ) ) {
 			wp_die( esc_html__( 'No tienes permisos.', 'atora-lms' ) );
 		}
-		$job    = self::request( $submission_id, $user_id );
-		$return = isset( $_POST['return'] ) ? esc_url_raw( wp_unslash( $_POST['return'] ) ) : admin_url();
+		$attempt = isset( $_POST['attempt'] ) ? absint( $_POST['attempt'] ) : 0;
+		$job     = self::request( $submission_id, $user_id, $attempt );
+		$return  = isset( $_POST['return'] ) ? esc_url_raw( wp_unslash( $_POST['return'] ) ) : admin_url();
 		if ( is_wp_error( $job ) ) {
 			wp_safe_redirect( add_query_arg( 'ai_error', rawurlencode( $job->get_error_message() ), remove_query_arg( 'ai_job', $return ) ) . '#atora-ai-suggestion' );
 			exit;
@@ -56,6 +60,67 @@ final class ATORA_AI_Grading_Suggestion_Service {
 	private static function jobs_table(): string {
 		global $wpdb;
 		return $wpdb->prefix . 'atora_ai_jobs';
+	}
+
+	/** 6.33.1: columnas del intento y de la huella (instalaciones de 6.32/6.33.0). */
+	public static function ensure_schema(): void {
+		global $wpdb;
+		if ( get_option( 'atora_ai_jobs_schema' ) === '6.33.1' ) {
+			return;
+		}
+		$table = self::jobs_table();
+		if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) ) {
+			if ( ! $wpdb->get_var( $wpdb->prepare( "SHOW COLUMNS FROM {$table} LIKE %s", 'attempt' ) ) ) { // phpcs:ignore WordPress.DB
+				$wpdb->query( "ALTER TABLE {$table} ADD COLUMN attempt INT UNSIGNED NOT NULL DEFAULT 0 AFTER user_id, ADD COLUMN content_hash VARCHAR(64) NOT NULL DEFAULT '' AFTER attempt" ); // phpcs:ignore WordPress.DB
+			}
+			update_option( 'atora_ai_jobs_schema', '6.33.1', false );
+		}
+	}
+
+	/** Intentos de la entrega (historial; sin historial, el post como intento 1). @return array<int,array{text:string,files:int[]}> */
+	public static function attempts( int $submission_id ): array {
+		$out     = array();
+		$history = class_exists( 'ATORA_Web_Submission_History' ) ? ATORA_Web_Submission_History::attempts_for_post( $submission_id ) : array();
+		foreach ( $history as $row ) {
+			$out[ (int) $row['attempt'] ] = array(
+				'text'  => (string) $row['body_text'],
+				'files' => array_values( array_filter( array_map( static fn( $f ) => absint( $f['attachment_id'] ?? 0 ), (array) ( $row['files'] ?? array() ) ) ) ),
+			);
+		}
+		if ( ! $out ) {
+			$out[1] = array(
+				'text'  => (string) get_post_meta( $submission_id, '_clms_submission_comment', true ),
+				'files' => array_map( 'absint', (array) get_post_meta( $submission_id, '_clms_submission_files', true ) ),
+			);
+		}
+		ksort( $out );
+		return $out;
+	}
+
+	/** Intento que el docente está evaluando: el elegido en SpeedGrader/app, o el último. */
+	public static function current_attempt( int $submission_id ): int {
+		$selected = absint( get_post_meta( $submission_id, '_clms_submission_graded_attempt', true ) );
+		$attempts = self::attempts( $submission_id );
+		if ( $selected && isset( $attempts[ $selected ] ) ) {
+			return $selected;
+		}
+		return (int) array_key_last( $attempts );
+	}
+
+	/** Huella del contenido evaluado de un intento (cambia si el contenido cambia). */
+	public static function content_hash( int $submission_id, int $attempt ): string {
+		return hash( 'sha256', $attempt . '|' . self::submission_text( $submission_id, $attempt ) );
+	}
+
+	/**
+	 * ¿La sugerencia corresponde al intento que se está calificando (y a su contenido actual)?
+	 *
+	 * @return array{attempt:int,stale:bool}
+	 */
+	public static function freshness( array $suggestion, int $submission_id, int $attempt ): array {
+		$for   = (int) ( $suggestion['attempt'] ?? 0 );
+		$stale = $for !== $attempt || (string) ( $suggestion['content_hash'] ?? '' ) !== self::content_hash( $submission_id, $attempt );
+		return array( 'attempt' => $for, 'stale' => $stale );
 	}
 
 	/** ¿Entrega de una tarea abierta (no un quiz)? */
@@ -74,9 +139,16 @@ final class ATORA_AI_Grading_Suggestion_Service {
 	 *
 	 * @return array|WP_Error {job_id, status}
 	 */
-	public static function request( int $submission_id, int $teacher_id ) {
+	public static function request( int $submission_id, int $teacher_id, int $attempt = 0 ) {
 		if ( ! self::is_open_task( $submission_id ) ) {
 			return new WP_Error( 'atora_ai_not_task', __( 'La sugerencia solo está disponible para entregas de tareas.', 'atora-lms' ), array( 'status' => 422 ) );
+		}
+		self::ensure_schema();
+		// 6.33.1 (E.3): la sugerencia es de un intento concreto (por defecto, el que se está calificando).
+		$attempts = self::attempts( $submission_id );
+		$attempt  = $attempt > 0 ? $attempt : self::current_attempt( $submission_id );
+		if ( ! isset( $attempts[ $attempt ] ) ) {
+			return new WP_Error( 'atora_ai_attempt', __( 'Ese intento no existe en la entrega.', 'atora-lms' ), array( 'status' => 422 ) );
 		}
 		$allowed = ATORA_AI_Usage_Service::check( $teacher_id, ATORA_AI_Usage_Service::SUGGESTION );
 		if ( is_wp_error( $allowed ) ) {
@@ -88,6 +160,8 @@ final class ATORA_AI_Grading_Suggestion_Service {
 			'id'            => $job_id,
 			'submission_id' => $submission_id,
 			'user_id'       => $teacher_id,
+			'attempt'       => $attempt,
+			'content_hash'  => self::content_hash( $submission_id, $attempt ),
 			'status'        => 'pending',
 			'created_at'    => current_time( 'mysql', true ),
 			'updated_at'    => current_time( 'mysql', true ),
@@ -100,7 +174,7 @@ final class ATORA_AI_Grading_Suggestion_Service {
 		} else {
 			wp_schedule_single_event( time(), self::RUN_HOOK, array( $job_id ) );
 		}
-		return array( 'job_id' => $job_id, 'status' => 'pending' );
+		return array( 'job_id' => $job_id, 'status' => 'pending', 'attempt' => $attempt );
 	}
 
 	public static function job( string $job_id ): ?array {
@@ -123,20 +197,60 @@ final class ATORA_AI_Grading_Suggestion_Service {
 		), array( 'id' => $job_id ) );
 	}
 
-	/** Resuelve un trabajo (lo llama la cola). */
-	/** 6.33.0: segundos que un trabajo puede esperar a la cola antes de que la consulta lo ejecute. */
-	const INLINE_AFTER = 15;
+	/** Segundos que un trabajo puede esperar a la cola antes de dispararlo aparte. */
+	const KICK_AFTER = 15;
 
 	/**
-	 * Si la cola no tomó el trabajo a tiempo (WP-Cron desactivado o sin visitas),
-	 * lo ejecuta quien consulta. El reclamo atómico evita que corra dos veces.
+	 * 6.33.1 (E.4): si la cola no tomó el trabajo a tiempo (WP-Cron desactivado o
+	 * sin visitas), quien consulta lo dispara por una petición asíncrona firmada al
+	 * propio sitio, sin esperarla (si el sitio no se alcanza por su URL pública,
+	 * filtro `atora_ai_kick_url`). La consulta nunca genera: responde enseguida.
+	 * Un disparo cada KICK_AFTER segundos como mucho; el reclamo atómico de run()
+	 * evita que corra dos veces.
 	 */
-	public static function run_if_stalled( string $job_id ): void {
+	public static function kick_if_stalled( string $job_id ): bool {
 		$job = self::job( $job_id );
-		if ( $job && 'pending' === $job['status'] && strtotime( $job['created_at'] . ' UTC' ) <= time() - self::INLINE_AFTER ) {
-			self::run( $job_id );
+		if ( ! $job || 'pending' !== $job['status'] || strtotime( $job['created_at'] . ' UTC' ) > time() - self::KICK_AFTER ) {
+			return false;
 		}
+		if ( ! wp_cache_add( 'kick_' . $job_id, 1, 'atora_ai', self::KICK_AFTER ) || get_transient( 'atora_ai_kick_' . md5( $job_id ) ) ) {
+			return false;
+		}
+		set_transient( 'atora_ai_kick_' . md5( $job_id ), 1, self::KICK_AFTER );
+		// Filtrable donde el sitio no se alcanza a sí mismo por su URL pública.
+		wp_remote_post( (string) apply_filters( 'atora_ai_kick_url', admin_url( 'admin-post.php' ) ), array(
+			'blocking'  => false,
+			'timeout'   => 0.01,
+			'sslverify' => apply_filters( 'https_local_ssl_verify', false ), // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals
+			'body'      => array( 'action' => 'atora_ai_run_job', 'job' => $job_id, 'key' => self::kick_key( $job_id ) ),
+		) );
+		// Sin spawn_cron(): su candado (`doing_cron`) frenaría un cron externo que sí funciona.
+		return true;
 	}
+
+	private static function kick_key( string $job_id ): string {
+		return wp_hash( 'atora_ai_run_job|' . $job_id );
+	}
+
+	/** Ruta del disparo asíncrono: ejecuta el trabajo si la firma es válida. */
+	public static function run_kicked( string $job_id, string $key ): bool {
+		if ( '' === $job_id || ! hash_equals( self::kick_key( $job_id ), $key ) ) {
+			return false;
+		}
+		self::run( $job_id );
+		return true;
+	}
+
+	public static function handle_kick(): void {
+		// phpcs:disable WordPress.Security.NonceVerification -- firmada con wp_hash, sin sesión.
+		$job = sanitize_text_field( wp_unslash( (string) ( $_POST['job'] ?? '' ) ) );
+		$key = sanitize_text_field( wp_unslash( (string) ( $_POST['key'] ?? '' ) ) );
+		// phpcs:enable
+		ignore_user_abort( true );
+		status_header( self::run_kicked( $job, $key ) ? 202 : 403 );
+	}
+
+	/** Resuelve un trabajo (lo llama la cola o el disparo asíncrono). */
 
 	public static function run( string $job_id ): void {
 		$job = self::job( $job_id );
@@ -151,6 +265,7 @@ final class ATORA_AI_Grading_Suggestion_Service {
 		}
 		$submission_id = (int) $job['submission_id'];
 		$teacher_id    = (int) $job['user_id'];
+		$attempt       = (int) ( $job['attempt'] ?? 0 ) ?: self::current_attempt( $submission_id );
 		$criteria      = self::criteria( $submission_id );
 		$manager       = function_exists( 'clms_core' ) ? clms_core( 'CLMS_AI_Manager' ) : null;
 		if ( ! $manager || ! method_exists( $manager, 'chat_with_meta' ) ) {
@@ -158,7 +273,7 @@ final class ATORA_AI_Grading_Suggestion_Service {
 			return;
 		}
 		$result = $manager->chat_with_meta(
-			array( array( 'role' => 'user', 'content' => self::prompt( $submission_id, $criteria ) ) ),
+			array( array( 'role' => 'user', 'content' => self::prompt( $submission_id, $criteria, $attempt ) ) ),
 			array(
 				'max_tokens'    => 900,
 				'temperature'   => 0.2,
@@ -182,6 +297,8 @@ final class ATORA_AI_Grading_Suggestion_Service {
 		}
 		$suggestion = $parsed + array(
 			'job_id'       => $job_id,
+			'attempt'      => $attempt,
+			'content_hash' => (string) ( $job['content_hash'] ?? '' ) ?: self::content_hash( $submission_id, $attempt ),
 			'provider'     => (string) ( $result['provider'] ?? '' ),
 			'model'        => (string) ( $result['model'] ?? '' ),
 			'requested_by' => $teacher_id,
@@ -219,11 +336,11 @@ final class ATORA_AI_Grading_Suggestion_Service {
 	}
 
 	/** Texto de la entrega: el último intento y los adjuntos de texto. Nada que identifique al estudiante. */
-	public static function submission_text( int $submission_id ): string {
-		$attempts = class_exists( 'ATORA_Web_Submission_History' ) ? ATORA_Web_Submission_History::attempts_for_post( $submission_id ) : array();
-		$last     = $attempts ? end( $attempts ) : null;
-		$text     = $last ? (string) $last['body_text'] : (string) get_post_meta( $submission_id, '_clms_submission_comment', true );
-		foreach ( (array) get_post_meta( $submission_id, '_clms_submission_files', true ) as $att_id ) {
+	public static function submission_text( int $submission_id, int $attempt = 0 ): string {
+		$attempts = self::attempts( $submission_id );
+		$attempt  = $attempt > 0 && isset( $attempts[ $attempt ] ) ? $attempt : (int) array_key_last( $attempts );
+		$text     = (string) ( $attempts[ $attempt ]['text'] ?? '' );
+		foreach ( (array) ( $attempts[ $attempt ]['files'] ?? array() ) as $att_id ) {
 			$path = get_attached_file( absint( $att_id ) );
 			if ( $path && is_readable( $path ) && 0 === strpos( (string) get_post_mime_type( absint( $att_id ) ), 'text/' ) ) {
 				$text .= "\n\n" . (string) file_get_contents( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions
@@ -232,7 +349,7 @@ final class ATORA_AI_Grading_Suggestion_Service {
 		return trim( wp_strip_all_tags( $text ) );
 	}
 
-	public static function prompt( int $submission_id, array $criteria ): string {
+	public static function prompt( int $submission_id, array $criteria, int $attempt = 0 ): string {
 		$lesson   = absint( get_post_meta( $submission_id, '_clms_submission_lesson_id', true ) );
 		$title    = (string) get_the_title( $lesson );
 		$consigna = trim( wp_strip_all_tags( (string) get_post_field( 'post_content', $lesson ) ) );
@@ -242,7 +359,7 @@ final class ATORA_AI_Grading_Suggestion_Service {
 			$rubric[] = sprintf( '- [%d] %s (0 a %d puntos)%s%s', $c['index'], $c['name'], $c['max_points'], $c['description'] ? ': ' . $c['description'] : '', $levels ? ". Niveles: {$levels}" : '' );
 		}
 		$rubric_text = implode( "\n", $rubric );
-		$text        = self::submission_text( $submission_id );
+		$text        = self::submission_text( $submission_id, $attempt );
 		return <<<PROMPT
 Eres un evaluador académico. Sugiere una calificación para la entrega de un estudiante según la rúbrica. El docente revisará y decidirá; tú solo sugieres.
 
@@ -313,11 +430,14 @@ PROMPT;
 	 *
 	 * @param array $rubric_scores Puntajes guardados [index => {score}].
 	 */
-	public static function audit( int $submission_id, array $rubric_scores ): array {
+	public static function audit( int $submission_id, array $rubric_scores, int $graded_attempt = 0 ): array {
 		$suggestion = self::suggestion( $submission_id );
 		if ( ! $suggestion ) {
 			return array( 'present' => false );
 		}
+		// 6.33.1 (E.3): de qué intento era la sugerencia, con qué contenido, y si correspondía a lo calificado.
+		$graded_attempt = $graded_attempt > 0 ? $graded_attempt : self::current_attempt( $submission_id );
+		$fresh          = self::freshness( $suggestion, $submission_id, $graded_attempt );
 		$diff = array();
 		foreach ( (array) $suggestion['criteria'] as $row ) {
 			$saved     = $rubric_scores[ $row['index'] ]['score'] ?? '';
@@ -329,6 +449,6 @@ PROMPT;
 				'diff'      => null !== $suggested && '' !== (string) $saved ? round( (float) $saved - (float) $suggested, 2 ) : null,
 			);
 		}
-		return array( 'present' => true, 'job_id' => (string) ( $suggestion['job_id'] ?? '' ), 'model' => (string) ( $suggestion['model'] ?? '' ), 'criteria' => $diff );
+		return array( 'present' => true, 'job_id' => (string) ( $suggestion['job_id'] ?? '' ), 'model' => (string) ( $suggestion['model'] ?? '' ), 'attempt' => $fresh['attempt'], 'content_hash' => (string) ( $suggestion['content_hash'] ?? '' ), 'graded_attempt' => $graded_attempt, 'stale' => $fresh['stale'], 'criteria' => $diff );
 	}
 }

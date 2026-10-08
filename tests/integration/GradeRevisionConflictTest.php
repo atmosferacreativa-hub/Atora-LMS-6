@@ -127,9 +127,57 @@ final class GradeRevisionConflictTest extends WP_UnitTestCase {
 	/** 6.31.1: dos primeros guardados (sin meta, revisión 0): gana uno, el otro 409. */
 	public function test_first_save_without_meta_is_atomic(): void {
 		$this->assertSame( '', get_post_meta( $this->submission, ATORA_Grading_Save_Service::REVISION_META, true ) );
-		$this->assertSame( 1, ATORA_Grading_Save_Service::claim_revision( $this->submission, 0 ) );
-		$second = ATORA_Grading_Save_Service::claim_revision( $this->submission, 0 );
+		$this->assertIsArray( $this->web_save( '70', 0 ) );
+		$second = $this->web_save( '75', 0 );
 		$this->assertWPError( $second );
 		$this->assertSame( 409, $second->get_error_data()['status'] );
+		$this->assertSame( '70', get_post_meta( $this->submission, '_clms_submission_grade', true ) );
+	}
+
+	/**
+	 * 6.33.1 (E.2): el bloqueo cubre todo el guardado y la revisión se escribe al
+	 * final. Otra conexión (otro proceso) que mira a mitad del guardado —cuando ya
+	 * se publicó la nota— encuentra el bloqueo tomado, y la revisión sigue siendo
+	 * la vieja: quien lee con el bloqueo espera y nunca ve una mezcla.
+	 */
+	public function test_lock_covers_the_whole_save_and_revision_is_written_last(): void {
+		$other = new wpdb( DB_USER, DB_PASSWORD, DB_NAME, DB_HOST );
+		$lock  = 'atora_grade_rev_' . $this->submission;
+		$seen  = array();
+		$probe = function ( $submission_id ) use ( $other, $lock, &$seen ) {
+			if ( (int) $submission_id !== $this->submission ) {
+				return;
+			}
+			wp_cache_delete( $this->submission, 'post_meta' );
+			$seen[] = array(
+				'free'     => (string) $other->get_var( $other->prepare( 'SELECT IS_FREE_LOCK(%s)', $lock ) ),
+				'grade'    => (string) get_post_meta( $this->submission, '_clms_submission_grade', true ),
+				'revision' => ATORA_Grading_Save_Service::revision( $this->submission ),
+			);
+		};
+		// A mitad del guardado: después de publicar la nota (avisos), antes de la auditoría y de la revisión.
+		add_action( 'clms_submission_graded', $probe, 1 );
+		add_action( 'clms_submission_grade_draft_saved', $probe, 1 );
+		$saved = $this->web_save( '88', 0 );
+		remove_action( 'clms_submission_graded', $probe, 1 );
+		remove_action( 'clms_submission_grade_draft_saved', $probe, 1 );
+
+		$this->assertIsArray( $saved );
+		$this->assertNotEmpty( $seen, 'El guardado pasó por la publicación.' );
+		$this->assertSame( '0', $seen[0]['free'], 'A mitad del guardado el bloqueo está tomado: otro proceso no puede leer ni guardar.' );
+		$this->assertSame( '88', $seen[0]['grade'] );
+		$this->assertSame( 0, $seen[0]['revision'], 'La revisión nueva todavía no se escribió.' );
+		$this->assertSame( '1', (string) $other->get_var( $other->prepare( 'SELECT IS_FREE_LOCK(%s)', $lock ) ), 'Al terminar, el bloqueo se libera.' );
+		$this->assertSame( 1, ATORA_Grading_Save_Service::revision( $this->submission ) );
+
+		// Una lectura consistente desde otro proceso, mientras alguien guarda, espera al final.
+		$other->get_var( $other->prepare( 'SELECT GET_LOCK(%s, 0)', $lock ) );
+		$started = microtime( true );
+		$busy    = $this->web_save( '90', 1 );
+		$this->assertWPError( $busy, 'Con el bloqueo tomado por otro proceso, no se guarda a medias.' );
+		$this->assertSame( 'atora_grade_busy', $busy->get_error_code() );
+		$this->assertGreaterThan( 9, microtime( true ) - $started, 'Esperó el bloqueo.' );
+		$other->get_var( $other->prepare( 'SELECT RELEASE_LOCK(%s)', $lock ) );
+		$this->assertSame( '88', get_post_meta( $this->submission, '_clms_submission_grade', true ) );
 	}
 }

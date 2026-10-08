@@ -30,10 +30,11 @@ if ( ! defined( 'ABSPATH' ) ) {
  * 6.32.1 — control central: toda salida hacia un proveedor (chat, embeddings,
  * transcripción y `post_json`) pasa por el mismo camino:
  *   1. Límite diario de la persona y tope mensual de la academia
- *      (`ATORA_AI_Usage_Service::check`): si se alcanzó, WP_Error 429 y no sale nada.
+ *      (`ATORA_AI_Usage_Service::reserve`, 6.33.1: reserva atómica que cuenta lo
+ *      que está en curso): si se alcanzó, WP_Error 429 y no sale nada.
  *   2. Filtro de datos personales (`ATORA_AI_Privacy`): sin correos ni nombres;
  *      el marcador "{{nombre}}" se reemplaza al recibir la respuesta.
- *   3. Registro en `atora_ai_usage` con la función que declara quien llama
+ *   3. Cierre de la reserva en `atora_ai_usage` (ok o error) con la función que declara quien llama
  *      (`feature` en las opciones; si no, `source`; si no, "other"), la persona
  *      (`user_id` en las opciones o el usuario actual), tokens y costo estimado.
  */
@@ -207,20 +208,26 @@ class CLMS_AI_Manager {
 	private function open_request( array $options, string $fallback_feature ) {
 		$feature = class_exists( 'ATORA_AI_Usage_Service' ) ? ATORA_AI_Usage_Service::feature_of( $options, $fallback_feature ) : $fallback_feature;
 		$user_id = isset( $options['user_id'] ) ? absint( $options['user_id'] ) : get_current_user_id();
+		// 6.33.1 (E.5): reserva atómica (lo que está en curso cuenta para los límites).
+		$reservation = 0;
 		if ( class_exists( 'ATORA_AI_Usage_Service' ) && empty( $options['skip_limits'] ) ) {
-			$allowed = ATORA_AI_Usage_Service::check( $user_id, $feature );
-			if ( is_wp_error( $allowed ) ) {
-				return $allowed;
+			$reservation = ATORA_AI_Usage_Service::reserve( $user_id, $feature );
+			if ( is_wp_error( $reservation ) ) {
+				return $reservation;
 			}
 		}
 		$plan = class_exists( 'ATORA_AI_Privacy' ) ? ATORA_AI_Privacy::plan( ATORA_AI_Privacy::subjects( $options ) ) : array( 'mask' => array(), 'restore' => array() );
-		return array( 'feature' => $feature, 'user_id' => $user_id, 'plan' => $plan );
+		return array( 'feature' => $feature, 'user_id' => $user_id, 'plan' => $plan, 'reservation' => (int) $reservation );
 	}
 
 	/** Después de la respuesta (o del error): una fila en `atora_ai_usage`. */
 	private function close_request( array $gate, string $provider, string $model, array $usage, string $result, ?float $cost = null ): void {
 		if ( class_exists( 'ATORA_AI_Usage_Service' ) ) {
-			ATORA_AI_Usage_Service::record( (int) $gate['user_id'], (string) $gate['feature'], $provider, $model, $usage, $result, $cost );
+			if ( ! empty( $gate['reservation'] ) ) {
+				ATORA_AI_Usage_Service::finish( (int) $gate['reservation'], $provider, $model, $usage, $result, $cost );
+			} else {
+				ATORA_AI_Usage_Service::record( (int) $gate['user_id'], (string) $gate['feature'], $provider, $model, $usage, $result, $cost );
+			}
 		}
 	}
 

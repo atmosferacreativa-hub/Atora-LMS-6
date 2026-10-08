@@ -7,7 +7,7 @@ Qué está comprobado y dónde. Se actualiza en cada versión del plugin o de la
 - **Integración**: PHPUnit con WordPress (`tests/integration`).
 - **Unitaria**: PHPUnit sin WordPress o Jest en la app.
 
-Última actualización: **plugin 6.33.0 · app 1.0.0**.
+Última actualización: **plugin 6.33.1 · app 1.0.0**.
 
 > No hay registro escrito de qué se recorrió en teléfono antes de esta tabla: la columna "Teléfono" queda "por confirmar" hasta la prueba al cierre de la Fase 4, que incluye la lista acumulada de las fases 0 a 3.
 
@@ -38,6 +38,12 @@ Qué está comprobado y dónde. Se actualiza en cada versión del plugin o de la
 | Eliminar mi cuenta | 1.0.0 | pendiente (fila 41) | sí (`eliminar-cuenta`) | `AccountDeletionTest` | — |
 | Rendimiento en gama baja (2 GB de RAM, red 3G simulada) | 1.0.0 | pendiente (fila 42) | sí (`modo=gama-baja`): arranque en frío 1,2–2,5 s (umbral 4 s); lección con 3 videos 478 ms; lista de 100 lecciones virtualizada | — | — |
 | Reporte de cierres sin datos personales, desactivable por academia | 1.0.0 | sin cuenta de Sentry todavía (apagado) | — | `AccountDeletionTest` (`crash_reports`) | Jest (limpieza del reporte) |
+| Eliminación de cuenta completa (borradores de WordPress, colas canceladas, verificación; "Incompleta" si queda algo) | 6.33.1 | pendiente (fila 44) | — | `PrivacyErasureTest` | — |
+| Sugerencia de IA atada al intento; "de otro intento" no se usa | 6.33.1 · 1.0.0 | pendiente (fila 45) | sí (`docente-sugerencia-ia`) | `AiGradingSuggestionTest` | Jest (`suggestionUsable`) |
+| La consulta de la sugerencia nunca genera; la app espera 3 min sin cancelar por la red y la retoma | 6.33.1 · 1.0.0 | pendiente (fila 46) | sí (`docente-sugerencia-ia`, con la cola del CI) | `AiGradingSuggestionTest` | Jest (consulta y trabajo pendiente) |
+| Límites de IA con llamadas simultáneas (reserva atómica) | 6.33.1 | — | sí (`scripts/e2e-concurrent-ai.sh`: 10 a la vez, límite 3 → 3) | `AiUsageReservationTest` | — |
+| Cerrar sesión (también sin red) deja de enviar avisos a ese teléfono | 6.33.1 · 1.0.0 | pendiente (fila 47) | — (requiere servicio externo) | `MobileOrganizeTest` | Jest (cierre en modo avión y reconexión) |
+| Calificar: el bloqueo cubre todo el guardado | 6.33.1 | — | sí (`scripts/e2e-concurrent-grade.sh`) | `GradeRevisionConflictTest` | — |
 
 ## App (docente, Fase 4)
 

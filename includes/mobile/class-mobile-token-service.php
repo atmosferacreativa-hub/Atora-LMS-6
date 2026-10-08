@@ -325,6 +325,8 @@ final class ATORA_Mobile_Token_Service {
 				array( '%s' ),
 				array( '%d','%s' )
 			);
+			// 6.33.1 (E.6): los tokens de notificaciones de esa sesión se borran.
+			do_action( 'atora_mobile_session_revoked', $user_id, $session_id );
 			return false !== $updated;
 		}
 
@@ -334,6 +336,7 @@ final class ATORA_Mobile_Token_Service {
 		}
 		unset( $sessions[ $session_id ] );
 		update_user_meta( $user_id, self::META_KEY, $sessions );
+		do_action( 'atora_mobile_session_revoked', $user_id, $session_id );
 		return true;
 	}
 
@@ -481,5 +484,6 @@ final class ATORA_Mobile_Token_Service {
 			array( '%s' ),
 			array( '%d','%s' )
 		);
+		do_action( 'atora_mobile_session_revoked', $user_id, $to_revoke );
 	}
 }

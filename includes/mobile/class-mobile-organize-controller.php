@@ -114,7 +114,8 @@ final class ATORA_Mobile_Organize_Controller {
 		if ( ! ATORA_Mobile_Push_Service::valid_token( $token ) ) {
 			return new WP_Error( 'atora_mobile_device_token', __( 'Token de notificaciones inválido.', 'atora-lms' ), array( 'status' => 400 ) );
 		}
-		$id = ATORA_Mobile_Push_Service::register_device( get_current_user_id(), $token, (string) ( $params['platform'] ?? '' ) );
+		// 6.33.1 (E.6): atado a la sesión que lo registra; al revocarla se borra.
+		$id = ATORA_Mobile_Push_Service::register_device( get_current_user_id(), $token, (string) ( $params['platform'] ?? '' ), (string) $request->get_param( '_atora_mobile_session_id' ) );
 		if ( is_wp_error( $id ) ) {
 			return $id;
 		}

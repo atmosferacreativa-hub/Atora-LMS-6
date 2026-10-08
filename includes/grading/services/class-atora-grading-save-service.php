@@ -35,7 +35,25 @@ class ATORA_Grading_Save_Service {
 	 */
 	public function save( int $submission_id, int $actor_id, array $input ) {
 		$submission_id = absint( $submission_id );
-		$user_id       = absint( $actor_id );
+		if ( ! $submission_id || ! absint( $actor_id ) ) {
+			return new WP_Error( 'invalid_request', __( 'Solicitud inválida.', 'atora-lms' ) );
+		}
+		// 6.33.1 (E.2): el bloqueo por entrega cubre TODO el guardado (nota, comentarios,
+		// rúbrica, moderación, publicación y auditoría), no solo el reclamo de la revisión.
+		$lock = self::lock( $submission_id );
+		if ( is_wp_error( $lock ) ) {
+			return $lock;
+		}
+		try {
+			return $this->save_locked( $submission_id, $actor_id, $input );
+		} finally {
+			self::unlock( $submission_id );
+		}
+	}
+
+	/** El guardado, con el bloqueo de la entrega ya tomado. La revisión nueva se escribe al final. */
+	private function save_locked( int $submission_id, int $actor_id, array $input ) {
+		$user_id = absint( $actor_id );
 
 		if ( ! $submission_id || ! $user_id ) {
 			return new WP_Error( 'invalid_request', __( 'Solicitud inválida.', 'atora-lms' ) );
@@ -366,10 +384,18 @@ class ATORA_Grading_Save_Service {
 		if ( ! isset( $input['expected_revision'] ) || '' === (string) $input['expected_revision'] || ! is_numeric( $input['expected_revision'] ) ) {
 			return new WP_Error( 'atora_grade_revision_required', __( 'Falta la revisión de la entrega. Recarga para calificar.', 'atora-lms' ), array( 'status' => 400 ) );
 		}
-		$revision = self::claim_revision( $submission_id, absint( $input['expected_revision'] ) );
-		if ( is_wp_error( $revision ) ) {
-			return $revision;
+		// Bajo el bloqueo: la revisión que vio quien guarda debe seguir siendo la actual.
+		wp_cache_delete( $submission_id, 'post_meta' );
+		$current = self::revision( $submission_id );
+		if ( $current !== absint( $input['expected_revision'] ) ) {
+			return new WP_Error(
+				'atora_grade_revision_conflict',
+				__( 'Otro docente guardó esta entrega; recarga para ver su versión.', 'atora-lms' ),
+				array( 'status' => 409, 'current_revision' => $current )
+			);
 		}
+		// Se escribe al terminar: nadie lee una revisión nueva con datos a medias, y un guardado que falla no la consume.
+		$revision = $current + 1;
 
 		// 6.31.0: intento calificado (por defecto, el último que se mostró).
 		$graded_attempt = isset( $input['attempt'] ) ? absint( $input['attempt'] ) : 0;
@@ -379,7 +405,6 @@ class ATORA_Grading_Save_Service {
 
 		if ( in_array( $submit_action, array( 'submit_moderation', 'approve_moderation', 'request_moderation_changes' ), true ) ) {
 			if ( ! $moderation_service ) {
-				self::release_revision( $submission_id, $revision );
 				return new WP_Error( 'clms_moderation_unavailable', __( 'El servicio de moderación no está disponible.', 'atora-lms' ) );
 			}
 			$expected_lock = isset( $input['moderation_lock_version'] ) ? absint( $input['moderation_lock_version'] ) : 0;
@@ -394,7 +419,6 @@ class ATORA_Grading_Save_Service {
 				}
 			}
 			if ( is_wp_error( $moderation_result ) ) {
-				self::release_revision( $submission_id, $revision );
 				return $moderation_result;
 			}
 		}
@@ -421,7 +445,6 @@ class ATORA_Grading_Save_Service {
 				)
 			);
 			if ( is_wp_error( $result ) ) {
-				self::release_revision( $submission_id, $revision );
 				return $result;
 			}
 		} else {
@@ -506,7 +529,7 @@ class ATORA_Grading_Save_Service {
 				'rubric_percent'      => ( '' !== (string) $rubric_pct_ref ) ? absint( $rubric_pct_ref ) : '',
 				'attempt'             => $graded_attempt,
 				// 6.32.0: ¿se guardó con o sin sugerencia de IA previa, y cuánto difiere?
-				'ai_suggestion'       => class_exists( 'ATORA_AI_Grading_Suggestion_Service' ) ? ATORA_AI_Grading_Suggestion_Service::audit( $submission_id, $rubric_scores ) : array( 'present' => false ),
+				'ai_suggestion'       => class_exists( 'ATORA_AI_Grading_Suggestion_Service' ) ? ATORA_AI_Grading_Suggestion_Service::audit( $submission_id, $rubric_scores, $graded_attempt ) : array( 'present' => false ),
 			);
 
 			\ATORA\LMS\Rubric_Service::record_evaluation( array(
@@ -530,9 +553,13 @@ class ATORA_Grading_Save_Service {
 
 		// 6.31.1: si la base no guardó lo decidido (error tras el reclamo), la revisión no se consume.
 		if ( ! self::persisted( $submission_id, $status, $grade ) ) {
-			self::release_revision( $submission_id, $revision );
 			return new WP_Error( 'atora_db_error', __( 'No se pudo guardar la calificación. Intenta de nuevo.', 'atora-lms' ), array( 'status' => 503 ) );
 		}
+		// 6.33.1: la revisión nueva, al final (con todo lo demás ya guardado).
+		if ( false === update_post_meta( $submission_id, self::REVISION_META, (string) $revision ) ) {
+			return new WP_Error( 'atora_db_error', __( 'No se pudo guardar la calificación. Intenta de nuevo.', 'atora-lms' ), array( 'status' => 503 ) );
+		}
+		do_action( 'atora_grade_revision_saved', $submission_id, $revision );
 
 		return array(
 			'submission_id' => $submission_id,
@@ -559,7 +586,28 @@ class ATORA_Grading_Save_Service {
 		return $saved_status === $status && $saved_grade === (string) $grade;
 	}
 
-	/** Bloqueo por entrega (MySQL GET_LOCK): leer, comparar y escribir la revisión es atómico entre procesos. */
+	/**
+	 * 6.33.1: lectura consistente. Espera a que termine un guardado en curso de la
+	 * entrega (el mismo bloqueo), para no ver la revisión vieja con datos nuevos ni
+	 * al revés. Si el bloqueo no llega en 10 s, lee igual.
+	 *
+	 * @template T
+	 * @param callable():T $read
+	 * @return T
+	 */
+	public static function read_consistent( int $submission_id, callable $read ) {
+		$locked = ! is_wp_error( self::lock( $submission_id ) );
+		try {
+			wp_cache_delete( $submission_id, 'post_meta' );
+			return $read();
+		} finally {
+			if ( $locked ) {
+				self::unlock( $submission_id );
+			}
+		}
+	}
+
+	/** Bloqueo por entrega (MySQL GET_LOCK, reentrante en la misma conexión). */
 	private static function lock( int $submission_id ) {
 		global $wpdb;
 		$got = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 10)', 'atora_grade_rev_' . $submission_id ) );
@@ -575,55 +623,5 @@ class ATORA_Grading_Save_Service {
 	private static function unlock( int $submission_id ): void {
 		global $wpdb;
 		$wpdb->query( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', 'atora_grade_rev_' . $submission_id ) ); // phpcs:ignore WordPress.DB
-	}
-
-	/**
-	 * Reclama la revisión siguiente si la actual es `$expected` (también la primera,
-	 * sin meta: revisión 0). Dos reclamos con la misma revisión: gana uno.
-	 *
-	 * @return int|WP_Error Nueva revisión, o 409 con la revisión actual.
-	 */
-	public static function claim_revision( int $submission_id, int $expected ) {
-		$lock = self::lock( $submission_id );
-		if ( is_wp_error( $lock ) ) {
-			return $lock;
-		}
-		try {
-			wp_cache_delete( $submission_id, 'post_meta' );
-			$current = self::revision( $submission_id );
-			if ( $current !== $expected ) {
-				return new WP_Error(
-					'atora_grade_revision_conflict',
-					__( 'Otro docente guardó esta entrega; recarga para ver su versión.', 'atora-lms' ),
-					array( 'status' => 409, 'current_revision' => $current )
-				);
-			}
-			$next = $current + 1;
-			$ok   = update_post_meta( $submission_id, self::REVISION_META, (string) $next );
-			if ( false === $ok ) {
-				return new WP_Error( 'atora_db_error', __( 'No se pudo guardar la calificación. Intenta de nuevo.', 'atora-lms' ), array( 'status' => 503 ) );
-			}
-			return $next;
-		} finally {
-			self::unlock( $submission_id );
-		}
-	}
-
-	/**
-	 * 6.31.1: un guardado que falló después de reclamar no consume la revisión.
-	 * Vuelve a la anterior solo si nadie la cambió desde el reclamo.
-	 */
-	public static function release_revision( int $submission_id, int $claimed ): void {
-		if ( is_wp_error( self::lock( $submission_id ) ) ) {
-			return;
-		}
-		try {
-			wp_cache_delete( $submission_id, 'post_meta' );
-			if ( self::revision( $submission_id ) === $claimed ) {
-				update_post_meta( $submission_id, self::REVISION_META, (string) max( 0, $claimed - 1 ) );
-			}
-		} finally {
-			self::unlock( $submission_id );
-		}
 	}
 }

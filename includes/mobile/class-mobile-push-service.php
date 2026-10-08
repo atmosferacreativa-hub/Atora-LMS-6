@@ -10,6 +10,11 @@
  * - Preferencias por tipo (mensajes, avisos, notas, fechas límite) en el servidor.
  * - Reintento con espera creciente; un token que Expo marca como
  *   `DeviceNotRegistered` se borra.
+ * - 6.33.1 (E.6): cada token queda atado a la sesión que lo registró. Al
+ *   revocarse la sesión (cerrar sesión, también la revocación pendiente que la
+ *   app envía al volver la red) se borra; a sesiones revocadas o vencidas no se
+ *   envía nada. Los tokens anteriores a 6.33.1 (sin sesión) siguen hasta que la
+ *   app los vuelva a registrar.
  * - Token de acceso de Expo opcional (ajustes → canales). Si no hay
  *   configuración o el envío falla, nada se rompe: el mensaje ya está en el buzón.
  *
@@ -32,6 +37,31 @@ final class ATORA_Mobile_Push_Service {
 	public static function boot(): void {
 		add_action( 'atora/inbox_message_created', array( __CLASS__, 'on_message_created' ), 10, 2 );
 		add_action( self::SEND_HOOK, array( __CLASS__, 'send_job' ), 10, 3 );
+		add_action( 'atora_mobile_session_revoked', array( __CLASS__, 'forget_session' ), 10, 2 );
+		add_action( 'admin_init', array( __CLASS__, 'ensure_schema' ) );
+	}
+
+	/** 6.33.1: columna `session_id` en instalaciones existentes (dbDelta con IF NOT EXISTS no altera). */
+	public static function ensure_schema(): void {
+		global $wpdb;
+		if ( get_option( 'atora_mobile_push_schema' ) === '6.33.1' ) {
+			return;
+		}
+		$table = self::table();
+		if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) === $table && ! $wpdb->get_var( "SHOW COLUMNS FROM {$table} LIKE 'session_id'" ) ) { // phpcs:ignore WordPress.DB
+			$wpdb->query( "ALTER TABLE {$table} ADD COLUMN session_id VARCHAR(32) NOT NULL DEFAULT '' AFTER token" ); // phpcs:ignore WordPress.DB
+		}
+		update_option( 'atora_mobile_push_schema', '6.33.1', false );
+	}
+
+	/** Sesión revocada: sus tokens se borran. */
+	public static function forget_session( int $user_id, string $session_id ): void {
+		global $wpdb;
+		if ( '' === $session_id ) {
+			return;
+		}
+		self::ensure_schema();
+		$wpdb->delete( self::table(), array( 'user_id' => $user_id, 'session_id' => $session_id ) ); // phpcs:ignore WordPress.DB
 	}
 
 	private static function table(): string {
@@ -46,16 +76,18 @@ final class ATORA_Mobile_Push_Service {
 	}
 
 	/** Registra (o reasigna al usuario actual) un token. @return int|WP_Error id */
-	public static function register_device( int $user_id, string $token, string $platform ) {
+	public static function register_device( int $user_id, string $token, string $platform, string $session_id = '' ) {
 		global $wpdb;
+		self::ensure_schema();
 		$now = current_time( 'mysql', true );
 		$ok  = $wpdb->query( // phpcs:ignore WordPress.DB
 			$wpdb->prepare(
-				'INSERT INTO ' . self::table() . ' (institution_id, user_id, token, platform, academy, created_at, last_seen_at) VALUES (%d, %d, %s, %s, %s, %s, %s)
-				 ON DUPLICATE KEY UPDATE user_id = VALUES(user_id), platform = VALUES(platform), academy = VALUES(academy), last_seen_at = VALUES(last_seen_at)',
+				'INSERT INTO ' . self::table() . ' (institution_id, user_id, token, session_id, platform, academy, created_at, last_seen_at) VALUES (%d, %d, %s, %s, %s, %s, %s, %s)
+				 ON DUPLICATE KEY UPDATE user_id = VALUES(user_id), session_id = VALUES(session_id), platform = VALUES(platform), academy = VALUES(academy), last_seen_at = VALUES(last_seen_at)',
 				absint( (int) get_option( 'atora_default_institution', 0 ) ),
 				$user_id,
 				$token,
+				substr( sanitize_text_field( $session_id ), 0, 32 ),
 				substr( sanitize_key( $platform ), 0, 20 ),
 				substr( (string) wp_parse_url( home_url(), PHP_URL_HOST ), 0, 190 ),
 				$now,
@@ -74,9 +106,24 @@ final class ATORA_Mobile_Push_Service {
 		return (bool) $wpdb->delete( self::table(), array( 'id' => $device_id, 'user_id' => $user_id ) ); // phpcs:ignore WordPress.DB
 	}
 
-	/** @return array<int,array{id:int,token:string}> */
+	/**
+	 * Tokens a los que se puede enviar: los de sesiones vivas (o sin sesión,
+	 * anteriores a 6.33.1). Los de sesiones revocadas o vencidas se borran aquí.
+	 *
+	 * @return array<int,array{id:int,token:string}>
+	 */
 	public static function tokens_for( int $user_id ): array {
 		global $wpdb;
+		self::ensure_schema();
+		$sessions = $wpdb->prefix . 'atora_mobile_sessions';
+		if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $sessions ) ) === $sessions ) {
+			$wpdb->query( $wpdb->prepare( // phpcs:ignore WordPress.DB
+				'DELETE p FROM ' . self::table() . " p LEFT JOIN {$sessions} s ON s.session_id = p.session_id AND s.user_id = p.user_id
+				 WHERE p.user_id = %d AND p.session_id <> '' AND ( s.id IS NULL OR s.revoked_at IS NOT NULL OR ( s.refresh_expires IS NOT NULL AND s.refresh_expires < %s ) )",
+				$user_id,
+				gmdate( 'Y-m-d H:i:s' )
+			) );
+		}
 		return (array) $wpdb->get_results( $wpdb->prepare( 'SELECT id, token FROM ' . self::table() . ' WHERE user_id = %d', $user_id ), ARRAY_A ); // phpcs:ignore WordPress.DB
 	}
 
