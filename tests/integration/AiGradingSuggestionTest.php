@@ -278,20 +278,68 @@ final class AiGradingSuggestionTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'name="attempt" value="2"', $new );
 	}
 
-	public function test_stalled_job_is_resolved_by_the_poll_and_never_runs_twice(): void {
-		$sub   = $this->submission( $this->student );
-		$job   = $this->call( $this->teacher, 'POST', "/teacher/submissions/{$sub}/ai-suggestion" )->get_data()['job_id'];
-		// Recién pedido: se espera a la cola.
-		$this->assertSame( 'pending', $this->call( $this->teacher, 'GET', "/teacher/ai-suggestions/{$job}" )->get_data()['status'] );
-		// La cola no lo tomó (WP-Cron desactivado): pasados 15 s, la consulta lo resuelve.
+	/**
+	 * 6.33.1 (E.4): la consulta (GET) nunca genera. Si la cola no tomó el trabajo,
+	 * lo dispara aparte, sin esperar (petición asíncrona firmada al propio sitio).
+	 */
+	public function test_poll_never_generates_and_a_stalled_job_is_kicked_async(): void {
 		global $wpdb;
+		$kicks = array();
+		$spy   = static function ( $pre, $args, $url ) use ( &$kicks ) {
+			$kicks[] = array( 'url' => $url, 'args' => $args );
+			return array( 'headers' => array(), 'body' => '', 'response' => array( 'code' => 200, 'message' => 'OK' ), 'cookies' => array() );
+		};
+		add_filter( 'pre_http_request', $spy, 10, 3 );
+		$usage = static fn() => (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}atora_ai_usage WHERE feature = 'grading_suggestion'" );
+
+		$sub = $this->submission( $this->student );
+		$job = $this->call( $this->teacher, 'POST', "/teacher/submissions/{$sub}/ai-suggestion" )->get_data()['job_id'];
+		$this->assertSame( 'pending', $this->call( $this->teacher, 'GET', "/teacher/ai-suggestions/{$job}" )->get_data()['status'] );
+		$this->assertSame( array(), $kicks, 'Recién pedido: se espera a la cola.' );
+
+		// La cola no lo tomó (WP-Cron desactivado): la consulta no genera, solo lo dispara aparte.
 		$wpdb->update( $wpdb->prefix . 'atora_ai_jobs', array( 'created_at' => gmdate( 'Y-m-d H:i:s', time() - 30 ) ), array( 'id' => $job ) );
+		$this->assertSame( 'pending', $this->call( $this->teacher, 'GET', "/teacher/ai-suggestions/{$job}" )->get_data()['status'] );
+		$this->assertSame( 0, $usage(), 'La consulta no llamó a la IA.' );
+		$kick = array_values( array_filter( $kicks, static fn( $k ) => false !== strpos( $k['url'], 'admin-post.php' ) ) );
+		$this->assertCount( 1, $kick );
+		$this->assertFalse( $kick[0]['args']['blocking'], 'No espera la respuesta.' );
+		$this->assertSame( 'atora_ai_run_job', $kick[0]['args']['body']['action'] );
+
+		// Consultas seguidas no disparan otra vez.
+		$this->call( $this->teacher, 'GET', "/teacher/ai-suggestions/{$job}" );
+		$this->assertCount( 1, array_filter( $kicks, static fn( $k ) => false !== strpos( $k['url'], 'admin-post.php' ) ) );
+
+		// Firma incorrecta: no corre. Correcta: corre una vez.
+		$this->assertFalse( ATORA_AI_Grading_Suggestion_Service::run_kicked( $job, 'x' ) );
+		$this->assertSame( 'pending', ATORA_AI_Grading_Suggestion_Service::job( $job )['status'] );
+		$this->assertTrue( ATORA_AI_Grading_Suggestion_Service::run_kicked( $job, (string) $kick[0]['args']['body']['key'] ) );
 		$done = $this->call( $this->teacher, 'GET', "/teacher/ai-suggestions/{$job}" )->get_data();
 		$this->assertSame( 'done', $done['status'] );
 		$this->assertEquals( 8.5, $done['suggestion']['criteria'][0]['score'] );
 		// La cola llega tarde: no vuelve a generar ni a cobrar.
 		ATORA_AI_Grading_Suggestion_Service::run( $job );
-		$this->assertSame( '1', $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}atora_ai_usage WHERE user_id = %d AND feature = 'grading_suggestion'", $this->teacher ) ) );
+		$this->assertSame( 1, $usage() );
+		remove_filter( 'pre_http_request', $spy, 10 );
+	}
+
+	/** 6.33.1 (E.4): SpeedGrader tampoco genera al recargar. */
+	public function test_speedgrader_reload_never_generates(): void {
+		global $wpdb;
+		add_filter( 'pre_http_request', $block = static fn() => array( 'headers' => array(), 'body' => '', 'response' => array( 'code' => 200, 'message' => 'OK' ), 'cookies' => array() ) );
+		$sub = $this->submission( $this->student );
+		$job = ATORA_AI_Grading_Suggestion_Service::request( $sub, $this->teacher );
+		$wpdb->update( $wpdb->prefix . 'atora_ai_jobs', array( 'created_at' => gmdate( 'Y-m-d H:i:s', time() - 30 ) ), array( 'id' => $job['job_id'] ) );
+		$_GET['ai_job'] = $job['job_id'];
+		wp_set_current_user( $this->teacher );
+		$grader = new class() {
+			use CLMS_Grading_SpeedGrade_Trait { render_ai_suggestion_panel as public; }
+		};
+		$html = $grader->render_ai_suggestion_panel( array( 'submission_id' => $sub, 'selected_attempt' => 0 ) );
+		unset( $_GET['ai_job'] );
+		remove_filter( 'pre_http_request', $block );
+		$this->assertStringContainsString( 'Generando', $html );
+		$this->assertSame( 'pending', ATORA_AI_Grading_Suggestion_Service::job( $job['job_id'] )['status'] );
 	}
 
 	public function test_student_403_stranger_404_and_limit_429(): void {

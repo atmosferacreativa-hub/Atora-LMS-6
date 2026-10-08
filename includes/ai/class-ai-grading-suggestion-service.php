@@ -34,6 +34,8 @@ final class ATORA_AI_Grading_Suggestion_Service {
 		add_action( self::RUN_HOOK, array( __CLASS__, 'run' ) );
 		add_action( 'admin_post_atora_ai_suggestion_request', array( __CLASS__, 'handle_web_request' ) );
 		add_action( 'admin_init', array( __CLASS__, 'ensure_schema' ) );
+		add_action( 'admin_post_atora_ai_run_job', array( __CLASS__, 'handle_kick' ) );
+		add_action( 'admin_post_nopriv_atora_ai_run_job', array( __CLASS__, 'handle_kick' ) );
 	}
 
 	/** SpeedGrader web: pedir la sugerencia (el mismo servicio que la app). */
@@ -195,20 +197,61 @@ final class ATORA_AI_Grading_Suggestion_Service {
 		), array( 'id' => $job_id ) );
 	}
 
-	/** Resuelve un trabajo (lo llama la cola). */
-	/** 6.33.0: segundos que un trabajo puede esperar a la cola antes de que la consulta lo ejecute. */
-	const INLINE_AFTER = 15;
+	/** Segundos que un trabajo puede esperar a la cola antes de dispararlo aparte. */
+	const KICK_AFTER = 15;
 
 	/**
-	 * Si la cola no tomó el trabajo a tiempo (WP-Cron desactivado o sin visitas),
-	 * lo ejecuta quien consulta. El reclamo atómico evita que corra dos veces.
+	 * 6.33.1 (E.4): si la cola no tomó el trabajo a tiempo (WP-Cron desactivado o
+	 * sin visitas), quien consulta lo dispara por una petición asíncrona firmada al
+	 * propio sitio, sin esperarla. La consulta nunca genera: responde enseguida.
+	 * Un disparo cada KICK_AFTER segundos como mucho; el reclamo atómico de run()
+	 * evita que corra dos veces.
 	 */
-	public static function run_if_stalled( string $job_id ): void {
+	public static function kick_if_stalled( string $job_id ): bool {
 		$job = self::job( $job_id );
-		if ( $job && 'pending' === $job['status'] && strtotime( $job['created_at'] . ' UTC' ) <= time() - self::INLINE_AFTER ) {
-			self::run( $job_id );
+		if ( ! $job || 'pending' !== $job['status'] || strtotime( $job['created_at'] . ' UTC' ) > time() - self::KICK_AFTER ) {
+			return false;
 		}
+		if ( ! wp_cache_add( 'kick_' . $job_id, 1, 'atora_ai', self::KICK_AFTER ) || get_transient( 'atora_ai_kick_' . md5( $job_id ) ) ) {
+			return false;
+		}
+		set_transient( 'atora_ai_kick_' . md5( $job_id ), 1, self::KICK_AFTER );
+		// Filtrable donde el sitio no se alcanza a sí mismo por su URL pública.
+		wp_remote_post( (string) apply_filters( 'atora_ai_kick_url', admin_url( 'admin-post.php' ) ), array(
+			'blocking'  => false,
+			'timeout'   => 0.01,
+			'sslverify' => apply_filters( 'https_local_ssl_verify', false ), // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals
+			'body'      => array( 'action' => 'atora_ai_run_job', 'job' => $job_id, 'key' => self::kick_key( $job_id ) ),
+		) );
+		if ( function_exists( 'spawn_cron' ) ) {
+			spawn_cron();
+		}
+		return true;
 	}
+
+	private static function kick_key( string $job_id ): string {
+		return wp_hash( 'atora_ai_run_job|' . $job_id );
+	}
+
+	/** Ruta del disparo asíncrono: ejecuta el trabajo si la firma es válida. */
+	public static function run_kicked( string $job_id, string $key ): bool {
+		if ( '' === $job_id || ! hash_equals( self::kick_key( $job_id ), $key ) ) {
+			return false;
+		}
+		self::run( $job_id );
+		return true;
+	}
+
+	public static function handle_kick(): void {
+		// phpcs:disable WordPress.Security.NonceVerification -- firmada con wp_hash, sin sesión.
+		$job = sanitize_text_field( wp_unslash( (string) ( $_POST['job'] ?? '' ) ) );
+		$key = sanitize_text_field( wp_unslash( (string) ( $_POST['key'] ?? '' ) ) );
+		// phpcs:enable
+		ignore_user_abort( true );
+		status_header( self::run_kicked( $job, $key ) ? 202 : 403 );
+	}
+
+	/** Resuelve un trabajo (lo llama la cola o el disparo asíncrono). */
 
 	public static function run( string $job_id ): void {
 		$job = self::job( $job_id );

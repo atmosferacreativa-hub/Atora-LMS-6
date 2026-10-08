@@ -674,10 +674,8 @@ trait CLMS_Grading_SpeedGrade_Trait {
 		$suggestion = ATORA_AI_Grading_Suggestion_Service::suggestion( $submission_id );
 		$job        = isset( $_GET['ai_job'] ) ? ATORA_AI_Grading_Suggestion_Service::job( sanitize_text_field( wp_unslash( $_GET['ai_job'] ) ) ) : null; // phpcs:ignore WordPress.Security.NonceVerification
 		if ( $job && 'pending' === $job['status'] ) {
-			// 6.33.0: sin cola que lo tome a tiempo, lo resuelve esta recarga.
-			ATORA_AI_Grading_Suggestion_Service::run_if_stalled( (string) $job['id'] );
-			$job        = ATORA_AI_Grading_Suggestion_Service::job( (string) $job['id'] );
-			$suggestion = ATORA_AI_Grading_Suggestion_Service::suggestion( $submission_id );
+			// 6.33.1 (E.4): la recarga no genera; si la cola no lo tomó, lo dispara aparte.
+			ATORA_AI_Grading_Suggestion_Service::kick_if_stalled( (string) $job['id'] );
 		}
 		$pending    = $job && in_array( $job['status'], array( 'pending', 'running' ), true );
 		// 6.33.1 (E.3): la sugerencia es del intento con que se pidió; si se mira otro o cambió, no se usa.

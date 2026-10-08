@@ -15,6 +15,10 @@ trait CLMS_Frontend_Access_Profile_Trait {
 		if ( defined( 'WP_CLI' ) && WP_CLI ) {
 			return;
 		}
+		// 6.33.1 (E.4): disparo asíncrono de la sugerencia de IA (sin sesión, firmado).
+		if ( 'admin-post.php' === ( $GLOBALS['pagenow'] ?? '' ) && 'atora_ai_run_job' === ( $_REQUEST['action'] ?? '' ) ) { // phpcs:ignore WordPress.Security.NonceVerification
+			return;
+		}
 
 		$role = $this->get_frontend_role_context();
 
