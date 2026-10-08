@@ -15,7 +15,7 @@ Antes del Bloque E quedó publicado: plugin `v6.33.0` (ZIP ea8a5468…), app `v1
 - [x] **C** (plugin) — `POST /account/deletion-request`, aviso al administrador, pantalla de solicitudes (anonimizar / eliminar), página pública `/eliminar-cuenta/` con enlace por correo. `AccountDeletionTest` (5).
 - [x] **C** (app y docs) — Yo → Eliminar mi cuenta; `docs/POLITICA-PRIVACIDAD-APP.md` y `docs/TIENDAS-DATOS.md` (app); permisos: se bloquean `READ/WRITE_EXTERNAL_STORAGE` y `SYSTEM_ALERT_WINDOW`; iOS sin textos de permiso (no usa cámara, fotos, ubicación…), cifrado exento.
 - [x] **D** — app 1.0.0. Hecho: i18n es/en (535 textos, prueba de catálogo), idioma en Yo, certificado PDF en la app, accesibilidad (etiquetas, 58 objetivos llevados a 44 pt, prueba de contraste, títulos sin cortes), errores con Sentry (sin datos personales, desactivable por academia en "App móvil" del plugin; apagado sin DSN). Falta: rendimiento, compilación de producción, cuentas de revisión, ficha y capturas, recorridos nuevos.
-- [ ] **E** — E.1 [x] E.2 [x] E.3 [x] E.4 [x] E.5 [ ] E.6 [ ]
+- [ ] **E** — E.1 [x] E.2 [x] E.3 [x] E.4 [x] E.5 [x] E.6 [ ]
 - [ ] Cierre (tras E; IPA pendiente de la cuenta de Apple): 6.33.0 + 1.0.0, changelog, ESTADO, PRUEBA-TELEFONO, etiquetas, ZIP, compilación de prueba y de producción (AAB, IPA) sin enviar.
 
 ## Ramas y PR
