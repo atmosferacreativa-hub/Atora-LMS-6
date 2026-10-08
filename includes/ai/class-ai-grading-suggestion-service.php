@@ -203,7 +203,8 @@ final class ATORA_AI_Grading_Suggestion_Service {
 	/**
 	 * 6.33.1 (E.4): si la cola no tomó el trabajo a tiempo (WP-Cron desactivado o
 	 * sin visitas), quien consulta lo dispara por una petición asíncrona firmada al
-	 * propio sitio, sin esperarla. La consulta nunca genera: responde enseguida.
+	 * propio sitio, sin esperarla (si el sitio no se alcanza por su URL pública,
+	 * filtro `atora_ai_kick_url`). La consulta nunca genera: responde enseguida.
 	 * Un disparo cada KICK_AFTER segundos como mucho; el reclamo atómico de run()
 	 * evita que corra dos veces.
 	 */
@@ -223,9 +224,7 @@ final class ATORA_AI_Grading_Suggestion_Service {
 			'sslverify' => apply_filters( 'https_local_ssl_verify', false ), // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals
 			'body'      => array( 'action' => 'atora_ai_run_job', 'job' => $job_id, 'key' => self::kick_key( $job_id ) ),
 		) );
-		if ( function_exists( 'spawn_cron' ) ) {
-			spawn_cron();
-		}
+		// Sin spawn_cron(): su candado (`doing_cron`) frenaría un cron externo que sí funciona.
 		return true;
 	}
 
