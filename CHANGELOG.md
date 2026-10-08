@@ -1,5 +1,25 @@
 # CHANGELOG — ATORA LMS
 
+## 6.33.1 (2026-10-08)
+
+### Fase 6 — Bloque E (auditoría externa)
+
+Orden `docs/ordenes/ORDEN-FASE-6.md`, Bloque E. Hallazgos de una auditoría externa, verificados en el código. Cada arreglo con su prueba, que fallaba antes.
+
+**E.1 — Eliminación de cuenta completa.** Cada módulo se registra en los borradores de datos personales de WordPress (`wp_privacy_personal_data_erasers`, clave `atora-lms`) y la eliminación los ejecuta todos. Antes de anonimizar se cancelan los correos y mensajes pendientes en las colas (no se envía nada a la dirección borrada). **Anonimizar** conserva entregas, notas y actas sin datos personales (textos propios en blanco; el nombre y el correo, donde aparezcan en textos del plugin, pasan a "[nombre]" y "[correo]"); los mensajes, el CRM, las sesiones, el uso de IA y los registros quedan desvinculados o borrados; en los certificados ya emitidos el titular pasa a "Titular anonimizado" y la verificación sigue funcionando (huella recalculada, evento registrado). **Eliminar por completo** borra además lo académico. Al final se **verifica** que no quede el nombre ni el correo en ninguna tabla del plugin: si queda algo, la solicitud queda **"Incompleta"** con el detalle y se puede reintentar. Al anonimizar ya no sale el correo de WordPress de "cambio de correo".
+
+**E.2 — El bloqueo cubre todo el guardado.** Al calificar (web y app), el bloqueo por entrega se toma al principio de `save()` y se suelta en `finally`: nota, comentarios, rúbrica, moderación, publicación y auditoría van dentro. La revisión nueva se escribe al final. La lectura de la entrega en la API espera a un guardado en curso: nunca ve una mezcla.
+
+**E.3 — Sugerencia de IA atada al intento.** La solicitud lleva el intento (por defecto, el que el docente califica; inexistente → 422). El trabajo, el resultado y la auditoría del guardado guardan el intento y el hash del contenido. Si llega otro intento o cambia el contenido, la sugerencia queda **"de otro intento"** (`stale`) y no se puede usar sin pedir otra. SpeedGrader y la app muestran "Sugerencia del intento N".
+
+**E.4 — Consultar nunca genera.** `GET /teacher/ai-suggestions/{job_id}` y la recarga de SpeedGrader ya no ejecutan la generación (en 6.33.0 la consulta la ejecutaba si la cola tardaba). Si la cola no toma el trabajo en 15 s, se dispara aparte con una petición asíncrona firmada al propio sitio (`admin-post.php?action=atora_ai_run_job`, sin esperar la respuesta) y `spawn_cron()`; el reclamo atómico evita que corra dos veces. Filtro `atora_ai_kick_url` para servidores que no se alcanzan a sí mismos por su URL pública.
+
+**E.5 — Los límites de IA reservan el consumo.** Cada llamada reserva antes de salir, de forma atómica (bloqueo por academia): lo que está en curso cuenta para el límite diario y, con su costo estimado, para el tope mensual. La reserva se cierra en ok (cuenta con el costo real) o error (libera el cupo) y caduca a los 5 minutos si el proceso muere. Con límite 3 y 10 llamadas a la vez pasan exactamente 3 (antes, las 10).
+
+**E.6 — Cerrar sesión deja de enviar avisos.** Cada token de notificaciones queda atado a la sesión que lo registró; al revocarla se borra, y a sesiones revocadas o vencidas no se envía nada. `/auth/logout` acepta el token de renovación en el cuerpo (`refresh_token`): la revocación de un cierre de sesión hecho sin red puede llegar cuando el token de acceso (15 min) ya venció.
+
+**TESTS**: `PrivacyErasureTest` (sin datos personales en ninguna tabla tras anonimizar; correo en cola no enviado; tabla que falla → "Incompleta" y reintento; borradores registrados; eliminación completa). `GradeRevisionConflictTest` (el bloqueo cubre todo el guardado y la revisión se escribe al final, observado desde otra conexión). `AiGradingSuggestionTest` (intento y hash; intento nuevo o contenido cambiado → `stale`; auditoría; SpeedGrader; la consulta y la recarga no generan; disparo firmado). `AiUsageReservationTest` (10 en curso con límite 3 → 3; error libera; caducidad; tope mensual con costo estimado; el gestor reserva y cierra). `MobileOrganizeTest` (tokens por sesión; revocada o vencida no recibe; cierre con token de renovación tras vencer el acceso). Prueba HTTP real `scripts/e2e-concurrent-ai.sh` (en el CI de la app).
+
 ## 6.33.0 (2026-10-07)
 
 ### Fase 6 — Publicación (plugin)
@@ -14,7 +34,7 @@ Orden `docs/ordenes/ORDEN-FASE-6.md`, Bloques B y C (el A ya era 6.32.1).
 
 **ATORA LMS → App móvil.** Reporte de cierres inesperados de la app (sin datos personales), activo por defecto y desactivable por academia (`/discovery`: `crash_reports`), y los enlaces públicos que piden las tiendas.
 
-**Sugerencia de IA sin depender de WP-Cron.** Si la cola no toma el trabajo en 15 s (cron desactivado o sin visitas), lo ejecuta la propia consulta (`GET /teacher/ai-suggestions/{job_id}` o la recarga de SpeedGrader). Un reclamo atómico (`pending` → `running`) evita que corra o cobre dos veces. Prueba: `AiGradingSuggestionTest`.
+**Sugerencia de IA sin depender de WP-Cron.** (Reemplazado en 6.33.1: la consulta ya no genera.) Si la cola no toma el trabajo en 15 s (cron desactivado o sin visitas), lo ejecuta la propia consulta (`GET /teacher/ai-suggestions/{job_id}` o la recarga de SpeedGrader). Un reclamo atómico (`pending` → `running`) evita que corra o cobre dos veces. Prueba: `AiGradingSuggestionTest`.
 
 **Herramientas.** `wp atora review-accounts --yes --password=… [--courses=…]` crea las cuentas de revisión de las tiendas (estudiante y docente) sobre cursos reales; repetirlo no duplica. `wp atora seed-e2e --perf` agrega un curso de 100 lecciones para medir la app en gama baja; en el WordPress del CI (`ATORA_E2E`) el curso E2E es certificable para el recorrido `certificado-pdf`.
 

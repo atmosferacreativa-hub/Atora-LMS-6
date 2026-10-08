@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 6.33.0
+Stable tag: 6.33.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,9 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.33.1 =
+* Auditoría externa: la eliminación de cuenta borra los datos personales de todas las tablas (también correos y mensajes en cola) y no se marca hecha si queda algo; calificar bloquea todo el guardado; la sugerencia de IA queda atada al intento que se califica; consultar una sugerencia nunca la genera; los límites de IA cuentan lo que está en curso; cerrar sesión deja de enviar avisos a ese teléfono.
+
 = 6.33.0 =
 * Fase 6 — Publicación: certificado institucional en PDF con plantilla (logo, colores, hasta tres firmas) y QR a la verificación pública /verificar/{codigo}; eliminación de cuenta desde la app y desde la web (/eliminar-cuenta/) con pantalla de solicitudes para el administrador; ajustes de la app móvil (reporte de errores desactivable).
 
