@@ -4,7 +4,7 @@ Orden: `docs/ordenes/ORDEN-FASE-6.md`. Reanudar: leer este archivo y la orden, c
 
 ## Paso actual
 
-**Cierre de la fase.** Bloque E hecho (E.1–E.6) en `fix/6.33.1-auditoria` (plugin) y `fix/1.0.0-auditoria` (app). Sigue: plugin 6.33.1 (versión, changelog, ESTADO, PR, CI, etiqueta, ZIP, release) → app (PR, CI completo contra el plugin nuevo, changelog, PRUEBA-TELEFONO, etiqueta `v1.0.0` movida, APK de prueba y AAB de producción sin enviar; IPA pendiente de la cuenta de Apple).
+**Fase 6 cerrada (2026-10-08).** Plugin **v6.33.1** (PR #69, release con ZIP, SHA-256 `1658c14300f868be34a3b8c10fc861f4dc4ca8ffc9319337e8f2644623bfb0a5`); app **v1.0.0** movida al merge del PR #28 (Bloque E + ícono con fondo blanco). CI: 11/11 del plugin; e2e de la app 17/17 contra `fix/6.33.1-auditoria` + concurrencia de calificación y de límites de IA. Compilaciones Bloque E, sin enviar: APK `preview` (versionCode 16) https://expo.dev/artifacts/eas/RmRk7omvzdmrblb3zllF5bw1osjbgjCsOHhj3u9_0BU.apk · AAB `production` (versionCode 17) https://expo.dev/artifacts/eas/28cHw7bwmW_clB43PSmwRuFH3Wf5ObWnnxzOCSP9JK8.aab. Ícono con fondo blanco comprobado dentro del APK. IPA: pendiente de la cuenta de Apple del titular. Pendiente del titular: filas 38–47 de `PRUEBA-TELEFONO.md`, cuentas de tiendas, publicar la política, `wp atora review-accounts` en el demo, Sentry.
 
 Antes del Bloque E quedó publicado: plugin `v6.33.0` (ZIP ea8a5468…), app `v1.0.0` (APK preview vc15, AAB vc16; sin enviar).
 
@@ -16,7 +16,7 @@ Antes del Bloque E quedó publicado: plugin `v6.33.0` (ZIP ea8a5468…), app `v1
 - [x] **C** (app y docs) — Yo → Eliminar mi cuenta; `docs/POLITICA-PRIVACIDAD-APP.md` y `docs/TIENDAS-DATOS.md` (app); permisos: se bloquean `READ/WRITE_EXTERNAL_STORAGE` y `SYSTEM_ALERT_WINDOW`; iOS sin textos de permiso (no usa cámara, fotos, ubicación…), cifrado exento.
 - [x] **D** — app 1.0.0. Hecho: i18n es/en (535 textos, prueba de catálogo), idioma en Yo, certificado PDF en la app, accesibilidad (etiquetas, 58 objetivos llevados a 44 pt, prueba de contraste, títulos sin cortes), errores con Sentry (sin datos personales, desactivable por academia en "App móvil" del plugin; apagado sin DSN). Falta: rendimiento, compilación de producción, cuentas de revisión, ficha y capturas, recorridos nuevos.
 - [x] **E** — E.1 [x] E.2 [x] E.3 [x] E.4 [x] E.5 [x] E.6 [x]
-- [ ] Cierre (tras E; IPA pendiente de la cuenta de Apple): 6.33.0 + 1.0.0, changelog, ESTADO, PRUEBA-TELEFONO, etiquetas, ZIP, compilación de prueba y de producción (AAB, IPA) sin enviar.
+- [x] Cierre (IPA pendiente de la cuenta de Apple): 6.33.0 + 1.0.0, changelog, ESTADO, PRUEBA-TELEFONO, etiquetas, ZIP, compilación de prueba y de producción (AAB, IPA) sin enviar.
 
 ## Ramas y PR
 
@@ -24,6 +24,8 @@ Antes del Bloque E quedó publicado: plugin `v6.33.0` (ZIP ea8a5468…), app `v1
 |---|---|---|
 | Atora-LMS-6 | `feat/6.33.0-publicacion` | fusionada (PR #68), `v6.33.0` |
 | atora-mobile | `feat/1.0.0-publicacion` | fusionada (PR #27), `v1.0.0` |
+| Atora-LMS-6 | `fix/6.33.1-auditoria` | fusionada (PR #69), `v6.33.1` |
+| atora-mobile | `fix/1.0.0-auditoria` | fusionada (PR #28), `v1.0.0` movida |
 
 ## Decisiones menores
 
@@ -50,4 +52,4 @@ Antes del Bloque E quedó publicado: plugin `v6.33.0` (ZIP ea8a5468…), app `v1
 22. E.5: la reserva es una fila `reserved` en `atora_ai_usage` creada bajo `GET_LOCK` por academia; costo estimado = promedio de las últimas 20 llamadas bien terminadas de esa función (0 sin historial; filtro `atora_ai_reservation_estimate`). Las caducadas se marcan `expired`. Prueba HTTP real `scripts/e2e-concurrent-ai.sh` (en el CI de la app): antes del arreglo pasaban 10 de 10; ahora 3. El simulado acepta un retardo (`atora_ai_fake_delay_ms`, solo pruebas).
 23. E.6: además de lo pedido apareció un hueco: la revocación pendiente usaba el token de acceso (15 min) y, si la red volvía más tarde, el servidor respondía 401 y la sesión (30 días) seguía viva con su token de avisos. `/auth/logout` acepta ahora el token de renovación en el cuerpo y la app lo usa. Los tokens de avisos anteriores a 6.33.1 (sin sesión) siguen hasta que la app los vuelva a registrar (lo hace al abrir).
 19. Versiones del Bloque E: el plugin sale como **6.33.1** (la 6.33.0 ya está publicada con ZIP y las academias deben poder actualizar); la app sigue en **1.0.0** (nunca llegó a una tienda), con nuevo número de compilación, y su etiqueta `v1.0.0` se mueve al cierre.
-
+24. Ícono de la app (pedido del titular): fondo blanco como el logo original; `icon.png` rehecho sobre blanco y fondo del ícono adaptable `#FFFFFF`. La pantalla de inicio sigue en azul marino (no se pidió cambiarla).
