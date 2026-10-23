@@ -5,10 +5,10 @@
 
 ## Bloque 0 — Multisitio no compatible
 
-- [ ] Activación en red bloqueada (mensaje claro).
-- [ ] Aviso si se activa dentro de una red (por-sitio).
-- [ ] Declarado en `readme.txt` y `docs/ESTADO.md`.
-- [ ] Prueba: la activación en red se rechaza.
+- [x] Activación en red bloqueada (mensaje claro).
+- [x] Aviso si se activa dentro de una red (por-sitio).
+- [x] Declarado en `readme.txt` y `docs/ESTADO.md`.
+- [x] Prueba: la activación en red se rechaza (`MultisiteUnsupportedTest`).
 
 ## Bloque 1 — Primitivas compartidas
 
