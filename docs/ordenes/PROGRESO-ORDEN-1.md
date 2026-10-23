@@ -16,12 +16,14 @@
 
 ## Parte B — App 1.0.2 (material zoom)
 
-- [ ] PDF: zoom gestos + botones (+/−/ajustar) + persistencia de zoom + scroll horizontal.
-- [ ] Imágenes: visor fullscreen con zoom/doble toque/arrastre.
-- [ ] Texto lección: control tamaño de letra (A−/A+) persistente + respeta tamaño del sistema.
-- [ ] Giro: visor PDF/imágenes permite horizontal.
-- [ ] Certificados heredan el visor.
-- [ ] Tests Jest (font size + config viewer).
-- [ ] Recorrido pantalla Maestro `material-zoom` y existentes verdes.
-- [ ] Versión 1.0.2 + versionCode + changelog/README + PRUEBA-TELEFONO.
+- [x] Seed del plugin para e2e (`_clms_lesson_resources` con PDF + imagen): PR https://github.com/atmosferacreativa-hub/Atora-LMS-6/pull/74 (merge a `main`).
+- [x] PDF: zoom gestos + botones (+/−/ajustar) + persistencia de zoom + scroll horizontal.
+- [x] Imágenes: visor fullscreen con zoom/doble toque/arrastre.
+- [x] Texto lección: control tamaño de letra (A−/A+) persistente + respeta tamaño del sistema.
+- [x] Giro: visor PDF/imágenes permite horizontal.
+- [x] Certificados heredan el visor.
+- [x] Tests Jest (font size + config viewer).
+- [x] Recorrido pantalla Maestro `material-zoom` agregado.
+- [x] Versión 1.0.2 + versionCode + changelog/README + PRUEBA-TELEFONO.
+- [ ] PR app 1.0.2 abierto y CI en verde: https://github.com/atmosferacreativa-hub/atora-mobile/pull/30
 - [ ] Tag `v1.0.2` + APK + AAB (sin enviar a tiendas).
