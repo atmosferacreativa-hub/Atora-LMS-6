@@ -34,6 +34,11 @@ class CLMS_Contacts_Core_Service {
 	protected bool $last_phone_contact_match_ambiguous = false;
 
 	/**
+	 * Indica si el último match de usuario por teléfono tuvo múltiples candidatos.
+	 */
+	protected bool $last_phone_user_match_ambiguous = false;
+
+	/**
 	 * @param int $user_id Usuario.
 	 * @return bool
 	 */
@@ -405,6 +410,186 @@ class CLMS_Contacts_Core_Service {
 		}
 	}
 
+	// ── Auto-tags (port CRM v1) ────────────────────────────────────────────
+
+	/**
+	 * Aplica y actualiza tags automáticos a todos los contactos.
+	 *
+	 * @return void
+	 */
+	public function process_auto_tags(): void {
+		global $wpdb;
+
+		$contacts_table = "{$wpdb->prefix}atora_contacts";
+		if ( ! $this->table_exists( $contacts_table ) ) {
+			return;
+		}
+
+		$contacts = (array) $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			"SELECT id, user_id FROM {$contacts_table} WHERE user_id > 0 LIMIT 500"
+		);
+
+		foreach ( $contacts as $contact ) {
+			$this->apply_auto_tags( (int) ( $contact->user_id ?? 0 ), (int) ( $contact->id ?? 0 ) );
+		}
+	}
+
+	/**
+	 * Aplica auto-tags a un contacto específico.
+	 *
+	 * @param int $user_id    Usuario.
+	 * @param int $contact_id Contacto CRM.
+	 * @return void
+	 */
+	private function apply_auto_tags( int $user_id, int $contact_id ): void {
+		global $wpdb;
+
+		$user_id    = absint( $user_id );
+		$contact_id = absint( $contact_id );
+		if ( $user_id <= 0 || $contact_id <= 0 ) {
+			return;
+		}
+
+		$email_table = "{$wpdb->prefix}atora_email_queue";
+		if ( $this->table_exists( $email_table ) ) {
+			$last_open = $wpdb->get_var( $wpdb->prepare(
+				"SELECT MAX(opened_at) FROM {$email_table} WHERE user_id = %d",
+				$user_id
+			) );
+
+			$days_since_open = $last_open
+				? (int) floor( ( time() - strtotime( (string) $last_open ) ) / DAY_IN_SECONDS )
+				: 999;
+
+			if ( $days_since_open >= 30 ) {
+				$this->add_tag( $user_id, '#inactive-30d' );
+			} else {
+				$this->remove_tag( $user_id, '#inactive-30d' );
+			}
+		}
+
+		$score_table = "{$wpdb->prefix}atora_user_engagement";
+		if ( ! $this->table_exists( $score_table ) ) {
+			return;
+		}
+
+		$score_row = $wpdb->get_row( $wpdb->prepare(
+			"SELECT engagement_score FROM {$score_table} WHERE user_id = %d LIMIT 1",
+			$user_id
+		) );
+		if ( ! $score_row ) {
+			return;
+		}
+
+		$score = (int) ( $score_row->engagement_score ?? 0 );
+		if ( $score >= 80 ) {
+			$this->add_tag( $user_id, '#high-engagement' );
+		} else {
+			$this->remove_tag( $user_id, '#high-engagement' );
+		}
+
+		if ( $score < 40 ) {
+			$this->add_tag( $user_id, '#potential-churn' );
+		} else {
+			$this->remove_tag( $user_id, '#potential-churn' );
+		}
+	}
+
+	// ── Flags manuales (port CRM v1) ────────────────────────────────────────
+
+	/**
+	 * Marca un correo de la cola como abierto, preservando `opened_at` existente.
+	 *
+	 * @param int $queue_id ID en `atora_email_queue`.
+	 * @return bool
+	 */
+	public function mark_email_opened( int $queue_id ): bool {
+		$queue_id = absint( $queue_id );
+		if ( $queue_id <= 0 ) {
+			return false;
+		}
+
+		global $wpdb;
+		$table = "{$wpdb->prefix}atora_email_queue";
+		if ( ! $this->table_exists( $table ) ) {
+			return false;
+		}
+
+		$row = $wpdb->get_row( // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			$wpdb->prepare(
+				"SELECT id, opened_at FROM {$table} WHERE id = %d LIMIT 1",
+				$queue_id
+			),
+			ARRAY_A
+		);
+		if ( ! is_array( $row ) || empty( $row ) ) {
+			return false;
+		}
+
+		$opened_at = sanitize_text_field( (string) ( $row['opened_at'] ?? '' ) );
+		if ( '' === $opened_at ) {
+			$opened_at = current_time( 'mysql', true );
+		}
+
+		$updated = $wpdb->update(
+			$table,
+			array( 'opened_at' => $opened_at ),
+			array( 'id' => $queue_id ),
+			array( '%s' ),
+			array( '%d' )
+		);
+
+		return false !== $updated;
+	}
+
+	/**
+	 * Marca un mensaje de cola como leído, preservando `read_at` existente.
+	 *
+	 * @param int $queue_id ID en `atora_message_queue`.
+	 * @return bool
+	 */
+	public function mark_message_read( int $queue_id ): bool {
+		$queue_id = absint( $queue_id );
+		if ( $queue_id <= 0 ) {
+			return false;
+		}
+
+		global $wpdb;
+		$table = "{$wpdb->prefix}atora_message_queue";
+		if ( ! $this->table_exists( $table ) ) {
+			return false;
+		}
+
+		$row = $wpdb->get_row( // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			$wpdb->prepare(
+				"SELECT id, read_at FROM {$table} WHERE id = %d LIMIT 1",
+				$queue_id
+			),
+			ARRAY_A
+		);
+		if ( ! is_array( $row ) || empty( $row ) ) {
+			return false;
+		}
+
+		$read_at = sanitize_text_field( (string) ( $row['read_at'] ?? '' ) );
+		if ( '' === $read_at ) {
+			$read_at = current_time( 'mysql', true );
+		}
+
+		$updated = $wpdb->update(
+			$table,
+			array(
+				'status'  => 'read',
+				'read_at' => $read_at,
+			),
+			array( 'id' => $queue_id ),
+			array( '%s', '%s' ),
+			array( '%d' )
+		);
+
+		return false !== $updated;
+	}
+
 	/**
 	 * Sincroniza mensaje de atora_message_queue a modelo de conversación.
 	 *
@@ -709,6 +894,313 @@ class CLMS_Contacts_Core_Service {
 		);
 	}
 
+	// ── Inbound WhatsApp/Telegram → conversación (port CRM v1) ─────────────
+
+	/**
+	 * Registra mensajes inbound de WhatsApp en la conversación unificada.
+	 *
+	 * @param array<string,mixed> $message Mensaje recibido.
+	 * @param array<string,mixed> $context Contexto del webhook.
+	 * @return void
+	 */
+	public function on_whatsapp_message_received( array $message, array $context = array() ): void {
+		global $wpdb;
+
+		$conv_table    = "{$wpdb->prefix}atora_conversations";
+		$message_table = "{$wpdb->prefix}atora_conversation_messages";
+		if ( ! $this->table_exists( $conv_table ) || ! $this->table_exists( $message_table ) ) {
+			return;
+		}
+
+		$from_raw = sanitize_text_field( (string) ( $message['from'] ?? '' ) );
+		$from     = $this->normalize_contact_phone( $from_raw );
+		if ( '' === $from ) {
+			return;
+		}
+
+		$provider_message_id = sanitize_text_field( (string) ( $message['id'] ?? '' ) );
+		$timestamp           = sanitize_text_field( (string) ( $message['timestamp'] ?? '' ) );
+		$created_at          = current_time( 'mysql', true );
+		if ( '' !== $timestamp && ctype_digit( $timestamp ) ) {
+			$created_at = gmdate( 'Y-m-d H:i:s', absint( $timestamp ) );
+		}
+
+		$message_type = sanitize_key( (string) ( $message['type'] ?? 'text' ) );
+		$body_text    = sanitize_textarea_field( (string) ( $message['text']['body'] ?? '' ) );
+		if ( '' === $body_text && 'button' === $message_type ) {
+			$body_text = sanitize_textarea_field( (string) ( $message['button']['text'] ?? '' ) );
+		}
+		if ( '' === $body_text && 'interactive' === $message_type ) {
+			$body_text = sanitize_textarea_field( (string) ( $message['interactive']['button_reply']['title'] ?? '' ) );
+		}
+		if ( '' === $body_text ) {
+			$body_text = sanitize_textarea_field( (string) wp_json_encode( $message ) );
+		}
+
+		$sender_name = sanitize_text_field( (string) ( $context['contacts'][0]['profile']['name'] ?? '' ) );
+		$user_id     = $this->find_user_id_by_phone( $from );
+		if ( $user_id <= 0 && $this->last_phone_user_match_ambiguous ) {
+			$this->log_inbound_resolution_issue(
+				'inbound_phone_collision_skip',
+				array(
+					'channel' => 'whatsapp',
+					'phone'   => $from,
+					'reason'  => 'multiple_users',
+				)
+			);
+			return;
+		}
+
+		$user = $user_id > 0 ? get_userdata( $user_id ) : null;
+		if ( '' === $sender_name && $user instanceof \WP_User ) {
+			$sender_name = sanitize_text_field( (string) $user->display_name );
+		}
+
+		$contact_email = $user instanceof \WP_User
+			? sanitize_email( (string) $user->user_email )
+			: $this->build_shadow_contact_email( 'whatsapp', $from );
+
+		$contact_id = $this->upsert_contact(
+			array(
+				'user_id'  => $user_id,
+				'email'    => $contact_email,
+				'name'     => $sender_name,
+				'phone'    => $from,
+				'whatsapp' => $from,
+				'source'   => 'whatsapp',
+				'status'   => 'lead',
+			)
+		);
+		if ( $contact_id <= 0 ) {
+			$contact_id = $this->find_contact_id_by_phone( $from );
+		}
+		if ( $contact_id <= 0 ) {
+			return;
+		}
+
+		$conversation_id = $this->upsert_conversation(
+			array(
+				'contact_id'      => $contact_id,
+				'user_id'         => $user_id,
+				'channel'         => 'whatsapp',
+				'subject'         => __( 'WhatsApp', 'atora-lms' ),
+				'status'          => 'open',
+				'last_message_at' => $created_at,
+			)
+		);
+		if ( $conversation_id <= 0 ) {
+			return;
+		}
+
+		if ( '' !== $provider_message_id ) {
+			$existing_message = (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT id FROM {$message_table}
+					 WHERE channel = %s
+					   AND provider_message_id = %s
+					   AND provider_message_id <> ''
+					 LIMIT 1",
+					'whatsapp',
+					$provider_message_id
+				)
+			);
+			if ( $existing_message > 0 ) {
+				return;
+			}
+		}
+
+		$wpdb->insert(
+			$message_table,
+			array(
+				'conversation_id'     => $conversation_id,
+				'direction'           => 'inbound',
+				'channel'             => 'whatsapp',
+				'provider_message_id' => $provider_message_id,
+				'sender'              => $from,
+				'recipient'           => sanitize_text_field( (string) get_bloginfo( 'name' ) ),
+				'subject'             => __( 'Mensaje entrante WhatsApp', 'atora-lms' ),
+				'body_text'           => $body_text,
+				'body_html'           => '',
+				'raw_payload_json'    => wp_json_encode(
+					array(
+						'message' => $message,
+						'context' => $context,
+					)
+				),
+				'status'              => 'received',
+				'error_message'       => '',
+				'created_at'          => $created_at,
+			),
+			array( '%d','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s' )
+		);
+
+		$wpdb->update(
+			$conv_table,
+			array(
+				'last_message_at' => $created_at,
+				'updated_at'      => current_time( 'mysql', true ),
+			),
+			array( 'id' => $conversation_id ),
+			array( '%s', '%s' ),
+			array( '%d' )
+		);
+
+		if ( $user_id > 0 ) {
+			$this->log_activity(
+				$user_id,
+				'whatsapp_received',
+				array(
+					'conversation_id'     => $conversation_id,
+					'provider_message_id' => $provider_message_id,
+				)
+			);
+		}
+	}
+
+	/**
+	 * Registra mensajes inbound de Telegram en la conversación unificada.
+	 *
+	 * @param string              $chat_id Chat ID de Telegram.
+	 * @param string              $text    Texto normalizado.
+	 * @param array<string,mixed> $message Payload del mensaje.
+	 * @return void
+	 */
+	public function on_telegram_message_received( string $chat_id, string $text, array $message = array() ): void {
+		global $wpdb;
+
+		$conv_table    = "{$wpdb->prefix}atora_conversations";
+		$message_table = "{$wpdb->prefix}atora_conversation_messages";
+		if ( ! $this->table_exists( $conv_table ) || ! $this->table_exists( $message_table ) ) {
+			return;
+		}
+
+		$chat_id = (string) preg_replace( '/[^0-9\-]/', '', (string) $chat_id );
+		if ( '' === $chat_id ) {
+			return;
+		}
+
+		$body_text = sanitize_textarea_field( $text );
+		if ( '' === $body_text ) {
+			$body_text = sanitize_textarea_field( (string) ( $message['caption'] ?? '' ) );
+		}
+		if ( '' === $body_text ) {
+			$body_text = sanitize_textarea_field( (string) wp_json_encode( $message ) );
+		}
+
+		$message_id          = absint( $message['message_id'] ?? 0 );
+		$provider_message_id = $message_id > 0 ? ( $chat_id . ':' . $message_id ) : '';
+		$timestamp           = absint( $message['date'] ?? 0 );
+		$created_at          = $timestamp > 0 ? gmdate( 'Y-m-d H:i:s', $timestamp ) : current_time( 'mysql', true );
+
+		$user_id = $this->find_user_id_by_telegram_chat( $chat_id );
+		$user    = $user_id > 0 ? get_userdata( $user_id ) : null;
+
+		$from_username = sanitize_text_field( (string) ( $message['from']['username'] ?? '' ) );
+		$from_name     = sanitize_text_field(
+			trim(
+				(string) ( $message['from']['first_name'] ?? '' ) . ' ' . (string) ( $message['from']['last_name'] ?? '' )
+			)
+		);
+		if ( '' === $from_name && $user instanceof \WP_User ) {
+			$from_name = sanitize_text_field( (string) $user->display_name );
+		}
+
+		$contact_email = $user instanceof \WP_User
+			? sanitize_email( (string) $user->user_email )
+			: $this->build_shadow_contact_email( 'telegram', $chat_id );
+
+		$contact_id = $this->upsert_contact(
+			array(
+				'user_id' => $user_id,
+				'email'   => $contact_email,
+				'name'    => $from_name,
+				'source'  => 'telegram',
+				'status'  => 'lead',
+			)
+		);
+		if ( $contact_id <= 0 ) {
+			return;
+		}
+
+		$conversation_id = $this->upsert_conversation(
+			array(
+				'contact_id'      => $contact_id,
+				'user_id'         => $user_id,
+				'channel'         => 'telegram',
+				'subject'         => __( 'Telegram', 'atora-lms' ),
+				'status'          => 'open',
+				'last_message_at' => $created_at,
+			)
+		);
+		if ( $conversation_id <= 0 ) {
+			return;
+		}
+
+		if ( '' !== $provider_message_id ) {
+			$existing_message = (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT id FROM {$message_table}
+					 WHERE channel = %s
+					   AND provider_message_id = %s
+					   AND provider_message_id <> ''
+					 LIMIT 1",
+					'telegram',
+					$provider_message_id
+				)
+			);
+			if ( $existing_message > 0 ) {
+				return;
+			}
+		}
+
+		$sender = $chat_id;
+		if ( '' !== $from_username ) {
+			$sender = '@' . ltrim( $from_username, '@' ) . ' (' . $chat_id . ')';
+		}
+
+		$wpdb->insert(
+			$message_table,
+			array(
+				'conversation_id'     => $conversation_id,
+				'direction'           => 'inbound',
+				'channel'             => 'telegram',
+				'provider_message_id' => $provider_message_id,
+				'sender'              => sanitize_text_field( $sender ),
+				'recipient'           => sanitize_text_field( (string) get_bloginfo( 'name' ) ),
+				'subject'             => __( 'Mensaje entrante Telegram', 'atora-lms' ),
+				'body_text'           => $body_text,
+				'body_html'           => '',
+				'raw_payload_json'    => wp_json_encode( $message ),
+				'status'              => 'received',
+				'error_message'       => '',
+				'created_at'          => $created_at,
+			),
+			array( '%d','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s' )
+		);
+
+		$wpdb->update(
+			$conv_table,
+			array(
+				'last_message_at' => $created_at,
+				'updated_at'      => current_time( 'mysql', true ),
+			),
+			array( 'id' => $conversation_id ),
+			array( '%s', '%s' ),
+			array( '%d' )
+		);
+
+		if ( $user_id > 0 ) {
+			$this->log_activity(
+				$user_id,
+				'telegram_received',
+				array(
+					'conversation_id'     => $conversation_id,
+					'provider_message_id' => $provider_message_id,
+				)
+			);
+		}
+	}
+
 	/**
 	 * Resuelve o crea contacto CRM para un registro de cola de email.
 	 *
@@ -905,6 +1397,108 @@ class CLMS_Contacts_Core_Service {
 		}
 
 		return (int) $wpdb->insert_id;
+	}
+
+	/**
+	 * Busca un usuario por teléfono (meta `atora_phone`).
+	 *
+	 * @param string $phone Teléfono.
+	 * @return int
+	 */
+	private function find_user_id_by_phone( string $phone ): int {
+		global $wpdb;
+		$this->last_phone_user_match_ambiguous = false;
+
+		$phone = $this->normalize_contact_phone( $phone );
+		if ( '' === $phone ) {
+			return 0;
+		}
+
+		$digits = (string) preg_replace( '/\D+/', '', $phone );
+		if ( '' === $digits ) {
+			return 0;
+		}
+
+		$suffix = strlen( $digits ) >= 8 ? substr( $digits, -8 ) : $digits;
+		$rows   = (array) $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT user_id, meta_value
+				 FROM {$wpdb->usermeta}
+				 WHERE meta_key = 'atora_phone'
+				   AND (
+					   meta_value = %s
+					   OR meta_value = %s
+					   OR meta_value LIKE %s
+				   )
+				 LIMIT 100",
+				$phone,
+				ltrim( $phone, '+' ),
+				'%' . $suffix
+			),
+			ARRAY_A
+		);
+
+		$matches = array();
+		foreach ( $rows as $row ) {
+			$user_id = absint( $row['user_id'] ?? 0 );
+			if ( $user_id <= 0 ) {
+				continue;
+			}
+			$candidate_phone  = $this->normalize_contact_phone( (string) ( $row['meta_value'] ?? '' ) );
+			$candidate_digits = (string) preg_replace( '/\D+/', '', $candidate_phone );
+			if ( '' !== $candidate_digits && hash_equals( $digits, $candidate_digits ) ) {
+				$matches[ $user_id ] = true;
+			}
+		}
+
+		$match_ids = array_map( 'absint', array_keys( $matches ) );
+		if ( 1 === count( $match_ids ) ) {
+			return (int) $match_ids[0];
+		}
+
+		if ( count( $match_ids ) > 1 ) {
+			$this->last_phone_user_match_ambiguous = true;
+			$this->log_inbound_resolution_issue(
+				'inbound_phone_ambiguous_user',
+				array(
+					'phone'      => $phone,
+					'candidates' => $match_ids,
+				)
+			);
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Busca un usuario por chat ID de Telegram.
+	 *
+	 * @param string $chat_id Chat ID.
+	 * @return int
+	 */
+	private function find_user_id_by_telegram_chat( string $chat_id ): int {
+		$chat_id = (string) preg_replace( '/[^0-9\-]/', '', $chat_id );
+		if ( '' === $chat_id ) {
+			return 0;
+		}
+		if ( ! class_exists( '\\ATORA\\Messaging\\Telegram_Bot' ) ) {
+			return 0;
+		}
+		return (int) ( \ATORA\Messaging\Telegram_Bot::get_user_by_chat( $chat_id ) ?? 0 );
+	}
+
+	/**
+	 * Construye email placeholder estable para leads sin email explícito.
+	 *
+	 * @param string $channel    Canal origen.
+	 * @param string $identifier Identificador externo.
+	 * @return string
+	 */
+	private function build_shadow_contact_email( string $channel, string $identifier ): string {
+		$channel    = sanitize_key( $channel );
+		$identifier = sanitize_text_field( $identifier );
+		$hash       = substr( md5( $channel . ':' . $identifier ), 0, 20 );
+		return $channel . '-' . $hash . '@atora.local';
 	}
 
 	/**
