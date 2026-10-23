@@ -5,17 +5,10 @@
 
 declare( strict_types = 1 );
 
-namespace ATORA\LMS {
-	if ( ! class_exists( Tenant_Context::class ) ) {
-		final class Tenant_Context {
-			public static function current_institution_id() {
-				return 7;
-			}
-		}
-	}
-}
-
 namespace ATORA\Tests\CRM {
+	if ( ! class_exists( '\\ATORA\\LMS\\Tenant_Context' ) ) {
+		require_once __DIR__ . '/../../modules/tenancy/class-tenant-context.php';
+	}
 
 use ATORA\CRM_V2\Services\Contact_Service;
 use PHPUnit\Framework\TestCase;
@@ -31,6 +24,10 @@ class FakeWpdbDuplicatesPhone {
 		}, $sql );
 	}
 
+	public function esc_like( string $s ): string {
+		return addcslashes( $s, '_%\\' );
+	}
+
 	public function get_var( $sql ) {
 		$sql = (string) $sql;
 		if ( str_contains( $sql, 'SHOW TABLES LIKE' ) ) {
@@ -38,6 +35,9 @@ class FakeWpdbDuplicatesPhone {
 				return str_replace( '\\', '', (string) $m[1] );
 			}
 			return '';
+		}
+		if ( str_contains( $sql, 'FROM wp_atora_institutions' ) ) {
+			return 1;
 		}
 		return null;
 	}
@@ -89,7 +89,7 @@ final class ContactDuplicatesPhoneTest extends TestCase {
 		global $wpdb;
 		$wpdb = new FakeWpdbDuplicatesPhone();
 
-		$dups = Contact_Service::find_duplicates( 10 );
+		$dups = \ATORA\LMS\Tenant_Context::with( 7, static fn() => Contact_Service::find_duplicates( 10 ) );
 		$this->assertNotEmpty( $dups );
 
 		$types = array_map( static fn( $d ) => (string) ( $d['match_type'] ?? '' ), $dups );

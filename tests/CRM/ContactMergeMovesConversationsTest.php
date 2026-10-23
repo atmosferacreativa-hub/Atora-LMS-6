@@ -5,17 +5,10 @@
 
 declare( strict_types = 1 );
 
-namespace ATORA\LMS {
-	if ( ! class_exists( Tenant_Context::class ) ) {
-		final class Tenant_Context {
-			public static function current_institution_id() {
-				return 7;
-			}
-		}
-	}
-}
-
 namespace ATORA\Tests\CRM {
+	if ( ! class_exists( '\\ATORA\\LMS\\Tenant_Context' ) ) {
+		require_once __DIR__ . '/../../modules/tenancy/class-tenant-context.php';
+	}
 
 use ATORA\CRM_V2\Services\Contact_Service;
 use PHPUnit\Framework\TestCase;
@@ -34,6 +27,10 @@ class FakeWpdbMergeConversations {
 		}, $sql );
 	}
 
+	public function esc_like( string $s ): string {
+		return addcslashes( $s, '_%\\' );
+	}
+
 	public function get_var( $sql ) {
 		$sql = (string) $sql;
 		if ( str_contains( $sql, 'SHOW TABLES LIKE' ) ) {
@@ -41,6 +38,9 @@ class FakeWpdbMergeConversations {
 				return str_replace( '\\', '', (string) $m[1] );
 			}
 			return '';
+		}
+		if ( str_contains( $sql, 'FROM wp_atora_institutions' ) ) {
+			return 1;
 		}
 		if ( str_contains( $sql, 'SELECT institution_id' ) && str_contains( $sql, 'wp_atora_contacts' ) ) {
 			return 7;
@@ -94,7 +94,7 @@ final class ContactMergeMovesConversationsTest extends TestCase {
 		$fake = new FakeWpdbMergeConversations();
 		$wpdb = $fake;
 
-		$result = Contact_Service::merge_contacts( 10, array( 11 ) );
+		$result = \ATORA\LMS\Tenant_Context::with( 7, static fn() => Contact_Service::merge_contacts( 10, array( 11 ) ) );
 		$this->assertTrue( (bool) ( $result['success'] ?? false ) );
 		$this->assertContains( 'wp_atora_conversations', $fake->updated_tables );
 	}

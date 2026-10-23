@@ -5,16 +5,6 @@
 
 declare( strict_types = 1 );
 
-namespace ATORA\LMS {
-	if ( ! class_exists( Tenant_Context::class ) ) {
-		final class Tenant_Context {
-			public static function current_institution_id() {
-				return 7;
-			}
-		}
-	}
-}
-
 namespace ATORA\Tests\CRM {
 
 use ATORA\CRM_V2\Services\Contact_Service;
@@ -78,7 +68,7 @@ final class ContactServiceInstitutionScopeTest extends TestCase {
 		$fake = new FakeWpdbInstitutionScope();
 		$wpdb = $fake;
 
-		Contact_Service::list_contacts( array( 'limit' => 1, 'offset' => 0 ) );
+		Contact_Service::list_contacts( array( 'limit' => 1, 'offset' => 0, 'institution_id' => 7 ) );
 
 		$this->assertStringContainsString( 'c.institution_id = 7', (string) $fake->last_prepared );
 	}

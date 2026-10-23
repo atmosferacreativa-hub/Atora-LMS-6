@@ -5,17 +5,10 @@
 
 declare( strict_types = 1 );
 
-namespace ATORA\LMS {
-	if ( ! class_exists( Tenant_Context::class ) ) {
-		final class Tenant_Context {
-			public static function current_institution_id() {
-				return 7;
-			}
-		}
-	}
-}
-
 namespace ATORA\Tests\CRM {
+	if ( ! class_exists( '\\ATORA\\LMS\\Tenant_Context' ) ) {
+		require_once __DIR__ . '/../../modules/tenancy/class-tenant-context.php';
+	}
 
 use ATORA\CRM_V2\Services\CSV_Import_Service;
 use PHPUnit\Framework\TestCase;
@@ -45,6 +38,9 @@ class FakeWpdbCsvImport {
 				return str_replace( '\\', '', (string) $m[1] );
 			}
 			return '';
+		}
+		if ( str_contains( $sql, 'FROM wp_atora_institutions' ) ) {
+			return 1;
 		}
 
 		// Find existing by email
@@ -106,11 +102,11 @@ final class CSVImportUpsertTest extends TestCase {
 		$csv = "Email,Name,CF:favorite_color\n" .
 			"dup@example.test,Ana,Azul\n";
 
-		$result = CSV_Import_Service::import_csv(
+		$result = \ATORA\LMS\Tenant_Context::with( 7, static fn() => CSV_Import_Service::import_csv(
 			$csv,
 			array(),
 			array( 'update_existing' => true )
-		);
+		) );
 
 		$this->assertSame( 0, $result['inserted'] );
 		$this->assertSame( 1, $result['updated'] );
