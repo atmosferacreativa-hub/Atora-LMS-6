@@ -21,12 +21,14 @@ PR: #76 (merge 2026-10-23).
 
 ## Bloque 2 — Portar v1 → v2
 
-- [ ] Exportación CSV + cola correo + streaming.
-- [ ] API mensajes (/crm/messages/*) con permisos.
-- [ ] WhatsApp/Telegram → conversaciones.
-- [ ] Etiquetado automático diario + scoring recalc en cron.
-- [ ] Marcar correo abierto / mensaje leído con fecha preservada.
-- [ ] Pruebas por punto.
+- [x] Exportación CSV + cola correo + streaming.
+- [x] API mensajes (/crm/messages/*) con permisos.
+- [x] WhatsApp/Telegram → conversaciones.
+- [x] Etiquetado automático diario + scoring recalc en cron.
+- [x] Marcar correo abierto / mensaje leído con fecha preservada.
+- [x] Pruebas por punto.
+
+PR: #78 (merge 2026-10-23).
 
 ## Bloque 3 — Eliminar CRM v1
 
