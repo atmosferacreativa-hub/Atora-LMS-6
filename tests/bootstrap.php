@@ -896,6 +896,11 @@ if ( file_exists( $crm_inbox_rest_controller_file ) ) {
 	require_once $crm_inbox_rest_controller_file;
 }
 
+$crm_messages_log_rest_controller_file = __DIR__ . '/../modules/crm-v2/rest/class-messages-log-rest-controller.php';
+if ( file_exists( $crm_messages_log_rest_controller_file ) ) {
+	require_once $crm_messages_log_rest_controller_file;
+}
+
 $crm_v2_file = __DIR__ . '/../modules/crm-v2/class-crm-v2.php';
 if ( file_exists( $crm_v2_file ) ) {
 	require_once $crm_v2_file;

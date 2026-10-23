@@ -20,6 +20,7 @@ use ATORA\CRM_V2\Rest\Pipeline_REST_Controller;
 use ATORA\CRM_V2\Rest\Tasks_REST_Controller;
 use ATORA\CRM_V2\Rest\Calendar_REST_Controller;
 use ATORA\CRM_V2\Rest\Inbox_REST_Controller;
+use ATORA\CRM_V2\Rest\Messages_Log_REST_Controller;
 use ATORA\CRM_V2\Rest\Reports_REST_Controller;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -94,6 +95,7 @@ class CRM_V2_App {
 		Tasks_REST_Controller::register_routes();
 		Calendar_REST_Controller::register_routes();
 		Inbox_REST_Controller::register_routes();
+		Messages_Log_REST_Controller::register_routes();
 		Reports_REST_Controller::register_routes();
 		// Fase 1
 		if ( class_exists( 'ATORA\CRM_V2\Rest\CRM_Draft_REST_Controller' ) ) {
@@ -1203,6 +1205,7 @@ class CRM_V2_App {
 			$base . '/rest/class-tasks-rest-controller.php',
 			$base . '/rest/class-calendar-rest-controller.php',
 			$base . '/rest/class-inbox-rest-controller.php',
+			$base . '/rest/class-messages-log-rest-controller.php',
 			$base . '/rest/class-reports-rest-controller.php',
 			$base . '/rest/class-reports-dashboard-rest-controller.php',
 			// Fase 4 — Ficha 360 accionable
