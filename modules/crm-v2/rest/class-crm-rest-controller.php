@@ -179,13 +179,23 @@ class CRM_REST_Controller {
 	 * @return int 0 cuando no se pudo resolver.
 	 */
 	private static function current_institution_id(): int {
+		global $wpdb;
+		$institutions_table = $wpdb->prefix . 'atora_institutions';
+		$like = method_exists( $wpdb, 'esc_like' ) ? $wpdb->esc_like( $institutions_table ) : $institutions_table;
+		$tenancy_configured = (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $like ) ) === $institutions_table;
+
 		if ( class_exists( '\\ATORA\\LMS\\Tenant_Context' ) ) {
 			$resolved = \ATORA\LMS\Tenant_Context::current_institution_id();
 			if ( is_wp_error( $resolved ) ) {
-				return 0;
+				return $tenancy_configured ? -1 : 0;
 			}
-			return absint( $resolved );
+			$id = absint( $resolved );
+			if ( $id > 0 ) {
+				return $id;
+			}
+			return $tenancy_configured ? -1 : 0;
 		}
+
 		return 0;
 	}
 
@@ -224,30 +234,33 @@ class CRM_REST_Controller {
 		}
 
 		$institution_id = self::current_institution_id();
-		if ( $institution_id <= 0 ) {
+		if ( $institution_id < 0 ) {
 			return false;
 		}
 
-		$row = (array) $wpdb->get_row(
+		$contact_user_id = (int) $wpdb->get_var(
 			$wpdb->prepare(
-				"SELECT user_id, institution_id FROM {$wpdb->prefix}atora_contacts WHERE id = %d LIMIT 1",
+				"SELECT user_id FROM {$wpdb->prefix}atora_contacts WHERE id = %d LIMIT 1",
 				$contact_id
-			),
-			ARRAY_A
+			)
 		);
-		if ( empty( $row ) ) {
-			return false;
-		}
-
-		if ( absint( $row['institution_id'] ?? 0 ) !== $institution_id ) {
-			return false;
+		if ( $institution_id > 0 ) {
+			$contact_inst_id = (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT institution_id FROM {$wpdb->prefix}atora_contacts WHERE id = %d LIMIT 1",
+					$contact_id
+				)
+			);
+			if ( $contact_inst_id !== $institution_id ) {
+				return false;
+			}
 		}
 
 		if ( self::has_global_scope() ) {
 			return true;
 		}
 
-		return self::user_id_is_visible( absint( $row['user_id'] ?? 0 ) );
+		return self::user_id_is_visible( $contact_user_id );
 	}
 
 	/**
@@ -265,7 +278,7 @@ class CRM_REST_Controller {
 		}
 
 		$institution_id = self::current_institution_id();
-		if ( $institution_id <= 0 ) {
+		if ( $institution_id < 0 ) {
 			return false;
 		}
 
@@ -284,7 +297,7 @@ class CRM_REST_Controller {
 			return false;
 		}
 
-		if ( absint( $row['contact_institution_id'] ?? 0 ) !== $institution_id ) {
+		if ( $institution_id > 0 && absint( $row['contact_institution_id'] ?? 0 ) !== $institution_id ) {
 			return false;
 		}
 

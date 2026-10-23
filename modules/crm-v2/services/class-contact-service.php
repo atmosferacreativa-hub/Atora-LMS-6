@@ -132,7 +132,7 @@ class Contact_Service {
 		}
 
 		$institution_id = self::resolve_institution_id_for_query( array() );
-		if ( $institution_id <= 0 ) {
+		if ( $institution_id < 0 ) {
 			return 0;
 		}
 
@@ -211,13 +211,15 @@ class Contact_Service {
 
 		$table   = $wpdb->prefix . 'atora_contacts';
 		$institution_id = self::resolve_institution_id_for_query( array() );
-		if ( $institution_id <= 0 ) {
+		if ( $institution_id < 0 ) {
 			return array();
 		}
-		$contact = (array) $wpdb->get_row(
-			$wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d AND institution_id = %d LIMIT 1", $contact_id, $institution_id ),
-			ARRAY_A
-		);
+
+		$contact_sql = $institution_id > 0
+			? $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d AND institution_id = %d LIMIT 1", $contact_id, $institution_id )
+			: $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d LIMIT 1", $contact_id );
+
+		$contact = (array) $wpdb->get_row( $contact_sql, ARRAY_A );
 		if ( empty( $contact ) ) {
 			return array();
 		}
@@ -280,25 +282,22 @@ class Contact_Service {
 		}
 
 		$institution_id = self::resolve_institution_id_for_query( array() );
-		if ( $institution_id <= 0 ) {
+		if ( $institution_id < 0 ) {
 			return array();
 		}
 
 		$limit = max( 1, min( 200, absint( $limit ) ) );
-		$rows  = (array) $wpdb->get_results(
-			$wpdb->prepare(
-				"SELECT LOWER(TRIM(email)) AS email_key, COUNT(*) AS total, GROUP_CONCAT(id ORDER BY created_at ASC) AS ids
-				 FROM {$table}
-				 WHERE institution_id = %d AND email <> ''
-				 GROUP BY institution_id, email_key
-				 HAVING total > 1
-				 ORDER BY total DESC
-				 LIMIT %d",
-				$institution_id,
-				$limit
-			),
-			ARRAY_A
-		); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$email_where = $institution_id > 0 ? 'institution_id = %d AND ' : '';
+		$email_group = $institution_id > 0 ? 'institution_id, email_key' : 'email_key';
+		$sql_email   = "SELECT LOWER(TRIM(email)) AS email_key, COUNT(*) AS total, GROUP_CONCAT(id ORDER BY created_at ASC) AS ids
+			 FROM {$table}
+			 WHERE {$email_where}email <> ''
+			 GROUP BY {$email_group}
+			 HAVING total > 1
+			 ORDER BY total DESC
+			 LIMIT %d";
+		$args_email  = $institution_id > 0 ? array( $institution_id, $limit ) : array( $limit );
+		$rows        = (array) $wpdb->get_results( $wpdb->prepare( $sql_email, ...$args_email ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 
 		$duplicates = array();
 		foreach ( $rows as $row ) {
@@ -338,20 +337,17 @@ class Contact_Service {
 			}
 
 			$key_expr = "LOWER(TRIM(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE({$col}, ' ', ''), '-', ''), '(', ''), ')', ''), '+', '')))";
-			$phone_rows = (array) $wpdb->get_results(
-				$wpdb->prepare(
-					"SELECT {$key_expr} AS phone_key, COUNT(*) AS total, GROUP_CONCAT(id ORDER BY created_at ASC) AS ids
-					 FROM {$table}
-					 WHERE institution_id = %d AND {$col} <> ''
-					 GROUP BY institution_id, phone_key
-					 HAVING total > 1
-					 ORDER BY total DESC
-					 LIMIT %d",
-					$institution_id,
-					$limit
-				),
-				ARRAY_A
-			); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			$phone_where = $institution_id > 0 ? 'institution_id = %d AND ' : '';
+			$phone_group = $institution_id > 0 ? 'institution_id, phone_key' : 'phone_key';
+			$sql_phone   = "SELECT {$key_expr} AS phone_key, COUNT(*) AS total, GROUP_CONCAT(id ORDER BY created_at ASC) AS ids
+				 FROM {$table}
+				 WHERE {$phone_where}{$col} <> ''
+				 GROUP BY {$phone_group}
+				 HAVING total > 1
+				 ORDER BY total DESC
+				 LIMIT %d";
+			$args_phone  = $institution_id > 0 ? array( $institution_id, $limit ) : array( $limit );
+			$phone_rows  = (array) $wpdb->get_results( $wpdb->prepare( $sql_phone, ...$args_phone ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 
 			foreach ( $phone_rows as $prow ) {
 				$ids = array_values( array_filter( array_map( 'absint', explode( ',', (string) ( $prow['ids'] ?? '' ) ) ) ) );
@@ -417,21 +413,23 @@ class Contact_Service {
 		$sequence_enrollments_table = $wpdb->prefix . 'atora_email_sequence_enrollments';
 
 		$institution_id = self::resolve_institution_id_for_query( array() );
-		if ( $institution_id <= 0 ) {
+		if ( $institution_id < 0 ) {
 			return array(
 				'success' => false,
 				'message' => __( 'Institución no resuelta.', 'atora-lms' ),
 			);
 		}
 
-		$keep_inst = (int) $wpdb->get_var(
-			$wpdb->prepare( "SELECT institution_id FROM {$contacts_table} WHERE id = %d LIMIT 1", $keep_id )
-		);
-		if ( $keep_inst !== $institution_id ) {
-			return array(
-				'success' => false,
-				'message' => __( 'El contacto no pertenece a esta institución.', 'atora-lms' ),
+		if ( $institution_id > 0 ) {
+			$keep_inst = (int) $wpdb->get_var(
+				$wpdb->prepare( "SELECT institution_id FROM {$contacts_table} WHERE id = %d LIMIT 1", $keep_id )
 			);
+			if ( $keep_inst !== $institution_id ) {
+				return array(
+					'success' => false,
+					'message' => __( 'El contacto no pertenece a esta institución.', 'atora-lms' ),
+				);
+			}
 		}
 
 		$merged = 0;
@@ -756,7 +754,7 @@ class Contact_Service {
 		if ( $institution_id > 0 ) {
 			$clauses[] = 'c.institution_id = %d';
 			$params[]  = $institution_id;
-		} else {
+		} elseif ( $institution_id < 0 ) {
 			$clauses[] = '1=0';
 			return array(
 				'sql'    => implode( ' AND ', $clauses ),
@@ -890,13 +888,28 @@ class Contact_Service {
 		if ( class_exists( '\\ATORA\\LMS\\Tenant_Context' ) ) {
 			$resolved = \ATORA\LMS\Tenant_Context::current_institution_id();
 			if ( is_wp_error( $resolved ) ) {
-				return -1;
+				return self::tenancy_is_configured() ? -1 : 0;
 			}
 			$id = absint( $resolved );
-			return $id > 0 ? $id : -1;
+			if ( $id > 0 ) {
+				return $id;
+			}
+			return self::tenancy_is_configured() ? -1 : 0;
 		}
 
-		return -1;
+		return 0;
+	}
+
+	/**
+	 * Determina si el sitio tiene tenancy configurado (tabla de instituciones).
+	 *
+	 * Si no existe, se asume modo legacy single-tenant (sin filtro).
+	 */
+	private static function tenancy_is_configured(): bool {
+		global $wpdb;
+		$table = $wpdb->prefix . 'atora_institutions';
+		$like = method_exists( $wpdb, 'esc_like' ) ? $wpdb->esc_like( $table ) : $table;
+		return (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $like ) ) === $table;
 	}
 
 	/**

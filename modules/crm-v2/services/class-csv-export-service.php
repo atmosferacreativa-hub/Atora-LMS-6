@@ -246,7 +246,7 @@ class CSV_Export_Service {
 		}
 
 		$institution_id = self::resolve_institution_id();
-		if ( $institution_id <= 0 ) {
+		if ( $institution_id < 0 ) {
 			return array();
 		}
 
@@ -257,12 +257,14 @@ class CSV_Export_Service {
 			// map se carga más abajo cuando sepamos IDs.
 			$custom_map = array();
 		}
+		$where_inst = $institution_id > 0 ? 'WHERE institution_id = %d' : '';
 		$sql  = "SELECT id, name, email, phone, country, city, status, source, created_at
 			FROM {$contacts_table}
-			WHERE institution_id = %d
+			{$where_inst}
 			ORDER BY created_at DESC
 			LIMIT %d OFFSET %d";
-		$rows = (array) $wpdb->get_results( $wpdb->prepare( $sql, $institution_id, $limit, $offset ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$args = $institution_id > 0 ? array( $institution_id, $limit, $offset ) : array( $limit, $offset );
+		$rows = (array) $wpdb->get_results( $wpdb->prepare( $sql, ...$args ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		$contact_ids = array_values( array_filter( array_map( 'absint', wp_list_pluck( $rows, 'id' ) ) ) );
 		if ( ! empty( $custom_keys ) && ! empty( $contact_ids ) ) {
 			$custom_map = self::get_custom_values_map_for_contacts( $contact_ids, $custom_keys );
@@ -353,13 +355,23 @@ class CSV_Export_Service {
 	}
 
 	private static function resolve_institution_id(): int {
+		global $wpdb;
+		$institutions_table = $wpdb->prefix . 'atora_institutions';
+		$like = method_exists( $wpdb, 'esc_like' ) ? $wpdb->esc_like( $institutions_table ) : $institutions_table;
+		$tenancy_configured = (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $like ) ) === $institutions_table;
+
 		if ( class_exists( '\\ATORA\\LMS\\Tenant_Context' ) ) {
 			$resolved = \ATORA\LMS\Tenant_Context::current_institution_id();
 			if ( is_wp_error( $resolved ) ) {
-				return 0;
+				return $tenancy_configured ? -1 : 0;
 			}
-			return absint( $resolved );
+			$id = absint( $resolved );
+			if ( $id > 0 ) {
+				return $id;
+			}
+			return $tenancy_configured ? -1 : 0;
 		}
+
 		return 0;
 	}
 }

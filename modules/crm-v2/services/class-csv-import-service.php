@@ -55,7 +55,7 @@ class CSV_Import_Service {
 		global $wpdb;
 
 		$institution_id = self::resolve_institution_id();
-		if ( $institution_id <= 0 ) {
+		if ( $institution_id < 0 ) {
 			return array(
 				'inserted' => 0,
 				'updated'  => 0,
@@ -160,7 +160,11 @@ class CSV_Import_Service {
 				$update_data['updated_at'] = current_time( 'mysql', true );
 
 				if ( ! empty( $update_data ) ) {
-					$wpdb->update( $contacts_table, $update_data, array( 'id' => $contact_id, 'institution_id' => $institution_id ) );
+				$where = array( 'id' => $contact_id );
+				if ( $institution_id > 0 ) {
+					$where['institution_id'] = $institution_id;
+				}
+				$wpdb->update( $contacts_table, $update_data, $where );
 					$updated++;
 					Audit_Service::log( 'contact_updated', 'contact', $contact_id, array( 'source' => 'csv_import' ), 0, $institution_id );
 					Activity_Service::log_contact_activity( $contact_id, 'contact_updated', array( 'source' => 'csv_import' ) );
@@ -374,12 +378,21 @@ class CSV_Import_Service {
 	}
 
 	private static function resolve_institution_id(): int {
+		global $wpdb;
+		$institutions_table = $wpdb->prefix . 'atora_institutions';
+		$like = method_exists( $wpdb, 'esc_like' ) ? $wpdb->esc_like( $institutions_table ) : $institutions_table;
+		$tenancy_configured = (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $like ) ) === $institutions_table;
+
 		if ( class_exists( '\\ATORA\\LMS\\Tenant_Context' ) ) {
 			$resolved = \ATORA\LMS\Tenant_Context::current_institution_id();
 			if ( is_wp_error( $resolved ) ) {
-				return 0;
+				return $tenancy_configured ? -1 : 0;
 			}
-			return absint( $resolved );
+			$id = absint( $resolved );
+			if ( $id > 0 ) {
+				return $id;
+			}
+			return $tenancy_configured ? -1 : 0;
 		}
 		return 0;
 	}
@@ -390,23 +403,25 @@ class CSV_Import_Service {
 		$email = sanitize_email( $email );
 		$phone = sanitize_text_field( $phone );
 		$table = $wpdb->prefix . 'atora_contacts';
-		if ( $institution_id <= 0 || ! DB_Service::table_exists( $table ) ) {
+		if ( $institution_id < 0 || ! DB_Service::table_exists( $table ) ) {
 			return 0;
 		}
 
 		if ( '' !== $email ) {
-			$id = (int) $wpdb->get_var(
-				$wpdb->prepare( "SELECT id FROM {$table} WHERE institution_id = %d AND LOWER(TRIM(email)) = LOWER(TRIM(%s)) LIMIT 1", $institution_id, $email )
-			);
+			$where = $institution_id > 0 ? 'institution_id = %d AND ' : '';
+			$sql   = "SELECT id FROM {$table} WHERE {$where}LOWER(TRIM(email)) = LOWER(TRIM(%s)) LIMIT 1";
+			$args  = $institution_id > 0 ? array( $institution_id, $email ) : array( $email );
+			$id = (int) $wpdb->get_var( $wpdb->prepare( $sql, ...$args ) );
 			if ( $id > 0 ) {
 				return $id;
 			}
 		}
 
 		if ( '' !== $phone ) {
-			$id = (int) $wpdb->get_var(
-				$wpdb->prepare( "SELECT id FROM {$table} WHERE institution_id = %d AND (phone = %s OR whatsapp = %s) LIMIT 1", $institution_id, $phone, $phone )
-			);
+			$where = $institution_id > 0 ? 'institution_id = %d AND ' : '';
+			$sql   = "SELECT id FROM {$table} WHERE {$where}(phone = %s OR whatsapp = %s) LIMIT 1";
+			$args  = $institution_id > 0 ? array( $institution_id, $phone, $phone ) : array( $phone, $phone );
+			$id = (int) $wpdb->get_var( $wpdb->prepare( $sql, ...$args ) );
 			if ( $id > 0 ) {
 				return $id;
 			}
