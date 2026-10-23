@@ -546,7 +546,7 @@ class Automation_Engine {
 		$user       = get_userdata( $user_id );
 		$contact_id = 0;
 		$core = function_exists( 'clms_core' ) ? clms_core( 'CLMS_Contacts_Core_Service' ) : null;
-		if ( $core && method_exists( $core, 'get_contact_id_by_user' ) ) {
+		if ( $core ) {
 			$contact_id = absint( $core->get_contact_id_by_user( $user_id ) );
 		}
 		self::fire_trigger( 'enrollment_completed', $user_id, array(
@@ -860,7 +860,7 @@ class Automation_Engine {
 				$contact_id  = absint( $context['contact_id'] ?? 0 );
 				if ( ! $contact_id && $user_id ) {
 					$core = function_exists( 'clms_core' ) ? clms_core( 'CLMS_Contacts_Core_Service' ) : null;
-					if ( $core && method_exists( $core, 'get_contact_id_by_user' ) ) {
+					if ( $core ) {
 						$contact_id = absint( $core->get_contact_id_by_user( $user_id ) );
 					}
 				}
@@ -882,7 +882,7 @@ class Automation_Engine {
 				$contact_id   = absint( $context['contact_id'] ?? 0 );
 				if ( ! $contact_id && $user_id ) {
 					$core = function_exists( 'clms_core' ) ? clms_core( 'CLMS_Contacts_Core_Service' ) : null;
-					if ( $core && method_exists( $core, 'get_contact_id_by_user' ) ) {
+					if ( $core ) {
 						$contact_id = absint( $core->get_contact_id_by_user( $user_id ) );
 					}
 				}
@@ -959,7 +959,7 @@ class Automation_Engine {
 
 		if ( ! $contact_id && $user_id > 0 ) {
 			$core = function_exists( 'clms_core' ) ? clms_core( 'CLMS_Contacts_Core_Service' ) : null;
-			if ( $core && method_exists( $core, 'get_contact_id_by_user' ) ) {
+			if ( $core ) {
 				$contact_id = absint( $core->get_contact_id_by_user( $user_id ) );
 			}
 		}
