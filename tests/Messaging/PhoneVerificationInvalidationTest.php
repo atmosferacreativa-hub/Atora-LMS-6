@@ -4,12 +4,8 @@
  *
  * Hallazgo confirmado: invalidate_phone_verification() existía pero su
  * único llamador en todo el repositorio era el propio test que la
- * ejercita. trait-frontend-access-profile.php y trait-crm-contacts.php
- * escribían atora_phone directo, sin invalidar la verificación previa.
- * Al buscar "atora_phone" en todo el árbol (regla 4.2, "no solo los
- * dos ya identificados") apareció un tercer punto:
- * trait-admin-menu-main-pages-academic.php (edición admin del perfil
- * académico del estudiante).
+ * ejercita. Varios flujos escribían `atora_phone` sin invalidar la
+ * verificación previa.
  *
  * PT-5 (6.5.9): verify_phone_code() ahora pasa por ATORA_Rate_Limiter
  * — necesita un $wpdb en memoria que respalde
@@ -196,6 +192,18 @@ class PhoneVerificationInvalidationTest extends TestCase {
 		return array_values( array_map( static fn( string $path ) => array( $path ), self::discover_phone_write_sites() ) );
 	}
 
+	/** @test */
+	public function test_static_detector_requires_a_real_call_not_a_comment(): void {
+		$php = <<<'PHP'
+<?php
+// Preferences::update_phone( 1, '+58 412 1234567' );
+/* Preferences::update_phone( 1, '+58 424 9876543' ); */
+"Preferences::update_phone( 1, '+58 424 9999999' );";
+PHP;
+
+		$this->assertFalse( self::has_preferences_update_phone_call( $php ) );
+	}
+
 	/**
 	 * Encuentra los archivos del plugin que podrían escribir `atora_phone`.
 	 *
@@ -208,6 +216,10 @@ class PhoneVerificationInvalidationTest extends TestCase {
 	private static function discover_phone_write_sites(): array {
 		$known_phone_write_sites = array(
 			'includes/contacts-core/class-contacts-core-service.php',
+			'includes/frontend/trait-frontend-access-profile.php',
+			'includes/admin-menu/trait-admin-menu-main-pages-academic.php',
+			'includes/metabox-program/trait-metabox-program-enrollment-ajax.php',
+			'includes/enrollment-manager/trait-enrollment-manager-access-enrollment.php',
 		);
 
 		$root = realpath( __DIR__ . '/../../' );
