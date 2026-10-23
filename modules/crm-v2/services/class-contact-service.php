@@ -26,6 +26,8 @@ class Contact_Service {
 			'status'   => '',
 			'tag'      => '',
 			'course_id'=> 0,
+			'institution_id' => 0,
+			'custom_filters' => array(),
 			'page'     => 1,
 			'per_page' => 20,
 			'limit'    => 0,
@@ -129,9 +131,15 @@ class Contact_Service {
 			return 0;
 		}
 
+		$institution_id = self::resolve_institution_id_for_query( array() );
+		if ( $institution_id < 0 ) {
+			return 0;
+		}
+
 		$inserted = $wpdb->insert(
 			$table,
 			array(
+				'institution_id' => $institution_id,
 				'name'       => $name ?: __( 'Lead nuevo', 'atora-lms' ),
 				'email'      => $email,
 				'status'     => 'lead',
@@ -155,6 +163,8 @@ class Contact_Service {
 
 		// Emitir hook para Automation Engine (Fase 7)
 		if ( $contact_id ) {
+			Audit_Service::log( 'contact_created', 'contact', $contact_id, array( 'source' => $source ), 0, $institution_id );
+			Activity_Service::log_contact_activity( $contact_id, 'contact_created', array( 'source' => $source ) );
 			do_action( 'atora/crm/contact_created', $contact_id, 0 );
 		}
 
@@ -200,10 +210,16 @@ class Contact_Service {
 		}
 
 		$table   = $wpdb->prefix . 'atora_contacts';
-		$contact = (array) $wpdb->get_row(
-			$wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d LIMIT 1", $contact_id ),
-			ARRAY_A
-		);
+		$institution_id = self::resolve_institution_id_for_query( array() );
+		if ( $institution_id < 0 ) {
+			return array();
+		}
+
+		$contact_sql = $institution_id > 0
+			? $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d AND institution_id = %d LIMIT 1", $contact_id, $institution_id )
+			: $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d LIMIT 1", $contact_id );
+
+		$contact = (array) $wpdb->get_row( $contact_sql, ARRAY_A );
 		if ( empty( $contact ) ) {
 			return array();
 		}
@@ -265,20 +281,23 @@ class Contact_Service {
 			return array();
 		}
 
+		$institution_id = self::resolve_institution_id_for_query( array() );
+		if ( $institution_id < 0 ) {
+			return array();
+		}
+
 		$limit = max( 1, min( 200, absint( $limit ) ) );
-		$rows  = (array) $wpdb->get_results(
-			$wpdb->prepare(
-				"SELECT LOWER(TRIM(email)) AS email_key, COUNT(*) AS total, GROUP_CONCAT(id ORDER BY created_at ASC) AS ids
-				 FROM {$table}
-				 WHERE email <> ''
-				 GROUP BY email_key
-				 HAVING total > 1
-				 ORDER BY total DESC
-				 LIMIT %d",
-				$limit
-			),
-			ARRAY_A
-		); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$email_where = $institution_id > 0 ? 'institution_id = %d AND ' : '';
+		$email_group = $institution_id > 0 ? 'institution_id, email_key' : 'email_key';
+		$sql_email   = "SELECT LOWER(TRIM(email)) AS email_key, COUNT(*) AS total, GROUP_CONCAT(id ORDER BY created_at ASC) AS ids
+			 FROM {$table}
+			 WHERE {$email_where}email <> ''
+			 GROUP BY {$email_group}
+			 HAVING total > 1
+			 ORDER BY total DESC
+			 LIMIT %d";
+		$args_email  = $institution_id > 0 ? array( $institution_id, $limit ) : array( $limit );
+		$rows        = (array) $wpdb->get_results( $wpdb->prepare( $sql_email, ...$args_email ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 
 		$duplicates = array();
 		foreach ( $rows as $row ) {
@@ -301,11 +320,61 @@ class Contact_Service {
 			}
 
 			$duplicates[] = array(
+				'match_type' => 'email',
 				'email_key' => sanitize_email( (string) ( $row['email_key'] ?? '' ) ),
 				'count'     => count( $contacts ),
 				'contacts'  => $contacts,
 				'canonical' => $contacts[0],
 			);
+		}
+
+		// Duplicados por teléfono (incluye whatsapp).
+		$phone_cols = array( 'phone', 'whatsapp' );
+		foreach ( $phone_cols as $col ) {
+			$col = sanitize_key( (string) $col );
+			if ( ! in_array( $col, array( 'phone', 'whatsapp' ), true ) ) {
+				continue;
+			}
+
+			$key_expr = "LOWER(TRIM(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE({$col}, ' ', ''), '-', ''), '(', ''), ')', ''), '+', '')))";
+			$phone_where = $institution_id > 0 ? 'institution_id = %d AND ' : '';
+			$phone_group = $institution_id > 0 ? 'institution_id, phone_key' : 'phone_key';
+			$sql_phone   = "SELECT {$key_expr} AS phone_key, COUNT(*) AS total, GROUP_CONCAT(id ORDER BY created_at ASC) AS ids
+				 FROM {$table}
+				 WHERE {$phone_where}{$col} <> ''
+				 GROUP BY {$phone_group}
+				 HAVING total > 1
+				 ORDER BY total DESC
+				 LIMIT %d";
+			$args_phone  = $institution_id > 0 ? array( $institution_id, $limit ) : array( $limit );
+			$phone_rows  = (array) $wpdb->get_results( $wpdb->prepare( $sql_phone, ...$args_phone ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+
+			foreach ( $phone_rows as $prow ) {
+				$ids = array_values( array_filter( array_map( 'absint', explode( ',', (string) ( $prow['ids'] ?? '' ) ) ) ) );
+				if ( count( $ids ) < 2 ) {
+					continue;
+				}
+
+				$placeholders = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
+				$contacts     = (array) $wpdb->get_results(
+					$wpdb->prepare(
+						"SELECT * FROM {$table} WHERE id IN ({$placeholders}) ORDER BY created_at ASC",
+						...$ids
+					),
+					ARRAY_A
+				); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+				if ( empty( $contacts ) ) {
+					continue;
+				}
+
+				$duplicates[] = array(
+					'match_type' => $col,
+					'phone_key'  => sanitize_text_field( (string) ( $prow['phone_key'] ?? '' ) ),
+					'count'      => count( $contacts ),
+					'contacts'   => $contacts,
+					'canonical'  => $contacts[0],
+				);
+			}
 		}
 
 		return $duplicates;
@@ -338,6 +407,30 @@ class Contact_Service {
 		$followups_table    = $wpdb->prefix . 'atora_crm_student_followups';
 		$tasks_table        = $wpdb->prefix . 'atora_crm_tasks';
 		$field_values_table = $wpdb->prefix . 'atora_crm_contact_field_values';
+		$conversations_table = $wpdb->prefix . 'atora_conversations';
+		$list_pivot_table    = $wpdb->prefix . 'atora_contact_list_pivot';
+		$campaign_recipients_table = $wpdb->prefix . 'atora_crm_campaign_recipients';
+		$sequence_enrollments_table = $wpdb->prefix . 'atora_email_sequence_enrollments';
+
+		$institution_id = self::resolve_institution_id_for_query( array() );
+		if ( $institution_id < 0 ) {
+			return array(
+				'success' => false,
+				'message' => __( 'Institución no resuelta.', 'atora-lms' ),
+			);
+		}
+
+		if ( $institution_id > 0 ) {
+			$keep_inst = (int) $wpdb->get_var(
+				$wpdb->prepare( "SELECT institution_id FROM {$contacts_table} WHERE id = %d LIMIT 1", $keep_id )
+			);
+			if ( $keep_inst !== $institution_id ) {
+				return array(
+					'success' => false,
+					'message' => __( 'El contacto no pertenece a esta institución.', 'atora-lms' ),
+				);
+			}
+		}
 
 		$merged = 0;
 		foreach ( $remove_ids as $old_id ) {
@@ -356,7 +449,7 @@ class Contact_Service {
 				$wpdb->delete( $tags_table, array( 'contact_id' => $old_id ), array( '%d' ) );
 			}
 
-			foreach ( array( $notes_table, $activities_table, $deals_table, $followups_table, $tasks_table, $field_values_table ) as $rel_table ) {
+			foreach ( array( $notes_table, $activities_table, $deals_table, $followups_table, $tasks_table, $field_values_table, $conversations_table, $list_pivot_table, $campaign_recipients_table, $sequence_enrollments_table ) as $rel_table ) {
 				if ( DB_Service::table_exists( $rel_table ) ) {
 					$wpdb->update( $rel_table, array( 'contact_id' => $keep_id ), array( 'contact_id' => $old_id ), array( '%d' ), array( '%d' ) );
 				}
@@ -381,6 +474,7 @@ class Contact_Service {
 		}
 
 		if ( $merged > 0 ) {
+			Audit_Service::log( 'contacts_merged', 'contact', $keep_id, array( 'merged_count' => $merged ), 0, $institution_id );
 			Activity_Service::log_contact_activity(
 				$keep_id,
 				'contacts_merged',
@@ -656,6 +750,18 @@ class Contact_Service {
 		$clauses = array( '1=1' );
 		$params  = array();
 
+		$institution_id = self::resolve_institution_id_for_query( $args );
+		if ( $institution_id > 0 ) {
+			$clauses[] = 'c.institution_id = %d';
+			$params[]  = $institution_id;
+		} elseif ( $institution_id < 0 ) {
+			$clauses[] = '1=0';
+			return array(
+				'sql'    => implode( ' AND ', $clauses ),
+				'params' => $params,
+			);
+		}
+
 		$scope_user_ids = self::get_scope_user_ids();
 		if ( ! empty( $scope_user_ids ) ) {
 			$in = implode( ',', array_fill( 0, count( $scope_user_ids ), '%d' ) );
@@ -723,10 +829,116 @@ class Contact_Service {
 			}
 		}
 
+		// ── Bloque 5 (6.34.0): filtros por campos personalizados ─────────────
+		$custom_filters    = (array) ( $args['custom_filters'] ?? array() );
+		$field_values_table = $wpdb->prefix . 'atora_crm_contact_field_values';
+		if ( ! empty( $custom_filters ) && DB_Service::table_exists( $field_values_table ) ) {
+			foreach ( $custom_filters as $cf ) {
+				$field_key = sanitize_key( (string) ( $cf['field_key'] ?? '' ) );
+				$operator  = sanitize_key( (string) ( $cf['operator'] ?? 'equals' ) );
+				$value     = sanitize_text_field( (string) ( $cf['value'] ?? '' ) );
+				if ( '' === $field_key ) {
+					continue;
+				}
+
+				if ( 'equals' === $operator ) {
+					$clauses[] = "EXISTS (SELECT 1 FROM {$field_values_table} fv WHERE fv.contact_id = c.id AND fv.field_key = %s AND fv.value = %s)";
+					$params[]  = $field_key;
+					$params[]  = $value;
+				} elseif ( 'contains' === $operator ) {
+					$like      = '%' . $wpdb->esc_like( $value ) . '%';
+					$clauses[] = "EXISTS (SELECT 1 FROM {$field_values_table} fv WHERE fv.contact_id = c.id AND fv.field_key = %s AND fv.value LIKE %s)";
+					$params[]  = $field_key;
+					$params[]  = $like;
+				} elseif ( 'is_empty' === $operator ) {
+					$clauses[] = "NOT EXISTS (SELECT 1 FROM {$field_values_table} fv WHERE fv.contact_id = c.id AND fv.field_key = %s AND fv.value <> '')";
+					$params[]  = $field_key;
+				} elseif ( 'is_not_empty' === $operator ) {
+					$clauses[] = "EXISTS (SELECT 1 FROM {$field_values_table} fv WHERE fv.contact_id = c.id AND fv.field_key = %s AND fv.value <> '')";
+					$params[]  = $field_key;
+				}
+			}
+		}
+
 		return array(
 			'sql'    => implode( ' AND ', $clauses ),
 			'params' => $params,
 		);
+	}
+
+	/**
+	 * Resuelve institution_id para queries del CRM.
+	 *
+	 * - Si viene explícito en args (incluye -1), se respeta.
+	 * - Si no, se resuelve con Tenant_Context.
+	 * - Si no se puede resolver, devuelve -1 (nunca degrada a alcance global).
+	 *
+	 * @param array $args
+	 * @return int
+	 */
+	private static function resolve_institution_id_for_query( array $args ): int {
+		if ( array_key_exists( 'institution_id', $args ) ) {
+			$raw = (int) ( $args['institution_id'] ?? 0 );
+			if ( 0 !== $raw ) {
+				return $raw;
+			}
+			// institution_id=0 significa "resolver por contexto".
+		}
+
+		if ( class_exists( '\\ATORA\\LMS\\Tenant_Context' ) ) {
+			$resolved = \ATORA\LMS\Tenant_Context::current_institution_id();
+			if ( is_wp_error( $resolved ) ) {
+				if ( ! self::tenancy_is_configured() ) {
+					return 0;
+				}
+				$single = self::single_institution_fallback_id();
+				return $single > 0 ? $single : -1;
+			}
+			$id = absint( $resolved );
+			if ( $id > 0 ) {
+				return $id;
+			}
+			if ( ! self::tenancy_is_configured() ) {
+				return 0;
+			}
+			$single = self::single_institution_fallback_id();
+			return $single > 0 ? $single : -1;
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Determina si el sitio tiene tenancy configurado (tabla de instituciones).
+	 *
+	 * Si no existe, se asume modo legacy single-tenant (sin filtro).
+	 */
+	private static function tenancy_is_configured(): bool {
+		global $wpdb;
+		$table = $wpdb->prefix . 'atora_institutions';
+		$like = method_exists( $wpdb, 'esc_like' ) ? $wpdb->esc_like( $table ) : $table;
+		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $like ) ) !== $table ) {
+			return false;
+		}
+		$first_id = absint( $wpdb->get_var( "SELECT id FROM {$table} ORDER BY id ASC LIMIT 1" ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+		return $first_id > 0;
+	}
+
+	/**
+	 * Fallback seguro: si existe exactamente 1 institución, úsala.
+	 */
+	private static function single_institution_fallback_id(): int {
+		global $wpdb;
+		if ( ! method_exists( $wpdb, 'get_col' ) ) {
+			return 0;
+		}
+		$table = $wpdb->prefix . 'atora_institutions';
+		$like  = method_exists( $wpdb, 'esc_like' ) ? $wpdb->esc_like( $table ) : $table;
+		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $like ) ) !== $table ) {
+			return 0;
+		}
+		$ids = array_values( array_filter( array_map( 'absint', (array) $wpdb->get_col( "SELECT id FROM {$table} ORDER BY id ASC LIMIT 2" ) ) ) );
+		return 1 === count( $ids ) ? absint( $ids[0] ) : 0;
 	}
 
 	/**

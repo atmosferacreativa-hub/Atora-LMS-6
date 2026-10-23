@@ -31,11 +31,19 @@ class FakeWpdbCsvExport {
 		$sql              = (string) $sql;
 		if ( str_contains( $sql, 'SHOW TABLES LIKE' ) ) {
 			if ( preg_match( "/LIKE\s+([^\s']+)/", $sql, $m ) ) {
-				return (string) $m[1];
+				$table = (string) $m[1];
+				if ( str_contains( $table, 'atora_institutions' ) ) {
+					return '';
+				}
+				return $table;
 			}
 			return '';
 		}
 		return null;
+	}
+
+	public function esc_like( string $text ): string {
+		return $text;
 	}
 
 	public function get_results( $sql, $output = OBJECT ) {

@@ -827,6 +827,36 @@ class Automation_Engine {
 				}
 				break;
 
+			case 'set_custom_field':
+				$contact_id = absint( $context['contact_id'] ?? 0 );
+				if ( ! $contact_id && $user_id ) {
+					$core = function_exists( 'clms_core' ) ? clms_core( 'CLMS_Contacts_Core_Service' ) : null;
+					if ( $core ) {
+						$contact_id = absint( $core->get_contact_id_by_user( $user_id ) );
+					}
+				}
+				$field_key = sanitize_key( (string) ( $action['field_key'] ?? '' ) );
+				$value     = self::interpolate_string( (string) ( $action['value'] ?? '' ), $user_id, $context );
+				if ( $contact_id > 0 && '' !== $field_key ) {
+					if ( ! class_exists( '\\ATORA\\CRM_V2\\Services\\Contact_Service' ) && defined( 'ATORA_LMS_MODULES_DIR' ) ) {
+						$base = ATORA_LMS_MODULES_DIR . 'crm-v2/services/';
+						foreach ( array( 'class-db-service.php', 'class-activity-service.php', 'class-audit-service.php', 'class-contact-service.php' ) as $file ) {
+							$path = $base . $file;
+							if ( file_exists( $path ) ) {
+								require_once $path;
+							}
+						}
+					}
+
+					if ( class_exists( '\\ATORA\\CRM_V2\\Services\\Contact_Service' ) ) {
+						$success = (bool) \ATORA\CRM_V2\Services\Contact_Service::save_contact_custom_value( $contact_id, $field_key, (string) $value );
+						if ( $success && class_exists( '\\ATORA\\CRM_V2\\Services\\Audit_Service' ) ) {
+							\ATORA\CRM_V2\Services\Audit_Service::log( 'custom_field_updated', 'contact', $contact_id, array( 'field_key' => $field_key ) );
+						}
+					}
+				}
+				break;
+
 			case 'webhook':
 				if ( class_exists( 'ATORA\Automation\Outbound_Webhooks' ) ) {
 					$success = Outbound_Webhooks::dispatch(

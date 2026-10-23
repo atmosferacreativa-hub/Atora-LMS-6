@@ -49,7 +49,11 @@ class CSV_Export_Service {
 			return array( 'ID', 'UserID', 'RecipientEmail', 'RecipientName', 'Subject', 'Status', 'EmailIdentity', 'ScheduledAt', 'SentAt', 'OpenedAt', 'ClickedAt', 'CreatedAt' );
 		}
 
-		return array( 'ID', 'Name', 'Email', 'Phone', 'Country', 'City', 'Status', 'Source', 'Created' );
+		$columns = array( 'ID', 'Name', 'Email', 'Phone', 'Country', 'City', 'Status', 'Source', 'Created' );
+		foreach ( self::get_contact_custom_field_keys() as $key ) {
+			$columns[] = 'CF:' . $key;
+		}
+		return $columns;
 	}
 
 	/**
@@ -147,6 +151,7 @@ class CSV_Export_Service {
 		}
 
 		$dataset = isset( $_REQUEST['dataset'] ) ? self::normalize_dataset( (string) wp_unslash( $_REQUEST['dataset'] ) ) : 'contacts';
+		Audit_Service::log( 'contacts_exported', 'export', 0, array( 'dataset' => $dataset ) );
 		foreach ( self::get_response_headers( $dataset ) as $header_name => $header_value ) {
 			header( $header_name . ': ' . $header_value );
 		}
@@ -239,14 +244,35 @@ class CSV_Export_Service {
 		if ( ! DB_Service::table_exists( $contacts_table ) ) {
 			return array();
 		}
+
+		$institution_id = self::resolve_institution_id();
+		if ( $institution_id < 0 ) {
+			return array();
+		}
+
+		$custom_keys = self::get_contact_custom_field_keys();
+		$custom_map  = self::get_custom_values_map_for_contacts( array(), $custom_keys );
+		$custom_values_table = $wpdb->prefix . 'atora_crm_contact_field_values';
+		if ( ! empty( $custom_keys ) && DB_Service::table_exists( $custom_values_table ) ) {
+			// map se carga más abajo cuando sepamos IDs.
+			$custom_map = array();
+		}
+		$where_inst = $institution_id > 0 ? 'WHERE institution_id = %d' : '';
 		$sql  = "SELECT id, name, email, phone, country, city, status, source, created_at
 			FROM {$contacts_table}
+			{$where_inst}
 			ORDER BY created_at DESC
 			LIMIT %d OFFSET %d";
-		$rows = (array) $wpdb->get_results( $wpdb->prepare( $sql, $limit, $offset ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$args = $institution_id > 0 ? array( $institution_id, $limit, $offset ) : array( $limit, $offset );
+		$rows = (array) $wpdb->get_results( $wpdb->prepare( $sql, ...$args ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$contact_ids = array_values( array_filter( array_map( 'absint', wp_list_pluck( $rows, 'id' ) ) ) );
+		if ( ! empty( $custom_keys ) && ! empty( $contact_ids ) ) {
+			$custom_map = self::get_custom_values_map_for_contacts( $contact_ids, $custom_keys );
+		}
 		$out  = array();
 		foreach ( $rows as $row ) {
-			$out[] = array(
+			$contact_id = absint( $row['id'] ?? 0 );
+			$line = array(
 				(int) ( $row['id'] ?? 0 ),
 				sanitize_text_field( (string) ( $row['name'] ?? '' ) ),
 				sanitize_email( (string) ( $row['email'] ?? '' ) ),
@@ -257,8 +283,122 @@ class CSV_Export_Service {
 				sanitize_text_field( (string) ( $row['source'] ?? '' ) ),
 				sanitize_text_field( (string) ( $row['created_at'] ?? '' ) ),
 			);
+
+			foreach ( $custom_keys as $key ) {
+				$line[] = sanitize_text_field( (string) ( $custom_map[ $contact_id ][ $key ] ?? '' ) );
+			}
+
+			$out[] = $line;
 		}
 		return $out;
+	}
+
+	/**
+	 * @return array<int,string>
+	 */
+	private static function get_contact_custom_field_keys(): array {
+		static $cached = null;
+		if ( null !== $cached ) {
+			return $cached;
+		}
+
+		$keys = array();
+		if ( class_exists( '\\ATORA\\CRM_V2\\Services\\Contact_Service' ) ) {
+			foreach ( (array) Contact_Service::get_custom_fields() as $field ) {
+				$key = sanitize_key( (string) ( $field['field_key'] ?? '' ) );
+				if ( '' !== $key ) {
+					$keys[] = $key;
+				}
+			}
+		}
+		$cached = array_values( array_unique( $keys ) );
+		return $cached;
+	}
+
+	/**
+	 * @param array<int,int>    $contact_ids
+	 * @param array<int,string> $custom_keys
+	 * @return array<int,array<string,string>>
+	 */
+	private static function get_custom_values_map_for_contacts( array $contact_ids, array $custom_keys ): array {
+		global $wpdb;
+
+		$contact_ids = array_values( array_filter( array_map( 'absint', $contact_ids ) ) );
+		$custom_keys = array_values( array_filter( array_map( 'sanitize_key', $custom_keys ) ) );
+		if ( empty( $contact_ids ) || empty( $custom_keys ) ) {
+			return array();
+		}
+
+		$table = $wpdb->prefix . 'atora_crm_contact_field_values';
+		if ( ! DB_Service::table_exists( $table ) ) {
+			return array();
+		}
+
+		$in = implode( ',', array_fill( 0, count( $contact_ids ), '%d' ) );
+		$sql = "SELECT contact_id, field_key, value FROM {$table} WHERE contact_id IN ({$in})";
+		$rows = (array) $wpdb->get_results( $wpdb->prepare( $sql, ...$contact_ids ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+
+		$map = array();
+		foreach ( $rows as $row ) {
+			$cid = absint( $row['contact_id'] ?? 0 );
+			$key = sanitize_key( (string) ( $row['field_key'] ?? '' ) );
+			if ( ! $cid || '' === $key || ! in_array( $key, $custom_keys, true ) ) {
+				continue;
+			}
+			if ( ! isset( $map[ $cid ] ) ) {
+				$map[ $cid ] = array();
+			}
+			$map[ $cid ][ $key ] = (string) ( $row['value'] ?? '' );
+		}
+
+		return $map;
+	}
+
+	private static function resolve_institution_id(): int {
+		global $wpdb;
+		$institutions_table = $wpdb->prefix . 'atora_institutions';
+		$like = method_exists( $wpdb, 'esc_like' ) ? $wpdb->esc_like( $institutions_table ) : $institutions_table;
+		$tenancy_configured = (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $like ) ) === $institutions_table;
+		if ( $tenancy_configured ) {
+			$first_id = absint( $wpdb->get_var( "SELECT id FROM {$institutions_table} ORDER BY id ASC LIMIT 1" ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+			$tenancy_configured = $first_id > 0;
+		}
+
+		if ( class_exists( '\\ATORA\\LMS\\Tenant_Context' ) ) {
+			$resolved = \ATORA\LMS\Tenant_Context::current_institution_id();
+			if ( is_wp_error( $resolved ) ) {
+				if ( ! $tenancy_configured ) {
+					return 0;
+				}
+				$single = self::single_institution_fallback_id();
+				return $single > 0 ? $single : -1;
+			}
+			$id = absint( $resolved );
+			if ( $id > 0 ) {
+				return $id;
+			}
+			if ( ! $tenancy_configured ) {
+				return 0;
+			}
+			$single = self::single_institution_fallback_id();
+			return $single > 0 ? $single : -1;
+		}
+
+		return 0;
+	}
+
+	private static function single_institution_fallback_id(): int {
+		global $wpdb;
+		if ( ! method_exists( $wpdb, 'get_col' ) ) {
+			return 0;
+		}
+		$table = $wpdb->prefix . 'atora_institutions';
+		$like  = method_exists( $wpdb, 'esc_like' ) ? $wpdb->esc_like( $table ) : $table;
+		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $like ) ) !== $table ) {
+			return 0;
+		}
+		$ids = array_values( array_filter( array_map( 'absint', (array) $wpdb->get_col( "SELECT id FROM {$table} ORDER BY id ASC LIMIT 2" ) ) ) );
+		return 1 === count( $ids ) ? absint( $ids[0] ) : 0;
 	}
 }
 

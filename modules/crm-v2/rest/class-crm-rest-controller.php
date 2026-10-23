@@ -174,6 +174,58 @@ class CRM_REST_Controller {
 	}
 
 	/**
+	 * Resuelve institution_id actual.
+	 *
+	 * @return int 0 cuando no se pudo resolver.
+	 */
+	private static function current_institution_id(): int {
+		global $wpdb;
+		$institutions_table = $wpdb->prefix . 'atora_institutions';
+		$like = method_exists( $wpdb, 'esc_like' ) ? $wpdb->esc_like( $institutions_table ) : $institutions_table;
+		$tenancy_configured = (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $like ) ) === $institutions_table;
+		if ( $tenancy_configured ) {
+			$first_id = absint( $wpdb->get_var( "SELECT id FROM {$institutions_table} ORDER BY id ASC LIMIT 1" ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+			$tenancy_configured = $first_id > 0;
+		}
+
+		if ( class_exists( '\\ATORA\\LMS\\Tenant_Context' ) ) {
+			$resolved = \ATORA\LMS\Tenant_Context::current_institution_id();
+			if ( is_wp_error( $resolved ) ) {
+				if ( ! $tenancy_configured ) {
+					return 0;
+				}
+				$single = self::single_institution_fallback_id();
+				return $single > 0 ? $single : -1;
+			}
+			$id = absint( $resolved );
+			if ( $id > 0 ) {
+				return $id;
+			}
+			if ( ! $tenancy_configured ) {
+				return 0;
+			}
+			$single = self::single_institution_fallback_id();
+			return $single > 0 ? $single : -1;
+		}
+
+		return 0;
+	}
+
+	private static function single_institution_fallback_id(): int {
+		global $wpdb;
+		if ( ! method_exists( $wpdb, 'get_col' ) ) {
+			return 0;
+		}
+		$table = $wpdb->prefix . 'atora_institutions';
+		$like  = method_exists( $wpdb, 'esc_like' ) ? $wpdb->esc_like( $table ) : $table;
+		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $like ) ) !== $table ) {
+			return 0;
+		}
+		$ids = array_values( array_filter( array_map( 'absint', (array) $wpdb->get_col( "SELECT id FROM {$table} ORDER BY id ASC LIMIT 2" ) ) ) );
+		return 1 === count( $ids ) ? absint( $ids[0] ) : 0;
+	}
+
+	/**
 	 * Determina si un user_id está visible para el usuario actual.
 	 *
 	 * @param int $user_id ID de usuario asociado al recurso.
@@ -207,8 +259,9 @@ class CRM_REST_Controller {
 			return false;
 		}
 
-		if ( self::has_global_scope() ) {
-			return true;
+		$institution_id = self::current_institution_id();
+		if ( $institution_id < 0 ) {
+			return false;
 		}
 
 		$contact_user_id = (int) $wpdb->get_var(
@@ -217,6 +270,21 @@ class CRM_REST_Controller {
 				$contact_id
 			)
 		);
+		if ( $institution_id > 0 ) {
+			$contact_inst_id = (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT institution_id FROM {$wpdb->prefix}atora_contacts WHERE id = %d LIMIT 1",
+					$contact_id
+				)
+			);
+			if ( $contact_inst_id !== $institution_id ) {
+				return false;
+			}
+		}
+
+		if ( self::has_global_scope() ) {
+			return true;
+		}
 
 		return self::user_id_is_visible( $contact_user_id );
 	}
@@ -235,13 +303,14 @@ class CRM_REST_Controller {
 			return false;
 		}
 
-		if ( self::has_global_scope() ) {
-			return true;
+		$institution_id = self::current_institution_id();
+		if ( $institution_id < 0 ) {
+			return false;
 		}
 
 		$row = (array) $wpdb->get_row(
 			$wpdb->prepare(
-				"SELECT c.user_id, c.contact_id, ct.user_id AS contact_user_id
+				"SELECT c.user_id, c.contact_id, ct.user_id AS contact_user_id, ct.institution_id AS contact_institution_id
 				 FROM {$wpdb->prefix}atora_conversations c
 				 LEFT JOIN {$wpdb->prefix}atora_contacts ct ON ct.id = c.contact_id
 				 WHERE c.id = %d
@@ -252,6 +321,14 @@ class CRM_REST_Controller {
 		);
 		if ( empty( $row ) ) {
 			return false;
+		}
+
+		if ( $institution_id > 0 && absint( $row['contact_institution_id'] ?? 0 ) !== $institution_id ) {
+			return false;
+		}
+
+		if ( self::has_global_scope() ) {
+			return true;
 		}
 
 		$conversation_user_id = absint( $row['user_id'] ?? 0 );
@@ -276,9 +353,6 @@ class CRM_REST_Controller {
 		if ( ! $deal_id ) {
 			return false;
 		}
-		if ( self::has_global_scope() ) {
-			return true;
-		}
 
 		$row = (array) $wpdb->get_row(
 			$wpdb->prepare(
@@ -291,11 +365,12 @@ class CRM_REST_Controller {
 			return false;
 		}
 
-		if ( self::user_id_is_visible( absint( $row['user_id'] ?? 0 ) ) ) {
+		$contact_id = absint( $row['contact_id'] ?? 0 );
+		if ( $contact_id > 0 && self::contact_id_is_visible( $contact_id ) ) {
 			return true;
 		}
 
-		return self::contact_id_is_visible( absint( $row['contact_id'] ?? 0 ) );
+		return self::user_id_is_visible( absint( $row['user_id'] ?? 0 ) );
 	}
 
 	/**
@@ -311,9 +386,6 @@ class CRM_REST_Controller {
 		if ( ! $followup_id ) {
 			return false;
 		}
-		if ( self::has_global_scope() ) {
-			return true;
-		}
 
 		$row = (array) $wpdb->get_row(
 			$wpdb->prepare(
@@ -326,11 +398,12 @@ class CRM_REST_Controller {
 			return false;
 		}
 
-		if ( self::user_id_is_visible( absint( $row['user_id'] ?? 0 ) ) ) {
+		$contact_id = absint( $row['contact_id'] ?? 0 );
+		if ( $contact_id > 0 && self::contact_id_is_visible( $contact_id ) ) {
 			return true;
 		}
 
-		return self::contact_id_is_visible( absint( $row['contact_id'] ?? 0 ) );
+		return self::user_id_is_visible( absint( $row['user_id'] ?? 0 ) );
 	}
 
 	/**
@@ -346,9 +419,6 @@ class CRM_REST_Controller {
 		if ( ! $task_id ) {
 			return false;
 		}
-		if ( self::has_global_scope() ) {
-			return true;
-		}
 
 		$row = (array) $wpdb->get_row(
 			$wpdb->prepare(
@@ -361,11 +431,12 @@ class CRM_REST_Controller {
 			return false;
 		}
 
-		if ( self::user_id_is_visible( absint( $row['user_id'] ?? 0 ) ) ) {
+		$contact_id = absint( $row['contact_id'] ?? 0 );
+		if ( $contact_id > 0 && self::contact_id_is_visible( $contact_id ) ) {
 			return true;
 		}
 
-		return self::contact_id_is_visible( absint( $row['contact_id'] ?? 0 ) );
+		return self::user_id_is_visible( absint( $row['user_id'] ?? 0 ) );
 	}
 
 	/**

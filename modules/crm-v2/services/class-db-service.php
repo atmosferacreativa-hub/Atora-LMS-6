@@ -122,6 +122,7 @@ class DB_Service {
 			"{$prefix}atora_crm_campaign_recipients",
 			"{$prefix}atora_crm_contact_fields",
 			"{$prefix}atora_crm_contact_field_values",
+			"{$prefix}atora_crm_audit_log",
 			// PT-6 (6.5.10): sin estas cuatro en la lista, get_missing_tables()
 			// nunca las detectaba como faltantes -- needs_schema solo se
 			// disparaba por el version_compare(), nunca por su ausencia real.
@@ -640,6 +641,20 @@ class DB_Service {
 				UNIQUE KEY contact_field (contact_id, field_key),
 				KEY contact_id (contact_id),
 				KEY field_key (field_key)
+			) {$charset};",
+			"{$prefix}atora_crm_audit_log" => "{$create_kw} {$prefix}atora_crm_audit_log (
+				id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+				institution_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+				actor_user_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+				action_key VARCHAR(60) NOT NULL DEFAULT '',
+				entity_type VARCHAR(40) NOT NULL DEFAULT '',
+				entity_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+				payload LONGTEXT NULL,
+				created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				PRIMARY KEY (id),
+				KEY institution_actor (institution_id, actor_user_id),
+				KEY action_key (action_key),
+				KEY entity_ref (entity_type, entity_id)
 			) {$charset};",
 			// PT-6 (6.5.10): las cuatro tablas de Sequence_Service (Fase 6,
 			// 5.28.0 — secuencias de email drip) nunca tuvieron un CREATE
