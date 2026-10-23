@@ -41,9 +41,11 @@ PR: #80 (merge 2026-10-23).
 
 ## Bloque 4 — Automatización
 
-- [ ] Implementado `get_contact_id_by_user()` en servicio compartido.
-- [ ] Quitado `method_exists()`.
-- [ ] Prueba: automatización etiqueta / mueve etapa realmente.
+- [x] Implementado `get_contact_id_by_user()` en servicio compartido.
+- [x] Quitado `method_exists()`.
+- [x] Prueba: automatización etiqueta / mueve etapa realmente.
+
+PR: #82 (merge 2026-10-23).
 
 ## Bloque 5 — CRM v2 completo
 
