@@ -390,7 +390,7 @@ Los endpoints de gestión (write) verifican `clms_manage_crm` o `manage_options`
 ## RECOMENDACIONES PENDIENTES (no críticas)
 
 1. **Content-Security-Policy header:** Añadir CSP en las páginas admin del plugin para mitigar XSS de terceros.
-2. **Subresource Integrity:** El Chart.js cargado desde CDN (`cdn.jsdelivr.net`) debería usar atributo `integrity`.
+2. **Subresource Integrity:** (Resuelto en 6.33.3) Chart.js ya no se carga desde CDN; se sirve desde el plugin.
 3. **File upload real MIME check:** En `class-whisper-live.php`, añadir validación con `finfo_open(FILEINFO_MIME_TYPE)` como segunda capa.
 4. **Audit log:** Registrar en BD las acciones sensibles (crear/revocar API keys, ejecutar migraciones, bulk actions).
 

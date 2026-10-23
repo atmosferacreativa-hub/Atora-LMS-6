@@ -1537,7 +1537,8 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 		}
 		// Cargar Chart.js si no está encolado
 		if ( ! wp_script_is( 'chart-js', 'enqueued' ) ) {
-			wp_enqueue_script( 'chart-js', 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js', array(), '4.4.1', true );
+			$assets = defined( 'ATORA_LMS_ASSETS_URL' ) ? ATORA_LMS_ASSETS_URL : ( defined( 'ATORA_LMS_URL' ) ? ATORA_LMS_URL . 'assets/' : '' );
+			wp_enqueue_script( 'chart-js', $assets . 'vendor/chartjs/chart.umd.min.js', array(), '4.4.1', true );
 		}
 		$view = defined( 'ATORA_LMS_MODULES_DIR' ) ? ATORA_LMS_MODULES_DIR . 'analytics/views/dashboard.php' : '';
 		if ( $view && file_exists( $view ) ) {

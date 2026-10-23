@@ -1,5 +1,18 @@
 # CHANGELOG — ATORA LMS
 
+## 6.33.3 (2026-10-23)
+
+### Seguridad: licencias y actualizaciones
+
+- Se elimina cualquier referencia a un dominio de tercero/no controlado para licencias/updates.
+- El servidor de licencias pasa a ser **configurable** (constante `ATORA_LICENSE_SERVER` en `wp-config.php` o ajuste en Admin → ATORA → Licencia), **sin valor por defecto**.
+- Sin servidor configurado: no se programa `atora_license_check_cron`, no se consulta el endpoint remoto, no se ofrecen updates automáticos y la pantalla de licencia muestra **"Actualizaciones por ZIP"**.
+- Con servidor: solo HTTPS y el zip de actualización se valida con firma Ed25519 (clave pública incluida en el plugin) antes de instalarse.
+
+### Dependencias: sin CDN
+
+- SortableJS, Chart.js y FullCalendar ahora se cargan desde archivos empaquetados dentro del plugin. No hay cargas de JS/CSS desde dominios externos.
+
 ## 6.33.2 (2026-10-08)
 
 ### Correcciones antes de las tiendas (orden `docs/ordenes/ORDEN-1.0.1.md`)
@@ -824,8 +837,8 @@ hasta que un administrador elija explícitamente lo contrario.
 
 ### Comercialización — Licencias, actualizaciones y desinstalación limpia
 
-- **NUEVO — Módulo de licencias** (`modules/licensing/`): activación/desactivación de clave contra el servidor de atora-lms.com, verificación semanal por cron con caché de 12h, página Admin → ATORA → Licencia con estado, plan y expiración. El plugin nunca se bloquea sin licencia; solo se condicionan las actualizaciones automáticas.
-- **NUEVO — Actualizaciones self-hosted**: integración con el estándar `update_plugins_{hostname}` de WP 5.8+ usando el `Update URI: https://atora-lms.com` ya declarado. Modal "Ver detalles" con changelog remoto. Spec del servidor en `docs/LICENSING-SERVER.md`.
+- **NUEVO — Módulo de licencias** (`modules/licensing/`): activación/desactivación de clave contra un servidor de licencias **configurable**, verificación semanal por cron con caché de 12h, página Admin → ATORA → Licencia con estado, plan y expiración. El plugin nunca se bloquea sin licencia; solo se condicionan las actualizaciones automáticas.
+- **NUEVO — Actualizaciones self-hosted**: integración con el estándar `update_plugins_{hostname}` de WP 5.8+ (Update URI del plugin). Spec del servidor en `docs/LICENSING-SERVER.md`.
 - **NUEVO — `uninstall.php`**: limpieza de crons y transients siempre; borrado completo de las 51 tablas custom, opciones, meta legacy y CPTs solo con opt-in explícito (`atora_lms_delete_data_on_uninstall`, toggle en la página de Licencia). Protege los datos del cliente por defecto.
 - **SEGURIDAD — REST**: `GET /courses/{id}/progress` y `POST /lessons/{id}/complete` pasan de `__return_true` a `permission_callback => is_user_logged_in` (defensa en capas; los callbacks ya validaban login y matrícula internamente).
 - **FIX — readme.txt**: `Stable tag` sincronizado con la versión real (estaba en 6.0.9).

@@ -2,9 +2,9 @@
 Contributors: atorastudio, atmosferacreativa
 Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
-Tested up to: 6.8
+Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 6.33.2
+Stable tag: 6.33.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,10 @@ Translation files are loaded from the `/languages` directory.
 4. Course overview template.
 
 == Changelog ==
+= 6.33.3 =
+* Seguridad: servidor de licencias configurable sin valor por defecto; sin servidor no hay cron ni llamadas salientes y las actualizaciones son por ZIP; con servidor solo HTTPS y verificación de firma antes de instalar.
+* Dependencias: SortableJS, Chart.js y FullCalendar se cargan desde el plugin (sin CDN).
+
 = 6.33.2 =
 * Correcciones antes de las tiendas: el estudiante inscrito en un programa entra a todos sus cursos (también a los agregados después; `wp atora reconcile-program-access`); leer una entrega mientras otro la guarda responde 409 reintentable; una reserva de IA que no se pudo registrar no llama al proveedor.
 

@@ -1,6 +1,8 @@
 # ATORA LMS — Servidor de Licencias (spec de implementación)
 
-El módulo `modules/licensing/class-licensing.php` (cliente) espera esta API en `https://atora-lms.com`. Puedes implementarla como plugin WP en tu propio sitio (recomendado: WooCommerce + suscripciones genera la clave al comprar) o como worker en Cloudflare.
+El módulo `modules/licensing/class-licensing.php` (cliente) consume un servidor **configurable** (constante `ATORA_LICENSE_SERVER` en `wp-config.php` o ajuste en la pantalla de licencia). **No hay dominio por defecto**.
+
+Además, para habilitar actualizaciones automáticas el sitio cliente debe configurar la clave pública Ed25519 (base64) vía `ATORA_LICENSE_PUBKEY_B64` (recomendado, en `wp-config.php`). Si no hay clave pública, el cliente rechaza cualquier update.
 
 ## Endpoints
 
@@ -28,13 +30,16 @@ Si la licencia es válida, responder con la última versión disponible:
 ```json
 {
   "version": "6.3.0",
-  "package": "https://atora-lms.com/releases/atora-lms-6.3.0.zip?token=FIRMADO",
+  "package": "https://tu-servidor.com/releases/atora-lms-6.3.0.zip?token=FIRMADO",
+  "signature": "BASE64_ED25519_SHA256(zip)",
   "tested": "6.6",
   "requires_php": "8.1",
   "sections": { "changelog": "<h4>6.3.0</h4><ul><li>...</li></ul>" }
 }
 ```
-**Importante:** la URL `package` debe ser firmada y de corta duración (token HMAC con expiración de 5 min) para que no se comparta públicamente el zip.
+**Importante:**
+- La URL `package` debe ser de corta duración (token HMAC con expiración de 5 min) para que no se comparta públicamente el zip.
+- El cliente **verifica** `signature` antes de instalar. La firma es Ed25519 y se calcula sobre el **SHA-256 binario** del zip.
 
 ## Modelo de datos mínimo (tabla `licenses`)
 | campo | tipo |
@@ -55,3 +60,4 @@ Al completarse una compra en WooCommerce (hook `woocommerce_order_status_complet
 - Rate-limit por IP en /activate y /check (p. ej. 30 req/h).
 - Nunca exponer el zip en URL pública sin token.
 - Log de activaciones para detectar claves filtradas (misma clave en >N dominios).
+- Firmar cada zip con la clave privada Ed25519 y exponer solo la firma (base64) por el endpoint /update.
