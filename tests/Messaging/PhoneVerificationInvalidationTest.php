@@ -182,18 +182,93 @@ class PhoneVerificationInvalidationTest extends TestCase {
 	public function test_phone_write_site_delegates_to_update_phone( string $relative_path ): void {
 		$contents = file_get_contents( __DIR__ . '/../../' . $relative_path );
 		$this->assertIsString( $contents );
+		$code = self::strip_comments_and_strings( $contents );
 		$this->assertStringContainsString(
 			'Preferences::update_phone(',
-			$contents,
+			$code,
 			"{$relative_path} debería escribir atora_phone vía Preferences::update_phone()"
 		);
 	}
 
 	public static function phone_write_sites(): array {
-		return array(
-			array( 'includes/frontend/trait-frontend-access-profile.php' ),
-			array( 'modules/crm/trait-crm-contacts.php' ),
-			array( 'includes/admin-menu/trait-admin-menu-main-pages-academic.php' ),
-		);
+		return array_values( array_map( static fn( string $path ) => array( $path ), self::discover_phone_write_sites() ) );
+	}
+
+	/**
+	 * Encuentra los archivos del plugin que podrían escribir `atora_phone`.
+	 *
+	 * Regla: cualquier archivo de producción que contenga `'atora_phone'` y
+	 * llame a `update_user_meta(` debe tener una llamada real (no en comentario
+	 * ni en string) a `Preferences::update_phone(`.
+	 *
+	 * @return array<int,string>
+	 */
+	private static function discover_phone_write_sites(): array {
+		$root = realpath( __DIR__ . '/../../' );
+		if ( ! is_string( $root ) ) {
+			return array();
+		}
+
+		$paths = array();
+		foreach ( array( 'includes', 'modules' ) as $dir ) {
+			$abs_dir = $root . DIRECTORY_SEPARATOR . $dir;
+			if ( ! is_dir( $abs_dir ) ) {
+				continue;
+			}
+
+			$iterator = new \RecursiveIteratorIterator(
+				new \RecursiveDirectoryIterator( $abs_dir, \FilesystemIterator::SKIP_DOTS )
+			);
+			foreach ( $iterator as $file ) {
+				if ( ! $file instanceof \SplFileInfo ) {
+					continue;
+				}
+				if ( 'php' !== strtolower( (string) $file->getExtension() ) ) {
+					continue;
+				}
+				$relative_path = ltrim( str_replace( $root, '', (string) $file->getPathname() ), DIRECTORY_SEPARATOR );
+				if ( 'modules/messaging/class-messaging-preferences.php' === $relative_path ) {
+					// Este archivo implementa Preferences::update_phone(); no puede llamarse a sí mismo.
+					continue;
+				}
+
+				$contents = file_get_contents( (string) $file->getPathname() );
+				if ( ! is_string( $contents ) ) {
+					continue;
+				}
+				if ( false === strpos( $contents, "'atora_phone'" ) ) {
+					continue;
+				}
+				if ( false === strpos( $contents, 'update_user_meta(' ) ) {
+					continue;
+				}
+
+				$paths[] = str_replace( DIRECTORY_SEPARATOR, '/', $relative_path );
+			}
+		}
+
+		sort( $paths );
+		return array_values( array_unique( $paths ) );
+	}
+
+	/**
+	 * Remueve comentarios y strings para evitar satisfacer una prueba
+	 * con texto no ejecutable.
+	 */
+	private static function strip_comments_and_strings( string $php ): string {
+		$out = '';
+		foreach ( token_get_all( $php ) as $token ) {
+			if ( is_array( $token ) ) {
+				$type = $token[0];
+				$text = $token[1];
+				if ( T_COMMENT === $type || T_DOC_COMMENT === $type || T_CONSTANT_ENCAPSED_STRING === $type || T_ENCAPSED_AND_WHITESPACE === $type ) {
+					continue;
+				}
+				$out .= $text;
+				continue;
+			}
+			$out .= $token;
+		}
+		return $out;
 	}
 }
