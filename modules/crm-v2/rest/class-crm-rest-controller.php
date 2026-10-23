@@ -174,6 +174,22 @@ class CRM_REST_Controller {
 	}
 
 	/**
+	 * Resuelve institution_id actual.
+	 *
+	 * @return int 0 cuando no se pudo resolver.
+	 */
+	private static function current_institution_id(): int {
+		if ( class_exists( '\\ATORA\\LMS\\Tenant_Context' ) ) {
+			$resolved = \ATORA\LMS\Tenant_Context::current_institution_id();
+			if ( is_wp_error( $resolved ) ) {
+				return 0;
+			}
+			return absint( $resolved );
+		}
+		return 0;
+	}
+
+	/**
 	 * Determina si un user_id está visible para el usuario actual.
 	 *
 	 * @param int $user_id ID de usuario asociado al recurso.
@@ -207,18 +223,31 @@ class CRM_REST_Controller {
 			return false;
 		}
 
+		$institution_id = self::current_institution_id();
+		if ( $institution_id <= 0 ) {
+			return false;
+		}
+
+		$row = (array) $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT user_id, institution_id FROM {$wpdb->prefix}atora_contacts WHERE id = %d LIMIT 1",
+				$contact_id
+			),
+			ARRAY_A
+		);
+		if ( empty( $row ) ) {
+			return false;
+		}
+
+		if ( absint( $row['institution_id'] ?? 0 ) !== $institution_id ) {
+			return false;
+		}
+
 		if ( self::has_global_scope() ) {
 			return true;
 		}
 
-		$contact_user_id = (int) $wpdb->get_var(
-			$wpdb->prepare(
-				"SELECT user_id FROM {$wpdb->prefix}atora_contacts WHERE id = %d LIMIT 1",
-				$contact_id
-			)
-		);
-
-		return self::user_id_is_visible( $contact_user_id );
+		return self::user_id_is_visible( absint( $row['user_id'] ?? 0 ) );
 	}
 
 	/**
@@ -235,13 +264,14 @@ class CRM_REST_Controller {
 			return false;
 		}
 
-		if ( self::has_global_scope() ) {
-			return true;
+		$institution_id = self::current_institution_id();
+		if ( $institution_id <= 0 ) {
+			return false;
 		}
 
 		$row = (array) $wpdb->get_row(
 			$wpdb->prepare(
-				"SELECT c.user_id, c.contact_id, ct.user_id AS contact_user_id
+				"SELECT c.user_id, c.contact_id, ct.user_id AS contact_user_id, ct.institution_id AS contact_institution_id
 				 FROM {$wpdb->prefix}atora_conversations c
 				 LEFT JOIN {$wpdb->prefix}atora_contacts ct ON ct.id = c.contact_id
 				 WHERE c.id = %d
@@ -252,6 +282,14 @@ class CRM_REST_Controller {
 		);
 		if ( empty( $row ) ) {
 			return false;
+		}
+
+		if ( absint( $row['contact_institution_id'] ?? 0 ) !== $institution_id ) {
+			return false;
+		}
+
+		if ( self::has_global_scope() ) {
+			return true;
 		}
 
 		$conversation_user_id = absint( $row['user_id'] ?? 0 );
@@ -276,9 +314,6 @@ class CRM_REST_Controller {
 		if ( ! $deal_id ) {
 			return false;
 		}
-		if ( self::has_global_scope() ) {
-			return true;
-		}
 
 		$row = (array) $wpdb->get_row(
 			$wpdb->prepare(
@@ -291,11 +326,12 @@ class CRM_REST_Controller {
 			return false;
 		}
 
-		if ( self::user_id_is_visible( absint( $row['user_id'] ?? 0 ) ) ) {
+		$contact_id = absint( $row['contact_id'] ?? 0 );
+		if ( $contact_id > 0 && self::contact_id_is_visible( $contact_id ) ) {
 			return true;
 		}
 
-		return self::contact_id_is_visible( absint( $row['contact_id'] ?? 0 ) );
+		return self::user_id_is_visible( absint( $row['user_id'] ?? 0 ) );
 	}
 
 	/**
@@ -311,9 +347,6 @@ class CRM_REST_Controller {
 		if ( ! $followup_id ) {
 			return false;
 		}
-		if ( self::has_global_scope() ) {
-			return true;
-		}
 
 		$row = (array) $wpdb->get_row(
 			$wpdb->prepare(
@@ -326,11 +359,12 @@ class CRM_REST_Controller {
 			return false;
 		}
 
-		if ( self::user_id_is_visible( absint( $row['user_id'] ?? 0 ) ) ) {
+		$contact_id = absint( $row['contact_id'] ?? 0 );
+		if ( $contact_id > 0 && self::contact_id_is_visible( $contact_id ) ) {
 			return true;
 		}
 
-		return self::contact_id_is_visible( absint( $row['contact_id'] ?? 0 ) );
+		return self::user_id_is_visible( absint( $row['user_id'] ?? 0 ) );
 	}
 
 	/**
@@ -346,9 +380,6 @@ class CRM_REST_Controller {
 		if ( ! $task_id ) {
 			return false;
 		}
-		if ( self::has_global_scope() ) {
-			return true;
-		}
 
 		$row = (array) $wpdb->get_row(
 			$wpdb->prepare(
@@ -361,11 +392,12 @@ class CRM_REST_Controller {
 			return false;
 		}
 
-		if ( self::user_id_is_visible( absint( $row['user_id'] ?? 0 ) ) ) {
+		$contact_id = absint( $row['contact_id'] ?? 0 );
+		if ( $contact_id > 0 && self::contact_id_is_visible( $contact_id ) ) {
 			return true;
 		}
 
-		return self::contact_id_is_visible( absint( $row['contact_id'] ?? 0 ) );
+		return self::user_id_is_visible( absint( $row['user_id'] ?? 0 ) );
 	}
 
 	/**

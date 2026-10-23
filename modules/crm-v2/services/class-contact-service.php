@@ -26,6 +26,8 @@ class Contact_Service {
 			'status'   => '',
 			'tag'      => '',
 			'course_id'=> 0,
+			'institution_id' => 0,
+			'custom_filters' => array(),
 			'page'     => 1,
 			'per_page' => 20,
 			'limit'    => 0,
@@ -129,9 +131,15 @@ class Contact_Service {
 			return 0;
 		}
 
+		$institution_id = self::resolve_institution_id_for_query( array() );
+		if ( $institution_id <= 0 ) {
+			return 0;
+		}
+
 		$inserted = $wpdb->insert(
 			$table,
 			array(
+				'institution_id' => $institution_id,
 				'name'       => $name ?: __( 'Lead nuevo', 'atora-lms' ),
 				'email'      => $email,
 				'status'     => 'lead',
@@ -155,6 +163,8 @@ class Contact_Service {
 
 		// Emitir hook para Automation Engine (Fase 7)
 		if ( $contact_id ) {
+			Audit_Service::log( 'contact_created', 'contact', $contact_id, array( 'source' => $source ), 0, $institution_id );
+			Activity_Service::log_contact_activity( $contact_id, 'contact_created', array( 'source' => $source ) );
 			do_action( 'atora/crm/contact_created', $contact_id, 0 );
 		}
 
@@ -200,8 +210,12 @@ class Contact_Service {
 		}
 
 		$table   = $wpdb->prefix . 'atora_contacts';
+		$institution_id = self::resolve_institution_id_for_query( array() );
+		if ( $institution_id <= 0 ) {
+			return array();
+		}
 		$contact = (array) $wpdb->get_row(
-			$wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d LIMIT 1", $contact_id ),
+			$wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d AND institution_id = %d LIMIT 1", $contact_id, $institution_id ),
 			ARRAY_A
 		);
 		if ( empty( $contact ) ) {
@@ -265,16 +279,22 @@ class Contact_Service {
 			return array();
 		}
 
+		$institution_id = self::resolve_institution_id_for_query( array() );
+		if ( $institution_id <= 0 ) {
+			return array();
+		}
+
 		$limit = max( 1, min( 200, absint( $limit ) ) );
 		$rows  = (array) $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT LOWER(TRIM(email)) AS email_key, COUNT(*) AS total, GROUP_CONCAT(id ORDER BY created_at ASC) AS ids
 				 FROM {$table}
-				 WHERE email <> ''
-				 GROUP BY email_key
+				 WHERE institution_id = %d AND email <> ''
+				 GROUP BY institution_id, email_key
 				 HAVING total > 1
 				 ORDER BY total DESC
 				 LIMIT %d",
+				$institution_id,
 				$limit
 			),
 			ARRAY_A
@@ -301,11 +321,64 @@ class Contact_Service {
 			}
 
 			$duplicates[] = array(
+				'match_type' => 'email',
 				'email_key' => sanitize_email( (string) ( $row['email_key'] ?? '' ) ),
 				'count'     => count( $contacts ),
 				'contacts'  => $contacts,
 				'canonical' => $contacts[0],
 			);
+		}
+
+		// Duplicados por teléfono (incluye whatsapp).
+		$phone_cols = array( 'phone', 'whatsapp' );
+		foreach ( $phone_cols as $col ) {
+			$col = sanitize_key( (string) $col );
+			if ( ! in_array( $col, array( 'phone', 'whatsapp' ), true ) ) {
+				continue;
+			}
+
+			$key_expr = "LOWER(TRIM(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE({$col}, ' ', ''), '-', ''), '(', ''), ')', ''), '+', '')))";
+			$phone_rows = (array) $wpdb->get_results(
+				$wpdb->prepare(
+					"SELECT {$key_expr} AS phone_key, COUNT(*) AS total, GROUP_CONCAT(id ORDER BY created_at ASC) AS ids
+					 FROM {$table}
+					 WHERE institution_id = %d AND {$col} <> ''
+					 GROUP BY institution_id, phone_key
+					 HAVING total > 1
+					 ORDER BY total DESC
+					 LIMIT %d",
+					$institution_id,
+					$limit
+				),
+				ARRAY_A
+			); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+
+			foreach ( $phone_rows as $prow ) {
+				$ids = array_values( array_filter( array_map( 'absint', explode( ',', (string) ( $prow['ids'] ?? '' ) ) ) ) );
+				if ( count( $ids ) < 2 ) {
+					continue;
+				}
+
+				$placeholders = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
+				$contacts     = (array) $wpdb->get_results(
+					$wpdb->prepare(
+						"SELECT * FROM {$table} WHERE id IN ({$placeholders}) ORDER BY created_at ASC",
+						...$ids
+					),
+					ARRAY_A
+				); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+				if ( empty( $contacts ) ) {
+					continue;
+				}
+
+				$duplicates[] = array(
+					'match_type' => $col,
+					'phone_key'  => sanitize_text_field( (string) ( $prow['phone_key'] ?? '' ) ),
+					'count'      => count( $contacts ),
+					'contacts'   => $contacts,
+					'canonical'  => $contacts[0],
+				);
+			}
 		}
 
 		return $duplicates;
@@ -338,6 +411,28 @@ class Contact_Service {
 		$followups_table    = $wpdb->prefix . 'atora_crm_student_followups';
 		$tasks_table        = $wpdb->prefix . 'atora_crm_tasks';
 		$field_values_table = $wpdb->prefix . 'atora_crm_contact_field_values';
+		$conversations_table = $wpdb->prefix . 'atora_conversations';
+		$list_pivot_table    = $wpdb->prefix . 'atora_contact_list_pivot';
+		$campaign_recipients_table = $wpdb->prefix . 'atora_crm_campaign_recipients';
+		$sequence_enrollments_table = $wpdb->prefix . 'atora_email_sequence_enrollments';
+
+		$institution_id = self::resolve_institution_id_for_query( array() );
+		if ( $institution_id <= 0 ) {
+			return array(
+				'success' => false,
+				'message' => __( 'Institución no resuelta.', 'atora-lms' ),
+			);
+		}
+
+		$keep_inst = (int) $wpdb->get_var(
+			$wpdb->prepare( "SELECT institution_id FROM {$contacts_table} WHERE id = %d LIMIT 1", $keep_id )
+		);
+		if ( $keep_inst !== $institution_id ) {
+			return array(
+				'success' => false,
+				'message' => __( 'El contacto no pertenece a esta institución.', 'atora-lms' ),
+			);
+		}
 
 		$merged = 0;
 		foreach ( $remove_ids as $old_id ) {
@@ -356,7 +451,7 @@ class Contact_Service {
 				$wpdb->delete( $tags_table, array( 'contact_id' => $old_id ), array( '%d' ) );
 			}
 
-			foreach ( array( $notes_table, $activities_table, $deals_table, $followups_table, $tasks_table, $field_values_table ) as $rel_table ) {
+			foreach ( array( $notes_table, $activities_table, $deals_table, $followups_table, $tasks_table, $field_values_table, $conversations_table, $list_pivot_table, $campaign_recipients_table, $sequence_enrollments_table ) as $rel_table ) {
 				if ( DB_Service::table_exists( $rel_table ) ) {
 					$wpdb->update( $rel_table, array( 'contact_id' => $keep_id ), array( 'contact_id' => $old_id ), array( '%d' ), array( '%d' ) );
 				}
@@ -381,6 +476,7 @@ class Contact_Service {
 		}
 
 		if ( $merged > 0 ) {
+			Audit_Service::log( 'contacts_merged', 'contact', $keep_id, array( 'merged_count' => $merged ), 0, $institution_id );
 			Activity_Service::log_contact_activity(
 				$keep_id,
 				'contacts_merged',
@@ -656,6 +752,18 @@ class Contact_Service {
 		$clauses = array( '1=1' );
 		$params  = array();
 
+		$institution_id = self::resolve_institution_id_for_query( $args );
+		if ( $institution_id > 0 ) {
+			$clauses[] = 'c.institution_id = %d';
+			$params[]  = $institution_id;
+		} else {
+			$clauses[] = '1=0';
+			return array(
+				'sql'    => implode( ' AND ', $clauses ),
+				'params' => $params,
+			);
+		}
+
 		$scope_user_ids = self::get_scope_user_ids();
 		if ( ! empty( $scope_user_ids ) ) {
 			$in = implode( ',', array_fill( 0, count( $scope_user_ids ), '%d' ) );
@@ -723,10 +831,72 @@ class Contact_Service {
 			}
 		}
 
+		// ── Bloque 5 (6.34.0): filtros por campos personalizados ─────────────
+		$custom_filters    = (array) ( $args['custom_filters'] ?? array() );
+		$field_values_table = $wpdb->prefix . 'atora_crm_contact_field_values';
+		if ( ! empty( $custom_filters ) && DB_Service::table_exists( $field_values_table ) ) {
+			foreach ( $custom_filters as $cf ) {
+				$field_key = sanitize_key( (string) ( $cf['field_key'] ?? '' ) );
+				$operator  = sanitize_key( (string) ( $cf['operator'] ?? 'equals' ) );
+				$value     = sanitize_text_field( (string) ( $cf['value'] ?? '' ) );
+				if ( '' === $field_key ) {
+					continue;
+				}
+
+				if ( 'equals' === $operator ) {
+					$clauses[] = "EXISTS (SELECT 1 FROM {$field_values_table} fv WHERE fv.contact_id = c.id AND fv.field_key = %s AND fv.value = %s)";
+					$params[]  = $field_key;
+					$params[]  = $value;
+				} elseif ( 'contains' === $operator ) {
+					$like      = '%' . $wpdb->esc_like( $value ) . '%';
+					$clauses[] = "EXISTS (SELECT 1 FROM {$field_values_table} fv WHERE fv.contact_id = c.id AND fv.field_key = %s AND fv.value LIKE %s)";
+					$params[]  = $field_key;
+					$params[]  = $like;
+				} elseif ( 'is_empty' === $operator ) {
+					$clauses[] = "NOT EXISTS (SELECT 1 FROM {$field_values_table} fv WHERE fv.contact_id = c.id AND fv.field_key = %s AND fv.value <> '')";
+					$params[]  = $field_key;
+				} elseif ( 'is_not_empty' === $operator ) {
+					$clauses[] = "EXISTS (SELECT 1 FROM {$field_values_table} fv WHERE fv.contact_id = c.id AND fv.field_key = %s AND fv.value <> '')";
+					$params[]  = $field_key;
+				}
+			}
+		}
+
 		return array(
 			'sql'    => implode( ' AND ', $clauses ),
 			'params' => $params,
 		);
+	}
+
+	/**
+	 * Resuelve institution_id para queries del CRM.
+	 *
+	 * - Si viene explícito en args (incluye -1), se respeta.
+	 * - Si no, se resuelve con Tenant_Context.
+	 * - Si no se puede resolver, devuelve -1 (nunca degrada a alcance global).
+	 *
+	 * @param array $args
+	 * @return int
+	 */
+	private static function resolve_institution_id_for_query( array $args ): int {
+		if ( array_key_exists( 'institution_id', $args ) ) {
+			$raw = (int) ( $args['institution_id'] ?? 0 );
+			if ( 0 !== $raw ) {
+				return $raw;
+			}
+			// institution_id=0 significa "resolver por contexto".
+		}
+
+		if ( class_exists( '\\ATORA\\LMS\\Tenant_Context' ) ) {
+			$resolved = \ATORA\LMS\Tenant_Context::current_institution_id();
+			if ( is_wp_error( $resolved ) ) {
+				return -1;
+			}
+			$id = absint( $resolved );
+			return $id > 0 ? $id : -1;
+		}
+
+		return -1;
 	}
 
 	/**

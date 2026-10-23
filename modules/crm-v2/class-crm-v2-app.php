@@ -129,6 +129,9 @@ class CRM_V2_App {
 		DB_Service::maybe_install_schema();
 
 		CRM_REST_Controller::register_routes();
+		if ( class_exists( 'ATORA\CRM_V2\Rest\Import_REST_Controller' ) ) {
+			\ATORA\CRM_V2\Rest\Import_REST_Controller::register_routes();
+		}
 		Pipeline_REST_Controller::register_routes();
 		Tasks_REST_Controller::register_routes();
 		Calendar_REST_Controller::register_routes();
@@ -1231,8 +1234,10 @@ class CRM_V2_App {
 		$files = array(
 			$base . '/services/class-db-service.php',
 			$base . '/services/class-activity-service.php',
+			$base . '/services/class-audit-service.php',
 			$base . '/services/class-contact-service.php',
 			$base . '/services/class-csv-export-service.php',
+			$base . '/services/class-csv-import-service.php',
 			$base . '/services/class-task-service.php',
 			$base . '/services/class-deal-service.php',
 			$base . '/services/class-student-followup-service.php',
@@ -1240,6 +1245,7 @@ class CRM_V2_App {
 			$base . '/services/class-campaign-service.php',
 			$base . '/services/class-report-service.php',
 			$base . '/rest/class-crm-rest-controller.php',
+			$base . '/rest/class-import-rest-controller.php',
 			$base . '/rest/class-pipeline-rest-controller.php',
 			$base . '/rest/class-tasks-rest-controller.php',
 			$base . '/rest/class-calendar-rest-controller.php',
