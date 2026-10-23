@@ -197,9 +197,9 @@ class PhoneVerificationInvalidationTest extends TestCase {
 	/**
 	 * Encuentra los archivos del plugin que podrían escribir `atora_phone`.
 	 *
-	 * Regla: cualquier archivo de producción que contenga `'atora_phone'` y
-	 * llame a `update_user_meta(` debe tener una llamada real (no en comentario
-	 * ni en string) a `Preferences::update_phone(`.
+	 * Regla: cualquier archivo de producción que tenga un call site real
+	 * `update_user_meta(..., 'atora_phone', ...)` debe delegar en
+	 * `Preferences::update_phone()`.
 	 *
 	 * @return array<int,string>
 	 */
@@ -236,10 +236,7 @@ class PhoneVerificationInvalidationTest extends TestCase {
 				if ( ! is_string( $contents ) ) {
 					continue;
 				}
-				if ( false === strpos( $contents, "'atora_phone'" ) ) {
-					continue;
-				}
-				if ( false === strpos( $contents, 'update_user_meta(' ) ) {
+				if ( ! self::has_direct_update_user_meta_phone_write( $contents ) ) {
 					continue;
 				}
 
@@ -249,6 +246,61 @@ class PhoneVerificationInvalidationTest extends TestCase {
 
 		sort( $paths );
 		return array_values( array_unique( $paths ) );
+	}
+
+	/**
+	 * Detecta si el archivo tiene una escritura real a `atora_phone` via
+	 * update_user_meta().
+	 */
+	private static function has_direct_update_user_meta_phone_write( string $php ): bool {
+		$tokens = token_get_all( $php );
+		$count  = count( $tokens );
+		for ( $i = 0; $i < $count; $i++ ) {
+			$token = $tokens[ $i ];
+			if ( ! is_array( $token ) || T_STRING !== $token[0] || 'update_user_meta' !== $token[1] ) {
+				continue;
+			}
+
+			$j = $i + 1;
+			while ( $j < $count && is_array( $tokens[ $j ] ) && T_WHITESPACE === $tokens[ $j ][0] ) {
+				$j++;
+			}
+			if ( $j >= $count || '(' !== $tokens[ $j ] ) {
+				continue;
+			}
+
+			$depth       = 0;
+			$arg_index   = 0;
+			$in_parens   = false;
+			for ( $k = $j; $k < $count; $k++ ) {
+				$t = $tokens[ $k ];
+				$val = is_array( $t ) ? $t[1] : $t;
+				if ( '(' === $val ) {
+					$depth++;
+					$in_parens = true;
+					continue;
+				}
+				if ( ')' === $val && $in_parens ) {
+					$depth--;
+					if ( 0 === $depth ) {
+						break;
+					}
+					continue;
+				}
+				if ( 1 === $depth && ',' === $val ) {
+					$arg_index++;
+					continue;
+				}
+				if ( 1 === $depth && 1 === $arg_index && is_array( $t ) && T_CONSTANT_ENCAPSED_STRING === $t[0] ) {
+					$raw = trim( (string) $t[1] );
+					$raw = trim( $raw, "\"'" );
+					if ( 'atora_phone' === $raw ) {
+						return true;
+					}
+				}
+			}
+		}
+		return false;
 	}
 
 	/**
