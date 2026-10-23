@@ -32,10 +32,12 @@ PR: #78 (merge 2026-10-23).
 
 ## Bloque 3 — Eliminar CRM v1
 
-- [ ] Sin referencias a `\\ATORA\\CRM\\CRM` ni `modules/crm/`.
-- [ ] `modules/crm/` eliminado + desprogramar crons al actualizar.
-- [ ] Menús v1 redirigen a v2.
-- [ ] Prueba de humo (pantallas + rutas REST sin fatales).
+- [x] Sin referencias a `\\ATORA\\CRM\\CRM` ni `modules/crm/`.
+- [x] `modules/crm/` eliminado + desprogramar crons al actualizar.
+- [x] Menús v1 redirigen a v2.
+- [x] Prueba de humo (pantallas + rutas REST sin fatales).
+
+PR: #80 (merge 2026-10-23).
 
 ## Bloque 4 — Automatización
 
