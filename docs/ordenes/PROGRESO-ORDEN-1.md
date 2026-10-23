@@ -26,4 +26,7 @@
 - [x] Recorrido pantalla Maestro `material-zoom` agregado.
 - [x] Versión 1.0.2 + versionCode + changelog/README + PRUEBA-TELEFONO.
 - [ ] PR app 1.0.2 abierto y CI en verde: https://github.com/atmosferacreativa-hub/atora-mobile/pull/30
-- [ ] Tag `v1.0.2` + APK + AAB (sin enviar a tiendas).
+- [x] PR app 1.0.2 abierto y CI en verde: https://github.com/atmosferacreativa-hub/atora-mobile/pull/30
+- [x] Merge a `main`.
+- [x] Tag `v1.0.2`.
+- [x] APK + AAB generados en GitHub Actions y adjuntos al release: https://github.com/atmosferacreativa-hub/atora-mobile/releases/tag/v1.0.2
