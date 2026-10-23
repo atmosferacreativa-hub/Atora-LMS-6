@@ -452,12 +452,6 @@ class V5_Modules {
 
 	/** @return void */
 	private static function load_crm(): void {
-		$dir = ATORA_LMS_MODULES_DIR . 'crm/';
-		self::require_file( $dir . 'class-crm.php' );
-		if ( class_exists( 'ATORA\CRM\CRM' ) ) {
-			\ATORA\CRM\CRM::init();
-		}
-
 		$crm_v2_dir = ATORA_LMS_MODULES_DIR . 'crm-v2/';
 		self::require_file( $crm_v2_dir . 'class-crm-v2-app.php' );
 		if ( class_exists( 'ATORA\CRM_V2\CRM_V2_App' ) ) {

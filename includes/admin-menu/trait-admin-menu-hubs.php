@@ -945,6 +945,17 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 		// ── CRM (oculta) — si el módulo 'crm' está activo ─────────────────────
 		if ( ( current_user_can( 'clms_access_crm_view' ) || current_user_can( 'manage_options' ) )
 			&& ( ! class_exists( 'CLMS_Module_Registry' ) || CLMS_Module_Registry::is_active( 'crm' ) ) ) {
+			// Slug legacy del CRM v1: se mantiene solo como redirección a CRM v2
+			// para no romper enlaces guardados (admin.php?page=atora-crm&tab=...).
+			add_submenu_page(
+				'',
+				__( 'CRM', 'atora-lms' ),
+				__( 'CRM', 'atora-lms' ),
+				'clms_access_crm_view',
+				'atora-crm',
+				array( $this, 'render_crm_legacy_redirect_page' )
+			);
+
 			add_submenu_page(
 				'',
 				__( 'CRM', 'atora-lms' ),
@@ -2170,32 +2181,38 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 	}
 
 	/**
-	 * Pantalla beta de CRM v2 (feature flag + admin).
-	 *
-	 * @return void
-	 */
-	/**
-	 * Devuelve la URL CRM correcta según flag (audit P1-5).
-	 * Evita el loop de redirección circular entre legacy y v2.
+	 * Devuelve la URL del CRM actual.
 	 */
 	public static function get_crm_url_for_current_user(): string {
-		$crm_v2_active = class_exists( 'CLMS_Settings' ) && method_exists( 'CLMS_Settings', 'is_crm_v2_enabled' )
-			? CLMS_Settings::is_crm_v2_enabled()
-			: (bool) get_option( 'clms_crm_v2_enabled', false );
-		return $crm_v2_active
-			? admin_url( 'admin.php?page=atora-crm-v2' )
-			: admin_url( 'admin.php?page=atora-crm-legacy' );
+		return admin_url( 'admin.php?page=atora-crm-v2' );
+	}
+
+	public function render_crm_legacy_redirect_page(): void {
+		if ( ! current_user_can( 'clms_access_crm_view' ) && ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'No tienes permisos.', 'atora-lms' ) );
+		}
+
+		$tab = isset( $_GET['tab'] ) ? sanitize_key( (string) wp_unslash( $_GET['tab'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$target_slug = 'atora-crm-v2';
+		if ( 'inbox' === $tab ) {
+			$target_slug = 'atora-crm-v2-inbox';
+		} elseif ( 'contacts' === $tab ) {
+			$target_slug = 'atora-crm-v2-contacts';
+		} elseif ( 'pipeline' === $tab ) {
+			$target_slug = 'atora-crm-v2-pipeline-sales';
+		} elseif ( 'emails' === $tab ) {
+			$target_slug = 'atora-crm-v2-inbox';
+		}
+
+		wp_safe_redirect( admin_url( 'admin.php?page=' . $target_slug ) );
+		exit;
 	}
 
 	public function render_crm_v2_page(): void {
 		$page_slug = isset( $_GET['page'] ) ? sanitize_key( (string) wp_unslash( $_GET['page'] ) ) : 'atora-crm-v2'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-
-		// Si v2 desactivado y el slug solicitado es un alias legacy → mostrar CRM legacy
-		$v2_enabled = $this->is_crm_v2_enabled();
-		$is_legacy_alias = in_array( $page_slug, array( 'atora-crm', 'clms-crm-hub' ), true );
-		if ( ! $v2_enabled || $is_legacy_alias ) {
-			$this->render_crm_legacy_fallback();
-			return;
+		if ( in_array( $page_slug, array( 'atora-crm', 'atora-crm-legacy', 'clms-crm-hub' ), true ) ) {
+			wp_safe_redirect( admin_url( 'admin.php?page=atora-crm-v2' ) );
+			exit;
 		}
 		$app_class = '\ATORA\CRM_V2\CRM_V2_App';
 		$app_file  = defined( 'ATORA_LMS_MODULES_DIR' ) ? ATORA_LMS_MODULES_DIR . 'crm-v2/class-crm-v2-app.php' : '';
@@ -2207,8 +2224,7 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 				$app_class::init();
 			}
 			if ( method_exists( $app_class, 'can_access' ) && ! $app_class::can_access() ) {
-				wp_safe_redirect( admin_url( 'admin.php?page=atora-crm' ) );
-				exit;
+				wp_die( esc_html__( 'No tienes permisos.', 'atora-lms' ) );
 			}
 			$app_class::render_page( $page_slug );
 			return;
@@ -2230,27 +2246,8 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 			return;
 		}
 
-		echo '<div class="wrap"><h1>' . esc_html__( 'CRM v2 (beta)', 'atora-lms' ) . '</h1>'
+		echo '<div class="wrap"><h1>' . esc_html__( 'CRM v2', 'atora-lms' ) . '</h1>'
 			. '<p>' . esc_html__( 'Módulo CRM v2 no disponible.', 'atora-lms' ) . '</p></div>';
-	}
-
-	/**
-	 * Fallback para slugs legacy cuando CRM v2 está desactivado.
-	 * Muestra el CRM legacy real o un aviso con link al módulo correcto (audit P1-5).
-	 */
-	private function render_crm_legacy_fallback(): void {
-		$legacy_view = defined( 'ATORA_LMS_MODULES_DIR' ) ? ATORA_LMS_MODULES_DIR . 'crm/views/admin.php' : '';
-		if ( $legacy_view && file_exists( $legacy_view ) ) {
-			require $legacy_view;
-			return;
-		}
-		echo '<div class="wrap" style="font-family:sans-serif;max-width:600px;margin-top:2rem">'
-			. '<h1>CRM</h1>'
-			. '<div style="background:#eff6ff;border:.5px solid #bfdbfe;border-radius:10px;padding:16px 20px;font-size:14px;color:#1e3a8a">'
-			. esc_html__( 'CRM v2 está desactivado. Actívalo desde Ajustes → ATORA → CRM para acceder al módulo completo.', 'atora-lms' )
-			. '<br><br><a class="button button-primary" href="' . esc_url( admin_url( 'admin.php?page=clms-settings-hub' ) ) . '">'
-			. esc_html__( 'Ir a Ajustes', 'atora-lms' ) . '</a>'
-			. '</div></div>';
 	}
 
 }

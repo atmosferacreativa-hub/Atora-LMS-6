@@ -636,21 +636,20 @@ trait CLMS_Admin_Menu_Navigation_Trait {
 		}
 
 		if ( false !== strpos( $url, 'atora-crm-v2' ) ) {
-			if ( ! $this->is_crm_v2_enabled() ) {
-				return false;
-			}
 			$app_class = '\ATORA\CRM_V2\CRM_V2_App';
 			if ( class_exists( $app_class ) && method_exists( $app_class, 'can_access' ) ) {
 				return (bool) $app_class::can_access();
 			}
-			return current_user_can( 'manage_options' );
+			$core = function_exists( 'clms_core' ) ? clms_core( 'CLMS_Contacts_Core_Service' ) : null;
+			return $core ? (bool) $core->can_access_crm( get_current_user_id() ) : current_user_can( 'manage_options' );
 		}
 		if ( false !== strpos( $url, 'atora-crm' ) ) {
-			$crm_class = '\ATORA\CRM\CRM';
-			if ( class_exists( $crm_class ) && method_exists( $crm_class, 'can_access_crm' ) ) {
-				return (bool) $crm_class::can_access_crm( get_current_user_id() );
+			$app_class = '\ATORA\CRM_V2\CRM_V2_App';
+			if ( class_exists( $app_class ) && method_exists( $app_class, 'can_access' ) ) {
+				return (bool) $app_class::can_access();
 			}
-			return current_user_can( 'manage_options' );
+			$core = function_exists( 'clms_core' ) ? clms_core( 'CLMS_Contacts_Core_Service' ) : null;
+			return $core ? (bool) $core->can_access_crm( get_current_user_id() ) : current_user_can( 'manage_options' );
 		}
 		if ( false !== strpos( $url, 'atora-analytics' ) ) {
 			return current_user_can( 'manage_options' );

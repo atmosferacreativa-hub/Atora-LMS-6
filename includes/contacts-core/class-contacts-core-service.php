@@ -4,15 +4,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * PT-1 (6.11.0): implementación real de las primitivas de contacto que
- * históricamente vivían solo en \ATORA\CRM\CRM (modules/crm/, "CRM v1").
- * Este servicio se registra en el grupo 'core' del loader (sin condition:
- * 'module:crm') para que exista siempre, sea cual sea el estado del módulo
- * CRM -- así el módulo académico (y cualquier código nuevo) puede depender
- * de "puedo ver este contacto" / "registrá esta actividad" sin engancharse
- * a modules/crm/. \ATORA\CRM\CRM ahora delega acá (ver trait-crm-access.php
- * y trait-crm-contacts.php) en vez de duplicar la lógica, así que los ~40
- * call sites existentes de CRM:: siguen funcionando sin cambios.
+ * PT-1 (6.11.0): implementación real de primitivas de contacto que
+ * históricamente vivían en el CRM legacy (v1). Este servicio se registra
+ * en el grupo 'core' del loader (sin condition: 'module:crm') para que
+ * exista siempre, sea cual sea el estado del módulo CRM — así el módulo
+ * académico (y cualquier código nuevo) puede depender de "puedo ver este
+ * contacto" / "registrá esta actividad" sin acoplarse a la UI legacy.
  *
  * upsert_contact() deliberadamente NO se migró: su resolución de contacto
  * por teléfono/WhatsApp (find_contact_id_by_phone/normalize_contact_phone,
@@ -211,7 +208,7 @@ class CLMS_Contacts_Core_Service {
 	/**
 	 * Crea o actualiza un contacto en la tabla CRM.
 	 *
-	 * Portado desde CRM v1 (modules/crm/) como primitiva compartida.
+	 * Portado desde CRM v1 como primitiva compartida.
 	 *
 	 * @param array<string,mixed> $data Datos del contacto.
 	 * @return int ID del contacto.

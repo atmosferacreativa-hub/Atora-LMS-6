@@ -1,14 +1,14 @@
 <?php
 /**
- * CRM (v1 y v2) — resolución de Telegram vía atora_telegram_links, no
- * usermeta — PT-3 (sprint 6.5.9, MEDIUM).
+ * CRM v2 — resolución de Telegram vía atora_telegram_links, no usermeta —
+ * PT-3 (sprint 6.5.9, MEDIUM).
  *
  * Hallazgo confirmado: tres puntos del CRM seguían leyendo
  * atora_telegram_chat_id de usermeta directamente en vez de consultar
  * atora_telegram_links (fuente de verdad desde 6.5.7):
- * CRM_Events_Messaging_Trait::find_user_id_by_telegram_chat() (SQL
- * directo contra wp_usermeta), CRM_V2_Pipeline_Trait::contact_can_receive_telegram()
- * y CRM_V2::contact_can_receive_telegram() (get_user_meta()). Durante
+ * CLMS_Contacts_Core_Service (resolución de inbound),
+ * CRM_V2_Pipeline_Trait::contact_can_receive_telegram() y
+ * CRM_V2::contact_can_receive_telegram() (get_user_meta()). Durante
  * un conflicto de chat_id que la tabla ya resuelve correctamente (a
  * nadie, por su UNIQUE KEY), usermeta podía seguir teniendo la
  * asignación ambigua para ambos usuarios, así que el CRM podía
@@ -28,20 +28,14 @@ namespace ATORA\Tests\CRM;
 
 use PHPUnit\Framework\TestCase;
 
-/**
- * Doble de prueba: compone solo el trait de mensajería/eventos del CRM
- * v1, evitando el resto de dependencias de CRM (contactos, REST,
- * admin-sync) no relevantes para esta lógica.
- */
-class Test_Crm_Events_Messaging_Host {
-	use \ATORA\CRM\CRM_Events_Messaging_Trait;
-
-	public static function find_user_id_by_telegram_chat_public( string $chat_id ): int {
-		return self::find_user_id_by_telegram_chat( $chat_id );
-	}
-}
-
 class TelegramCrmSourceOfTruthTest extends TestCase {
+
+	private function resolve_user_id_by_chat( string $chat_id ): int {
+		$service = new \CLMS_Contacts_Core_Service();
+		$ref     = new \ReflectionMethod( \CLMS_Contacts_Core_Service::class, 'find_user_id_by_telegram_chat' );
+		$ref->setAccessible( true );
+		return (int) $ref->invoke( $service, $chat_id );
+	}
 
 	protected function setUp(): void {
 		parent::setUp();
@@ -137,7 +131,7 @@ class TelegramCrmSourceOfTruthTest extends TestCase {
 		// arbitrario.
 		$original = $this->install_wpdb_fixture( array() );
 
-		$resolved = Test_Crm_Events_Messaging_Host::find_user_id_by_telegram_chat_public( '777000' );
+		$resolved = $this->resolve_user_id_by_chat( '777000' );
 
 		$this->assertSame( 0, $resolved, 'un chat_id en conflicto no debe atribuirse a ninguno de los usuarios en disputa' );
 
@@ -158,7 +152,7 @@ class TelegramCrmSourceOfTruthTest extends TestCase {
 			array( 'user_id' => 601, 'chat_id' => '777111' ),
 		) );
 
-		$resolved = Test_Crm_Events_Messaging_Host::find_user_id_by_telegram_chat_public( '777111' );
+		$resolved = $this->resolve_user_id_by_chat( '777111' );
 
 		$this->assertSame( 601, $resolved );
 

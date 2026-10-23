@@ -1656,23 +1656,15 @@ trait CLMS_Admin_Menu_Widgets_And_Hubs_Trait {
 		$reco_count     = absint( $msg_snapshot['stats']['recommendations'] ?? 0 );
 		$pending_emails = absint( $crm_snapshot['pending_emails'] ?? 0 );
 		$teacher_users  = $this->count_users_with_capability( 'clms_view_teacher_dashboard' );
-		$crm_console_url = admin_url( 'admin.php?page=atora-crm' );
-		if ( $this->is_crm_v2_enabled() ) {
-			$app_class = '\ATORA\CRM_V2\CRM_V2_App';
-			$app_file  = defined( 'ATORA_LMS_MODULES_DIR' ) ? ATORA_LMS_MODULES_DIR . 'crm-v2/class-crm-v2-app.php' : '';
-			if ( $app_file && file_exists( $app_file ) ) {
-				require_once $app_file;
-			}
-
-			$can_open_v2 = false;
-			if ( class_exists( $app_class ) && method_exists( $app_class, 'can_access' ) ) {
-				$can_open_v2 = (bool) $app_class::can_access();
-			}
-
-			if ( $can_open_v2 ) {
-				$crm_console_url = admin_url( 'admin.php?page=atora-crm-v2' );
-			}
+		$app_class       = '\ATORA\CRM_V2\CRM_V2_App';
+		$crm_console_url = admin_url( 'admin.php?page=atora-crm-v2' );
+		$app_file        = defined( 'ATORA_LMS_MODULES_DIR' ) ? ATORA_LMS_MODULES_DIR . 'crm-v2/class-crm-v2-app.php' : '';
+		if ( $app_file && file_exists( $app_file ) ) {
+			require_once $app_file;
 		}
+		$can_open_v2 = class_exists( $app_class ) && method_exists( $app_class, 'can_access' )
+			? (bool) $app_class::can_access()
+			: (bool) current_user_can( 'manage_options' );
 
 		$role_title = __( 'CRM Hub operativo', 'atora-lms' );
 			$role_copy  = __( 'Conecta contactos, comunicación y seguimiento para sostener una experiencia académica y comercial coherente.', 'atora-lms' );
@@ -1683,29 +1675,24 @@ trait CLMS_Admin_Menu_Widgets_And_Hubs_Trait {
 				array( 'label' => __( 'Recomendaciones', 'atora-lms' ), 'value' => $reco_count ),
 			);
 			$cards      = array();
-			$crm_class  = '\ATORA\CRM\CRM';
-			$crm_log_summary_enabled = class_exists( $crm_class ) && method_exists( $crm_class, 'can_access_crm' )
-				? (bool) $crm_class::can_access_crm( $user_id )
-				: current_user_can( 'manage_options' );
+			$crm_log_summary_enabled   = $can_open_v2;
 			$crm_log_summary_bootstrap = array();
 			if ( $crm_log_summary_enabled ) {
-				$crm_log_summary_bootstrap = class_exists( $crm_class ) && method_exists( $crm_class, 'get_message_log_summary_bootstrap' )
-					? (array) $crm_class::get_message_log_summary_bootstrap()
-					: array(
-						'endpoint' => esc_url_raw( rest_url( 'atora/v1/crm/messages/log/summary' ) ),
-						'nonce'    => wp_create_nonce( 'wp_rest' ),
-						'labels' => array(
-							'channel'    => array(),
-							'status'     => array(),
-							'event_type' => array(),
-						),
-						'empty'  => array(
-							'channel'    => __( 'Sin actividad de canales.', 'atora-lms' ),
-							'status'     => __( 'Sin estados registrados.', 'atora-lms' ),
-							'event_type' => __( 'Sin eventos de trazabilidad.', 'atora-lms' ),
-						),
-						'error'  => __( 'No fue posible cargar la trazabilidad de mensajes.', 'atora-lms' ),
-					);
+				$crm_log_summary_bootstrap = array(
+					'endpoint' => esc_url_raw( rest_url( 'atora-crm/v2/messages/log/summary' ) ),
+					'nonce'    => wp_create_nonce( 'wp_rest' ),
+					'labels'   => array(
+						'channel'    => array(),
+						'status'     => array(),
+						'event_type' => array(),
+					),
+					'empty'    => array(
+						'channel'    => __( 'Sin actividad de canales.', 'atora-lms' ),
+						'status'     => __( 'Sin estados registrados.', 'atora-lms' ),
+						'event_type' => __( 'Sin eventos de trazabilidad.', 'atora-lms' ),
+					),
+					'error'    => __( 'No fue posible cargar la trazabilidad de mensajes.', 'atora-lms' ),
+				);
 			}
 
 		if ( 'instructor' === $role_context ) {
