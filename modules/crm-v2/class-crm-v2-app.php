@@ -75,7 +75,36 @@ class CRM_V2_App {
 			add_action( 'atora_daily_cron', array( '\ATORA\CRM_V2\Services\Followup_Plan_Service', 'run_daily_maintenance' ) );
 		}
 
+		// Bloque 2 (6.34.0): mantenimiento diario CRM (auto-tags + scoring).
+		add_action( 'atora_scoring_cron', array( __CLASS__, 'run_daily_maintenance' ) );
+
 		self::$booted = true;
+	}
+
+	/**
+	 * Mantenimiento diario CRM: scoring + auto-tags.
+	 *
+	 * @return void
+	 */
+	public static function run_daily_maintenance(): void {
+		if ( ! self::is_enabled() ) {
+			return;
+		}
+
+		$auto_tags_cb = apply_filters( 'atora_crm_v2_auto_tags_callback', null );
+		if ( is_callable( $auto_tags_cb ) ) {
+			call_user_func( $auto_tags_cb );
+		} else {
+			$core = clms_core( 'CLMS_Contacts_Core_Service' );
+			if ( $core && method_exists( $core, 'process_auto_tags' ) ) {
+				$core->process_auto_tags();
+			}
+		}
+
+		$scoring_cb = apply_filters( 'atora_crm_v2_scoring_recalculate_callback', array( '\\ATORA\\CRM_V2\\Services\\Scoring_Service', 'recalculate_all' ) );
+		if ( is_callable( $scoring_cb ) ) {
+			call_user_func( $scoring_cb, 100 );
+		}
 	}
 
 	/**

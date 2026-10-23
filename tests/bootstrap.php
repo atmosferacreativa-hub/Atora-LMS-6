@@ -907,6 +907,11 @@ if ( file_exists( $crm_v2_file ) ) {
 	require_once $crm_v2_file;
 }
 
+$crm_v2_app_file = __DIR__ . '/../modules/crm-v2/class-crm-v2-app.php';
+if ( file_exists( $crm_v2_app_file ) ) {
+	require_once $crm_v2_app_file;
+}
+
 $mcp_api_key_service_file = __DIR__ . '/../modules/mcp/class-api-key-service.php';
 if ( file_exists( $mcp_api_key_service_file ) ) {
 	require_once $mcp_api_key_service_file;
