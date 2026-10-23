@@ -20,6 +20,7 @@ use ATORA\CRM_V2\Rest\Pipeline_REST_Controller;
 use ATORA\CRM_V2\Rest\Tasks_REST_Controller;
 use ATORA\CRM_V2\Rest\Calendar_REST_Controller;
 use ATORA\CRM_V2\Rest\Inbox_REST_Controller;
+use ATORA\CRM_V2\Rest\Messages_Log_REST_Controller;
 use ATORA\CRM_V2\Rest\Reports_REST_Controller;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -58,6 +59,7 @@ class CRM_V2_App {
 			add_action( 'rest_api_init', array( __CLASS__, 'register_rest_routes' ) );
 		}
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue_admin_assets' ) );
+		add_action( 'wp_ajax_atora_crm_export', array( '\\ATORA\\CRM_V2\\Services\\CSV_Export_Service', 'ajax_export_csv' ) );
 		// ── Invalidar caché de scope CRM al cambiar matrículas (Fase 5) ───
 		add_action( 'clms_user_enrolled_in_course',     array( __CLASS__, 'flush_crm_scope_cache' ), 10, 2 );
 		add_action( 'clms_user_unenrolled_from_course', array( __CLASS__, 'flush_crm_scope_cache' ), 10, 2 );
@@ -74,7 +76,44 @@ class CRM_V2_App {
 			add_action( 'atora_daily_cron', array( '\ATORA\CRM_V2\Services\Followup_Plan_Service', 'run_daily_maintenance' ) );
 		}
 
+		$core = clms_core( 'CLMS_Contacts_Core_Service' );
+		if ( $core && method_exists( $core, 'on_whatsapp_message_received' ) ) {
+			add_action( 'atora/whatsapp/message_received', array( $core, 'on_whatsapp_message_received' ), 10, 2 );
+		}
+		if ( $core && method_exists( $core, 'on_telegram_message_received' ) ) {
+			add_action( 'atora/telegram/message_received', array( $core, 'on_telegram_message_received' ), 10, 3 );
+		}
+
+		// Bloque 2 (6.34.0): mantenimiento diario CRM (auto-tags + scoring).
+		add_action( 'atora_scoring_cron', array( __CLASS__, 'run_daily_maintenance' ) );
+
 		self::$booted = true;
+	}
+
+	/**
+	 * Mantenimiento diario CRM: scoring + auto-tags.
+	 *
+	 * @return void
+	 */
+	public static function run_daily_maintenance(): void {
+		if ( ! self::is_enabled() ) {
+			return;
+		}
+
+		$auto_tags_cb = apply_filters( 'atora_crm_v2_auto_tags_callback', null );
+		if ( is_callable( $auto_tags_cb ) ) {
+			call_user_func( $auto_tags_cb );
+		} else {
+			$core = clms_core( 'CLMS_Contacts_Core_Service' );
+			if ( $core && method_exists( $core, 'process_auto_tags' ) ) {
+				$core->process_auto_tags();
+			}
+		}
+
+		$scoring_cb = apply_filters( 'atora_crm_v2_scoring_recalculate_callback', array( '\\ATORA\\CRM_V2\\Services\\Scoring_Service', 'recalculate_all' ) );
+		if ( is_callable( $scoring_cb ) ) {
+			call_user_func( $scoring_cb, 100 );
+		}
 	}
 
 	/**
@@ -94,6 +133,7 @@ class CRM_V2_App {
 		Tasks_REST_Controller::register_routes();
 		Calendar_REST_Controller::register_routes();
 		Inbox_REST_Controller::register_routes();
+		Messages_Log_REST_Controller::register_routes();
 		Reports_REST_Controller::register_routes();
 		// Fase 1
 		if ( class_exists( 'ATORA\CRM_V2\Rest\CRM_Draft_REST_Controller' ) ) {
@@ -1192,6 +1232,7 @@ class CRM_V2_App {
 			$base . '/services/class-db-service.php',
 			$base . '/services/class-activity-service.php',
 			$base . '/services/class-contact-service.php',
+			$base . '/services/class-csv-export-service.php',
 			$base . '/services/class-task-service.php',
 			$base . '/services/class-deal-service.php',
 			$base . '/services/class-student-followup-service.php',
@@ -1203,6 +1244,7 @@ class CRM_V2_App {
 			$base . '/rest/class-tasks-rest-controller.php',
 			$base . '/rest/class-calendar-rest-controller.php',
 			$base . '/rest/class-inbox-rest-controller.php',
+			$base . '/rest/class-messages-log-rest-controller.php',
 			$base . '/rest/class-reports-rest-controller.php',
 			$base . '/rest/class-reports-dashboard-rest-controller.php',
 			// Fase 4 — Ficha 360 accionable

@@ -772,6 +772,7 @@ if ( file_exists( $contacts_core_file ) ) {
 $services_dir = __DIR__ . '/../modules/crm-v2/services/';
 foreach ( array(
 	'class-db-service.php',
+	'class-csv-export-service.php',
 	'class-contact-service.php',
 	'class-activity-service.php',
 	'class-scoring-service.php',
@@ -896,9 +897,19 @@ if ( file_exists( $crm_inbox_rest_controller_file ) ) {
 	require_once $crm_inbox_rest_controller_file;
 }
 
+$crm_messages_log_rest_controller_file = __DIR__ . '/../modules/crm-v2/rest/class-messages-log-rest-controller.php';
+if ( file_exists( $crm_messages_log_rest_controller_file ) ) {
+	require_once $crm_messages_log_rest_controller_file;
+}
+
 $crm_v2_file = __DIR__ . '/../modules/crm-v2/class-crm-v2.php';
 if ( file_exists( $crm_v2_file ) ) {
 	require_once $crm_v2_file;
+}
+
+$crm_v2_app_file = __DIR__ . '/../modules/crm-v2/class-crm-v2-app.php';
+if ( file_exists( $crm_v2_app_file ) ) {
+	require_once $crm_v2_app_file;
 }
 
 $mcp_api_key_service_file = __DIR__ . '/../modules/mcp/class-api-key-service.php';

@@ -715,6 +715,12 @@ trait CLMS_Enrollment_Manager_Access_Enrollment_Trait {
 		);
 		foreach ( $meta_map as $key => $meta_key ) {
 			if ( isset( $profile_data[ $key ] ) ) {
+				// PT-4.3 (6.5.1): atora_phone pasa por Preferences::update_phone()
+				// para invalidar verificación si el número cambió de verdad.
+				if ( 'atora_phone' === $meta_key && class_exists( '\\ATORA\\Messaging\\Preferences' ) ) {
+					\ATORA\Messaging\Preferences::update_phone( $user_id, (string) $profile_data[ $key ] );
+					continue;
+				}
 				update_user_meta( $user_id, $meta_key, $profile_data[ $key ] );
 			}
 		}

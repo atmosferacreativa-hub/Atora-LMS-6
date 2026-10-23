@@ -182,18 +182,185 @@ class PhoneVerificationInvalidationTest extends TestCase {
 	public function test_phone_write_site_delegates_to_update_phone( string $relative_path ): void {
 		$contents = file_get_contents( __DIR__ . '/../../' . $relative_path );
 		$this->assertIsString( $contents );
-		$this->assertStringContainsString(
-			'Preferences::update_phone(',
-			$contents,
-			"{$relative_path} debería escribir atora_phone vía Preferences::update_phone()"
+		$this->assertFalse(
+			self::has_direct_update_user_meta_phone_write( $contents ),
+			"{$relative_path} no debe escribir atora_phone con update_user_meta(); debe usar Preferences::update_phone()"
+		);
+		$this->assertTrue(
+			self::has_preferences_update_phone_call( $contents ),
+			"{$relative_path} debería llamar a Preferences::update_phone() cuando actualiza el teléfono"
 		);
 	}
 
 	public static function phone_write_sites(): array {
-		return array(
-			array( 'includes/frontend/trait-frontend-access-profile.php' ),
-			array( 'modules/crm/trait-crm-contacts.php' ),
-			array( 'includes/admin-menu/trait-admin-menu-main-pages-academic.php' ),
-		);
+		return array_values( array_map( static fn( string $path ) => array( $path ), self::discover_phone_write_sites() ) );
 	}
+
+	/**
+	 * Encuentra los archivos del plugin que podrían escribir `atora_phone`.
+	 *
+	 * Regla: cualquier archivo de producción que tenga un call site real
+	 * `update_user_meta(..., 'atora_phone', ...)` debe delegar en
+	 * `Preferences::update_phone()`.
+	 *
+	 * @return array<int,string>
+	 */
+	private static function discover_phone_write_sites(): array {
+		$known_phone_write_sites = array(
+			'includes/contacts-core/class-contacts-core-service.php',
+		);
+
+		$root = realpath( __DIR__ . '/../../' );
+		if ( ! is_string( $root ) ) {
+			return $known_phone_write_sites;
+		}
+
+		$paths = $known_phone_write_sites;
+		foreach ( array( 'includes', 'modules' ) as $dir ) {
+			$abs_dir = $root . DIRECTORY_SEPARATOR . $dir;
+			if ( ! is_dir( $abs_dir ) ) {
+				continue;
+			}
+
+			$iterator = new \RecursiveIteratorIterator(
+				new \RecursiveDirectoryIterator( $abs_dir, \FilesystemIterator::SKIP_DOTS )
+			);
+			foreach ( $iterator as $file ) {
+				if ( ! $file instanceof \SplFileInfo ) {
+					continue;
+				}
+				if ( 'php' !== strtolower( (string) $file->getExtension() ) ) {
+					continue;
+				}
+				$relative_path = ltrim( str_replace( $root, '', (string) $file->getPathname() ), DIRECTORY_SEPARATOR );
+				if ( 'modules/messaging/class-messaging-preferences.php' === $relative_path ) {
+					// Este archivo implementa Preferences::update_phone(); no puede llamarse a sí mismo.
+					continue;
+				}
+
+				$contents = file_get_contents( (string) $file->getPathname() );
+				if ( ! is_string( $contents ) ) {
+					continue;
+				}
+				if ( ! self::has_direct_update_user_meta_phone_write( $contents ) ) {
+					continue;
+				}
+
+				$paths[] = str_replace( DIRECTORY_SEPARATOR, '/', $relative_path );
+			}
+		}
+
+		sort( $paths );
+		return array_values( array_unique( $paths ) );
+	}
+
+	private static function has_preferences_update_phone_call( string $php ): bool {
+		$tokens = token_get_all( $php );
+		$count  = count( $tokens );
+		for ( $i = 0; $i < $count; $i++ ) {
+			$token = $tokens[ $i ];
+			if ( ! is_array( $token ) ) {
+				continue;
+			}
+
+			$token_type = $token[0];
+			$token_text = $token[1];
+			$looks_like_preferences = false;
+			if ( defined( 'T_NAME_FULLY_QUALIFIED' ) && T_NAME_FULLY_QUALIFIED === $token_type ) {
+				$looks_like_preferences = str_ends_with( $token_text, '\\Preferences' );
+			} elseif ( defined( 'T_NAME_QUALIFIED' ) && T_NAME_QUALIFIED === $token_type ) {
+				$looks_like_preferences = str_ends_with( $token_text, '\\Preferences' );
+			} elseif ( T_STRING === $token_type ) {
+				$looks_like_preferences = ( 'Preferences' === $token_text );
+			}
+
+			if ( ! $looks_like_preferences ) {
+				continue;
+			}
+
+			$j = $i + 1;
+			while ( $j < $count && is_array( $tokens[ $j ] ) && T_WHITESPACE === $tokens[ $j ][0] ) {
+				$j++;
+			}
+			if ( $j >= $count || ! is_array( $tokens[ $j ] ) || T_DOUBLE_COLON !== $tokens[ $j ][0] ) {
+				continue;
+			}
+
+			$j++;
+			while ( $j < $count && is_array( $tokens[ $j ] ) && T_WHITESPACE === $tokens[ $j ][0] ) {
+				$j++;
+			}
+			if ( $j >= $count || ! is_array( $tokens[ $j ] ) || T_STRING !== $tokens[ $j ][0] || 'update_phone' !== $tokens[ $j ][1] ) {
+				continue;
+			}
+
+			$j++;
+			while ( $j < $count && is_array( $tokens[ $j ] ) && T_WHITESPACE === $tokens[ $j ][0] ) {
+				$j++;
+			}
+			if ( $j < $count && '(' === ( is_array( $tokens[ $j ] ) ? $tokens[ $j ][1] : $tokens[ $j ] ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Detecta si el archivo tiene una escritura real a `atora_phone` via
+	 * update_user_meta().
+	 */
+	private static function has_direct_update_user_meta_phone_write( string $php ): bool {
+		$tokens = token_get_all( $php );
+		$count  = count( $tokens );
+		for ( $i = 0; $i < $count; $i++ ) {
+			$token = $tokens[ $i ];
+			if ( ! is_array( $token ) || T_STRING !== $token[0] || 'update_user_meta' !== $token[1] ) {
+				continue;
+			}
+
+			$j = $i + 1;
+			while ( $j < $count && is_array( $tokens[ $j ] ) && T_WHITESPACE === $tokens[ $j ][0] ) {
+				$j++;
+			}
+			if ( $j >= $count || '(' !== $tokens[ $j ] ) {
+				continue;
+			}
+
+			$depth       = 0;
+			$arg_index   = 0;
+			$in_parens   = false;
+			for ( $k = $j; $k < $count; $k++ ) {
+				$t = $tokens[ $k ];
+				$val = is_array( $t ) ? $t[1] : $t;
+				if ( '(' === $val ) {
+					$depth++;
+					$in_parens = true;
+					continue;
+				}
+				if ( ')' === $val && $in_parens ) {
+					$depth--;
+					if ( 0 === $depth ) {
+						break;
+					}
+					continue;
+				}
+				if ( 1 === $depth && ',' === $val ) {
+					$arg_index++;
+					continue;
+				}
+				if ( 1 === $depth && 1 === $arg_index && is_array( $t ) && T_CONSTANT_ENCAPSED_STRING === $t[0] ) {
+					$raw = trim( (string) $t[1] );
+					$raw = trim( $raw, "\"'" );
+					if ( 'atora_phone' === $raw ) {
+						return true;
+					}
+				}
+			}
+		}
+		return false;
+	}
+
+	// strip_comments_and_strings() se eliminó: las verificaciones de llamadas
+	// a update_phone() y escrituras directas a atora_phone se hacen vía tokens,
+	// no por búsquedas de strings, para que no pueda "pasar" con comentarios.
 }

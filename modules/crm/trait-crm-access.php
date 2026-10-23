@@ -115,13 +115,20 @@ trait CRM_Access_Trait {
 		add_action( 'clms_user_enrolled_in_course',     array( __CLASS__, 'on_course_enrolled' ), 10, 2 );
 		add_action( 'atora/forms/submitted',            array( __CLASS__, 'on_form_submitted' ), 10, 3 );
 		add_action( 'atora/email/webhook_event',        array( __CLASS__, 'on_email_event' ), 10, 3 );
-		add_action( 'atora/whatsapp/message_received',  array( __CLASS__, 'on_whatsapp_message_received' ), 10, 2 );
-		add_action( 'atora/telegram/message_received',  array( __CLASS__, 'on_telegram_message_received' ), 10, 3 );
 
-		// Cron: auto-tags diario.
-		add_action( 'atora_crm_autotag_cron', array( __CLASS__, 'process_auto_tags' ) );
-		if ( ! wp_next_scheduled( 'atora_crm_autotag_cron' ) ) {
-			wp_schedule_event( time(), 'daily', 'atora_crm_autotag_cron' );
+		$crm_v2_enabled = class_exists( '\\ATORA\\CRM_V2\\CRM_V2_App' ) && \ATORA\CRM_V2\CRM_V2_App::is_enabled();
+		if ( ! $crm_v2_enabled ) {
+			add_action( 'atora/whatsapp/message_received',  array( __CLASS__, 'on_whatsapp_message_received' ), 10, 2 );
+			add_action( 'atora/telegram/message_received',  array( __CLASS__, 'on_telegram_message_received' ), 10, 3 );
+		}
+
+		// Cron: auto-tags diario (solo v1). En v2 se corre en
+		// atora_scoring_cron (CRM_V2_App::run_daily_maintenance).
+		if ( ! $crm_v2_enabled ) {
+			add_action( 'atora_crm_autotag_cron', array( __CLASS__, 'process_auto_tags' ) );
+			if ( function_exists( 'wp_next_scheduled' ) && function_exists( 'wp_schedule_event' ) && ! wp_next_scheduled( 'atora_crm_autotag_cron' ) ) {
+				wp_schedule_event( time(), 'daily', 'atora_crm_autotag_cron' );
+			}
 		}
 
 		// REST API.
@@ -142,7 +149,9 @@ trait CRM_Access_Trait {
 			add_action( 'wp_ajax_atora_crm_search',    array( __CLASS__, 'ajax_search' ) );
 			add_action( 'wp_ajax_atora_crm_note_save', array( __CLASS__, 'ajax_save_note' ) );
 			add_action( 'wp_ajax_atora_crm_tag',       array( __CLASS__, 'ajax_add_tag' ) );
-			add_action( 'wp_ajax_atora_crm_export',    array( __CLASS__, 'ajax_export_csv' ) );
+			if ( ! $crm_v2_enabled ) {
+				add_action( 'wp_ajax_atora_crm_export',    array( __CLASS__, 'ajax_export_csv' ) );
+			}
 		}
 	}
 
