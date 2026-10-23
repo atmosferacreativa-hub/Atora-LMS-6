@@ -25,6 +25,13 @@ if ( ! defined( 'ABSPATH' ) ) {
  * ese único uso interno.
  */
 class CLMS_Contacts_Core_Service {
+	/**
+	 * Indica si el último match por teléfono tuvo múltiples candidatos.
+	 *
+	 * Se usa por upsert_contact() (portado de CRM v1) para mantener el
+	 * comportamiento de rechazo en casos ambiguos.
+	 */
+	protected bool $last_phone_contact_match_ambiguous = false;
 
 	/**
 	 * @param int $user_id Usuario.
@@ -194,6 +201,841 @@ class CLMS_Contacts_Core_Service {
 			"SELECT * FROM {$contacts_table} WHERE user_id = %d LIMIT 1",
 			$user_id
 		) ) ?: null;
+	}
+
+	/**
+	 * Crea o actualiza un contacto en la tabla CRM.
+	 *
+	 * Portado desde CRM v1 (modules/crm/) como primitiva compartida.
+	 *
+	 * @param array<string,mixed> $data Datos del contacto.
+	 * @return int ID del contacto.
+	 */
+	public function upsert_contact( array $data ): int {
+		global $wpdb;
+
+		$user_id      = absint( $data['user_id'] ?? 0 );
+		$email        = sanitize_email( $data['email'] ?? '' );
+		$raw_phone    = sanitize_text_field( (string) ( $data['phone'] ?? get_user_meta( $user_id, 'atora_phone', true ) ) );
+		$raw_whatsapp = sanitize_text_field( (string) ( $data['whatsapp'] ?? '' ) );
+		$phone        = $this->normalize_contact_phone( $raw_phone );
+		$whatsapp     = $this->normalize_contact_phone( $raw_whatsapp );
+		$state        = sanitize_text_field( (string) ( $data['state'] ?? get_user_meta( $user_id, 'atora_state', true ) ) );
+		$sex          = sanitize_key( (string) ( $data['sex'] ?? get_user_meta( $user_id, 'atora_sex', true ) ) );
+		$age          = absint( $data['age'] ?? get_user_meta( $user_id, 'atora_age', true ) );
+		$allowed_sexes = array( 'femenino', 'masculino', 'no_binario', 'prefiero_no_decir' );
+		if ( '' !== $sex && ! in_array( $sex, $allowed_sexes, true ) ) {
+			$sex = '';
+		}
+		if ( $age > 120 ) {
+			$age = 120;
+		}
+
+		if ( ! $user_id && ! $email ) {
+			return 0;
+		}
+
+		// Mantener user_meta coherente cuando llegan datos explícitos desde flujos UI/CSV/invitación.
+		if ( $user_id > 0 ) {
+			$profile_meta_map = array(
+				'phone'    => array( 'atora_phone', $raw_phone ),
+				'whatsapp' => array( 'atora_whatsapp', $raw_whatsapp ),
+				'country'  => array( 'atora_country_code', sanitize_text_field( (string) ( $data['country'] ?? '' ) ) ),
+				'city'     => array( 'atora_city', sanitize_text_field( (string) ( $data['city'] ?? '' ) ) ),
+				'telegram' => array( 'atora_telegram', sanitize_text_field( (string) ( $data['telegram'] ?? '' ) ) ),
+				'state'    => array( 'atora_state', $state ),
+				'sex'      => array( 'atora_sex', $sex ),
+				'age'      => array( 'atora_age', $age > 0 ? (string) $age : '' ),
+			);
+			foreach ( $profile_meta_map as $data_key => $meta_pair ) {
+				if ( ! array_key_exists( $data_key, $data ) ) {
+					continue;
+				}
+				$meta_key = (string) $meta_pair[0];
+				$value    = (string) $meta_pair[1];
+				// PT-4.3 (6.5.1): atora_phone pasa por
+				// Preferences::update_phone() — invalida la verificación
+				// si el número cambió de verdad, en vez de un
+				// update_user_meta() directo que dejaba "verificado" un
+				// número que el CRM acababa de sobreescribir.
+				if ( 'atora_phone' === $meta_key && class_exists( '\\ATORA\\Messaging\\Preferences' ) ) {
+					\ATORA\Messaging\Preferences::update_phone( $user_id, $value );
+					continue;
+				}
+				update_user_meta( $user_id, $meta_key, $value );
+			}
+		}
+
+		// Buscar contacto existente.
+		$existing_id = 0;
+		if ( $user_id ) {
+			$existing_id = (int) $wpdb->get_var( $wpdb->prepare(
+				"SELECT id FROM {$wpdb->prefix}atora_contacts WHERE user_id = %d LIMIT 1",
+				$user_id
+			) );
+		}
+
+		if ( ! $existing_id && $email ) {
+			$existing_id = (int) $wpdb->get_var( $wpdb->prepare(
+				"SELECT id FROM {$wpdb->prefix}atora_contacts WHERE email = %s LIMIT 1",
+				$email
+			) );
+		}
+
+		if ( ! $existing_id && '' !== $phone ) {
+			$existing_id = $this->find_contact_id_by_phone( $phone );
+			if ( ! $existing_id && $this->last_phone_contact_match_ambiguous ) {
+				return 0;
+			}
+		}
+
+		if ( ! $existing_id && '' !== $whatsapp ) {
+			$existing_id = $this->find_contact_id_by_phone( $whatsapp );
+			if ( ! $existing_id && $this->last_phone_contact_match_ambiguous ) {
+				return 0;
+			}
+		}
+
+		$record = array(
+			'user_id'    => $user_id ?: null,
+			'email'      => $email,
+			'name'       => sanitize_text_field( $data['name'] ?? '' ),
+			'phone'      => $phone,
+			'whatsapp'   => $whatsapp,
+			'country'    => sanitize_text_field( $data['country'] ?? get_user_meta( $user_id, 'atora_country_code', true ) ),
+			'city'       => sanitize_text_field( $data['city'] ?? get_user_meta( $user_id, 'atora_city', true ) ),
+			'source'     => sanitize_key( $data['source'] ?? 'manual' ),
+			'status'     => sanitize_key( $data['status'] ?? 'lead' ),
+			'updated_at' => current_time( 'mysql', true ),
+		);
+
+		if ( $existing_id ) {
+			// Actualizar solo campos no vacíos.
+			$update = array_filter( $record );
+			$wpdb->update(
+				"{$wpdb->prefix}atora_contacts",
+				$update,
+				array( 'id' => $existing_id )
+			);
+			return $existing_id;
+		}
+
+		$record['created_at'] = current_time( 'mysql', true );
+		$wpdb->insert( "{$wpdb->prefix}atora_contacts", $record );
+		return (int) $wpdb->insert_id;
+	}
+
+	/**
+	 * Añade un tag a un contacto.
+	 *
+	 * @param int    $user_id  ID del usuario.
+	 * @param string $tag_name Nombre del tag.
+	 * @return void
+	 */
+	public function add_tag( int $user_id, string $tag_name ): void {
+		global $wpdb;
+		$tags_table = "{$wpdb->prefix}atora_contact_tags";
+		if ( ! $this->table_exists( $tags_table ) ) {
+			return;
+		}
+
+		$contact = $this->get_contact( $user_id );
+		if ( ! $contact ) {
+			return;
+		}
+
+		$tag_name = sanitize_text_field( $tag_name );
+		if ( '' === $tag_name ) {
+			return;
+		}
+
+		$exists = $wpdb->get_var( $wpdb->prepare(
+			"SELECT id FROM {$tags_table} WHERE contact_id = %d AND tag_name = %s LIMIT 1",
+			$contact->id,
+			$tag_name
+		) );
+
+		if ( ! $exists ) {
+			$inserted = $wpdb->insert(
+				$tags_table,
+				array( 'contact_id' => $contact->id, 'tag_name' => $tag_name ),
+				array( '%d', '%s' )
+			);
+
+			if ( $inserted ) {
+				$this->log_activity( $user_id, 'tag_added', array( 'tag' => $tag_name ) );
+				do_action( 'atora/crm/tag_added', $user_id, $tag_name, (int) $contact->id );
+			}
+		}
+	}
+
+	/**
+	 * Elimina un tag de un contacto.
+	 *
+	 * @param int    $user_id  ID del usuario.
+	 * @param string $tag_name Nombre del tag.
+	 * @return void
+	 */
+	public function remove_tag( int $user_id, string $tag_name ): void {
+		global $wpdb;
+		$tags_table = "{$wpdb->prefix}atora_contact_tags";
+		if ( ! $this->table_exists( $tags_table ) ) {
+			return;
+		}
+
+		$contact = $this->get_contact( $user_id );
+		if ( ! $contact ) {
+			return;
+		}
+
+		$tag_name = sanitize_text_field( $tag_name );
+		if ( '' === $tag_name ) {
+			return;
+		}
+
+		$deleted = $wpdb->delete(
+			$tags_table,
+			array( 'contact_id' => $contact->id, 'tag_name' => $tag_name ),
+			array( '%d', '%s' )
+		);
+
+		if ( $deleted ) {
+			$this->log_activity( $user_id, 'tag_removed', array( 'tag' => $tag_name ) );
+			do_action( 'atora/crm/tag_removed', $user_id, $tag_name, (int) $contact->id );
+		}
+	}
+
+	/**
+	 * Sincroniza mensaje de atora_message_queue a modelo de conversación.
+	 *
+	 * @param int $queue_id ID de cola.
+	 * @return void
+	 */
+	public function sync_message_queue_to_conversation( int $queue_id ): void {
+		$queue_id = absint( $queue_id );
+		if ( $queue_id <= 0 ) {
+			return;
+		}
+
+		global $wpdb;
+		$queue_table   = "{$wpdb->prefix}atora_message_queue";
+		$conv_table    = "{$wpdb->prefix}atora_conversations";
+		$message_table = "{$wpdb->prefix}atora_conversation_messages";
+		if ( ! $this->table_exists( $queue_table ) || ! $this->table_exists( $conv_table ) || ! $this->table_exists( $message_table ) ) {
+			return;
+		}
+
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT * FROM {$queue_table} WHERE id = %d LIMIT 1",
+				$queue_id
+			),
+			ARRAY_A
+		);
+		if ( ! is_array( $row ) || empty( $row ) ) {
+			return;
+		}
+
+		$user_id    = absint( $row['user_id'] ?? 0 );
+		$contact_id = 0;
+		if ( $user_id > 0 ) {
+			$contact_id = (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT id FROM {$wpdb->prefix}atora_contacts WHERE user_id = %d LIMIT 1",
+					$user_id
+				)
+			);
+		}
+
+		$channel             = sanitize_key( (string) ( $row['channel'] ?? 'email' ) );
+		$status              = sanitize_key( (string) ( $row['status'] ?? 'pending' ) );
+		$template            = sanitize_key( (string) ( $row['template_key'] ?? '' ) );
+		$created_at          = sanitize_text_field( (string) ( $row['sent_at'] ?: $row['scheduled_at'] ?: current_time( 'mysql', true ) ) );
+		$recipient           = sanitize_text_field( (string) ( $row['recipient_phone'] ?? '' ) );
+		$provider_message_id = sanitize_text_field( (string) ( $row['provider_message_id'] ?? '' ) );
+
+		$conversation_id = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT id FROM {$conv_table}
+				 WHERE user_id = %d
+				   AND channel = %s
+				   AND status IN ('open','pending')
+				 ORDER BY updated_at DESC
+				 LIMIT 1",
+				$user_id,
+				$channel
+			)
+		);
+
+		if ( $conversation_id <= 0 ) {
+			$wpdb->insert(
+				$conv_table,
+				array(
+					'contact_id'      => $contact_id,
+					'user_id'         => $user_id,
+					'channel'         => $channel,
+					'identity_key'    => '',
+					'subject'         => $template ?: __( 'Conversación', 'atora-lms' ),
+					'status'          => in_array( $status, array( 'failed', 'pending' ), true ) ? 'pending' : 'open',
+					'last_message_at' => $created_at,
+					'assigned_to'     => 0,
+					'course_id'       => 0,
+					'order_id'        => 0,
+					'created_at'      => current_time( 'mysql', true ),
+					'updated_at'      => current_time( 'mysql', true ),
+				),
+				array( '%d','%d','%s','%s','%s','%s','%s','%d','%d','%d','%s','%s' )
+			);
+			$conversation_id = (int) $wpdb->insert_id;
+		}
+
+		if ( $conversation_id <= 0 ) {
+			return;
+		}
+
+		$exists = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT id FROM {$message_table}
+				 WHERE channel = %s
+				   AND provider_message_id = %s
+				   AND provider_message_id <> ''
+				 LIMIT 1",
+				$channel,
+				$provider_message_id
+			)
+		);
+		if ( $exists > 0 ) {
+			return;
+		}
+
+		$wpdb->insert(
+			$message_table,
+			array(
+				'conversation_id'     => $conversation_id,
+				'direction'           => 'outbound',
+				'channel'             => $channel,
+				'provider_message_id' => $provider_message_id,
+				'sender'              => '',
+				'recipient'           => $recipient,
+				'subject'             => $template,
+				'body_text'           => wp_json_encode( array( 'template' => $template ) ),
+				'body_html'           => '',
+				'raw_payload_json'    => wp_json_encode( $row ),
+				'status'              => in_array( $status, array( 'sent', 'delivered', 'read', 'failed', 'pending' ), true ) ? $status : 'pending',
+				'error_message'       => sanitize_text_field( (string) ( $row['error_message'] ?? '' ) ),
+				'created_at'          => $created_at,
+			),
+			array( '%d','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s' )
+		);
+
+		$wpdb->update(
+			$conv_table,
+			array(
+				'last_message_at' => $created_at,
+				'updated_at'      => current_time( 'mysql', true ),
+			),
+			array( 'id' => $conversation_id ),
+			array( '%s', '%s' ),
+			array( '%d' )
+		);
+	}
+
+	/**
+	 * Sincroniza correo de atora_email_queue a modelo de conversación.
+	 *
+	 * @param int $queue_id ID de cola de email.
+	 * @return void
+	 */
+	public function sync_email_queue_to_conversation( int $queue_id ): void {
+		$queue_id = absint( $queue_id );
+		if ( $queue_id <= 0 ) {
+			return;
+		}
+
+		global $wpdb;
+		$queue_table   = "{$wpdb->prefix}atora_email_queue";
+		$conv_table    = "{$wpdb->prefix}atora_conversations";
+		$message_table = "{$wpdb->prefix}atora_conversation_messages";
+		if ( ! $this->table_exists( $queue_table ) || ! $this->table_exists( $conv_table ) || ! $this->table_exists( $message_table ) ) {
+			return;
+		}
+
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT * FROM {$queue_table} WHERE id = %d LIMIT 1",
+				$queue_id
+			),
+			ARRAY_A
+		);
+		if ( ! is_array( $row ) || empty( $row ) ) {
+			return;
+		}
+
+		$metadata = is_string( $row['metadata'] ?? '' ) ? json_decode( (string) $row['metadata'], true ) : array();
+		$metadata = is_array( $metadata ) ? $metadata : array();
+		$recipient_email = sanitize_email( (string) ( $row['recipient_email'] ?? '' ) );
+		$recipient_name  = sanitize_text_field( (string) ( $row['recipient_name'] ?? '' ) );
+		$user_id         = absint( $row['user_id'] ?? 0 );
+		if ( $user_id <= 0 ) {
+			$user_id = absint( $metadata['user_id'] ?? 0 );
+		}
+		if ( $user_id <= 0 && '' !== $recipient_email && is_email( $recipient_email ) ) {
+			$recipient_user = get_user_by( 'email', $recipient_email );
+			if ( $recipient_user instanceof \WP_User ) {
+				$user_id = absint( $recipient_user->ID );
+			}
+		}
+
+		$contact_id = $this->resolve_contact_id_for_email_queue( $user_id, $recipient_email, $recipient_name, $metadata );
+		$identity   = sanitize_key( (string) ( $row['identity_key'] ?? $metadata['email_identity'] ?? '' ) );
+		$status     = sanitize_key( (string) ( $row['status'] ?? 'pending' ) );
+		$created_at = sanitize_text_field( (string) ( $row['sent_at'] ?: $row['scheduled_at'] ?: current_time( 'mysql', true ) ) );
+		$subject    = sanitize_text_field( (string) ( $row['subject'] ?? '' ) );
+		$conversation_status = in_array( $status, array( 'failed', 'pending' ), true ) ? 'pending' : 'open';
+		$message_status      = in_array( $status, array( 'sent', 'delivered', 'read', 'failed', 'pending', 'sending' ), true ) ? $status : 'pending';
+		$opened_at           = sanitize_text_field( (string) ( $row['opened_at'] ?? '' ) );
+		$clicked_at          = sanitize_text_field( (string) ( $row['clicked_at'] ?? '' ) );
+		if ( '' !== $opened_at || '' !== $clicked_at ) {
+			$message_status = 'read';
+		} elseif ( 'bounced' === $status ) {
+			$message_status = 'failed';
+		}
+		$course_id = absint( $metadata['course_id'] ?? 0 );
+		$order_id  = absint( $metadata['order_id'] ?? 0 );
+
+		$conversation_id = $this->upsert_conversation(
+			array(
+				'contact_id'      => $contact_id,
+				'user_id'         => $user_id,
+				'channel'         => 'email',
+				'identity_key'    => $identity,
+				'subject'         => $subject,
+				'status'          => $conversation_status,
+				'last_message_at' => $created_at,
+				'course_id'       => $course_id,
+				'order_id'        => $order_id,
+			)
+		);
+		if ( $conversation_id <= 0 ) {
+			return;
+		}
+
+		$exists = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT id FROM {$message_table}
+				 WHERE conversation_id = %d
+				   AND recipient = %s
+				   AND subject = %s
+				   AND created_at = %s
+				 LIMIT 1",
+				$conversation_id,
+				$recipient_email,
+				$subject,
+				$created_at
+			)
+		);
+		if ( $exists > 0 ) {
+			$wpdb->update(
+				$message_table,
+				array(
+					'status'        => $message_status,
+					'error_message' => sanitize_text_field( (string) ( $row['error_message'] ?? '' ) ),
+				),
+				array( 'id' => $exists ),
+				array( '%s', '%s' ),
+				array( '%d' )
+			);
+			$wpdb->update(
+				$conv_table,
+				array(
+					'last_message_at' => $created_at,
+					'identity_key'    => $identity,
+					'updated_at'      => current_time( 'mysql', true ),
+				),
+				array( 'id' => $conversation_id ),
+				array( '%s', '%s', '%s' ),
+				array( '%d' )
+			);
+			return;
+		}
+
+		$sender_email = sanitize_email(
+			(string) (
+				$metadata['from_email']
+				?? $metadata['sender_email']
+				?? ''
+			)
+		);
+		$sender_name = sanitize_text_field( (string) ( $metadata['from_name'] ?? '' ) );
+		$sender      = '';
+		if ( '' !== $sender_name && '' !== $sender_email ) {
+			$sender = sanitize_text_field( $sender_name . ' <' . $sender_email . '>' );
+		} elseif ( '' !== $sender_email ) {
+			$sender = $sender_email;
+		} elseif ( '' !== $sender_name ) {
+			$sender = $sender_name;
+		}
+
+		$wpdb->insert(
+			$message_table,
+			array(
+				'conversation_id'     => $conversation_id,
+				'direction'           => 'outbound',
+				'channel'             => 'email',
+				'provider_message_id' => '',
+				'sender'              => $sender,
+				'recipient'           => $recipient_email,
+				'subject'             => $subject,
+				'body_text'           => sanitize_textarea_field( (string) ( $row['body_text'] ?? '' ) ),
+				'body_html'           => wp_kses_post( (string) ( $row['body_html'] ?? '' ) ),
+				'raw_payload_json'    => wp_json_encode( $row ),
+				'status'              => $message_status,
+				'error_message'       => sanitize_text_field( (string) ( $row['error_message'] ?? '' ) ),
+				'created_at'          => $created_at,
+			),
+			array( '%d','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s' )
+		);
+
+		$wpdb->update(
+			$conv_table,
+			array(
+				'last_message_at' => $created_at,
+				'identity_key'    => $identity,
+				'updated_at'      => current_time( 'mysql', true ),
+			),
+			array( 'id' => $conversation_id ),
+			array( '%s', '%s', '%s' ),
+			array( '%d' )
+		);
+	}
+
+	/**
+	 * Resuelve o crea contacto CRM para un registro de cola de email.
+	 *
+	 * @param int                 $user_id         Usuario relacionado.
+	 * @param string              $recipient_email Email destino.
+	 * @param string              $recipient_name  Nombre destino.
+	 * @param array<string,mixed> $metadata        Metadata del envío.
+	 * @return int
+	 */
+	private function resolve_contact_id_for_email_queue( int $user_id, string $recipient_email, string $recipient_name, array $metadata = array() ): int {
+		global $wpdb;
+
+		$contacts_table = "{$wpdb->prefix}atora_contacts";
+		if ( ! $this->table_exists( $contacts_table ) ) {
+			return 0;
+		}
+
+		$user_id         = absint( $user_id );
+		$recipient_email = sanitize_email( $recipient_email );
+		$recipient_name  = sanitize_text_field( $recipient_name );
+		$metadata        = is_array( $metadata ) ? $metadata : array();
+		$contact_id      = 0;
+
+		if ( $user_id > 0 ) {
+			$contact_id = (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT id FROM {$contacts_table} WHERE user_id = %d LIMIT 1",
+					$user_id
+				)
+			);
+		}
+
+		if ( $contact_id <= 0 && '' !== $recipient_email && is_email( $recipient_email ) ) {
+			$contact_row = (array) $wpdb->get_row(
+				$wpdb->prepare(
+					"SELECT id, user_id FROM {$contacts_table} WHERE email = %s LIMIT 1",
+					$recipient_email
+				),
+				ARRAY_A
+			);
+			if ( ! empty( $contact_row ) ) {
+				$contact_id       = absint( $contact_row['id'] ?? 0 );
+				$existing_user_id = absint( $contact_row['user_id'] ?? 0 );
+				if ( $contact_id > 0 && $user_id > 0 && $existing_user_id <= 0 ) {
+					$wpdb->update(
+						$contacts_table,
+						array(
+							'user_id'    => $user_id,
+							'updated_at' => current_time( 'mysql', true ),
+						),
+						array( 'id' => $contact_id ),
+						array( '%d', '%s' ),
+						array( '%d' )
+					);
+				}
+			}
+		}
+
+		if ( $contact_id <= 0 && $user_id > 0 ) {
+			$user = get_userdata( $user_id );
+			if ( $user instanceof \WP_User ) {
+				$contact_id = $this->upsert_contact(
+					array(
+						'user_id' => $user_id,
+						'email'   => sanitize_email( (string) $user->user_email ),
+						'name'    => sanitize_text_field( (string) ( $user->display_name ?: $user->user_login ) ),
+						'source'  => sanitize_key( (string) ( $metadata['source'] ?? 'email_engine' ) ),
+						'status'  => 'student',
+					)
+				);
+			}
+		}
+
+		if ( $contact_id <= 0 && '' !== $recipient_email && is_email( $recipient_email ) ) {
+			$fallback_name = $recipient_name;
+			if ( '' === $fallback_name ) {
+				$local_part     = strstr( $recipient_email, '@', true );
+				$fallback_name  = sanitize_text_field( false !== $local_part ? (string) $local_part : $recipient_email );
+			}
+
+			$contact_id = $this->upsert_contact(
+				array(
+					'email'  => $recipient_email,
+					'name'   => $fallback_name,
+					'source' => sanitize_key( (string) ( $metadata['source'] ?? 'email_engine' ) ),
+					'status' => 'lead',
+				)
+			);
+		}
+
+		return absint( $contact_id );
+	}
+
+	/**
+	 * Crea o actualiza una conversación para canal/contacto.
+	 *
+	 * @param array<string,mixed> $args Datos de conversación.
+	 * @return int
+	 */
+	private function upsert_conversation( array $args ): int {
+		global $wpdb;
+
+		$conv_table = "{$wpdb->prefix}atora_conversations";
+		if ( ! $this->table_exists( $conv_table ) ) {
+			return 0;
+		}
+
+		$contact_id      = absint( $args['contact_id'] ?? 0 );
+		$user_id         = absint( $args['user_id'] ?? 0 );
+		$channel         = sanitize_key( (string) ( $args['channel'] ?? 'email' ) );
+		$identity_key    = sanitize_key( (string) ( $args['identity_key'] ?? '' ) );
+		$subject         = sanitize_text_field( (string) ( $args['subject'] ?? '' ) );
+		$status          = sanitize_key( (string) ( $args['status'] ?? 'open' ) );
+		$last_message_at = sanitize_text_field( (string) ( $args['last_message_at'] ?? current_time( 'mysql', true ) ) );
+		$course_id       = absint( $args['course_id'] ?? 0 );
+		$order_id        = absint( $args['order_id'] ?? 0 );
+
+		if ( '' === $channel || ( 0 === $contact_id && 0 === $user_id ) ) {
+			return 0;
+		}
+
+		$conversation_id = 0;
+		if ( $user_id > 0 ) {
+			$conversation_id = (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT id FROM {$conv_table}
+					 WHERE user_id = %d
+					   AND channel = %s
+					   AND status IN ('open','pending')
+					 ORDER BY updated_at DESC
+					 LIMIT 1",
+					$user_id,
+					$channel
+				)
+			);
+		}
+		if ( $conversation_id <= 0 && $contact_id > 0 ) {
+			$conversation_id = (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT id FROM {$conv_table}
+					 WHERE contact_id = %d
+					   AND channel = %s
+					   AND status IN ('open','pending')
+					 ORDER BY updated_at DESC
+					 LIMIT 1",
+					$contact_id,
+					$channel
+				)
+			);
+		}
+
+		if ( $conversation_id > 0 ) {
+			$update_data = array(
+				'last_message_at' => $last_message_at,
+				'updated_at'      => current_time( 'mysql', true ),
+			);
+			if ( $contact_id > 0 ) {
+				$update_data['contact_id'] = $contact_id;
+			}
+			if ( $user_id > 0 ) {
+				$update_data['user_id'] = $user_id;
+			}
+			if ( '' !== $identity_key ) {
+				$update_data['identity_key'] = $identity_key;
+			}
+			if ( '' !== $subject ) {
+				$update_data['subject'] = $subject;
+			}
+			$wpdb->update( $conv_table, $update_data, array( 'id' => $conversation_id ) );
+			return $conversation_id;
+		}
+
+		$inserted = $wpdb->insert(
+			$conv_table,
+			array(
+				'contact_id'      => $contact_id,
+				'user_id'         => $user_id,
+				'channel'         => $channel,
+				'identity_key'    => $identity_key,
+				'subject'         => '' !== $subject ? $subject : __( 'Conversación', 'atora-lms' ),
+				'status'          => in_array( $status, array( 'open', 'pending', 'closed', 'archived' ), true ) ? $status : 'open',
+				'last_message_at' => $last_message_at,
+				'assigned_to'     => 0,
+				'course_id'       => $course_id,
+				'order_id'        => $order_id,
+				'created_at'      => current_time( 'mysql', true ),
+				'updated_at'      => current_time( 'mysql', true ),
+			),
+			array( '%d','%d','%s','%s','%s','%s','%s','%d','%d','%d','%s','%s' )
+		);
+
+		if ( ! $inserted ) {
+			return 0;
+		}
+
+		return (int) $wpdb->insert_id;
+	}
+
+	/**
+	 * Busca contacto por teléfono/whatsapp.
+	 *
+	 * @param string $phone Teléfono normalizado.
+	 * @return int
+	 */
+	private function find_contact_id_by_phone( string $phone ): int {
+		global $wpdb;
+		$this->last_phone_contact_match_ambiguous = false;
+
+		$contacts_table = "{$wpdb->prefix}atora_contacts";
+		if ( ! $this->table_exists( $contacts_table ) ) {
+			return 0;
+		}
+
+		$phone  = $this->normalize_contact_phone( $phone );
+		$digits = (string) preg_replace( '/\D+/', '', $phone );
+		if ( '' === $digits ) {
+			return 0;
+		}
+
+		$suffix = strlen( $digits ) >= 8 ? substr( $digits, -8 ) : $digits;
+		$rows   = (array) $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT id, phone, whatsapp
+				 FROM {$contacts_table}
+				 WHERE phone = %s
+				    OR whatsapp = %s
+				    OR phone LIKE %s
+				    OR whatsapp LIKE %s
+				 LIMIT 100",
+				$phone,
+				$phone,
+				'%' . $suffix,
+				'%' . $suffix
+			),
+			ARRAY_A
+		);
+
+		$matches = array();
+		foreach ( $rows as $row ) {
+			$contact_id = absint( $row['id'] ?? 0 );
+			if ( $contact_id <= 0 ) {
+				continue;
+			}
+
+			$phone_digits    = (string) preg_replace( '/\D+/', '', $this->normalize_contact_phone( (string) ( $row['phone'] ?? '' ) ) );
+			$whatsapp_digits = (string) preg_replace( '/\D+/', '', $this->normalize_contact_phone( (string) ( $row['whatsapp'] ?? '' ) ) );
+
+			if ( ( '' !== $phone_digits && hash_equals( $digits, $phone_digits ) ) || ( '' !== $whatsapp_digits && hash_equals( $digits, $whatsapp_digits ) ) ) {
+				$matches[ $contact_id ] = true;
+			}
+		}
+
+		$match_ids = array_map( 'absint', array_keys( $matches ) );
+		if ( 1 === count( $match_ids ) ) {
+			return (int) $match_ids[0];
+		}
+
+		if ( count( $match_ids ) > 1 ) {
+			$this->last_phone_contact_match_ambiguous = true;
+			$this->log_inbound_resolution_issue(
+				'inbound_phone_ambiguous_contact',
+				array(
+					'phone'      => $phone,
+					'candidates' => $match_ids,
+				)
+			);
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Normaliza teléfono para matching entre canales.
+	 *
+	 * @param string $phone Teléfono.
+	 * @return string
+	 */
+	private function normalize_contact_phone( string $phone ): string {
+		$phone = sanitize_text_field( $phone );
+		if ( '' === $phone ) {
+			return '';
+		}
+
+		$has_plus = 0 === strpos( $phone, '+' );
+		$digits   = (string) preg_replace( '/\D+/', '', $phone );
+		if ( '' === $digits ) {
+			return '';
+		}
+
+		if ( ! $has_plus && 0 === strpos( $digits, '00' ) ) {
+			$digits   = substr( $digits, 2 );
+			$has_plus = true;
+		}
+
+		return $has_plus ? '+' . ltrim( $digits, '+' ) : ltrim( $digits, '+' );
+	}
+
+	/**
+	 * Registra incidencias de resolución inbound para trazabilidad operativa.
+	 *
+	 * @param string $event_type Tipo de incidencia.
+	 * @param array  $event_data Datos asociados.
+	 * @return void
+	 */
+	private function log_inbound_resolution_issue( string $event_type, array $event_data = array() ): void {
+		global $wpdb;
+
+		$table = "{$wpdb->prefix}atora_message_log";
+		if ( ! $this->table_exists( $table ) ) {
+			return;
+		}
+
+		$event_type = sanitize_key( $event_type );
+		if ( '' === $event_type ) {
+			$event_type = 'inbound_resolution_issue';
+		}
+
+		$wpdb->insert(
+			$table,
+			array(
+				'queue_id'   => 0,
+				'event_type' => $event_type,
+				'event_data' => wp_json_encode( $event_data ),
+				'created_at' => current_time( 'mysql', true ),
+			),
+			array( '%d', '%s', '%s', '%s' )
+		);
 	}
 
 	/**

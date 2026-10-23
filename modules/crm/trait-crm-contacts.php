@@ -16,115 +16,7 @@ trait CRM_Contacts_Trait {
 	 * @return int ID del contacto.
 	 */
 	public static function upsert_contact( array $data ): int {
-		global $wpdb;
-
-		$user_id      = absint( $data['user_id'] ?? 0 );
-		$email        = sanitize_email( $data['email'] ?? '' );
-		$raw_phone    = sanitize_text_field( (string) ( $data['phone'] ?? get_user_meta( $user_id, 'atora_phone', true ) ) );
-		$raw_whatsapp = sanitize_text_field( (string) ( $data['whatsapp'] ?? '' ) );
-		$phone        = self::normalize_contact_phone( $raw_phone );
-		$whatsapp     = self::normalize_contact_phone( $raw_whatsapp );
-		$state   = sanitize_text_field( (string) ( $data['state'] ?? get_user_meta( $user_id, 'atora_state', true ) ) );
-		$sex     = sanitize_key( (string) ( $data['sex'] ?? get_user_meta( $user_id, 'atora_sex', true ) ) );
-		$age     = absint( $data['age'] ?? get_user_meta( $user_id, 'atora_age', true ) );
-		$allowed_sexes = array( 'femenino', 'masculino', 'no_binario', 'prefiero_no_decir' );
-		if ( '' !== $sex && ! in_array( $sex, $allowed_sexes, true ) ) {
-			$sex = '';
-		}
-		if ( $age > 120 ) {
-			$age = 120;
-		}
-
-		if ( ! $user_id && ! $email ) { return 0; }
-
-		// Mantener user_meta coherente cuando llegan datos explícitos desde flujos UI/CSV/invitación.
-		if ( $user_id > 0 ) {
-			$profile_meta_map = array(
-				'phone'    => array( 'atora_phone', $raw_phone ),
-				'whatsapp' => array( 'atora_whatsapp', $raw_whatsapp ),
-				'country'  => array( 'atora_country_code', sanitize_text_field( (string) ( $data['country'] ?? '' ) ) ),
-				'city'     => array( 'atora_city', sanitize_text_field( (string) ( $data['city'] ?? '' ) ) ),
-				'telegram' => array( 'atora_telegram', sanitize_text_field( (string) ( $data['telegram'] ?? '' ) ) ),
-				'state'    => array( 'atora_state', $state ),
-				'sex'      => array( 'atora_sex', $sex ),
-				'age'      => array( 'atora_age', $age > 0 ? (string) $age : '' ),
-			);
-			foreach ( $profile_meta_map as $data_key => $meta_pair ) {
-				if ( ! array_key_exists( $data_key, $data ) ) {
-					continue;
-				}
-				$meta_key = (string) $meta_pair[0];
-				$value    = (string) $meta_pair[1];
-				// PT-4.3 (6.5.1): atora_phone pasa por
-				// Preferences::update_phone() — invalida la verificación
-				// si el número cambió de verdad, en vez de un
-				// update_user_meta() directo que dejaba "verificado" un
-				// número que el CRM acababa de sobreescribir.
-				if ( 'atora_phone' === $meta_key && class_exists( '\ATORA\Messaging\Preferences' ) ) {
-					\ATORA\Messaging\Preferences::update_phone( $user_id, $value );
-					continue;
-				}
-				update_user_meta( $user_id, $meta_key, $value );
-			}
-		}
-
-		// Buscar contacto existente.
-		$existing_id = 0;
-		if ( $user_id ) {
-			$existing_id = (int) $wpdb->get_var( $wpdb->prepare(
-				"SELECT id FROM {$wpdb->prefix}atora_contacts WHERE user_id = %d LIMIT 1",
-				$user_id
-			) );
-		}
-
-		if ( ! $existing_id && $email ) {
-			$existing_id = (int) $wpdb->get_var( $wpdb->prepare(
-				"SELECT id FROM {$wpdb->prefix}atora_contacts WHERE email = %s LIMIT 1",
-				$email
-			) );
-		}
-
-		if ( ! $existing_id && '' !== $phone ) {
-			$existing_id = self::find_contact_id_by_phone( $phone );
-			if ( ! $existing_id && self::$last_phone_contact_match_ambiguous ) {
-				return 0;
-			}
-		}
-
-		if ( ! $existing_id && '' !== $whatsapp ) {
-			$existing_id = self::find_contact_id_by_phone( $whatsapp );
-			if ( ! $existing_id && self::$last_phone_contact_match_ambiguous ) {
-				return 0;
-			}
-		}
-
-		$record = array(
-			'user_id'    => $user_id ?: null,
-			'email'      => $email,
-			'name'       => sanitize_text_field( $data['name'] ?? '' ),
-			'phone'      => $phone,
-			'whatsapp'   => $whatsapp,
-			'country'    => sanitize_text_field( $data['country'] ?? get_user_meta( $user_id, 'atora_country_code', true ) ),
-			'city'       => sanitize_text_field( $data['city'] ?? get_user_meta( $user_id, 'atora_city', true ) ),
-			'source'     => sanitize_key( $data['source'] ?? 'manual' ),
-			'status'     => sanitize_key( $data['status'] ?? 'lead' ),
-			'updated_at' => current_time( 'mysql', true ),
-		);
-
-		if ( $existing_id ) {
-			// Actualizar solo campos no vacíos.
-			$update = array_filter( $record );
-			$wpdb->update(
-				"{$wpdb->prefix}atora_contacts",
-				$update,
-				array( 'id' => $existing_id )
-			);
-			return $existing_id;
-		}
-
-		$record['created_at'] = current_time( 'mysql', true );
-		$wpdb->insert( "{$wpdb->prefix}atora_contacts", $record );
-		return (int) $wpdb->insert_id;
+		return clms_core( 'CLMS_Contacts_Core_Service' )->upsert_contact( $data );
 	}
 
 	/**
@@ -181,37 +73,7 @@ trait CRM_Contacts_Trait {
 	 * @return void
 	 */
 	public static function add_tag( int $user_id, string $tag_name ): void {
-		global $wpdb;
-		$tags_table = "{$wpdb->prefix}atora_contact_tags";
-		if ( ! self::table_exists( $tags_table ) ) {
-			return;
-		}
-
-		$contact = self::get_contact( $user_id );
-		if ( ! $contact ) { return; }
-
-		$tag_name = sanitize_text_field( $tag_name );
-		if ( '' === $tag_name ) {
-			return;
-		}
-
-		$exists = $wpdb->get_var( $wpdb->prepare(
-			"SELECT id FROM {$tags_table} WHERE contact_id = %d AND tag_name = %s LIMIT 1",
-			$contact->id, $tag_name
-		) );
-
-		if ( ! $exists ) {
-			$inserted = $wpdb->insert(
-				$tags_table,
-				array( 'contact_id' => $contact->id, 'tag_name' => $tag_name ),
-				array( '%d', '%s' )
-			);
-
-			if ( $inserted ) {
-				self::log_activity( $user_id, 'tag_added', array( 'tag' => $tag_name ) );
-				do_action( 'atora/crm/tag_added', $user_id, $tag_name, (int) $contact->id );
-			}
-		}
+		clms_core( 'CLMS_Contacts_Core_Service' )->add_tag( $user_id, $tag_name );
 	}
 
 	/**
@@ -222,30 +84,7 @@ trait CRM_Contacts_Trait {
 	 * @return void
 	 */
 	public static function remove_tag( int $user_id, string $tag_name ): void {
-		global $wpdb;
-		$tags_table = "{$wpdb->prefix}atora_contact_tags";
-		if ( ! self::table_exists( $tags_table ) ) {
-			return;
-		}
-
-		$contact = self::get_contact( $user_id );
-		if ( ! $contact ) { return; }
-
-		$tag_name = sanitize_text_field( $tag_name );
-		if ( '' === $tag_name ) {
-			return;
-		}
-
-		$deleted = $wpdb->delete(
-			$tags_table,
-			array( 'contact_id' => $contact->id, 'tag_name' => $tag_name ),
-			array( '%d', '%s' )
-		);
-
-		if ( $deleted ) {
-			self::log_activity( $user_id, 'tag_removed', array( 'tag' => $tag_name ) );
-			do_action( 'atora/crm/tag_removed', $user_id, $tag_name, (int) $contact->id );
-		}
+		clms_core( 'CLMS_Contacts_Core_Service' )->remove_tag( $user_id, $tag_name );
 	}
 
 	/**
