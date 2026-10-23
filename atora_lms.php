@@ -334,6 +334,20 @@ add_action( 'plugins_loaded', static function() {
 		delete_option( 'atora_db_columns_version' );
 		update_option( 'atora_lms_plugin_version', ATORA_LMS_VERSION, false );
 
+		// Bloque 3 (6.34.0): el CRM v1 se retira. El cron legacy no debe quedar
+		// programado tras actualizar.
+		if ( function_exists( 'wp_clear_scheduled_hook' ) ) {
+			wp_clear_scheduled_hook( 'atora_crm_autotag_cron' );
+		}
+
+		// El CRM v2 se convierte en el CRM por defecto tras retirar el v1.
+		if ( function_exists( 'get_option' ) && function_exists( 'update_option' ) ) {
+			$crm_v2_enabled = (bool) get_option( 'clms_crm_v2_enabled', false );
+			if ( ! $crm_v2_enabled ) {
+				update_option( 'clms_crm_v2_enabled', true, false );
+			}
+		}
+
 		// 6.1.1: invalidar caché del payload del panel de estudiante (course_ids
 		// quedaban resueltos en el espacio de IDs equivocado).
 		if ( class_exists( 'CLMS_Cache' ) ) {
@@ -390,9 +404,6 @@ function atora_lms_build_probe_manifest(): array {
 	$files = array(
 		'atora_lms.php',
 		'includes/class-admin-menu.php',
-		'modules/crm/class-crm.php',
-		'modules/crm/views/admin.php',
-		'modules/crm/views/contact-profile.php',
 		'modules/crm-v2/class-crm-v2-app.php',
 		// Módulos cargados condicionalmente en el bootstrap de 'init' — si faltan
 		// en el servidor (deploy incompleto), fallan en silencio salvo por este probe.
@@ -450,23 +461,18 @@ function atora_lms_get_build_probe_payload(): array {
 	$current_user_id = (int) get_current_user_id();
 	$is_super_admin  = (bool) ( function_exists( 'is_super_admin' ) && is_super_admin() );
 
-	$crm_class       = '\ATORA\CRM\CRM';
 	$crm_v2_app      = '\ATORA\CRM_V2\CRM_V2_App';
-	$crm_class_ready = class_exists( $crm_class ) && method_exists( $crm_class, 'can_access_crm' );
 	$crm_v2_ready    = class_exists( $crm_v2_app ) && method_exists( $crm_v2_app, 'can_access' );
 
-	$crm_can_access  = $crm_class_ready ? (bool) $crm_class::can_access_crm( $current_user_id ) : false;
-	$crm_can_manage  = $crm_class_ready && method_exists( $crm_class, 'can_manage_crm' )
-		? (bool) $crm_class::can_manage_crm( $current_user_id )
-		: false;
+	$core = function_exists( 'clms_core' ) ? clms_core( 'CLMS_Contacts_Core_Service' ) : null;
+	$crm_can_access = $core ? (bool) $core->can_access_crm( $current_user_id ) : (bool) current_user_can( 'clms_access_crm_view' );
+	$crm_can_manage = $core ? (bool) $core->can_manage_crm( $current_user_id ) : (bool) current_user_can( 'clms_manage_crm' );
 	$crm_v2_enabled  = class_exists( 'CLMS_Settings' ) && method_exists( 'CLMS_Settings', 'is_crm_v2_enabled' )
 		? (bool) CLMS_Settings::is_crm_v2_enabled()
 		: (bool) get_option( 'clms_crm_v2_enabled', false );
 	$crm_v2_access   = $crm_v2_ready ? (bool) $crm_v2_app::can_access() : false;
 
-	$recommended_crm_url = ( $crm_v2_enabled && $crm_v2_access )
-		? admin_url( 'admin.php?page=atora-crm-v2' )
-		: admin_url( 'admin.php?page=atora-crm' );
+	$recommended_crm_url = admin_url( 'admin.php?page=atora-crm-v2' );
 
 	return array(
 		'signature'      => ATORA_LMS_BUILD_SIGNATURE,
@@ -482,7 +488,6 @@ function atora_lms_get_build_probe_payload(): array {
 		'runtime_access' => array(
 			'current_user_can_read'           => (bool) current_user_can( 'read' ),
 			'current_user_can_manage_options' => (bool) current_user_can( 'manage_options' ),
-			'crm_class_ready'                 => $crm_class_ready,
 			'crm_can_access'                  => $crm_can_access,
 			'crm_can_manage'                  => $crm_can_manage,
 			'crm_v2_enabled'                  => $crm_v2_enabled,

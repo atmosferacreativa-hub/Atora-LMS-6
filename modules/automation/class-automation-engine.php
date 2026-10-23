@@ -545,8 +545,9 @@ class Automation_Engine {
 	public static function on_enrollment_completed( int $user_id, int $course_id ): void {
 		$user       = get_userdata( $user_id );
 		$contact_id = 0;
-		if ( class_exists( '\ATORA\CRM\CRM' ) && method_exists( '\ATORA\CRM\CRM', 'get_contact_id_by_user' ) ) {
-			$contact_id = absint( \ATORA\CRM\CRM::get_contact_id_by_user( $user_id ) );
+		$core = function_exists( 'clms_core' ) ? clms_core( 'CLMS_Contacts_Core_Service' ) : null;
+		if ( $core && method_exists( $core, 'get_contact_id_by_user' ) ) {
+			$contact_id = absint( $core->get_contact_id_by_user( $user_id ) );
 		}
 		self::fire_trigger( 'enrollment_completed', $user_id, array(
 			'course_id'    => absint( $course_id ),
@@ -858,8 +859,9 @@ class Automation_Engine {
 				$sequence_id = absint( $action['sequence_id'] ?? 0 );
 				$contact_id  = absint( $context['contact_id'] ?? 0 );
 				if ( ! $contact_id && $user_id ) {
-					if ( class_exists( '\ATORA\CRM\CRM' ) && method_exists( '\ATORA\CRM\CRM', 'get_contact_id_by_user' ) ) {
-						$contact_id = absint( \ATORA\CRM\CRM::get_contact_id_by_user( $user_id ) );
+					$core = function_exists( 'clms_core' ) ? clms_core( 'CLMS_Contacts_Core_Service' ) : null;
+					if ( $core && method_exists( $core, 'get_contact_id_by_user' ) ) {
+						$contact_id = absint( $core->get_contact_id_by_user( $user_id ) );
 					}
 				}
 				if ( $sequence_id > 0 && $contact_id > 0 ) {
@@ -879,8 +881,9 @@ class Automation_Engine {
 				$target_stage = sanitize_key( (string) ( $action['stage']    ?? '' ) );
 				$contact_id   = absint( $context['contact_id'] ?? 0 );
 				if ( ! $contact_id && $user_id ) {
-					if ( class_exists( '\ATORA\CRM\CRM' ) && method_exists( '\ATORA\CRM\CRM', 'get_contact_id_by_user' ) ) {
-						$contact_id = absint( \ATORA\CRM\CRM::get_contact_id_by_user( $user_id ) );
+					$core = function_exists( 'clms_core' ) ? clms_core( 'CLMS_Contacts_Core_Service' ) : null;
+					if ( $core && method_exists( $core, 'get_contact_id_by_user' ) ) {
+						$contact_id = absint( $core->get_contact_id_by_user( $user_id ) );
 					}
 				}
 				if ( $contact_id && $target_stage ) {
@@ -955,8 +958,9 @@ class Automation_Engine {
 		$contact_id    = absint( $context['contact_id'] ?? 0 );
 
 		if ( ! $contact_id && $user_id > 0 ) {
-			if ( class_exists( '\ATORA\CRM\CRM' ) && method_exists( '\ATORA\CRM\CRM', 'get_contact_id_by_user' ) ) {
-				$contact_id = absint( \ATORA\CRM\CRM::get_contact_id_by_user( $user_id ) );
+			$core = function_exists( 'clms_core' ) ? clms_core( 'CLMS_Contacts_Core_Service' ) : null;
+			if ( $core && method_exists( $core, 'get_contact_id_by_user' ) ) {
+				$contact_id = absint( $core->get_contact_id_by_user( $user_id ) );
 			}
 		}
 

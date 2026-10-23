@@ -122,17 +122,10 @@ trait CLMS_Admin_Menu_Main_Pages_Academic_Trait {
 				|| current_user_can( 'edit_user', $requested_user_id );
 
 			if ( ! $can_view_requested ) {
-				$crm_class = '\ATORA\CRM\CRM';
-				if ( class_exists( $crm_class ) && method_exists( $crm_class, 'get_accessible_contact_user_ids' ) ) {
-					$visible_user_ids = array_values(
-						array_filter(
-							array_map(
-								'absint',
-								(array) $crm_class::get_accessible_contact_user_ids( $current_user_id )
-							)
-						)
-					);
-					$can_view_requested = in_array( $requested_user_id, $visible_user_ids, true );
+				$core = function_exists( 'clms_core' ) ? clms_core( 'CLMS_Contacts_Core_Service' ) : null;
+				if ( $core && method_exists( $core, 'get_accessible_contact_user_ids' ) ) {
+					$visible_user_ids   = array_map( 'absint', (array) $core->get_accessible_contact_user_ids( $current_user_id ) );
+					$can_view_requested = in_array( $requested_user_id, array_values( array_unique( array_filter( $visible_user_ids ) ) ), true );
 				}
 			}
 

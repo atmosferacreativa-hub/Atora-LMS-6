@@ -43,8 +43,6 @@ def strip_comments(php):
 
 
 CONTACTS_CORE   = 'includes/contacts-core/class-contacts-core-service.php'
-CRM_ACCESS      = 'modules/crm/trait-crm-access.php'
-CRM_CONTACTS    = 'modules/crm/trait-crm-contacts.php'
 LOADER_GROUPS   = 'includes/loader/trait-loader-module-groups.php'
 BRIDGE          = 'includes/academic/class-academic-messaging-bridge.php'
 STUDENT_PROFILE = 'includes/admin-menu/trait-admin-menu-student-profile.php'
@@ -60,24 +58,6 @@ MIGRATED_PRIMITIVES = (
     'get_accessible_contact_user_ids', 'get_contact', 'log_activity', 'get_timeline',
 )
 
-# Consumidores confirmados en la investigación de este sprint -- no deben
-# haber sido tocados por la extracción (siguen llamando a CRM:: sin cambios).
-EXTERNAL_CRM_CONSUMERS = (
-    'modules/crm-v2/class-crm-v2-app.php',
-    'modules/crm-v2/class-crm-v2.php',
-    'modules/crm-v2/trait-crm-v2-pipeline.php',
-    'modules/crm-v2/trait-crm-v2-segmenter.php',
-    'modules/crm-v2/services/class-contact-service.php',
-    'modules/crm-v2/services/class-activity-service.php',
-    'modules/crm-v2/rest/class-crm-rest-controller.php',
-    'includes/ui/class-ui-search-service.php',
-    'includes/frontend/trait-frontend-access-profile.php',
-    'includes/enrollment-manager/trait-enrollment-manager-access-enrollment.php',
-    'includes/admin-menu/trait-admin-menu-main-pages-academic.php',
-    'includes/metabox-program/trait-metabox-program-enrollment-ajax.php',
-    'modules/automation/class-automation-engine.php',
-)
-
 
 # ── 01: el servicio neutro existe y contiene las 7 primitivas migradas ──
 
@@ -90,26 +70,45 @@ def check_contacts_core_exists():
     log_pass('01-contacts-core-exists', f'{CONTACTS_CORE} define las 7 primitivas migradas')
 
 
-# ── 02: CRM:: (v1) ya no contiene SQL propio para las primitivas migradas — delega ──
+# ── 02: retiro CRM v1 (6.34.0) — no quedan referencias legacy ──
 
-def check_v1_delegates_not_duplicates():
-    for path, primitives in ((CRM_ACCESS, ('can_access_crm', 'can_manage_crm', 'has_global_contact_scope', 'get_accessible_contact_user_ids')),
-                              (CRM_CONTACTS, ('get_contact', 'log_activity', 'get_timeline'))):
-        content = read(path)
-        for primitive in primitives:
-            m = re.search(r'function\s+' + primitive + r'\([^)]*\)[^{]*\{(.*?)\n\t\}', content, re.S)
-            if not m:
-                log_fail('02-v1-delegates', f'{path}: no se encontró el cuerpo de {primitive}()')
-                continue
-            body = m.group(1)
-            if 'global $wpdb' in body or 'SELECT' in body.upper() or 'INSERT INTO' in body.upper():
-                log_fail('02-v1-delegates', f'{path}: {primitive}() todavía contiene SQL propio -- se esperaba que delegara')
-                continue
-            if 'clms_core( \'CLMS_Contacts_Core_Service\' )' not in body and 'clms_core(\'CLMS_Contacts_Core_Service\')' not in body:
-                log_fail('02-v1-delegates', f'{path}: {primitive}() no delega a CLMS_Contacts_Core_Service')
-                continue
-    if not any(f[0] == '02-v1-delegates' for f in FAILURES):
-        log_pass('02-v1-delegates', 'las 7 primitivas en modules/crm/ delegan al servicio neutro, sin SQL duplicado')
+def check_no_legacy_crm_references():
+    legacy_markers = (
+        '\\ATORA\\CRM\\' + 'CRM',
+        # Evita dejar el literal del path legacy en el repo (la orden pide
+        # que no exista ni siquiera como string), pero mantiene el mismo
+        # criterio de detección.
+        'modules' + '/crm' + '/',
+    )
+    offenders = []
+
+    for rel_root in ('atora_lms.php', 'includes', 'modules', 'tests/bootstrap.php'):
+        abs_root = os.path.join(ROOT, rel_root)
+
+        if os.path.isfile(abs_root):
+            content = read(rel_root)
+            if any(m in content for m in legacy_markers):
+                offenders.append(rel_root)
+            continue
+
+        for dirpath, _, filenames in os.walk(abs_root):
+            for filename in filenames:
+                if not filename.endswith('.php'):
+                    continue
+                abs_path = os.path.join(dirpath, filename)
+                rel_path = os.path.relpath(abs_path, ROOT).replace(os.sep, '/')
+                content = read(rel_path)
+                if any(m in content for m in legacy_markers):
+                    offenders.append(rel_path)
+
+    offenders = sorted(set(offenders))
+    if offenders:
+        preview = offenders[:12]
+        suffix = '…' if len(offenders) > len(preview) else ''
+        log_fail('02-no-legacy-crm', f'referencias legacy detectadas: {preview}{suffix}')
+        return
+
+    log_pass('02-no-legacy-crm', 'no quedan referencias a CRM v1 (clase legacy ni path legacy)')
 
 
 # ── 03: el servicio se registra en el grupo 'core' del loader, sin condition ──
@@ -126,24 +125,6 @@ def check_loader_registration():
         log_fail('03-loader-registration', 'CLMS_Contacts_Core_Service tiene un condition -- se esperaba que cargue siempre (grupo core, sin condition)')
         return
     log_pass('03-loader-registration', 'registrado en el loader sin condition (carga siempre)')
-
-
-# ── 04: ningún consumidor externo confirmado de CRM:: fue tocado (sigue llamando CRM::) ──
-
-def check_external_consumers_untouched():
-    missing = []
-    for path in EXTERNAL_CRM_CONSUMERS:
-        full = os.path.join(ROOT, path)
-        if not os.path.exists(full):
-            missing.append(path)
-            continue
-        content = read(path)
-        if 'CRM::' not in content and '\\ATORA\\CRM\\CRM' not in content:
-            missing.append(path)
-    if missing:
-        log_fail('04-external-consumers-untouched', f'archivos que dejaron de llamar a CRM:: (se esperaba que no cambiaran): {missing}')
-        return
-    log_pass('04-external-consumers-untouched', f'los {len(EXTERNAL_CRM_CONSUMERS)} consumidores externos confirmados siguen llamando a CRM:: sin cambios')
 
 
 # ── 05: on_at_risk_signal() persiste en el timeline (academic_at_risk_alert) ──
@@ -268,9 +249,8 @@ def check_cohort_metabox_links_coordinator():
 
 def main():
     check_contacts_core_exists()
-    check_v1_delegates_not_duplicates()
+    check_no_legacy_crm_references()
     check_loader_registration()
-    check_external_consumers_untouched()
     check_bridge_logs_at_risk()
     check_student_profile_capability_gate()
     check_pages_wired_up()
