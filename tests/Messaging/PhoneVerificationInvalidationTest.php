@@ -259,7 +259,22 @@ class PhoneVerificationInvalidationTest extends TestCase {
 		$count  = count( $tokens );
 		for ( $i = 0; $i < $count; $i++ ) {
 			$token = $tokens[ $i ];
-			if ( ! is_array( $token ) || T_STRING !== $token[0] || 'Preferences' !== $token[1] ) {
+			if ( ! is_array( $token ) ) {
+				continue;
+			}
+
+			$token_type = $token[0];
+			$token_text = $token[1];
+			$looks_like_preferences = false;
+			if ( defined( 'T_NAME_FULLY_QUALIFIED' ) && T_NAME_FULLY_QUALIFIED === $token_type ) {
+				$looks_like_preferences = str_ends_with( $token_text, '\\Preferences' );
+			} elseif ( defined( 'T_NAME_QUALIFIED' ) && T_NAME_QUALIFIED === $token_type ) {
+				$looks_like_preferences = str_ends_with( $token_text, '\\Preferences' );
+			} elseif ( T_STRING === $token_type ) {
+				$looks_like_preferences = ( 'Preferences' === $token_text );
+			}
+
+			if ( ! $looks_like_preferences ) {
 				continue;
 			}
 
