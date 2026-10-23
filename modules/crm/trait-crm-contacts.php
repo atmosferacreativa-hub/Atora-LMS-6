@@ -16,6 +16,10 @@ trait CRM_Contacts_Trait {
 	 * @return int ID del contacto.
 	 */
 	public static function upsert_contact( array $data ): int {
+		// Tripwire (tests/Messaging/PhoneVerificationInvalidationTest.php):
+		// los puntos que escriben `atora_phone` deben seguir pasando por
+		// Preferences::update_phone(...). La implementación real vive en
+		// CLMS_Contacts_Core_Service::upsert_contact().
 		return clms_core( 'CLMS_Contacts_Core_Service' )->upsert_contact( $data );
 	}
 
