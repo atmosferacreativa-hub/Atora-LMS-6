@@ -1,7 +1,7 @@
 # Progreso — Orden A (CRM: retirar v1, v2 completo · 6.34.0)
 
 - Inicio: 2026-10-23
-- Estado: en curso
+- Estado: completada (2026-10-23)
 
 ## Bloque 0 — Multisitio no compatible
 
@@ -60,5 +60,11 @@ PR: #84 (merge 2026-10-23). Follow-up: #85 (tripwire de `atora_phone`, merge 202
 
 ## Cierre — 6.34.0
 
-- [ ] Changelog + `docs/ESTADO.md` + actualización paridad.
-- [ ] Tag `v6.34.0` + ZIP verificado + release.
+- [x] Changelog + `docs/ESTADO.md` + actualización paridad.
+- [x] Tag `v6.34.0` + ZIP verificado + release.
+
+PR: #86 (merge 2026-10-23). Release: https://github.com/atmosferacreativa-hub/Atora-LMS-6/releases/tag/v6.34.0
+
+ZIP: `dist/atora-lms-6.34.0.zip`
+
+SHA-256: `0004eafbe62a137ef9b43cf2a9b41f6d77dcc8ac085ff81f971b0e85ba74879a`
