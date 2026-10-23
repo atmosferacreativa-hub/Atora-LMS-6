@@ -206,6 +206,31 @@ class CLMS_Contacts_Core_Service {
 	}
 
 	/**
+	 * Devuelve el ID del contacto asociado a un usuario.
+	 *
+	 * Si aún no existe una fila CRM para el usuario, crea una fila mínima
+	 * (misma estrategia usada por log_activity()).
+	 *
+	 * @param int $user_id Usuario.
+	 * @return int ID del contacto, o 0 si no se pudo resolver.
+	 */
+	public function get_contact_id_by_user( int $user_id ): int {
+		$user_id = absint( $user_id );
+		if ( $user_id <= 0 ) {
+			return 0;
+		}
+
+		$contact = $this->get_contact( $user_id );
+		$contact_id = $contact ? absint( $contact->id ?? 0 ) : 0;
+		if ( $contact_id > 0 ) {
+			return $contact_id;
+		}
+
+		$contact = $this->ensure_contact_for_user( $user_id );
+		return $contact ? absint( $contact->id ?? 0 ) : 0;
+	}
+
+	/**
 	 * Crea o actualiza un contacto en la tabla CRM.
 	 *
 	 * Portado desde CRM v1 como primitiva compartida.
