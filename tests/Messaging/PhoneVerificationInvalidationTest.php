@@ -182,11 +182,13 @@ class PhoneVerificationInvalidationTest extends TestCase {
 	public function test_phone_write_site_delegates_to_update_phone( string $relative_path ): void {
 		$contents = file_get_contents( __DIR__ . '/../../' . $relative_path );
 		$this->assertIsString( $contents );
-		$code = self::strip_comments_and_strings( $contents );
-		$this->assertStringContainsString(
-			'Preferences::update_phone(',
-			$code,
-			"{$relative_path} debería escribir atora_phone vía Preferences::update_phone()"
+		$this->assertFalse(
+			self::has_direct_update_user_meta_phone_write( $contents ),
+			"{$relative_path} no debe escribir atora_phone con update_user_meta(); debe usar Preferences::update_phone()"
+		);
+		$this->assertTrue(
+			self::has_preferences_update_phone_call( $contents ),
+			"{$relative_path} debería llamar a Preferences::update_phone() cuando actualiza el teléfono"
 		);
 	}
 
@@ -204,12 +206,16 @@ class PhoneVerificationInvalidationTest extends TestCase {
 	 * @return array<int,string>
 	 */
 	private static function discover_phone_write_sites(): array {
+		$known_phone_write_sites = array(
+			'includes/contacts-core/class-contacts-core-service.php',
+		);
+
 		$root = realpath( __DIR__ . '/../../' );
 		if ( ! is_string( $root ) ) {
-			return array();
+			return $known_phone_write_sites;
 		}
 
-		$paths = array();
+		$paths = $known_phone_write_sites;
 		foreach ( array( 'includes', 'modules' ) as $dir ) {
 			$abs_dir = $root . DIRECTORY_SEPARATOR . $dir;
 			if ( ! is_dir( $abs_dir ) ) {
@@ -246,6 +252,42 @@ class PhoneVerificationInvalidationTest extends TestCase {
 
 		sort( $paths );
 		return array_values( array_unique( $paths ) );
+	}
+
+	private static function has_preferences_update_phone_call( string $php ): bool {
+		$tokens = token_get_all( $php );
+		$count  = count( $tokens );
+		for ( $i = 0; $i < $count; $i++ ) {
+			$token = $tokens[ $i ];
+			if ( ! is_array( $token ) || T_STRING !== $token[0] || 'Preferences' !== $token[1] ) {
+				continue;
+			}
+
+			$j = $i + 1;
+			while ( $j < $count && is_array( $tokens[ $j ] ) && T_WHITESPACE === $tokens[ $j ][0] ) {
+				$j++;
+			}
+			if ( $j >= $count || ! is_array( $tokens[ $j ] ) || T_DOUBLE_COLON !== $tokens[ $j ][0] ) {
+				continue;
+			}
+
+			$j++;
+			while ( $j < $count && is_array( $tokens[ $j ] ) && T_WHITESPACE === $tokens[ $j ][0] ) {
+				$j++;
+			}
+			if ( $j >= $count || ! is_array( $tokens[ $j ] ) || T_STRING !== $tokens[ $j ][0] || 'update_phone' !== $tokens[ $j ][1] ) {
+				continue;
+			}
+
+			$j++;
+			while ( $j < $count && is_array( $tokens[ $j ] ) && T_WHITESPACE === $tokens[ $j ][0] ) {
+				$j++;
+			}
+			if ( $j < $count && '(' === ( is_array( $tokens[ $j ] ) ? $tokens[ $j ][1] : $tokens[ $j ] ) ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**
@@ -303,24 +345,7 @@ class PhoneVerificationInvalidationTest extends TestCase {
 		return false;
 	}
 
-	/**
-	 * Remueve comentarios y strings para evitar satisfacer una prueba
-	 * con texto no ejecutable.
-	 */
-	private static function strip_comments_and_strings( string $php ): string {
-		$out = '';
-		foreach ( token_get_all( $php ) as $token ) {
-			if ( is_array( $token ) ) {
-				$type = $token[0];
-				$text = $token[1];
-				if ( T_COMMENT === $type || T_DOC_COMMENT === $type || T_CONSTANT_ENCAPSED_STRING === $type || T_ENCAPSED_AND_WHITESPACE === $type ) {
-					continue;
-				}
-				$out .= $text;
-				continue;
-			}
-			$out .= $token;
-		}
-		return $out;
-	}
+	// strip_comments_and_strings() se eliminó: las verificaciones de llamadas
+	// a update_phone() y escrituras directas a atora_phone se hacen vía tokens,
+	// no por búsquedas de strings, para que no pueda "pasar" con comentarios.
 }
