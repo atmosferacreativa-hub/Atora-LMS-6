@@ -11,12 +11,12 @@
  *  - Verificación semanal en segundo plano (cron), con caché de 12h
  *    para no golpear el servidor en cada carga de admin.
  *
- * API remota esperada (implementar en atora-lms.com — ver docs/LICENSING-SERVER.md):
+ * API remota esperada (ver docs/LICENSING-SERVER.md):
  *  POST {server}/wp-json/atora-licensing/v1/activate    { license_key, site_url }
  *  POST {server}/wp-json/atora-licensing/v1/deactivate  { license_key, site_url }
  *  POST {server}/wp-json/atora-licensing/v1/check       { license_key, site_url, version }
  *  GET  {server}/wp-json/atora-licensing/v1/update?license_key=&site_url=&version=
- *       → { version, package (zip URL firmada), tested, requires_php, sections{...} }
+ *       → { version, package (zip URL firmada), signature, tested, requires_php, sections{...} }
  *
  * @package ATORA_LMS
  * @since   6.2.0
@@ -36,10 +36,14 @@ class Licensing {
 	const OPT_KEY      = 'atora_license_key';
 	const OPT_STATUS   = 'atora_license_status';   // valid | invalid | expired | inactive.
 	const OPT_DATA     = 'atora_license_data';     // Payload del servidor (expira, plan, sites).
+	const OPT_SERVER   = 'atora_license_server';   // URL base del servidor de licencias (https://...).
 	const TRANSIENT    = 'atora_license_last_check';
 	const CRON_HOOK    = 'atora_license_check_cron';
-	const SERVER_URL   = 'https://atora-lms.com';
 	const API_NS       = '/wp-json/atora-licensing/v1';
+	// Clave pública Ed25519 (base64) para verificar updates.
+	// Se deja vacía a propósito: sin una clave pública configurada,
+	// no se instala ninguna actualización automática.
+	const PUBLIC_KEY_B64 = '';
 
 	/**
 	 * Bootstrap del módulo.
@@ -47,11 +51,21 @@ class Licensing {
 	 * @return void
 	 */
 	public static function init(): void {
-		// Actualizaciones self-hosted — hook estándar por hostname del Update URI.
-		add_filter( 'update_plugins_atora-lms.com', array( __CLASS__, 'check_for_update' ), 10, 4 );
+		// Limpieza al actualizar: si existía una tarea con el hook anterior,
+		// la eliminamos y solo la reprogramamos cuando haya servidor.
+		wp_clear_scheduled_hook( self::CRON_HOOK );
 
-		// Info del plugin en el modal "Ver detalles".
-		add_filter( 'plugins_api', array( __CLASS__, 'plugin_info' ), 10, 3 );
+		$server = self::license_server();
+		if ( '' !== $server ) {
+			// Actualizaciones self-hosted — hook estándar por hostname del Update URI.
+			add_filter( 'update_plugins_atora.studio', array( __CLASS__, 'check_for_update' ), 10, 4 );
+
+			// Info del plugin en el modal "Ver detalles".
+			add_filter( 'plugins_api', array( __CLASS__, 'plugin_info' ), 10, 3 );
+
+			// Verificación de firma de updates antes de instalar.
+			add_filter( 'upgrader_pre_download', array( __CLASS__, 'upgrader_pre_download' ), 10, 3 );
+		}
 
 		if ( is_admin() ) {
 			add_action( 'admin_menu', array( __CLASS__, 'register_page' ), 99 );
@@ -59,11 +73,48 @@ class Licensing {
 			add_action( 'admin_notices', array( __CLASS__, 'maybe_notice' ) );
 		}
 
-		// Cron semanal de verificación.
-		add_action( self::CRON_HOOK, array( __CLASS__, 'cron_check' ) );
-		if ( ! wp_next_scheduled( self::CRON_HOOK ) ) {
-			wp_schedule_event( time() + DAY_IN_SECONDS, 'weekly', self::CRON_HOOK );
+		// Cron semanal de verificación (solo cuando hay servidor configurado).
+		if ( '' !== $server ) {
+			add_action( self::CRON_HOOK, array( __CLASS__, 'cron_check' ) );
+			if ( ! wp_next_scheduled( self::CRON_HOOK ) ) {
+				wp_schedule_event( time() + DAY_IN_SECONDS, 'weekly', self::CRON_HOOK );
+			}
 		}
+	}
+
+	// ── Config ───────────────────────────────────────────────────────────────
+
+	/**
+	 * URL base del servidor de licencias (https://...).
+	 *
+	 * Se puede definir en wp-config.php vía `ATORA_LICENSE_SERVER`.
+	 * Alternativamente, se guarda en la opción `atora_license_server`.
+	 * No hay valor por defecto.
+	 *
+	 * @return string
+	 */
+	public static function license_server(): string {
+		$server = '';
+		if ( defined( 'ATORA_LICENSE_SERVER' ) ) {
+			$server = (string) ATORA_LICENSE_SERVER;
+		} else {
+			$server = (string) get_option( self::OPT_SERVER, '' );
+		}
+
+		$server = trim( $server );
+		if ( '' === $server ) {
+			return '';
+		}
+
+		$parts = wp_parse_url( $server );
+		if ( ! is_array( $parts ) || empty( $parts['scheme'] ) || empty( $parts['host'] ) ) {
+			return '';
+		}
+		if ( 'https' !== strtolower( (string) $parts['scheme'] ) ) {
+			return '';
+		}
+
+		return rtrim( $server, '/' );
 	}
 
 	// ── Estado ───────────────────────────────────────────────────────────────
@@ -100,7 +151,11 @@ class Licensing {
 	 * @return array<string,mixed>|\WP_Error
 	 */
 	private static function api( string $endpoint, array $body = array() ) {
-		$url  = self::SERVER_URL . self::API_NS . '/' . $endpoint;
+		$server = self::license_server();
+		if ( '' === $server ) {
+			return new \WP_Error( 'atora_license_no_server', __( 'Servidor de licencias no configurado.', 'atora-lms' ) );
+		}
+		$url  = $server . self::API_NS . '/' . $endpoint;
 		$body = array_merge(
 			array(
 				'license_key' => (string) get_option( self::OPT_KEY, '' ),
@@ -147,6 +202,9 @@ class Licensing {
 	 * @return array{ok:bool,message:string}
 	 */
 	public static function activate( string $key ): array {
+		if ( '' === self::license_server() ) {
+			return array( 'ok' => false, 'message' => __( 'Actualizaciones por ZIP: el servidor de licencias no está configurado.', 'atora-lms' ) );
+		}
 		$key = sanitize_text_field( $key );
 		if ( '' === $key ) {
 			return array( 'ok' => false, 'message' => __( 'Introduce una clave de licencia.', 'atora-lms' ) );
@@ -180,7 +238,9 @@ class Licensing {
 	 * @return array{ok:bool,message:string}
 	 */
 	public static function deactivate(): array {
-		self::api( 'deactivate' ); // Best effort; ignoramos error de red.
+		if ( '' !== self::license_server() ) {
+			self::api( 'deactivate' ); // Best effort; ignoramos error de red.
+		}
 		update_option( self::OPT_STATUS, 'inactive', false );
 		delete_option( self::OPT_DATA );
 		delete_transient( self::TRANSIENT );
@@ -193,6 +253,9 @@ class Licensing {
 	 * @return void
 	 */
 	public static function cron_check(): void {
+		if ( '' === self::license_server() ) {
+			return;
+		}
 		if ( '' === (string) get_option( self::OPT_KEY, '' ) ) {
 			return;
 		}
@@ -225,6 +288,10 @@ class Licensing {
 		if ( false === strpos( (string) $plugin_file, 'atora_lms.php' ) ) {
 			return $update;
 		}
+		$server = self::license_server();
+		if ( '' === $server ) {
+			return $update;
+		}
 		if ( ! self::is_valid() ) {
 			return $update; // Sin licencia válida no hay update (el plugin sigue funcionando).
 		}
@@ -237,7 +304,7 @@ class Licensing {
 					'site_url'    => rawurlencode( home_url() ),
 					'version'     => rawurlencode( defined( 'ATORA_LMS_VERSION' ) ? ATORA_LMS_VERSION : '' ),
 				),
-				self::SERVER_URL . self::API_NS . '/update'
+				$server . self::API_NS . '/update'
 			);
 			$response = wp_remote_get( $url, array( 'timeout' => 15 ) );
 			$cached   = array();
@@ -248,7 +315,7 @@ class Licensing {
 			set_transient( 'atora_update_payload', $cached, 6 * HOUR_IN_SECONDS );
 		}
 
-		if ( empty( $cached['version'] ) || empty( $cached['package'] ) ) {
+		if ( empty( $cached['version'] ) || empty( $cached['package'] ) || empty( $cached['signature'] ) ) {
 			return $update;
 		}
 		if ( ! version_compare( (string) $cached['version'], (string) ( $plugin_data['Version'] ?? '0' ), '>' ) ) {
@@ -256,10 +323,10 @@ class Licensing {
 		}
 
 		return array(
-			'id'           => 'atora-lms.com/atora-lms',
+			'id'           => 'atora.studio/atora-lms',
 			'slug'         => 'atora-lms',
 			'version'      => (string) $cached['version'],
-			'url'          => self::SERVER_URL,
+			'url'          => $server,
 			'package'      => (string) $cached['package'],
 			'tested'       => (string) ( $cached['tested'] ?? '' ),
 			'requires_php' => (string) ( $cached['requires_php'] ?? '8.1' ),
@@ -278,6 +345,10 @@ class Licensing {
 		if ( 'plugin_information' !== $action || 'atora-lms' !== ( $args->slug ?? '' ) ) {
 			return $result;
 		}
+		$server = self::license_server();
+		if ( '' === $server ) {
+			return $result;
+		}
 		$cached = get_transient( 'atora_update_payload' );
 		if ( ! is_array( $cached ) || empty( $cached['version'] ) ) {
 			return $result;
@@ -287,14 +358,108 @@ class Licensing {
 		$info->slug          = 'atora-lms';
 		$info->version       = (string) $cached['version'];
 		$info->author        = '<a href="https://mundocap.com">@mundocap</a>';
-		$info->homepage      = self::SERVER_URL;
+		$info->homepage      = $server;
 		$info->requires_php  = (string) ( $cached['requires_php'] ?? '8.1' );
 		$info->tested        = (string) ( $cached['tested'] ?? '' );
 		$info->download_link = (string) ( $cached['package'] ?? '' );
 		$info->sections      = is_array( $cached['sections'] ?? null )
 			? array_map( 'wp_kses_post', $cached['sections'] )
-			: array( 'changelog' => __( 'Consulta el changelog en atora-lms.com.', 'atora-lms' ) );
+			: array( 'changelog' => __( 'Consulta el changelog en tu servidor de licencias.', 'atora-lms' ) );
 		return $info;
+	}
+
+	/**
+	 * Descarga y verifica el paquete de actualización antes de que
+	 * WordPress lo descomprima/instale.
+	 *
+	 * Espera que el endpoint /update incluya un campo `signature` en base64
+	 * que firma el SHA-256 del zip (binario) con Ed25519.
+	 *
+	 * @param mixed  $reply   Respuesta previa.
+	 * @param string $package URL del zip.
+	 * @param object $upgrader Upgrader.
+	 * @return mixed
+	 */
+	public static function upgrader_pre_download( $reply, string $package, $upgrader ) {
+		if ( false !== $reply ) {
+			return $reply;
+		}
+		$server = self::license_server();
+		if ( '' === $server ) {
+			return $reply;
+		}
+
+		$payload = get_transient( 'atora_update_payload' );
+		if ( ! is_array( $payload ) || empty( $payload['package'] ) || empty( $payload['signature'] ) ) {
+			return $reply;
+		}
+		if ( (string) $payload['package'] !== $package ) {
+			return $reply;
+		}
+
+		$package_parts = wp_parse_url( $package );
+		if ( ! is_array( $package_parts ) || ( 'https' !== strtolower( (string) ( $package_parts['scheme'] ?? '' ) ) ) ) {
+			return new \WP_Error( 'atora_license_package_insecure', __( 'El paquete de actualización debe usar HTTPS.', 'atora-lms' ) );
+		}
+		$server_parts = wp_parse_url( $server );
+		if ( is_array( $server_parts ) && ! empty( $server_parts['host'] ) ) {
+			$pkg_host = strtolower( (string) ( $package_parts['host'] ?? '' ) );
+			$sv_host  = strtolower( (string) $server_parts['host'] );
+			if ( '' !== $pkg_host && $pkg_host !== $sv_host ) {
+				return new \WP_Error( 'atora_license_package_host', __( 'El paquete de actualización no proviene del servidor de licencias configurado.', 'atora-lms' ) );
+			}
+		}
+
+		if ( ! function_exists( 'download_url' ) ) {
+			return new \WP_Error( 'atora_license_no_download_url', __( 'No se pudo preparar la descarga del paquete (download_url no disponible).', 'atora-lms' ) );
+		}
+
+		$tmp = download_url( $package, 30 );
+		if ( is_wp_error( $tmp ) ) {
+			return $tmp;
+		}
+
+		$ok = self::verify_update_signature( $tmp, (string) $payload['signature'] );
+		if ( is_wp_error( $ok ) ) {
+			@unlink( (string) $tmp );
+			return $ok;
+		}
+
+		return $tmp;
+	}
+
+	/**
+	 * @param string $zip_path Ruta local del zip descargado.
+	 * @param string $signature_b64 Firma Ed25519 del SHA-256 del zip.
+	 * @return true|\WP_Error
+	 */
+	public static function verify_update_signature( string $zip_path, string $signature_b64 ) {
+		if ( '' === $signature_b64 ) {
+			return new \WP_Error( 'atora_license_no_signature', __( 'El paquete de actualización no incluye firma.', 'atora-lms' ) );
+		}
+		if ( ! function_exists( 'sodium_crypto_sign_verify_detached' ) ) {
+			return new \WP_Error( 'atora_license_no_sodium', __( 'No se puede verificar la firma (ext-sodium no disponible).', 'atora-lms' ) );
+		}
+		$pub_b64 = defined( 'ATORA_LICENSE_PUBKEY_B64' ) ? (string) ATORA_LICENSE_PUBKEY_B64 : self::PUBLIC_KEY_B64;
+		if ( '' === trim( $pub_b64 ) ) {
+			return new \WP_Error( 'atora_license_no_pubkey', __( 'Actualizaciones automáticas deshabilitadas: no hay clave pública configurada para verificar firmas.', 'atora-lms' ) );
+		}
+		$pub     = base64_decode( trim( $pub_b64 ), true );
+		$sig     = base64_decode( trim( $signature_b64 ), true );
+		if ( false === $pub || false === $sig ) {
+			return new \WP_Error( 'atora_license_bad_key', __( 'No se pudo decodificar la clave pública o la firma.', 'atora-lms' ) );
+		}
+
+		$contents = @file_get_contents( $zip_path );
+		if ( false === $contents ) {
+			return new \WP_Error( 'atora_license_read_zip', __( 'No se pudo leer el paquete descargado para verificar la firma.', 'atora-lms' ) );
+		}
+		$digest = hash( 'sha256', $contents, true );
+		$valid  = sodium_crypto_sign_verify_detached( $sig, $digest, $pub );
+		if ( ! $valid ) {
+			return new \WP_Error( 'atora_license_bad_signature', __( 'La firma del paquete de actualización no coincide. Instalación rechazada.', 'atora-lms' ) );
+		}
+		return true;
 	}
 
 	// ── Admin UI ─────────────────────────────────────────────────────────────
@@ -324,6 +489,21 @@ class Licensing {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( esc_html__( 'Sin permisos.', 'atora-lms' ) );
 		}
+
+		$server_defined = defined( 'ATORA_LICENSE_SERVER' ) && '' !== trim( (string) ATORA_LICENSE_SERVER );
+		$server_raw     = $server_defined ? (string) ATORA_LICENSE_SERVER : (string) get_option( self::OPT_SERVER, '' );
+		$server_active  = self::license_server();
+		$server_notice  = '';
+		if ( isset( $_POST['atora_license_server_save'] ) && check_admin_referer( 'atora_license_server_save' ) && ! $server_defined ) {
+			$server_raw = isset( $_POST['atora_license_server'] ) ? sanitize_text_field( (string) wp_unslash( $_POST['atora_license_server'] ) ) : '';
+			update_option( self::OPT_SERVER, $server_raw, false );
+			$server_active = self::license_server();
+			$server_notice = __( 'Servidor guardado.', 'atora-lms' );
+			if ( '' !== trim( $server_raw ) && '' === $server_active ) {
+				$server_notice = __( 'Servidor guardado pero inválido: debe ser una URL HTTPS completa (ej. https://licencias.tu-dominio.com).', 'atora-lms' );
+			}
+		}
+
 		$status = (string) get_option( self::OPT_STATUS, 'inactive' );
 		$data   = (array) get_option( self::OPT_DATA, array() );
 		$nonce  = wp_create_nonce( 'atora_license_admin' );
@@ -337,6 +517,33 @@ class Licensing {
 		?>
 		<div class="wrap">
 			<h1><?php esc_html_e( 'ATORA LMS — Licencia', 'atora-lms' ); ?></h1>
+			<div class="card" style="max-width:640px;padding:20px">
+				<h2 style="margin-top:0"><?php esc_html_e( 'Servidor de licencias', 'atora-lms' ); ?></h2>
+				<?php if ( '' !== $server_notice ) : ?>
+					<div class="notice notice-success inline"><p><?php echo esc_html( $server_notice ); ?></p></div>
+				<?php endif; ?>
+				<form method="post">
+					<?php wp_nonce_field( 'atora_license_server_save' ); ?>
+					<input type="hidden" name="atora_license_server_save" value="1" />
+					<p>
+						<input type="url" name="atora_license_server" class="regular-text" placeholder="https://..."
+							value="<?php echo esc_attr( $server_raw ); ?>" <?php disabled( $server_defined ); ?> />
+					</p>
+					<p class="description">
+						<?php
+						if ( $server_defined ) {
+							esc_html_e( 'Bloqueado por ATORA_LICENSE_SERVER en wp-config.php.', 'atora-lms' );
+						} else {
+							esc_html_e( 'Sin servidor configurado no hay llamadas salientes ni actualizaciones automáticas.', 'atora-lms' );
+						}
+						?>
+					</p>
+					<p>
+						<button class="button" <?php disabled( $server_defined ); ?>><?php esc_html_e( 'Guardar', 'atora-lms' ); ?></button>
+					</p>
+				</form>
+			</div>
+
 			<div class="card" style="max-width:640px;padding:20px">
 				<p>
 					<strong><?php esc_html_e( 'Estado:', 'atora-lms' ); ?></strong>
@@ -356,12 +563,18 @@ class Licensing {
 						value="<?php echo esc_attr( self::masked_key() ); ?>" />
 				</p>
 				<p>
-					<button class="button button-primary" id="atora-license-activate"><?php esc_html_e( 'Activar', 'atora-lms' ); ?></button>
-					<button class="button" id="atora-license-deactivate"><?php esc_html_e( 'Desactivar', 'atora-lms' ); ?></button>
+					<button class="button button-primary" id="atora-license-activate" <?php disabled( '' === $server_active ); ?>><?php esc_html_e( 'Activar', 'atora-lms' ); ?></button>
+					<button class="button" id="atora-license-deactivate" <?php disabled( '' === $server_active ); ?>><?php esc_html_e( 'Desactivar', 'atora-lms' ); ?></button>
 					<span id="atora-license-msg" style="margin-left:8px"></span>
 				</p>
 				<p class="description">
-					<?php esc_html_e( 'Sin licencia, el plugin sigue funcionando pero no recibe actualizaciones automáticas ni soporte.', 'atora-lms' ); ?>
+					<?php
+					if ( '' === $server_active ) {
+						esc_html_e( 'Actualizaciones por ZIP.', 'atora-lms' );
+					} else {
+						esc_html_e( 'Sin licencia, el plugin sigue funcionando pero no recibe actualizaciones automáticas ni soporte.', 'atora-lms' );
+					}
+					?>
 				</p>
 			</div>
 
@@ -472,6 +685,9 @@ class Licensing {
 	 * @return void
 	 */
 	public static function maybe_notice(): void {
+		if ( '' === self::license_server() ) {
+			return;
+		}
 		if ( self::is_valid() || ! current_user_can( 'manage_options' ) ) {
 			return;
 		}

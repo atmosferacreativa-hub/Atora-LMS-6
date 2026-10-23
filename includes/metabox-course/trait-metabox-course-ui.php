@@ -23,10 +23,10 @@ trait CLMS_Metabox_Course_UI_Trait {
 		$version = defined( 'CLMS_VERSION' ) ? CLMS_VERSION : '1.0.0';
 		$assets  = defined( 'ATORA_LMS_ASSETS_URL' ) ? ATORA_LMS_ASSETS_URL : ( defined( 'ATORA_LMS_URL' ) ? ATORA_LMS_URL . 'assets/' : '' );
 
-		// SortableJS (CDN)
+		// SortableJS (bundled)
 		wp_enqueue_script(
 			'sortablejs',
-			'https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.3/Sortable.min.js',
+			$assets . 'vendor/sortablejs/Sortable.min.js',
 			array(),
 			'1.15.3',
 			true

@@ -128,9 +128,11 @@ class CLMS_Rubric {
 			return;
 		}
 
+			$assets = defined( 'ATORA_LMS_ASSETS_URL' ) ? ATORA_LMS_ASSETS_URL : ( defined( 'ATORA_LMS_URL' ) ? ATORA_LMS_URL . 'assets/' : '' );
+
 		wp_enqueue_script(
 			'clms-sortablejs',
-			'https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.3/Sortable.min.js',
+				$assets . 'vendor/sortablejs/Sortable.min.js',
 			array(),
 			'1.15.3',
 			true

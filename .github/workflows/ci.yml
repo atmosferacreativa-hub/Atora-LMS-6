@@ -164,6 +164,7 @@ jobs:
         wordpress:
           - "6.4"
           - "6.8"
+          - "7.1.3"
 
     services:
       mysql:

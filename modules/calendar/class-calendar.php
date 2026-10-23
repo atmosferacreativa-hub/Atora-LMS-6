@@ -863,27 +863,21 @@ class Calendar {
 	}
 
 	/**
-	 * Encola FullCalendar desde CDN.
+	 * Encola FullCalendar desde el plugin (no CDN).
 	 *
 	 * @return void
 	 */
 	private static function enqueue_fullcalendar(): void {
-		wp_register_style(
-			'atora-fullcalendar',
-			'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css',
-			array(),
-			'6.1.11'
-		);
+		$assets = defined( 'ATORA_LMS_ASSETS_URL' ) ? ATORA_LMS_ASSETS_URL : ( defined( 'ATORA_LMS_URL' ) ? ATORA_LMS_URL . 'assets/' : '' );
+		$ver    = defined( 'ATORA_LMS_VERSION' ) ? ATORA_LMS_VERSION : '6.0.0';
 
 		wp_register_script(
 			'atora-fullcalendar',
-			'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js',
+			$assets . 'vendor/fullcalendar/index.global.min.js',
 			array(),
-			'6.1.11',
+			$ver,
 			true
 		);
-
-		wp_enqueue_style( 'atora-fullcalendar' );
 		wp_enqueue_script( 'atora-fullcalendar' );
 
 		wp_add_inline_script( 'atora-fullcalendar', self::get_calendar_init_js(), 'after' );

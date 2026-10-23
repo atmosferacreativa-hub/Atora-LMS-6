@@ -165,27 +165,14 @@ class CRM_V2_App {
 		// ── Kanban ────────────────────────────────────────────────────────
 		wp_enqueue_script( 'atora-crm-v2-kanban', ATORA_LMS_MODULES_URL . 'crm-v2/assets/crm-kanban.js', array( 'atora-crm-v2-ui' ), $ver, true );
 
-		// ── FullCalendar 6 (Fase 2) — local si existe, si no CDN ─────────
-		$fc_ver  = '6.1.15';
-		$fc_base = 'https://unpkg.com/@fullcalendar/';
-		$fc_local_core = ATORA_LMS_MODULES_URL . 'crm-v2/assets/fullcalendar/core.global.min.js';
-		$fc_local_exists = file_exists( str_replace( ATORA_LMS_MODULES_URL, ATORA_LMS_MODULES_DIR, $fc_local_core ) );
-
-		if ( $fc_local_exists ) {
-			$fc_url_core        = ATORA_LMS_MODULES_URL . 'crm-v2/assets/fullcalendar/core.global.min.js';
-			$fc_url_daygrid     = ATORA_LMS_MODULES_URL . 'crm-v2/assets/fullcalendar/daygrid.global.min.js';
-			$fc_url_timegrid    = ATORA_LMS_MODULES_URL . 'crm-v2/assets/fullcalendar/timegrid.global.min.js';
-			$fc_url_list        = ATORA_LMS_MODULES_URL . 'crm-v2/assets/fullcalendar/list.global.min.js';
-			$fc_url_interaction = ATORA_LMS_MODULES_URL . 'crm-v2/assets/fullcalendar/interaction.global.min.js';
-			$fc_url_locale      = ATORA_LMS_MODULES_URL . 'crm-v2/assets/fullcalendar/es.global.min.js';
-		} else {
-			$fc_url_core        = $fc_base . 'core@' . $fc_ver . '/index.global.min.js';
-			$fc_url_daygrid     = $fc_base . 'daygrid@' . $fc_ver . '/index.global.min.js';
-			$fc_url_timegrid    = $fc_base . 'timegrid@' . $fc_ver . '/index.global.min.js';
-			$fc_url_list        = $fc_base . 'list@' . $fc_ver . '/index.global.min.js';
-			$fc_url_interaction = $fc_base . 'interaction@' . $fc_ver . '/index.global.min.js';
-			$fc_url_locale      = $fc_base . 'core@' . $fc_ver . '/locales/es.global.min.js';
-		}
+		// ── FullCalendar 6 (Fase 2) — bundled (no CDN) ───────────────────
+		$fc_ver            = '6.1.15';
+		$fc_url_core        = ATORA_LMS_MODULES_URL . 'crm-v2/assets/fullcalendar/core.global.min.js';
+		$fc_url_daygrid     = ATORA_LMS_MODULES_URL . 'crm-v2/assets/fullcalendar/daygrid.global.min.js';
+		$fc_url_timegrid    = ATORA_LMS_MODULES_URL . 'crm-v2/assets/fullcalendar/timegrid.global.min.js';
+		$fc_url_list        = ATORA_LMS_MODULES_URL . 'crm-v2/assets/fullcalendar/list.global.min.js';
+		$fc_url_interaction = ATORA_LMS_MODULES_URL . 'crm-v2/assets/fullcalendar/interaction.global.min.js';
+		$fc_url_locale      = ATORA_LMS_MODULES_URL . 'crm-v2/assets/fullcalendar/es.global.min.js';
 
 		wp_enqueue_script( 'fullcalendar-core',        $fc_url_core,        array(),                           $fc_ver, true );
 		wp_enqueue_script( 'fullcalendar-daygrid',     $fc_url_daygrid,     array( 'fullcalendar-core' ),      $fc_ver, true );
@@ -251,7 +238,8 @@ class CRM_V2_App {
 		}
 
 		if ( false !== strpos( $page, 'reports' ) ) {
-			wp_enqueue_script( 'chart-js', 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js', array(), '4.4.1', true );
+			$assets = defined( 'ATORA_LMS_ASSETS_URL' ) ? ATORA_LMS_ASSETS_URL : ( defined( 'ATORA_LMS_URL' ) ? ATORA_LMS_URL . 'assets/' : '' );
+			wp_enqueue_script( 'chart-js', $assets . 'vendor/chartjs/chart.umd.min.js', array(), '4.4.1', true );
 		}
 
 		// Fase 4 — JS de la ficha 360 (solo en la pantalla de contactos)

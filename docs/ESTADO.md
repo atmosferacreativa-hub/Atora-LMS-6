@@ -7,7 +7,7 @@ Qué está comprobado y dónde. Se actualiza en cada versión del plugin o de la
 - **Integración**: PHPUnit con WordPress (`tests/integration`).
 - **Unitaria**: PHPUnit sin WordPress o Jest en la app.
 
-Última actualización: **plugin 6.33.2 · app 1.0.1**.
+Última actualización: **plugin 6.33.3 · app 1.0.1**.
 
 > No hay registro escrito de qué se recorrió en teléfono antes de esta tabla: la columna "Teléfono" queda "por confirmar" hasta la prueba al cierre de la Fase 4, que incluye la lista acumulada de las fases 0 a 3.
 
@@ -68,6 +68,7 @@ Qué está comprobado y dónde. Se actualiza en cada versión del plugin o de la
 
 | Función | Desde | Integración | Notas |
 |---|---|---|---|
+| Licencias y actualizaciones | 6.33.3 | — | Actualizaciones automáticas deshabilitadas por defecto: solo por ZIP hasta configurar `ATORA_LICENSE_SERVER` y `ATORA_LICENSE_PUBKEY_B64` y tener un servidor de licencias propio. |
 | Un borrador de calificación no llega al estudiante; copias grupales heredan estado y rúbrica | 6.30.1 | `GradeDraftNoLeakTest` | |
 | Listeners de `clms_submission_graded` con argumentos en orden | 6.30.2 | `GradedHookListenersTest` | Ver "Datos históricos" |
 | Mensajes del docente en la web: hilos completos, mismo buzón y contador que la app | 6.30.2 | `TeacherWebMessagesTest` | |
