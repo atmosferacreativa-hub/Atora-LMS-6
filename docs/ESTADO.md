@@ -91,6 +91,7 @@ Qué está comprobado y dónde. Se actualiza en cada versión del plugin o de la
 | Verificación pública `/verificar/{codigo}` (válido, revocado, no encontrado; sin correo) | 6.33.0 | `CertificatePdfTest` | Probado también en local por HTTP (404 con código inventado) |
 | Eliminación de cuenta (app, página pública, solicitudes; anonimizar por defecto) | 6.33.0 | `AccountDeletionTest` | Pantalla: `eliminar-cuenta` (app 1.0.0) |
 | Ajustes de la app móvil (reporte de errores desactivable) | 6.33.0 | `AccountDeletionTest` (`crash_reports`) | |
+| Multisitio (WordPress Multisite) | 6.34.0 | — | No soportado. Activación en red bloqueada; si se activa por sitio dentro de una red se muestra un aviso. |
 
 ## Datos históricos
 

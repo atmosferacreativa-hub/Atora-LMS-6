@@ -361,6 +361,18 @@ if ( ATORA_DEV_MODE ) {
 	} );
 }
 
+add_action( 'admin_notices', static function() {
+	if ( ! atora_lms_is_multisite() ) {
+		return;
+	}
+	if ( ! current_user_can( 'manage_options' ) ) {
+		return;
+	}
+	echo '<div class="notice notice-warning"><p><strong>⚠ ATORA LMS — Multisitio no soportado.</strong> '
+		. esc_html__( 'Este plugin no está diseñado para WordPress Multisite. Evita usarlo en una red; algunas funciones pueden comportarse de forma inesperada.', 'atora-lms' )
+		. '</p></div>';
+} );
+
 if ( ! defined( 'ATORA_LMS_MODULES_URL' ) ) {
 	define( 'ATORA_LMS_MODULES_URL', ATORA_LMS_URL . 'modules/' );
 }
@@ -1438,9 +1450,33 @@ function atora_lms_load_textdomain(): void {
 add_action( 'init', 'atora_lms_load_textdomain', 0 );
 
 /**
+ * Wrapper for multisite detection.
+ *
+ * El CRM (y otros módulos) dependen de tablas globales, permisos y alcance que
+ * no están aislados por sitio. En Multisite, ATORA LMS no está soportado.
+ */
+function atora_lms_is_multisite(): bool {
+	$multisite = function_exists( 'is_multisite' ) && is_multisite();
+	/**
+	 * Filtro para tests (WP_UnitTestCase no corre en multisite).
+	 *
+	 * @param bool $multisite
+	 */
+	return (bool) apply_filters( 'atora_lms_is_multisite', $multisite );
+}
+
+/**
  * Activation hook.
  */
-function atora_lms_activate(): void {
+function atora_lms_activate( bool $network_wide = false ): void {
+	if ( atora_lms_is_multisite() && $network_wide ) {
+		wp_die(
+			esc_html__( 'ATORA LMS no es compatible con WordPress Multisite y no puede activarse en red.', 'atora-lms' ),
+			esc_html__( 'Activación rechazada', 'atora-lms' ),
+			array( 'back_link' => true )
+		);
+	}
+
 	// Register CPT so rewrite rules flush correctly.
 	atora_lms_require_module( 'includes/class-cpt.php', static function() {
 		if ( class_exists( 'CLMS_CPT' ) ) {

@@ -40,6 +40,9 @@ Yes. ATORA LMS can integrate with WooCommerce for enrollment and checkout workfl
 = Where are translations stored? =
 Translation files are loaded from the `/languages` directory.
 
+= Is ATORA LMS compatible with WordPress Multisite? =
+No. ATORA LMS is not designed for WordPress Multisite. Network activation is blocked and using it inside a multisite network is not supported.
+
 == Screenshots ==
 1. Teacher dashboard overview.
 2. SpeedGrade evaluation panel.
