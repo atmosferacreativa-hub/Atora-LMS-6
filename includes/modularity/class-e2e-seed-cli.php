@@ -125,6 +125,22 @@ final class ATORA_E2E_Seed_CLI {
 		$videos = self::lesson( $course, $teacher, 'leccion-e2e-videos', 'Videos', 1, array(
 			'_clms_lesson_extra_videos' => self::videos( $video_dir, $teacher ),
 		) );
+
+		// 1.0.2 (app): materiales descargables para el recorrido `material-zoom`.
+		update_post_meta( $videos, '_clms_lesson_resources', array(
+			array(
+				'type'        => 'file',
+				'title'       => 'Guía PDF',
+				'description' => 'PDF para pruebas de zoom (app).',
+				'file_id'     => self::pdf( $teacher ),
+			),
+			array(
+				'type'        => 'file',
+				'title'       => 'Imagen de ejemplo',
+				'description' => 'Imagen para pruebas de zoom (app).',
+				'file_id'     => self::image( $teacher ),
+			),
+		) );
 		$task = self::lesson( $course, $teacher, 'leccion-e2e-tarea', 'Tarea', 2, array(
 			'lm_activity_type' => 'tarea',
 			'_clms_due_date'   => gmdate( 'Y-m-d', time() + 7 * DAY_IN_SECONDS ),
@@ -422,6 +438,27 @@ final class ATORA_E2E_Seed_CLI {
 		file_put_contents( $tmp, $pdf ); // phpcs:ignore WordPress.WP.AlternativeFunctions
 		$id = media_handle_sideload( array( 'name' => 'ensayo-e2e.pdf', 'tmp_name' => $tmp ), 0, 'Ensayo E2E', array( 'post_name' => 'ensayo-e2e', 'post_author' => $author ) );
 		return is_wp_error( $id ) ? 0 : (int) $id;
+	}
+
+	/** Imagen PNG mínima (1×1), como material descargable. */
+	private static function image( int $author ): int {
+		// PNG 1×1 transparente.
+		$png = base64_decode( 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO5W1c8AAAAASUVORK5CYII=', true );
+		if ( false === $png ) {
+			return 0;
+		}
+		$tmp = wp_tempnam( 'material-e2e.png' );
+		if ( ! $tmp ) {
+			return 0;
+		}
+		file_put_contents( $tmp, $png ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		$id = media_handle_sideload(
+			array( 'name' => 'material-e2e.png', 'tmp_name' => $tmp ),
+			0,
+			'Material E2E',
+			array( 'post_name' => 'material-e2e', 'post_author' => $author )
+		);
+		return is_wp_error( $id ) ? 0 : absint( $id );
 	}
 
 	/** Grupo de la tarea grupal. */
