@@ -6,13 +6,13 @@
 ## Parte A — Plugin 6.33.3
 
 - [x] Rama `release/6.33.3` existe en GitHub.
-- [ ] PR abierto contra `main`.
-- [ ] CI completo en verde (incluye WordPress 7.1.3).
-- [ ] Merge a `main`.
-- [ ] Tag `v6.33.3` (sin mover tags existentes).
-- [ ] ZIP `dist/atora-lms-6.33.3.zip` generado y verificado.
-- [ ] Release en GitHub con ZIP adjunto.
-- [ ] Rama remota borrada.
+- [x] PR abierto contra `main`: https://github.com/atmosferacreativa-hub/Atora-LMS-6/pull/73
+- [x] CI completo en verde (incluye WordPress 7.1.3).
+- [x] Merge a `main`.
+- [x] Tag `v6.33.3` (sin mover tags existentes).
+- [x] ZIP `dist/atora-lms-6.33.3.zip` generado y verificado (`inspect-dist.py`).
+- [x] Release en GitHub con ZIP adjunto: https://github.com/atmosferacreativa-hub/Atora-LMS-6/releases/tag/v6.33.3
+- [x] Rama remota borrada.
 
 ## Parte B — App 1.0.2 (material zoom)
 
