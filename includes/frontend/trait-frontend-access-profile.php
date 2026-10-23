@@ -257,8 +257,9 @@ trait CLMS_Frontend_Access_Profile_Trait {
 						update_user_meta( $user_id, $social_key, $social_value );
 					}
 
-					if ( class_exists( '\ATORA\CRM\CRM' ) && method_exists( '\ATORA\CRM\CRM', 'upsert_contact' ) ) {
-						\ATORA\CRM\CRM::upsert_contact(
+					$core = clms_core( 'CLMS_Contacts_Core_Service' );
+					if ( $core ) {
+						$core->upsert_contact(
 							array(
 								'user_id'  => $user_id,
 								'name'     => $display_name,

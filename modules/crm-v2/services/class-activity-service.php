@@ -80,8 +80,9 @@ class Activity_Service {
 			return;
 		}
 
-		if ( class_exists( '\\ATORA\\CRM\\CRM' ) && method_exists( '\\ATORA\\CRM\\CRM', 'log_activity' ) ) {
-			\ATORA\CRM\CRM::log_activity( $user_id, $type, $payload );
+		$core = clms_core( 'CLMS_Contacts_Core_Service' );
+		if ( $core ) {
+			$core->log_activity( $user_id, $type, $payload );
 		}
 	}
 

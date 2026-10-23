@@ -218,6 +218,7 @@ trait CRM_V2_Pipeline_Trait {
 	 */
 	private static function bulk_set_status( array $contacts, string $status ): int {
 		global $wpdb;
+		$core = clms_core( 'CLMS_Contacts_Core_Service' );
 
 		$status = sanitize_key( $status );
 		if ( '' === $status ) {
@@ -245,8 +246,8 @@ trait CRM_V2_Pipeline_Trait {
 			if ( false !== $updated ) {
 				$done++;
 				$user_id = absint( $contact['user_id'] ?? 0 );
-				if ( $user_id && class_exists( '\ATORA\\CRM\\CRM' ) && method_exists( '\ATORA\\CRM\\CRM', 'log_activity' ) ) {
-					\ATORA\CRM\CRM::log_activity(
+				if ( $user_id && $core ) {
+					$core->log_activity(
 						$user_id,
 						'crm_v2_status_updated',
 						array(
@@ -271,6 +272,7 @@ trait CRM_V2_Pipeline_Trait {
 	 */
 	private static function bulk_cleanup_contacts( array $contacts ): array {
 		global $wpdb;
+		$core = clms_core( 'CLMS_Contacts_Core_Service' );
 
 		$deleted  = 0;
 		$archived = 0;
@@ -295,8 +297,8 @@ trait CRM_V2_Pipeline_Trait {
 				);
 				if ( false !== $updated ) {
 					$archived++;
-					if ( class_exists( '\ATORA\\CRM\\CRM' ) && method_exists( '\ATORA\\CRM\\CRM', 'log_activity' ) ) {
-						\ATORA\CRM\CRM::log_activity(
+					if ( $core ) {
+						$core->log_activity(
 							$user_id,
 							'crm_v2_contact_archived',
 							array( 'contact_id' => $contact_id )
@@ -337,8 +339,9 @@ trait CRM_V2_Pipeline_Trait {
 		}
 
 		$user_id = absint( $contact['user_id'] ?? 0 );
-		if ( $user_id && class_exists( '\ATORA\\CRM\\CRM' ) && method_exists( '\ATORA\\CRM\\CRM', 'add_tag' ) ) {
-			\ATORA\CRM\CRM::add_tag( $user_id, $tag );
+		$core = clms_core( 'CLMS_Contacts_Core_Service' );
+		if ( $user_id && $core ) {
+			$core->add_tag( $user_id, $tag );
 			return true;
 		}
 
@@ -387,8 +390,9 @@ trait CRM_V2_Pipeline_Trait {
 		}
 
 		$user_id = absint( $contact['user_id'] ?? 0 );
-		if ( $user_id && class_exists( '\ATORA\\CRM\\CRM' ) && method_exists( '\ATORA\\CRM\\CRM', 'remove_tag' ) ) {
-			\ATORA\CRM\CRM::remove_tag( $user_id, $tag );
+		$core = clms_core( 'CLMS_Contacts_Core_Service' );
+		if ( $user_id && $core ) {
+			$core->remove_tag( $user_id, $tag );
 			return true;
 		}
 
@@ -486,8 +490,9 @@ trait CRM_V2_Pipeline_Trait {
 		}
 
 		$queue_id = (int) $wpdb->insert_id;
-		if ( class_exists( '\ATORA\\CRM\\CRM' ) && method_exists( '\ATORA\\CRM\\CRM', 'sync_email_queue_to_conversation' ) ) {
-			\ATORA\CRM\CRM::sync_email_queue_to_conversation( $queue_id );
+		$core = clms_core( 'CLMS_Contacts_Core_Service' );
+		if ( $core ) {
+			$core->sync_email_queue_to_conversation( $queue_id );
 		}
 
 		return true;

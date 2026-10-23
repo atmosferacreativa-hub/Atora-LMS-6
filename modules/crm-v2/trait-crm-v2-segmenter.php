@@ -354,19 +354,13 @@ trait CRM_V2_Segmenter_Trait {
 			return array( -1 );
 		}
 
-		if ( class_exists( '\ATORA\\CRM\\CRM' ) && method_exists( '\ATORA\\CRM\\CRM', 'can_manage_crm' ) && \ATORA\CRM\CRM::can_manage_crm( $current_user_id ) ) {
+		$core = clms_core( 'CLMS_Contacts_Core_Service' );
+		if ( $core && $core->can_manage_crm( $current_user_id ) ) {
 			return array();
 		}
 
-		if ( class_exists( '\ATORA\\CRM\\CRM' ) && method_exists( '\ATORA\\CRM\\CRM', 'get_accessible_contact_user_ids' ) ) {
-			return array_values(
-				array_filter(
-					array_map( 'absint', (array) \ATORA\CRM\CRM::get_accessible_contact_user_ids( $current_user_id ) )
-				)
-			);
-		}
-
-		return array();
+		$ids = $core ? (array) $core->get_accessible_contact_user_ids( $current_user_id ) : array();
+		return array_values( array_filter( array_map( 'absint', $ids ) ) );
 	}
 
 	/**

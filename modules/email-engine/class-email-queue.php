@@ -172,9 +172,7 @@ class Email_Queue {
 		}
 
 		$queue_id = (int) $wpdb->insert_id;
-		if ( class_exists( '\ATORA\CRM\CRM' ) && method_exists( '\ATORA\CRM\CRM', 'sync_email_queue_to_conversation' ) ) {
-			\ATORA\CRM\CRM::sync_email_queue_to_conversation( $queue_id );
-		}
+		clms_core( 'CLMS_Contacts_Core_Service' )->sync_email_queue_to_conversation( $queue_id );
 		self::log_event(
 			$queue_id,
 			'queued',
@@ -316,9 +314,7 @@ class Email_Queue {
 				array( '%s', '%s' ),
 				array( '%d' )
 			);
-			if ( class_exists( '\ATORA\CRM\CRM' ) && method_exists( '\ATORA\CRM\CRM', 'sync_email_queue_to_conversation' ) ) {
-				\ATORA\CRM\CRM::sync_email_queue_to_conversation( (int) $row->id );
-			}
+			clms_core( 'CLMS_Contacts_Core_Service' )->sync_email_queue_to_conversation( (int) $row->id );
 			self::log_event( (int) $row->id, 'sent', array( 'provider' => $provider_key ) );
 		} else {
 			$retry = (int) $row->retry_count + 1;
@@ -359,9 +355,7 @@ class Email_Queue {
 						array( '%s', '%s' ),
 						array( '%d' )
 					);
-					if ( class_exists( '\ATORA\CRM\CRM' ) && method_exists( '\ATORA\CRM\CRM', 'sync_email_queue_to_conversation' ) ) {
-						\ATORA\CRM\CRM::sync_email_queue_to_conversation( (int) $row->id );
-					}
+					clms_core( 'CLMS_Contacts_Core_Service' )->sync_email_queue_to_conversation( (int) $row->id );
 					self::log_event( (int) $row->id, 'sent_via_fallback', array( 'provider' => 'wp_mail' ) );
 					return;
 				}
@@ -380,9 +374,7 @@ class Email_Queue {
 				array( '%s', '%d', '%s' ),
 				array( '%d' )
 			);
-			if ( class_exists( '\ATORA\CRM\CRM' ) && method_exists( '\ATORA\CRM\CRM', 'sync_email_queue_to_conversation' ) ) {
-				\ATORA\CRM\CRM::sync_email_queue_to_conversation( (int) $row->id );
-			}
+			clms_core( 'CLMS_Contacts_Core_Service' )->sync_email_queue_to_conversation( (int) $row->id );
 			self::log_event(
 				(int) $row->id,
 				'failed' === $status ? 'failed' : 'retry_scheduled',

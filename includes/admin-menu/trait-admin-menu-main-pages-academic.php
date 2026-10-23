@@ -290,8 +290,9 @@ trait CLMS_Admin_Menu_Main_Pages_Academic_Trait {
 							update_user_meta( $user_id, $meta_key, $meta_value );
 						}
 
-						if ( class_exists( '\ATORA\CRM\CRM' ) && method_exists( '\ATORA\CRM\CRM', 'upsert_contact' ) ) {
-							\ATORA\CRM\CRM::upsert_contact(
+						$core = clms_core( 'CLMS_Contacts_Core_Service' );
+						if ( $core ) {
+							$core->upsert_contact(
 								array(
 									'user_id'  => $user_id,
 									'name'     => $display,

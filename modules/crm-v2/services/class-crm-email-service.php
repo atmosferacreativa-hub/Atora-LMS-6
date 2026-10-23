@@ -638,8 +638,9 @@ class CRM_Email_Service {
 		}
 
 		$queue_id = (int) $wpdb->insert_id;
-		if ( class_exists( '\\ATORA\\CRM\\CRM' ) && method_exists( '\\ATORA\\CRM\\CRM', 'sync_email_queue_to_conversation' ) ) {
-			\ATORA\CRM\CRM::sync_email_queue_to_conversation( $queue_id );
+		$core = clms_core( 'CLMS_Contacts_Core_Service' );
+		if ( $core ) {
+			$core->sync_email_queue_to_conversation( $queue_id );
 		}
 
 		return $queue_id;

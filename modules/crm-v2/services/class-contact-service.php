@@ -211,10 +211,8 @@ class Contact_Service {
 		$user_id = absint( $contact['user_id'] ?? 0 );
 		$tags    = self::get_tags_map( array( $contact_id ) );
 		$notes   = self::get_notes( $contact_id );
-		$timeline = array();
-		if ( class_exists( '\\ATORA\\CRM\\CRM' ) && method_exists( '\\ATORA\\CRM\\CRM', 'get_timeline' ) ) {
-			$timeline = (array) \ATORA\CRM\CRM::get_timeline( $contact_id, 120 );
-		}
+		$core     = clms_core( 'CLMS_Contacts_Core_Service' );
+		$timeline = $core ? (array) $core->get_timeline( $contact_id, 120 ) : array();
 
 		$courses = self::get_course_snapshots( $user_id );
 		$deals   = class_exists( '\\ATORA\\CRM_V2\\Services\\Deal_Service' )
@@ -625,13 +623,10 @@ class Contact_Service {
 			return array();
 		}
 
-		if ( class_exists( '\\ATORA\\CRM\\CRM' ) && method_exists( '\\ATORA\\CRM\\CRM', 'get_accessible_contact_user_ids' ) ) {
-			$ids = (array) \ATORA\CRM\CRM::get_accessible_contact_user_ids( $current_user_id );
-			$ids = array_values( array_filter( array_map( 'absint', $ids ) ) );
-			return ! empty( $ids ) ? $ids : array( -1 );
-		}
-
-		return array( -1 );
+		$core = clms_core( 'CLMS_Contacts_Core_Service' );
+		$ids  = $core ? (array) $core->get_accessible_contact_user_ids( $current_user_id ) : array();
+		$ids  = array_values( array_filter( array_map( 'absint', $ids ) ) );
+		return ! empty( $ids ) ? $ids : array( -1 );
 	}
 
 	/**
@@ -645,11 +640,8 @@ class Contact_Service {
 			return false;
 		}
 
-		if ( class_exists( '\\ATORA\\CRM\\CRM' ) && method_exists( '\\ATORA\\CRM\\CRM', 'has_global_contact_scope' ) ) {
-			return (bool) \ATORA\CRM\CRM::has_global_contact_scope( $current_user_id );
-		}
-
-		return current_user_can( 'manage_options' );
+		$core = clms_core( 'CLMS_Contacts_Core_Service' );
+		return $core ? (bool) $core->has_global_contact_scope( $current_user_id ) : current_user_can( 'manage_options' );
 	}
 
 	/**

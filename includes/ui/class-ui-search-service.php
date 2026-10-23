@@ -206,7 +206,8 @@ class CLMS_UI_Search_Service {
 		if ( ! class_exists( '\ATORA\CRM_V2\Services\Contact_Service' ) ) {
 			return array();
 		}
-		if ( class_exists( '\ATORA\CRM\CRM' ) && method_exists( '\ATORA\CRM\CRM', 'can_access_crm' ) && ! \ATORA\CRM\CRM::can_access_crm() ) {
+		$core = clms_core( 'CLMS_Contacts_Core_Service' );
+		if ( $core && ! $core->can_access_crm( get_current_user_id() ) ) {
 			return array();
 		}
 

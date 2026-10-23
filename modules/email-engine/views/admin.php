@@ -437,10 +437,8 @@ $register_test_delivery = static function ( array $payload ) use ( $normalize_id
 		);
 	}
 
-	if ( class_exists( '\ATORA\CRM\CRM' ) && method_exists( '\ATORA\CRM\CRM', 'sync_email_queue_to_conversation' ) ) {
-		\ATORA\CRM\CRM::sync_email_queue_to_conversation( $queue_id );
-		$result['crm_synced'] = true;
-	}
+	clms_core( 'CLMS_Contacts_Core_Service' )->sync_email_queue_to_conversation( $queue_id );
+	$result['crm_synced'] = true;
 
 	return $result;
 };

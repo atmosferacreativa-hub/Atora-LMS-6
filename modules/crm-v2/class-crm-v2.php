@@ -76,11 +76,8 @@ class CRM_V2 {
 			return false;
 		}
 
-		if ( class_exists( '\ATORA\\CRM\\CRM' ) && method_exists( '\ATORA\\CRM\\CRM', 'can_manage_crm' ) ) {
-			return (bool) \ATORA\CRM\CRM::can_manage_crm( $user_id );
-		}
-
-		return user_can( $user_id, 'manage_options' );
+		$core = clms_core( 'CLMS_Contacts_Core_Service' );
+		return $core ? (bool) $core->can_manage_crm( $user_id ) : user_can( $user_id, 'manage_options' );
 	}
 
 	/**
@@ -642,6 +639,7 @@ class CRM_V2 {
 	 */
 	private static function bulk_set_status( array $contacts, string $status ): int {
 		global $wpdb;
+		$core = clms_core( 'CLMS_Contacts_Core_Service' );
 
 		$status = sanitize_key( $status );
 		if ( '' === $status ) {
@@ -669,8 +667,8 @@ class CRM_V2 {
 			if ( false !== $updated ) {
 				$done++;
 				$user_id = absint( $contact['user_id'] ?? 0 );
-				if ( $user_id && class_exists( '\ATORA\\CRM\\CRM' ) && method_exists( '\ATORA\\CRM\\CRM', 'log_activity' ) ) {
-					\ATORA\CRM\CRM::log_activity(
+				if ( $user_id && $core ) {
+					$core->log_activity(
 						$user_id,
 						'crm_v2_status_updated',
 						array(
@@ -695,6 +693,7 @@ class CRM_V2 {
 	 */
 	private static function bulk_cleanup_contacts( array $contacts ): array {
 		global $wpdb;
+		$core = clms_core( 'CLMS_Contacts_Core_Service' );
 
 		$deleted  = 0;
 		$archived = 0;
@@ -719,8 +718,8 @@ class CRM_V2 {
 				);
 				if ( false !== $updated ) {
 					$archived++;
-					if ( class_exists( '\ATORA\\CRM\\CRM' ) && method_exists( '\ATORA\\CRM\\CRM', 'log_activity' ) ) {
-						\ATORA\CRM\CRM::log_activity(
+					if ( $core ) {
+						$core->log_activity(
 							$user_id,
 							'crm_v2_contact_archived',
 							array( 'contact_id' => $contact_id )
@@ -761,8 +760,9 @@ class CRM_V2 {
 		}
 
 		$user_id = absint( $contact['user_id'] ?? 0 );
-		if ( $user_id && class_exists( '\ATORA\\CRM\\CRM' ) && method_exists( '\ATORA\\CRM\\CRM', 'add_tag' ) ) {
-			\ATORA\CRM\CRM::add_tag( $user_id, $tag );
+		$core = clms_core( 'CLMS_Contacts_Core_Service' );
+		if ( $user_id && $core ) {
+			$core->add_tag( $user_id, $tag );
 			return true;
 		}
 
@@ -811,8 +811,9 @@ class CRM_V2 {
 		}
 
 		$user_id = absint( $contact['user_id'] ?? 0 );
-		if ( $user_id && class_exists( '\ATORA\\CRM\\CRM' ) && method_exists( '\ATORA\\CRM\\CRM', 'remove_tag' ) ) {
-			\ATORA\CRM\CRM::remove_tag( $user_id, $tag );
+		$core = clms_core( 'CLMS_Contacts_Core_Service' );
+		if ( $user_id && $core ) {
+			$core->remove_tag( $user_id, $tag );
 			return true;
 		}
 
@@ -910,8 +911,9 @@ class CRM_V2 {
 		}
 
 		$queue_id = (int) $wpdb->insert_id;
-		if ( class_exists( '\ATORA\\CRM\\CRM' ) && method_exists( '\ATORA\\CRM\\CRM', 'sync_email_queue_to_conversation' ) ) {
-			\ATORA\CRM\CRM::sync_email_queue_to_conversation( $queue_id );
+		$core = clms_core( 'CLMS_Contacts_Core_Service' );
+		if ( $core ) {
+			$core->sync_email_queue_to_conversation( $queue_id );
 		}
 
 		return true;
@@ -1330,19 +1332,13 @@ class CRM_V2 {
 			return array( -1 );
 		}
 
-		if ( class_exists( '\ATORA\\CRM\\CRM' ) && method_exists( '\ATORA\\CRM\\CRM', 'can_manage_crm' ) && \ATORA\CRM\CRM::can_manage_crm( $current_user_id ) ) {
+		$core = clms_core( 'CLMS_Contacts_Core_Service' );
+		if ( $core && $core->can_manage_crm( $current_user_id ) ) {
 			return array();
 		}
 
-		if ( class_exists( '\ATORA\\CRM\\CRM' ) && method_exists( '\ATORA\\CRM\\CRM', 'get_accessible_contact_user_ids' ) ) {
-			return array_values(
-				array_filter(
-					array_map( 'absint', (array) \ATORA\CRM\CRM::get_accessible_contact_user_ids( $current_user_id ) )
-				)
-			);
-		}
-
-		return array();
+		$ids = $core ? (array) $core->get_accessible_contact_user_ids( $current_user_id ) : array();
+		return array_values( array_filter( array_map( 'absint', $ids ) ) );
 	}
 
 	/**
