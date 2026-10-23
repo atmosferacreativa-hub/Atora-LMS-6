@@ -359,6 +359,10 @@ class CSV_Export_Service {
 		$institutions_table = $wpdb->prefix . 'atora_institutions';
 		$like = method_exists( $wpdb, 'esc_like' ) ? $wpdb->esc_like( $institutions_table ) : $institutions_table;
 		$tenancy_configured = (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $like ) ) === $institutions_table;
+		if ( $tenancy_configured ) {
+			$first_id = absint( $wpdb->get_var( "SELECT id FROM {$institutions_table} ORDER BY id ASC LIMIT 1" ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+			$tenancy_configured = $first_id > 0;
+		}
 
 		if ( class_exists( '\\ATORA\\LMS\\Tenant_Context' ) ) {
 			$resolved = \ATORA\LMS\Tenant_Context::current_institution_id();

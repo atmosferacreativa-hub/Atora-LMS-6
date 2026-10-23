@@ -917,7 +917,11 @@ class Contact_Service {
 		global $wpdb;
 		$table = $wpdb->prefix . 'atora_institutions';
 		$like = method_exists( $wpdb, 'esc_like' ) ? $wpdb->esc_like( $table ) : $table;
-		return (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $like ) ) === $table;
+		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $like ) ) !== $table ) {
+			return false;
+		}
+		$first_id = absint( $wpdb->get_var( "SELECT id FROM {$table} ORDER BY id ASC LIMIT 1" ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+		return $first_id > 0;
 	}
 
 	/**
