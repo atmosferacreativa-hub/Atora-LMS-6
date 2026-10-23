@@ -1194,6 +1194,7 @@ class CRM_V2_App {
 			$base . '/services/class-db-service.php',
 			$base . '/services/class-activity-service.php',
 			$base . '/services/class-contact-service.php',
+			$base . '/services/class-csv-export-service.php',
 			$base . '/services/class-task-service.php',
 			$base . '/services/class-deal-service.php',
 			$base . '/services/class-student-followup-service.php',

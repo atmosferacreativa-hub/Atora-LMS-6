@@ -772,6 +772,7 @@ if ( file_exists( $contacts_core_file ) ) {
 $services_dir = __DIR__ . '/../modules/crm-v2/services/';
 foreach ( array(
 	'class-db-service.php',
+	'class-csv-export-service.php',
 	'class-contact-service.php',
 	'class-activity-service.php',
 	'class-scoring-service.php',
