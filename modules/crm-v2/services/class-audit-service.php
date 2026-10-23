@@ -61,14 +61,46 @@ class Audit_Service {
 	 * @return int 0 cuando no se puede resolver.
 	 */
 	private static function resolve_institution_id(): int {
+		global $wpdb;
+		$institutions_table = $wpdb->prefix . 'atora_institutions';
+		$like = method_exists( $wpdb, 'esc_like' ) ? $wpdb->esc_like( $institutions_table ) : $institutions_table;
+		$tenancy_configured = (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $like ) ) === $institutions_table;
+
 		if ( class_exists( '\\ATORA\\LMS\\Tenant_Context' ) ) {
 			$resolved = \ATORA\LMS\Tenant_Context::current_institution_id();
 			if ( is_wp_error( $resolved ) ) {
+				if ( ! $tenancy_configured ) {
+					return 0;
+				}
+				$single = self::single_institution_fallback_id();
+				return $single > 0 ? $single : 0;
+			}
+			$id = absint( $resolved );
+			if ( $id > 0 ) {
+				return $id;
+			}
+			if ( ! $tenancy_configured ) {
 				return 0;
 			}
-			return absint( $resolved );
+			$single = self::single_institution_fallback_id();
+			return $single > 0 ? $single : 0;
 		}
 		return 0;
+	}
+
+	private static function single_institution_fallback_id(): int {
+		global $wpdb;
+		if ( ! method_exists( $wpdb, 'get_col' ) ) {
+			return 0;
+		}
+		$table = $wpdb->prefix . 'atora_institutions';
+		$like  = method_exists( $wpdb, 'esc_like' ) ? $wpdb->esc_like( $table ) : $table;
+		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $like ) ) !== $table ) {
+			return 0;
+		}
+		$raw_ids = (array) $wpdb->get_col( "SELECT id FROM {$table} ORDER BY id ASC LIMIT 2" );
+		$ids     = array_values( array_filter( array_map( 'absint', $raw_ids ) ) );
+		return 1 === count( $ids ) ? absint( $ids[0] ) : 0;
 	}
 }
 

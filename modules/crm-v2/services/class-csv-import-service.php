@@ -386,15 +386,37 @@ class CSV_Import_Service {
 		if ( class_exists( '\\ATORA\\LMS\\Tenant_Context' ) ) {
 			$resolved = \ATORA\LMS\Tenant_Context::current_institution_id();
 			if ( is_wp_error( $resolved ) ) {
-				return $tenancy_configured ? -1 : 0;
+				if ( ! $tenancy_configured ) {
+					return 0;
+				}
+				$single = self::single_institution_fallback_id();
+				return $single > 0 ? $single : -1;
 			}
 			$id = absint( $resolved );
 			if ( $id > 0 ) {
 				return $id;
 			}
-			return $tenancy_configured ? -1 : 0;
+			if ( ! $tenancy_configured ) {
+				return 0;
+			}
+			$single = self::single_institution_fallback_id();
+			return $single > 0 ? $single : -1;
 		}
 		return 0;
+	}
+
+	private static function single_institution_fallback_id(): int {
+		global $wpdb;
+		if ( ! method_exists( $wpdb, 'get_col' ) ) {
+			return 0;
+		}
+		$table = $wpdb->prefix . 'atora_institutions';
+		$like  = method_exists( $wpdb, 'esc_like' ) ? $wpdb->esc_like( $table ) : $table;
+		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $like ) ) !== $table ) {
+			return 0;
+		}
+		$ids = array_values( array_filter( array_map( 'absint', (array) $wpdb->get_col( "SELECT id FROM {$table} ORDER BY id ASC LIMIT 2" ) ) ) );
+		return 1 === count( $ids ) ? absint( $ids[0] ) : 0;
 	}
 
 	private static function find_existing_contact_id( int $institution_id, string $email, string $phone ): int {
