@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 6.33.3
+Stable tag: 6.34.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -50,6 +50,10 @@ No. ATORA LMS is not designed for WordPress Multisite. Network activation is blo
 4. Course overview template.
 
 == Changelog ==
+= 6.34.0 =
+* CRM: retiro completo del CRM v1; el CRM v2 queda como implementación única (sin migración de datos).
+* CRM v2: campos personalizados, importación y exportación CSV, deduplicación/fusión, auditoría y aislamiento por institución.
+
 = 6.33.3 =
 * Seguridad: servidor de licencias configurable sin valor por defecto; sin servidor no hay cron ni llamadas salientes y las actualizaciones son por ZIP; con servidor solo HTTPS y verificación de firma antes de instalar.
 * Dependencias: SortableJS, Chart.js y FullCalendar se cargan desde el plugin (sin CDN).

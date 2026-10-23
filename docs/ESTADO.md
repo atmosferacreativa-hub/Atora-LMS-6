@@ -7,7 +7,7 @@ Qué está comprobado y dónde. Se actualiza en cada versión del plugin o de la
 - **Integración**: PHPUnit con WordPress (`tests/integration`).
 - **Unitaria**: PHPUnit sin WordPress o Jest en la app.
 
-Última actualización: **plugin 6.33.3 · app 1.0.1**.
+Última actualización: **plugin 6.34.0 · app 1.0.1**.
 
 > No hay registro escrito de qué se recorrió en teléfono antes de esta tabla: la columna "Teléfono" queda "por confirmar" hasta la prueba al cierre de la Fase 4, que incluye la lista acumulada de las fases 0 a 3.
 
@@ -92,6 +92,7 @@ Qué está comprobado y dónde. Se actualiza en cada versión del plugin o de la
 | Eliminación de cuenta (app, página pública, solicitudes; anonimizar por defecto) | 6.33.0 | `AccountDeletionTest` | Pantalla: `eliminar-cuenta` (app 1.0.0) |
 | Ajustes de la app móvil (reporte de errores desactivable) | 6.33.0 | `AccountDeletionTest` (`crash_reports`) | |
 | Multisitio (WordPress Multisite) | 6.34.0 | — | No soportado. Activación en red bloqueada; si se activa por sitio dentro de una red se muestra un aviso. |
+| CRM v2 completo (retiro de v1) | 6.34.0 | `tests/CRM/*`, `tests/integration/*` | CRM v1 retirado; CRM v2: import/export CSV, deduplicación, auditoría, aislamiento por institución. |
 
 ## Datos históricos
 
