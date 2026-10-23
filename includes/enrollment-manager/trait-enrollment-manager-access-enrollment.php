@@ -719,9 +719,10 @@ trait CLMS_Enrollment_Manager_Access_Enrollment_Trait {
 			}
 		}
 
-		if ( class_exists( '\ATORA\CRM\CRM' ) && method_exists( '\ATORA\CRM\CRM', 'upsert_contact' ) ) {
+		$core = clms_core( 'CLMS_Contacts_Core_Service' );
+		if ( $core ) {
 			$user = get_userdata( $user_id );
-			\ATORA\CRM\CRM::upsert_contact(
+			$core->upsert_contact(
 				array(
 					'user_id'  => $user_id,
 					'email'    => $user ? (string) $user->user_email : '',

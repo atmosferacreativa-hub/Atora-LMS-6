@@ -780,9 +780,7 @@ class Email_Engine {
 				),
 				array( '%d', '%s', '%s' )
 			);
-			if ( class_exists( '\ATORA\CRM\CRM' ) && method_exists( '\ATORA\CRM\CRM', 'sync_email_queue_to_conversation' ) ) {
-				\ATORA\CRM\CRM::sync_email_queue_to_conversation( $queue_id );
-			}
+			clms_core( 'CLMS_Contacts_Core_Service' )->sync_email_queue_to_conversation( $queue_id );
 
 			do_action( 'atora/email/webhook_event', $event_type, $queue_id, $event );
 		}

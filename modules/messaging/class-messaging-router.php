@@ -450,9 +450,7 @@ class Messaging_Router {
 		}
 
 		$queue_id = (int) $wpdb->insert_id;
-		if ( class_exists( '\ATORA\CRM\CRM' ) && method_exists( '\ATORA\CRM\CRM', 'sync_message_queue_to_conversation' ) ) {
-			\ATORA\CRM\CRM::sync_message_queue_to_conversation( $queue_id );
-		}
+		clms_core( 'CLMS_Contacts_Core_Service' )->sync_message_queue_to_conversation( $queue_id );
 		self::log_queue_event(
 			$queue_id,
 			'queued',
@@ -576,9 +574,7 @@ class Messaging_Router {
 			array( '%s', '%s', '%s', '%d' ),
 			array( '%d' )
 		);
-		if ( class_exists( '\ATORA\CRM\CRM' ) && method_exists( '\ATORA\CRM\CRM', 'sync_message_queue_to_conversation' ) ) {
-			\ATORA\CRM\CRM::sync_message_queue_to_conversation( (int) $row->id );
-		}
+		clms_core( 'CLMS_Contacts_Core_Service' )->sync_message_queue_to_conversation( (int) $row->id );
 	}
 
 	/**

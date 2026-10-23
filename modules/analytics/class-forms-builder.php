@@ -613,8 +613,8 @@ class Forms_Builder {
 		}
 
 		// Agregar tag CRM.
-		if ( ! empty( $schema['crm_tag'] ) && $user_id && class_exists( 'ATORA\CRM\CRM' ) ) {
-			\ATORA\CRM\CRM::add_tag( $user_id, sanitize_text_field( $schema['crm_tag'] ) );
+		if ( ! empty( $schema['crm_tag'] ) && $user_id ) {
+			clms_core( 'CLMS_Contacts_Core_Service' )->add_tag( $user_id, sanitize_text_field( $schema['crm_tag'] ) );
 		}
 	}
 

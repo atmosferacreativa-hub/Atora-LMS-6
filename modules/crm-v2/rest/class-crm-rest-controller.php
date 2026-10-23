@@ -104,9 +104,6 @@ class CRM_REST_Controller {
 	 * @return bool
 	 */
 	public static function can_access(): bool {
-		if ( class_exists( '\\ATORA\\CRM\\CRM' ) && method_exists( '\\ATORA\\CRM\\CRM', 'can_access_crm' ) ) {
-			return (bool) \ATORA\CRM\CRM::can_access_crm( get_current_user_id() );
-		}
 		$core = clms_core( 'CLMS_Contacts_Core_Service' );
 		return $core ? (bool) $core->can_access_crm( get_current_user_id() ) : current_user_can( 'manage_options' );
 	}
@@ -117,10 +114,6 @@ class CRM_REST_Controller {
 	 * @return bool
 	 */
 	public static function can_manage(): bool {
-		if ( class_exists( '\\ATORA\\CRM\\CRM' ) && method_exists( '\\ATORA\\CRM\\CRM', 'can_manage_crm' ) ) {
-			return (bool) \ATORA\CRM\CRM::can_manage_crm( get_current_user_id() );
-		}
-
 		$core = clms_core( 'CLMS_Contacts_Core_Service' );
 		return $core ? (bool) $core->can_manage_crm( get_current_user_id() ) : current_user_can( 'manage_options' );
 	}
@@ -154,19 +147,10 @@ class CRM_REST_Controller {
 			return $cached;
 		}
 
-		$ids = array( -1 );
-
-		if ( class_exists( '\\ATORA\\CRM\\CRM' ) && method_exists( '\\ATORA\\CRM\\CRM', 'get_accessible_contact_user_ids' ) ) {
-			$raw = array_values(
-				array_filter(
-					array_map(
-						'absint',
-						(array) \ATORA\CRM\CRM::get_accessible_contact_user_ids( $current_user_id )
-					)
-				)
-			);
-			$ids = ! empty( $raw ) ? $raw : array( -1 );
-		}
+		$core = clms_core( 'CLMS_Contacts_Core_Service' );
+		$raw  = $core ? (array) $core->get_accessible_contact_user_ids( $current_user_id ) : array();
+		$raw  = array_values( array_filter( array_map( 'absint', $raw ) ) );
+		$ids  = ! empty( $raw ) ? $raw : array( -1 );
 
 		if ( count( $ids ) <= 500 ) {
 			set_transient( $transient_key, $ids, 5 * MINUTE_IN_SECONDS );
@@ -185,11 +169,8 @@ class CRM_REST_Controller {
 			return false;
 		}
 
-		if ( class_exists( '\\ATORA\\CRM\\CRM' ) && method_exists( '\\ATORA\\CRM\\CRM', 'has_global_contact_scope' ) ) {
-			return (bool) \ATORA\CRM\CRM::has_global_contact_scope( get_current_user_id() );
-		}
-
-		return current_user_can( 'manage_options' );
+		$core = clms_core( 'CLMS_Contacts_Core_Service' );
+		return $core ? (bool) $core->has_global_contact_scope( get_current_user_id() ) : current_user_can( 'manage_options' );
 	}
 
 	/**

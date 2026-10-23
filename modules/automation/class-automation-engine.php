@@ -811,15 +811,17 @@ class Automation_Engine {
 					break;
 
 			case 'add_tag':
-				if ( class_exists( 'ATORA\CRM\CRM' ) ) {
-					\ATORA\CRM\CRM::add_tag( $user_id, sanitize_text_field( $action['tag'] ?? '' ) );
+				$core = clms_core( 'CLMS_Contacts_Core_Service' );
+				if ( $core ) {
+					$core->add_tag( $user_id, sanitize_text_field( $action['tag'] ?? '' ) );
 					$success = true;
 				}
 				break;
 
 			case 'remove_tag':
-				if ( class_exists( 'ATORA\CRM\CRM' ) ) {
-					\ATORA\CRM\CRM::remove_tag( $user_id, sanitize_text_field( $action['tag'] ?? '' ) );
+				$core = clms_core( 'CLMS_Contacts_Core_Service' );
+				if ( $core ) {
+					$core->remove_tag( $user_id, sanitize_text_field( $action['tag'] ?? '' ) );
 					$success = true;
 				}
 				break;
@@ -1324,13 +1326,8 @@ class Automation_Engine {
 			}
 		}
 
-		if ( ! class_exists( '\ATORA\CRM\CRM' ) ) {
-			$crm_file = defined( 'ATORA_LMS_MODULES_DIR' ) ? ATORA_LMS_MODULES_DIR . 'crm/class-crm.php' : '';
-			if ( $crm_file && file_exists( $crm_file ) ) {
-				require_once $crm_file;
-			}
-		}
-		if ( ! class_exists( '\ATORA\CRM\CRM' ) || ! method_exists( '\ATORA\CRM\CRM', 'upsert_contact' ) ) {
+		$core = clms_core( 'CLMS_Contacts_Core_Service' );
+		if ( ! $core ) {
 			return 0;
 		}
 
@@ -1338,7 +1335,7 @@ class Automation_Engine {
 			return 0;
 		}
 
-		$contact_id = \ATORA\CRM\CRM::upsert_contact(
+		$contact_id = $core->upsert_contact(
 			array(
 				'user_id' => $user_id,
 				'email'   => $email,
