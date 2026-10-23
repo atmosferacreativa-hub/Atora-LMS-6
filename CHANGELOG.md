@@ -1,5 +1,13 @@
 # CHANGELOG — ATORA LMS
 
+## 6.34.0 (2026-10-23)
+
+### CRM: retiro de v1 y cierre de paridad
+
+- CRM v1 (`modules/crm/`) retirado por completo.
+- CRM v2 queda como implementación única, sin migración de datos (v1 y v2 ya compartían tablas).
+- CRM v2: campos personalizados, importación y exportación CSV, deduplicación/fusión, auditoría y permisos/aislamiento por institución.
+
 ## 6.33.3 (2026-10-23)
 
 ### Seguridad: licencias y actualizaciones

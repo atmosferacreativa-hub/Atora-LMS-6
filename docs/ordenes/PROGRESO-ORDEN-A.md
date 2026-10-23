@@ -49,12 +49,14 @@ PR: #82 (merge 2026-10-23).
 
 ## Bloque 5 — CRM v2 completo
 
-- [ ] Campos personalizados.
-- [ ] Importación CSV avanzada.
-- [ ] Deduplicación + fusión.
-- [ ] Permisos por rol e institución.
-- [ ] Auditoría.
-- [ ] Pruebas por servicio (meta: casos principales + permisos).
+- [x] Campos personalizados.
+- [x] Importación CSV avanzada.
+- [x] Deduplicación + fusión.
+- [x] Permisos por rol e institución.
+- [x] Auditoría.
+- [x] Pruebas por servicio (meta: casos principales + permisos).
+
+PR: #84 (merge 2026-10-23). Follow-up: #85 (tripwire de `atora_phone`, merge 2026-10-23).
 
 ## Cierre — 6.34.0
 

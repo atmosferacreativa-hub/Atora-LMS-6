@@ -1,8 +1,18 @@
 # CRM v1 vs v2 — Paridad y riesgo de retiro
 
-> Documento de decisión para PT-5.2. **No se retira nada en este
-> sprint** — `modules/crm/` (v1) sigue intacto. Esto es para que 6.4.0
-> decida con información real, no una propuesta de cómo hacerlo.
+> Histórico. Documento de decisión para PT-5.2.
+>
+> **Retiro completado en 6.34.0:** `modules/crm/` (v1) fue retirado y el CRM v2
+> quedó como implementación única.
+
+## Estado actual (6.34.0)
+
+- CRM v1 retirado (no quedan referencias a `\ATORA\CRM\CRM` ni a `modules/crm/`).
+- Primitivas compartidas movidas a `includes/contacts-core/` (`CLMS_Contacts_Core_Service`).
+- CRM v2 cubre exportación/importación CSV, ingesta WhatsApp/Telegram hacia conversaciones,
+  auto-etiquetado + scoring cron, deduplicación/fusión, auditoría y aislamiento por institución.
+
+## Histórico (antes del retiro)
 
 ## El hallazgo que cambia el marco de la decisión
 
