@@ -12,10 +12,12 @@
 
 ## Bloque 1 — Primitivas compartidas
 
-- [ ] Servicio nuevo en `includes/contacts-core/`.
-- [ ] Reapuntadas llamadas desde v2 y desde fuera del CRM.
-- [ ] v1 delega al servicio.
-- [ ] Pruebas existentes pasan sin cambios.
+- [x] Servicio compartido en `includes/contacts-core/` (usa `CLMS_Contacts_Core_Service`).
+- [x] Reapuntadas llamadas desde v2 y desde fuera del CRM (se evita `\ATORA\CRM\CRM::*` salvo `get_contact_id_by_user()` pendiente de Bloque 4 y `CRM::init()` mientras exista v1).
+- [x] v1 delega al servicio.
+- [x] Pruebas existentes pasan sin cambios (CI verde).
+
+PR: #76 (merge 2026-10-23).
 
 ## Bloque 2 — Portar v1 → v2
 
