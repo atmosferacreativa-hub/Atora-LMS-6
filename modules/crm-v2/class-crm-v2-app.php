@@ -59,6 +59,7 @@ class CRM_V2_App {
 			add_action( 'rest_api_init', array( __CLASS__, 'register_rest_routes' ) );
 		}
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue_admin_assets' ) );
+		add_action( 'wp_ajax_atora_crm_export', array( '\\ATORA\\CRM_V2\\Services\\CSV_Export_Service', 'ajax_export_csv' ) );
 		// ── Invalidar caché de scope CRM al cambiar matrículas (Fase 5) ───
 		add_action( 'clms_user_enrolled_in_course',     array( __CLASS__, 'flush_crm_scope_cache' ), 10, 2 );
 		add_action( 'clms_user_unenrolled_from_course', array( __CLASS__, 'flush_crm_scope_cache' ), 10, 2 );
@@ -73,6 +74,14 @@ class CRM_V2_App {
 		// no se crea un cron nuevo.
 		if ( class_exists( 'ATORA\CRM_V2\Services\Followup_Plan_Service' ) ) {
 			add_action( 'atora_daily_cron', array( '\ATORA\CRM_V2\Services\Followup_Plan_Service', 'run_daily_maintenance' ) );
+		}
+
+		$core = clms_core( 'CLMS_Contacts_Core_Service' );
+		if ( $core && method_exists( $core, 'on_whatsapp_message_received' ) ) {
+			add_action( 'atora/whatsapp/message_received', array( $core, 'on_whatsapp_message_received' ), 10, 2 );
+		}
+		if ( $core && method_exists( $core, 'on_telegram_message_received' ) ) {
+			add_action( 'atora/telegram/message_received', array( $core, 'on_telegram_message_received' ), 10, 3 );
 		}
 
 		// Bloque 2 (6.34.0): mantenimiento diario CRM (auto-tags + scoring).

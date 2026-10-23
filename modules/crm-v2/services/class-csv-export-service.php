@@ -118,6 +118,51 @@ class CSV_Export_Service {
 	}
 
 	/**
+	 * Determina si el handler AJAX debe finalizar ejecución al terminar el export.
+	 *
+	 * Mantiene comportamiento actual (exit=true) y permite desactivarlo en pruebas.
+	 *
+	 * @return bool
+	 */
+	private static function should_exit_after_export_ajax(): bool {
+		/**
+		 * Controla si `ajax_export_csv()` finaliza con `exit`.
+		 *
+		 * @param bool $should_exit Si debe finalizar.
+		 */
+		return (bool) apply_filters( 'atora_crm_export_should_exit', true );
+	}
+
+	/** @return void */
+	public static function ajax_export_csv(): void {
+		check_ajax_referer( 'atora_crm_export' );
+		$core = clms_core( 'CLMS_Contacts_Core_Service' );
+		if ( ! $core || ! method_exists( $core, 'can_manage_crm' ) || ! $core->can_manage_crm( get_current_user_id() ) ) {
+			wp_die();
+		}
+		if ( class_exists( 'CLMS_Access' ) && method_exists( 'CLMS_Access', 'can_export_contacts' ) ) {
+			if ( ! \CLMS_Access::can_export_contacts() ) {
+				wp_die();
+			}
+		}
+
+		$dataset = isset( $_REQUEST['dataset'] ) ? self::normalize_dataset( (string) wp_unslash( $_REQUEST['dataset'] ) ) : 'contacts';
+		foreach ( self::get_response_headers( $dataset ) as $header_name => $header_value ) {
+			header( $header_name . ': ' . $header_value );
+		}
+
+		$stream = fopen( 'php://output', 'w' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
+		if ( is_resource( $stream ) ) {
+			self::write_csv( $dataset, $stream );
+			fclose( $stream );
+		}
+
+		if ( self::should_exit_after_export_ajax() ) {
+			exit;
+		}
+	}
+
+	/**
 	 * @param string $dataset
 	 * @param int    $limit
 	 * @param int    $offset
