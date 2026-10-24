@@ -22,6 +22,7 @@ final class ScormUploadPermissionTest extends TestCase {
 
 	/** @test */
 	public function test_teacher_without_cap_cannot_upload_scorm_versions(): void {
+		require_once dirname( __DIR__, 2 ) . '/modules/tenancy/class-tenant-context.php';
 		require_once dirname( __DIR__, 2 ) . '/includes/library/class-academic-library-policy.php';
 		require_once dirname( __DIR__, 2 ) . '/includes/library/class-academic-library-service.php';
 
