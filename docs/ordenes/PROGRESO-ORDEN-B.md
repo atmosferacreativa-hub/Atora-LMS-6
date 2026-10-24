@@ -51,6 +51,17 @@ PR: #90 (merge 2026-10-24).
 
 PR: #92 (merge 2026-10-24).
 
+## Bloque 2.1 — Arreglos
+
+- [ ] Nunca retroceder por commits fuera de orden (intento/score/success).
+- [ ] `start_attempt` valida que el paquete esté enlazado a la lección.
+- [ ] `.htaccess` de protección corregido + migración idempotente.
+- [ ] Límite de intentos por lección (`_clms_scorm_max_attempts`) con 409 cuando se agota.
+- [ ] Subida/versionado SCORM: requiere `manage_options` o `atora_upload_scorm` (default admin).
+- [ ] Documentación de seguridad/limitaciones en `docs/SCORM.md`.
+
+PR: (pendiente) `block/scorm-b2-fixes`.
+
 ## Bloque 3 — App 1.1.0
 
 - [ ] WebView con adaptador API + API móvil.

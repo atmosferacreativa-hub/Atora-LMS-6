@@ -338,6 +338,14 @@ trait CLMS_Metabox_Lesson_Save_Trait {
 		update_post_meta( $post_id, '_clms_evidence_allow_resubmission', $evidence_allow_resubmission );
 		update_post_meta( $post_id, '_clms_evidence_read_requirement', $evidence_read_requirement );
 		update_post_meta( $post_id, self::LESSON_SUPPORT_RESOURCES, $resources );
+		$scorm_max_attempts = 0;
+		foreach ( $resources as $resource ) {
+			if ( is_array( $resource ) && 'scorm' === (string) ( $resource['type'] ?? '' ) ) {
+				$scorm_max_attempts = max( 0, absint( $resource['scorm_max_attempts'] ?? 0 ) );
+				break;
+			}
+		}
+		update_post_meta( $post_id, '_clms_scorm_max_attempts', $scorm_max_attempts );
 		update_post_meta( $post_id, CLMS_Helper::LESSON_PREREQUISITES_META, array_values( array_diff( array_unique( $lesson_prerequisites ), array( (int) $post_id ) ) ) );
 
 		update_post_meta( $post_id, '_clms_h5p_content_id', $h5p_content_id );
@@ -654,6 +662,7 @@ trait CLMS_Metabox_Lesson_Save_Trait {
 				'thumb_id'    => isset( $resource['thumb_id'] ) ? absint( $resource['thumb_id'] ) : 0,
 				'library_item_id'    => isset( $resource['library_item_id'] ) ? absint( $resource['library_item_id'] ) : 0,
 				'library_version_id' => isset( $resource['library_version_id'] ) ? absint( $resource['library_version_id'] ) : 0,
+				'scorm_max_attempts' => isset( $resource['scorm_max_attempts'] ) ? max( 0, absint( $resource['scorm_max_attempts'] ) ) : 0,
 			);
 
 			if ( $item['file_id'] && 'attachment' !== get_post_type( $item['file_id'] ) ) {
@@ -670,6 +679,7 @@ trait CLMS_Metabox_Lesson_Save_Trait {
 				if ( $item['library_item_id'] <= 0 ) {
 					continue;
 				}
+				$item['scorm_max_attempts'] = max( 0, absint( $item['scorm_max_attempts'] ?? 0 ) );
 				if ( $item['library_version_id'] < 0 ) {
 					$item['library_version_id'] = 0;
 				}
