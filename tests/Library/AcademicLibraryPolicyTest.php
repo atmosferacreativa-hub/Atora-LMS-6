@@ -16,6 +16,7 @@ final class AcademicLibraryPolicyTest extends TestCase {
 
 	public function test_resource_types_are_allowlisted(): void {
 		$this->assertSame( 'video', CLMS_Academic_Library_Policy::normalize_resource_type( 'video' ) );
+		$this->assertSame( 'scorm', CLMS_Academic_Library_Policy::normalize_resource_type( 'scorm' ) );
 		$this->assertSame( 'document', CLMS_Academic_Library_Policy::normalize_resource_type( 'executable' ) );
 	}
 
