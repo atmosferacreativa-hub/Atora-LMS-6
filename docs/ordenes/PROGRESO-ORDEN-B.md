@@ -31,11 +31,13 @@ Decisiones (Bloque 0):
 
 ## Bloque 1 — Paquetes en la biblioteca (plugin)
 
-- [ ] Subida ZIP + validación `imsmanifest.xml` + detección de versión.
-- [ ] Descompresión segura (zip slip, symlink, extensiones, límites, directorio).
-- [ ] Ítem `scorm` con versionado y compatibilidad de intentos anteriores.
-- [ ] Enlazado a lección (tipo o recurso).
-- [ ] Pruebas (manifiestos válidos/ inválidos + seguridad + versionado).
+- [x] Subida ZIP + validación `imsmanifest.xml` + detección de versión.
+- [x] Descompresión segura (zip slip, symlink, extensiones, límites, directorio).
+- [x] Ítem `scorm` con versionado (cada versión instala en `vN/`, no pisa versiones anteriores).
+- [x] Enlazado a lección (recurso `type=scorm` en `_clms_lesson_resources`).
+- [x] Pruebas (manifiestos válidos/ inválidos + seguridad ZIP + recurso SCORM).
+
+PR: #90 (merge 2026-10-24).
 
 ## Bloque 2 — Reproductor y seguimiento (plugin)
 
