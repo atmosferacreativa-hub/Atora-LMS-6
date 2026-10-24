@@ -35,6 +35,22 @@ final class CLMS_SCORM_Attempt_Service {
 		return $wpdb->prefix . 'atora_scorm_cmi';
 	}
 
+	public static function table_commit_events(): string {
+		global $wpdb;
+		return $wpdb->prefix . 'atora_scorm_commit_events';
+	}
+
+	private function storage_unavailable( string $context ): WP_Error {
+		if ( function_exists( 'error_log' ) ) {
+			error_log( '[ATORA SCORM] ' . $context . ': error de base de datos' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+		}
+		return new WP_Error(
+			'atora_scorm_storage_unavailable',
+			__( 'No se pudo guardar. Reintenta en unos segundos.', 'atora-lms' ),
+			array( 'status' => 503 )
+		);
+	}
+
 	/**
 	 * @return array<string,mixed>|WP_Error
 	 */
@@ -110,7 +126,7 @@ final class CLMS_SCORM_Attempt_Service {
 			array( '%d', '%d', '%d', '%d', '%d', '%d', '%s', '%s', '%s', '%s', '%d' )
 		);
 		if ( ! $ok ) {
-			return new WP_Error( 'clms_scorm_attempt_create_failed', __( 'No se pudo iniciar el intento.', 'atora-lms' ) );
+			return $this->storage_unavailable( 'start_or_resume_attempt: insert' );
 		}
 
 		$attempt_id = (int) $wpdb->insert_id;
@@ -165,7 +181,7 @@ final class CLMS_SCORM_Attempt_Service {
 
 		$cmi_table = self::table_cmi();
 		foreach ( $values as $key => $value ) {
-			$wpdb->query(
+			$ok = $wpdb->query(
 				$wpdb->prepare(
 					"INSERT INTO {$cmi_table} (attempt_id, cmi_key, cmi_value) VALUES (%d, %s, %s)
 					 ON DUPLICATE KEY UPDATE cmi_value = VALUES(cmi_value), updated_at = CURRENT_TIMESTAMP",
@@ -174,6 +190,9 @@ final class CLMS_SCORM_Attempt_Service {
 					$value
 				)
 			);
+			if ( false === $ok ) {
+				return $this->storage_unavailable( 'commit_values: cmi insert/update' );
+			}
 		}
 
 		$derived = $this->derive_and_update_attempt_from_values( (array) $attempt, $values );
@@ -244,17 +263,92 @@ final class CLMS_SCORM_Attempt_Service {
 		}
 
 		$attempts_table = self::table_attempts();
-		$wpdb->update(
+		$updated = $wpdb->update(
 			$attempts_table,
 			$update,
 			array( 'id' => absint( $attempt['id'] ?? 0 ) )
 		);
+		if ( false === $updated ) {
+			return $this->storage_unavailable( 'derive_and_update_attempt_from_values: update attempt' );
+		}
 
 		if ( ! $was_complete && ! empty( $update['is_complete'] ) ) {
 			$this->maybe_mark_lesson_completed( absint( $attempt['user_id'] ?? 0 ), absint( $attempt['lesson_id'] ?? 0 ), (string) ( $update['completion_status'] ?? '' ), (string) ( $update['success_status'] ?? '' ) );
 		}
 
 		return $derived;
+	}
+
+	/**
+	 * Commit idempotente por evento del cliente (atora-mobile).
+	 *
+	 * Si llega el mismo `client_event_id` para el mismo intento, no se vuelven a
+	 * escribir valores CMI ni se recalcula el intento: se devuelve la respuesta
+	 * almacenada (si existe) o un snapshot del intento.
+	 *
+	 * @param array<string,string> $values
+	 * @return array{attempt:array<string,mixed>,derived:array<string,mixed>}|WP_Error
+	 */
+	public function commit_values_with_client_event( int $attempt_id, int $user_id, array $values, string $client_event_id, string $device_time = '' ) {
+		global $wpdb;
+		$attempt_id       = absint( $attempt_id );
+		$user_id          = absint( $user_id );
+		$client_event_id  = sanitize_text_field( $client_event_id );
+		$device_time      = sanitize_text_field( $device_time );
+		if ( ! $attempt_id || ! $user_id || '' === $client_event_id ) {
+			return new WP_Error( 'atora_scorm_invalid_event', __( 'Evento inválido.', 'atora-lms' ), array( 'status' => 400 ) );
+		}
+
+		$attempt = $this->get_attempt_for_user( $attempt_id, $user_id );
+		if ( is_wp_error( $attempt ) ) {
+			return $attempt;
+		}
+
+		$table = self::table_commit_events();
+		$existing = (array) $wpdb->get_row(
+			$wpdb->prepare( "SELECT * FROM {$table} WHERE attempt_id = %d AND client_event_id = %s LIMIT 1", $attempt_id, $client_event_id ),
+			ARRAY_A
+		);
+		if ( ! empty( $existing ) ) {
+			$response_json = (string) ( $existing['response_json'] ?? '' );
+			if ( '' !== $response_json ) {
+				$decoded = json_decode( $response_json, true );
+				if ( is_array( $decoded ) ) {
+					return $decoded;
+				}
+			}
+			return array( 'attempt' => (array) $attempt, 'derived' => array() );
+		}
+
+		$inserted = $wpdb->insert(
+			$table,
+			array(
+				'attempt_id'      => $attempt_id,
+				'client_event_id' => $client_event_id,
+				'device_time'     => $device_time,
+				'response_json'   => '',
+			),
+			array( '%d', '%s', '%s', '%s' )
+		);
+		if ( ! $inserted ) {
+			return $this->storage_unavailable( 'commit_values_with_client_event: insert' );
+		}
+
+		$result = $this->commit_values( $attempt_id, $user_id, $values );
+		if ( is_wp_error( $result ) ) {
+			$wpdb->delete( $table, array( 'attempt_id' => $attempt_id, 'client_event_id' => $client_event_id ), array( '%d', '%s' ) );
+			return $result;
+		}
+
+		$encoded = wp_json_encode( $result );
+		$wpdb->update(
+			$table,
+			array( 'response_json' => $encoded ),
+			array( 'attempt_id' => $attempt_id, 'client_event_id' => $client_event_id ),
+			array( '%s' ),
+			array( '%d', '%s' )
+		);
+		return $result;
 	}
 
 	/**

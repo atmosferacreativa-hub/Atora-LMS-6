@@ -8,6 +8,7 @@ final class ScormSchemaTest extends TestCase {
 		$this->assertIsString( $installer );
 		$this->assertStringContainsString( 'atora_scorm_attempts', $installer );
 		$this->assertStringContainsString( 'atora_scorm_cmi', $installer );
+		$this->assertStringContainsString( 'atora_scorm_commit_events', $installer );
 		$this->assertStringContainsString( 'UNIQUE KEY attempt_key', $installer );
 	}
 }

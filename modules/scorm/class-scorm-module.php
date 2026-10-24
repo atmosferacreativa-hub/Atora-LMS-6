@@ -19,6 +19,7 @@ final class SCORM_Module {
 
 	public static function init(): void {
 		require_once ATORA_LMS_INCLUDES_DIR . 'scorm/class-scorm-manifest-parser.php';
+		require_once ATORA_LMS_INCLUDES_DIR . 'scorm/class-scorm-launch-service.php';
 		require_once ATORA_LMS_INCLUDES_DIR . 'scorm/class-scorm-attempt-service.php';
 		require_once ATORA_LMS_INCLUDES_DIR . 'scorm/class-scorm-gradebook-integration.php';
 		require_once ATORA_LMS_INCLUDES_DIR . 'scorm/class-scorm-zip-extractor.php';
