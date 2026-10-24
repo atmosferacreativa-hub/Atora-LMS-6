@@ -2656,6 +2656,19 @@ class V5_Installer {
 			KEY attempt_id (attempt_id),
 			KEY cmi_key (cmi_key)
 		) $charset_collate;" );
+
+		// SCORM (Bloque 3): commits idempotentes por evento del cliente (atora-mobile).
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_scorm_commit_events (
+			id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			attempt_id      BIGINT UNSIGNED NOT NULL,
+			client_event_id VARCHAR(190) NOT NULL,
+			device_time     VARCHAR(64) NOT NULL DEFAULT '',
+			response_json   LONGTEXT NULL DEFAULT NULL,
+			created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			UNIQUE KEY attempt_event (attempt_id, client_event_id),
+			KEY attempt_id (attempt_id)
+		) $charset_collate;" );
 		// Calificaciones finales por alumno/curso (D-002; migra _clms_gradebook_course_{id}).
 		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_gradebook (
 			id              BIGINT UNSIGNED  NOT NULL AUTO_INCREMENT,

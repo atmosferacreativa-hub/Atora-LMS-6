@@ -240,7 +240,7 @@ final class ATORA_Mobile_REST_Controller {
 			'authentication'   => 'opaque_bearer',
 			'access_ttl'       => ATORA_Mobile_Token_Service::ACCESS_TTL,
 			'refresh_ttl'      => ATORA_Mobile_Token_Service::REFRESH_TTL,
-			'features'         => array( 'profile', 'dashboard', 'courses', 'progress', 'lesson_completion', 'quizzes', 'assignments', 'sync_changes', 'playback_position', 'resource_downloads', 'multi_video', 'grades', 'certificates', 'messages', 'agenda', 'today', 'push_notifications', 'teacher', 'ai_assistant', 'ai_grading_suggestion', 'certificate_pdf', 'account_deletion', 'crash_reports' ),
+			'features'         => array( 'profile', 'dashboard', 'courses', 'progress', 'lesson_completion', 'quizzes', 'assignments', 'sync_changes', 'playback_position', 'resource_downloads', 'multi_video', 'grades', 'certificates', 'messages', 'agenda', 'today', 'push_notifications', 'teacher', 'ai_assistant', 'ai_grading_suggestion', 'certificate_pdf', 'account_deletion', 'crash_reports', 'scorm' ),
 			'capabilities'     => array(
 				'assignments'        => true,
 				'sync_changes'       => class_exists( '\\ATORA\\LMS\\LMS_Content_Changes' ),
@@ -258,6 +258,8 @@ final class ATORA_Mobile_REST_Controller {
 				// 6.30.0: Fase 3 — buzón, agenda, Hoy y notificaciones al teléfono.
 				'messages'           => class_exists( 'ATORA_Mobile_Messages_Controller' ) && class_exists( 'ATORA_Inbox_Store' ),
 				'agenda'             => class_exists( 'CLMS_Agenda_Service' ),
+				// 6.35.0: SCORM (Orden B).
+				'scorm'              => class_exists( 'CLMS_SCORM_Attempt_Service' ) && class_exists( 'CLMS_SCORM_Launch_Service' ),
 				'today'              => class_exists( 'ATORA_Mobile_Organize_Controller' ),
 				'push_notifications' => class_exists( 'ATORA_Mobile_Push_Service' ),
 				// 6.31.0: Fase 4 — docente (hoy, cursos, estudiantes, entregas, calificar, avisos).
@@ -1763,6 +1765,7 @@ final class ATORA_Mobile_REST_Controller {
 	 * }>
 	 */
 	private static function normalize_lesson_resources( int $wp_lesson_id ): array {
+		global $wpdb;
 		$raw = get_post_meta( $wp_lesson_id, '_clms_lesson_resources', true );
 
 		if ( is_string( $raw ) && '' !== trim( $raw ) ) {
@@ -1783,12 +1786,65 @@ final class ATORA_Mobile_REST_Controller {
 		foreach ( $raw as $resource ) {
 			if ( ! is_array( $resource ) ) { continue; }
 
+			$type = sanitize_key( (string) ( $resource['type'] ?? '' ) );
+			if ( 'scorm' === $type ) {
+				$library_item_id    = absint( $resource['library_item_id'] ?? 0 );
+				$resource_version_id = absint( $resource['library_version_id'] ?? 0 );
+				if ( $library_item_id <= 0 || ! class_exists( 'CLMS_SCORM_Launch_Service' ) ) {
+					continue;
+				}
+
+				$version = CLMS_SCORM_Launch_Service::resolve_library_version( $library_item_id, $resource_version_id );
+				if ( is_wp_error( $version ) ) {
+					continue;
+				}
+				$meta = CLMS_SCORM_Launch_Service::extract_scorm_meta( $version );
+				$meta = is_wp_error( $meta ) ? array() : $meta;
+
+				$item_title = '';
+				if ( isset( $wpdb->prefix ) ) {
+					$row = (array) $wpdb->get_row( $wpdb->prepare( "SELECT title FROM {$wpdb->prefix}atora_library_items WHERE id = %d LIMIT 1", $library_item_id ), ARRAY_A );
+					$item_title = sanitize_text_field( (string) ( $row['title'] ?? '' ) );
+				}
+
+				$bytes = 0;
+				$attachment_id = absint( $version['attachment_id'] ?? 0 );
+				if ( $attachment_id > 0 && function_exists( 'get_attached_file' ) ) {
+					$path = (string) get_attached_file( $attachment_id );
+					if ( '' !== $path && file_exists( $path ) ) {
+						$bytes = max( 0, (int) filesize( $path ) );
+					}
+				}
+
+				$title = sanitize_text_field( (string) ( $resource['title'] ?? '' ) );
+				$desc  = sanitize_textarea_field( (string) ( $resource['description'] ?? '' ) );
+				$items[] = array(
+					'type'         => 'scorm',
+					'title'        => '' !== $title ? $title : ( '' !== $item_title ? $item_title : __( 'SCORM', 'atora-lms' ) ),
+					'description'  => $desc,
+					'url'          => '',
+					'download_url' => '',
+					'file_id'      => 0,
+					'mime'         => 'application/zip',
+					'thumb_url'    => '',
+					'downloadable' => true,
+					'bytes'        => $bytes,
+					'updated_at'   => sanitize_text_field( (string) ( $version['created_at'] ?? '' ) ),
+					'library_item_id'         => $library_item_id,
+					'library_version_id'      => absint( $version['id'] ?? 0 ),
+					'version_checksum_sha256' => sanitize_text_field( (string) ( $version['checksum_sha256'] ?? '' ) ),
+					'scorm_version'           => sanitize_text_field( (string) ( $meta['scorm_version'] ?? '' ) ),
+					'launch_href'             => sanitize_text_field( (string) ( $meta['launch_href'] ?? '' ) ),
+				);
+				continue;
+			}
+
 			$file_id   = absint( $resource['file_id'] ?? 0 );
 			$thumb_id  = absint( $resource['thumb_id'] ?? 0 );
 			$title     = sanitize_text_field( (string) ( $resource['title'] ?? '' ) );
 			$desc      = sanitize_textarea_field( (string) ( $resource['description'] ?? '' ) );
 			$url       = esc_url_raw( (string) ( $resource['url'] ?? '' ) );
-			$type      = sanitize_key( (string) ( $resource['type'] ?? '' ) );
+			$type      = $type;
 			$mime      = '';
 			$thumb_url = '';
 

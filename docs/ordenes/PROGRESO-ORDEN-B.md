@@ -64,11 +64,16 @@ PR: #94 (merge 2026-10-24).
 
 ## Bloque 3 — App 1.1.0
 
+- [x] Plugin: API SCORM móvil (`atora-mobile/v1/scorm/*`) + commits idempotentes.
 - [ ] WebView con adaptador API + API móvil.
 - [ ] Sin conexión (descarga, reproducción local, cola commits, no retroceder).
 - [ ] Versionado de paquete descargado.
 - [ ] Pruebas Jest + recorridos pantalla (`scorm-online`, `scorm-sin-conexion`).
 - [ ] Cierre app 1.1.0 (tag, APK/AAB, docs).
+
+Pendiente de PR (Bloque 3 — plugin):
+- API móvil: `POST /atora-mobile/v1/scorm/attempts/start`, `POST /commit` con `client_event_id` + `device_time`, link de descarga temporal firmado.
+- Tests: `tests/SCORM/ScormAttemptServiceClientEventIdempotencyTest.php`, `tests/Rest/MobileScormDiscoveryTest.php`.
 
 ## Cierre plugin — 6.35.0
 

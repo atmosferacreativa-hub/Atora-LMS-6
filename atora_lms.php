@@ -1328,6 +1328,7 @@ add_action( 'init', static function () {
 	atora_lms_require_module( 'includes/mobile/class-mobile-assignment-store.php' );
 	atora_lms_require_module( 'includes/mobile/class-mobile-assignment-service.php' );
 	atora_lms_require_module( 'includes/mobile/class-mobile-rest-controller.php' );
+	atora_lms_require_module( 'includes/mobile/class-mobile-scorm-controller.php' );
 	// 6.30.0: Fase 3 — mensajes, agenda, Hoy y notificaciones al teléfono.
 	atora_lms_require_module( 'includes/today/class-agenda-service.php', static function () { CLMS_Agenda_Service::boot(); } );
 	atora_lms_require_module( 'includes/mobile/class-mobile-messages-controller.php' );
@@ -1365,6 +1366,9 @@ add_action( 'init', static function () {
 	if ( class_exists( 'ATORA_Mobile_REST_Controller' ) ) {
 		add_action( 'rest_api_init', array( 'ATORA_Mobile_REST_Controller', 'register_routes' ) );
 		add_filter( 'rest_post_dispatch', array( 'ATORA_Mobile_REST_Controller', 'no_cache' ), 99, 3 );
+	}
+	if ( class_exists( 'ATORA_Mobile_SCORM_Controller' ) ) {
+		add_action( 'rest_api_init', array( 'ATORA_Mobile_SCORM_Controller', 'register_routes' ) );
 	}
 	// 6.27.0: limpieza de subidas móviles vencidas (fragmentos parciales).
 	if ( class_exists( 'ATORA_Mobile_Assignment_Service' ) ) {
