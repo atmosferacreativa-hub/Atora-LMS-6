@@ -71,9 +71,7 @@ PR: #94 (merge 2026-10-24).
 - [ ] Pruebas Jest + recorridos pantalla (`scorm-online`, `scorm-sin-conexion`).
 - [ ] Cierre app 1.1.0 (tag, APK/AAB, docs).
 
-Pendiente de PR (Bloque 3 — plugin):
-- API móvil: `POST /atora-mobile/v1/scorm/attempts/start`, `POST /commit` con `client_event_id` + `device_time`, link de descarga temporal firmado.
-- Tests: `tests/SCORM/ScormAttemptServiceClientEventIdempotencyTest.php`, `tests/Rest/MobileScormDiscoveryTest.php`.
+PR: #96 (merge 2026-10-24).
 
 ## Cierre plugin — 6.35.0
 
