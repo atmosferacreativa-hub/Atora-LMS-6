@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class V5_Installer {
 
 	/** Versión del esquema. Incrementar para forzar re-instalación. */
-	const SCHEMA_VERSION = '6.33.1-audit';
+	const SCHEMA_VERSION = '6.35.0-scorm-b2';
 
 	/** Option key que almacena la versión instalada. */
 	const OPTION_KEY = 'atora_v5_schema_version';
@@ -2610,6 +2610,49 @@ class V5_Installer {
 			KEY item_action (item_id, action),
 			KEY created_at (created_at)
 		) $charset_collate;" );
+
+		// SCORM (Orden B): intentos + almacenamiento CMI por intento.
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_scorm_attempts (
+			id                 BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			institution_id     BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			user_id            BIGINT UNSIGNED NOT NULL,
+			lesson_id          BIGINT UNSIGNED NOT NULL,
+			library_item_id    BIGINT UNSIGNED NOT NULL,
+			library_version_id BIGINT UNSIGNED NOT NULL,
+			attempt_number     INT UNSIGNED NOT NULL DEFAULT 1,
+			scorm_version      VARCHAR(10) NOT NULL DEFAULT '',
+			completion_status  VARCHAR(20) NOT NULL DEFAULT 'unknown',
+			success_status     VARCHAR(20) NOT NULL DEFAULT 'unknown',
+			score_raw          DECIMAL(9,4) NULL DEFAULT NULL,
+			score_min          DECIMAL(9,4) NULL DEFAULT NULL,
+			score_max          DECIMAL(9,4) NULL DEFAULT NULL,
+			session_time_seconds INT UNSIGNED NOT NULL DEFAULT 0,
+			total_time_seconds   INT UNSIGNED NOT NULL DEFAULT 0,
+			lesson_location    VARCHAR(255) NOT NULL DEFAULT '',
+			suspend_data       LONGTEXT NULL DEFAULT NULL,
+			is_complete        TINYINT(1) NOT NULL DEFAULT 0,
+			created_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			UNIQUE KEY attempt_ref (user_id, lesson_id, library_item_id, library_version_id, attempt_number),
+			KEY institution_id (institution_id),
+			KEY user_lesson (user_id, lesson_id),
+			KEY lesson_id (lesson_id),
+			KEY library_version (library_item_id, library_version_id)
+		) $charset_collate;" );
+
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_scorm_cmi (
+			id         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			attempt_id BIGINT UNSIGNED NOT NULL,
+			cmi_key    VARCHAR(190) NOT NULL,
+			cmi_value  LONGTEXT NULL DEFAULT NULL,
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			UNIQUE KEY attempt_key (attempt_id, cmi_key),
+			KEY attempt_id (attempt_id),
+			KEY cmi_key (cmi_key)
+		) $charset_collate;" );
 		// Calificaciones finales por alumno/curso (D-002; migra _clms_gradebook_course_{id}).
 		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_gradebook (
 			id              BIGINT UNSIGNED  NOT NULL AUTO_INCREMENT,
@@ -3131,6 +3174,9 @@ class V5_Installer {
 			"{$wpdb->prefix}atora_library_versions",
 			"{$wpdb->prefix}atora_library_links",
 			"{$wpdb->prefix}atora_library_events",
+			// SCORM.
+			"{$wpdb->prefix}atora_scorm_attempts",
+			"{$wpdb->prefix}atora_scorm_cmi",
 			// Affiliates.
 			"{$wpdb->prefix}atora_affiliates",
 			"{$wpdb->prefix}atora_affiliate_clicks",
