@@ -9,10 +9,25 @@
 - [x] Decisión documentada: dónde viven paquetes SCORM y cómo se enlazan a una lección.
 
 Decisiones (Bloque 0):
-- **Fuente de verdad**: cada paquete SCORM vive como ítem de Biblioteca (`atora_library_items.resource_type = scorm`).
-- **Versionado**: cada subida crea una fila nueva en `atora_library_versions` con `attachment_id` (ZIP) + `metadata_json` (manifiesto parseado, edición 1.2/2004, organizaciones, SCO inicial, etc.).
-- **Archivos extraídos**: se descomprime el ZIP a `wp-content/uploads/atora-library/scorm/<institution_id>/<item_id>/v<version_number>/` con reglas anti-ejecución (p.ej. `.htaccess`/`web.config`/`index.html`) y solo extensiones permitidas.
-- **Enlace a lección**: se implementa **tipo de lección** `scorm` usando `_clms_lesson_type = scorm` y meta `_clms_scorm_library_item_id` + `_clms_scorm_library_version_id` (0 = seguir la última versión). Esto evita romper el esquema actual de `_clms_lesson_resources`.
+- **Tipo `scorm` en Biblioteca sin romper lo existente**:
+  - Se agrega `scorm` de forma aditiva a `includes/library/class-academic-library-policy.php::RESOURCE_TYPES`.
+  - No se cambia el significado de tipos existentes (`document`, `video`, etc.) ni el esquema de versionado: SCORM usa las mismas tablas (`atora_library_items` + `atora_library_versions`) y solo extiende validaciones y metadata (en `metadata_json`).
+- **Archivos extraídos (ruta y servido)**:
+  - Se descomprime el ZIP a `wp-content/uploads/atora-library/scorm/<institution_id>/<item_id>/v<version_number>/`.
+  - Se sirve como archivos estáticos desde la carpeta de uploads (mismo origen), con protección anti-ejecución (`.htaccess`/`web.config`/`index.html`) y un allowlist de extensiones al extraer.
+- **Reuso de `modules/h5p/`**:
+  - No se reutiliza su modelo (H5P no usa Biblioteca ni extracción “segura” de ZIP a storage versionado compartible).
+  - No se reutiliza su tracking/xAPI ni su REST.
+  - Se toma solo como referencia conceptual de “contenido empaquetado”, pero SCORM se implementa como feature nueva basada en Biblioteca + tablas propias de intentos/CMI.
+- **Enlace paquete ↔ lección**:
+  - Se enlaza como **recurso dentro de la lección** (se extiende `_clms_lesson_resources` con `type=scorm`), porque hoy no existe UI activa para `_clms_lesson_type` y el editor ya soporta recursos.
+  - El recurso `scorm` guarda como mínimo `library_item_id` y `library_version_id` (0 = seguir la última versión).
+  - La API móvil normaliza el recurso (como los demás) para que la app lo abra con un viewer SCORM.
+- **Tablas nuevas (Bloque 2: intentos y CMI)**:
+  - Se agregan en el instalador (dbDelta) sin tocar tablas existentes.
+  - Esquema propuesto (nombres sujetos a ajuste mínimo al implementarlo):
+    - `atora_scorm_attempts`: un intento por usuario+lección+versión, con estado (incomplete/completed/passed/failed), puntaje, tiempos (session/total), `suspend_data`/`lesson_location`, y timestamps.
+    - `atora_scorm_cmi`: almacenamiento de valores CMI por intento (`attempt_id`, `cmi_key`, `cmi_value`, timestamps) o bien `cmi_json` por intento si resulta más eficiente; se decide al implementar para mantener compatibilidad con consultas de informe docente.
 
 ## Bloque 1 — Paquetes en la biblioteca (plugin)
 
