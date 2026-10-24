@@ -14,6 +14,16 @@ require_once __DIR__ . '/class-scorm-cmi.php';
 
 final class CLMS_SCORM_Attempt_Service {
 	private const DEFAULT_GRADE_STATUS = 'in_review';
+	private const SUCCESS_STATUS_ORDER = array(
+		'unknown' => 0,
+		'failed'  => 1,
+		'passed'  => 2,
+	);
+	private const COMPLETION_STATUS_ORDER = array(
+		'unknown'    => 0,
+		'incomplete' => 1,
+		'completed'  => 2,
+	);
 
 	public static function table_attempts(): string {
 		global $wpdb;
@@ -28,7 +38,7 @@ final class CLMS_SCORM_Attempt_Service {
 	/**
 	 * @return array<string,mixed>|WP_Error
 	 */
-	public function start_or_resume_attempt( int $user_id, int $lesson_id, int $library_item_id, int $library_version_id, string $scorm_version ) {
+	public function start_or_resume_attempt( int $user_id, int $lesson_id, int $library_item_id, int $library_version_id, string $scorm_version, int $max_attempts = 0 ) {
 		global $wpdb;
 
 		$user_id            = absint( $user_id );
@@ -36,6 +46,7 @@ final class CLMS_SCORM_Attempt_Service {
 		$library_item_id    = absint( $library_item_id );
 		$library_version_id = absint( $library_version_id );
 		$scorm_version      = trim( (string) $scorm_version );
+		$max_attempts       = max( 0, absint( $max_attempts ) );
 
 		if ( ! $user_id || ! $lesson_id || ! $library_item_id || ! $library_version_id || '' === $scorm_version ) {
 			return new WP_Error( 'clms_scorm_invalid_attempt_ref', __( 'Parámetros inválidos.', 'atora-lms' ) );
@@ -63,6 +74,20 @@ final class CLMS_SCORM_Attempt_Service {
 		);
 		if ( ! empty( $existing ) && empty( $existing['is_complete'] ) ) {
 			return $existing;
+		}
+
+		if ( $max_attempts > 0 ) {
+			$count = (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(*) FROM {$table} WHERE user_id = %d AND lesson_id = %d AND library_item_id = %d AND is_complete = 1",
+					$user_id,
+					$lesson_id,
+					$library_item_id
+				)
+			);
+			if ( $count >= $max_attempts ) {
+				return new WP_Error( 'atora_scorm_no_attempts', __( 'No quedan intentos disponibles.', 'atora-lms' ), array( 'status' => 409 ) );
+			}
 		}
 
 		$next_number = ! empty( $existing['attempt_number'] ) ? ( absint( $existing['attempt_number'] ) + 1 ) : 1;
@@ -178,16 +203,39 @@ final class CLMS_SCORM_Attempt_Service {
 			'is_complete'       => ! empty( $derived['is_complete'] ) ? 1 : 0,
 		);
 
-		$score = $this->extract_score_fields( $scorm_version, $values );
-		$time  = $this->extract_time_fields( $scorm_version, $values );
-		$loc   = $this->extract_location_and_suspend( $scorm_version, $values );
-		$update = array_merge( $update, $score, $time, $loc );
+		$has_score = $this->commit_includes_score( $scorm_version, $values );
+		if ( $has_score ) {
+			$score = $this->extract_score_fields( $scorm_version, $values );
+			$update = array_merge( $update, $score );
+			if ( null !== ( $update['score_raw'] ?? null ) || null !== ( $update['score_max'] ?? null ) || null !== ( $update['score_min'] ?? null ) ) {
+				$update['score_percent'] = $this->compute_percent( $update['score_raw'] ?? null, $update['score_min'] ?? null, $update['score_max'] ?? null );
+			}
+		}
 
-		if ( null !== ( $update['score_raw'] ?? null ) || null !== ( $update['score_max'] ?? null ) || null !== ( $update['score_min'] ?? null ) ) {
-			$update['score_percent'] = $this->compute_percent( $update['score_raw'] ?? null, $update['score_min'] ?? null, $update['score_max'] ?? null );
+		$has_time = $this->commit_includes_time( $scorm_version, $values );
+		if ( $has_time ) {
+			$update = array_merge( $update, $this->extract_time_fields( $scorm_version, $values ) );
+		}
+
+		$has_loc = $this->commit_includes_location_or_suspend( $scorm_version, $values );
+		if ( $has_loc ) {
+			$update = array_merge( $update, $this->extract_location_and_suspend( $scorm_version, $values ) );
 		}
 
 		$was_complete = ! empty( $attempt['is_complete'] );
+		if ( $was_complete ) {
+			$update['is_complete'] = 1;
+			$update['completion_status'] = $this->prefer_non_regressing_status(
+				sanitize_key( (string) ( $attempt['completion_status'] ?? 'unknown' ) ),
+				sanitize_key( (string) ( $update['completion_status'] ?? 'unknown' ) ),
+				self::COMPLETION_STATUS_ORDER
+			);
+			$update['success_status'] = $this->prefer_non_regressing_status(
+				sanitize_key( (string) ( $attempt['success_status'] ?? 'unknown' ) ),
+				sanitize_key( (string) ( $update['success_status'] ?? 'unknown' ) ),
+				self::SUCCESS_STATUS_ORDER
+			);
+		}
 		if ( ! $was_complete && ! empty( $update['is_complete'] ) ) {
 			$update['ended_at'] = current_time( 'mysql', true );
 			if ( $this->should_auto_release_grade( absint( $attempt['lesson_id'] ?? 0 ) ) ) {
@@ -207,6 +255,40 @@ final class CLMS_SCORM_Attempt_Service {
 		}
 
 		return $derived;
+	}
+
+	/**
+	 * @param array<string,int> $order
+	 */
+	private function prefer_non_regressing_status( string $current, string $next, array $order ): string {
+		$current = sanitize_key( $current );
+		$next    = sanitize_key( $next );
+		$current_rank = $order[ $current ] ?? 0;
+		$next_rank    = $order[ $next ] ?? 0;
+		return $next_rank >= $current_rank ? $next : $current;
+	}
+
+	private function commit_includes_score( string $scorm_version, array $values ): bool {
+		$keys = ( '1.2' === $scorm_version )
+			? array( 'cmi.core.score.raw', 'cmi.core.score.min', 'cmi.core.score.max' )
+			: array( 'cmi.score.raw', 'cmi.score.min', 'cmi.score.max', 'cmi.score.scaled' );
+		foreach ( $keys as $key ) {
+			if ( array_key_exists( $key, $values ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private function commit_includes_time( string $scorm_version, array $values ): bool {
+		$session_key = ( '1.2' === $scorm_version ) ? 'cmi.core.session_time' : 'cmi.session_time';
+		$total_key   = ( '1.2' === $scorm_version ) ? 'cmi.core.total_time' : 'cmi.total_time';
+		return array_key_exists( $session_key, $values ) || array_key_exists( $total_key, $values );
+	}
+
+	private function commit_includes_location_or_suspend( string $scorm_version, array $values ): bool {
+		$location_key = ( '1.2' === $scorm_version ) ? 'cmi.core.lesson_location' : 'cmi.location';
+		return array_key_exists( $location_key, $values ) || array_key_exists( 'cmi.suspend_data', $values );
 	}
 
 	/** @return array<string,string> */

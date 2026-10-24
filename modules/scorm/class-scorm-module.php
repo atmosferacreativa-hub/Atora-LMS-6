@@ -21,13 +21,46 @@ final class SCORM_Module {
 		require_once ATORA_LMS_INCLUDES_DIR . 'scorm/class-scorm-manifest-parser.php';
 		require_once ATORA_LMS_INCLUDES_DIR . 'scorm/class-scorm-attempt-service.php';
 		require_once ATORA_LMS_INCLUDES_DIR . 'scorm/class-scorm-gradebook-integration.php';
+		require_once ATORA_LMS_INCLUDES_DIR . 'scorm/class-scorm-zip-extractor.php';
 		require_once ATORA_LMS_MODULES_DIR . 'scorm/rest/class-scorm-controller.php';
 
 		add_action( 'init', array( __CLASS__, 'register_query_var' ) );
+		add_action( 'init', array( __CLASS__, 'maybe_migrate_htaccess' ), 1 );
 		add_action( 'template_redirect', array( __CLASS__, 'maybe_render_player' ), 0 );
 		add_action( 'rest_api_init', array( __CLASS__, 'register_rest' ) );
 
 		\CLMS_SCORM_Gradebook_Integration::init();
+	}
+
+	public static function maybe_migrate_htaccess(): void {
+		$done = (string) get_option( 'atora_scorm_htaccess_migrated', '' );
+		if ( '' !== $done ) {
+			return;
+		}
+		if ( ! function_exists( 'wp_upload_dir' ) ) {
+			return;
+		}
+		$uploads = wp_upload_dir();
+		$basedir = rtrim( (string) ( $uploads['basedir'] ?? '' ), '/\\' );
+		if ( '' === $basedir ) {
+			return;
+		}
+		$root = $basedir . '/atora-library/scorm';
+		if ( ! is_dir( $root ) ) {
+			update_option( 'atora_scorm_htaccess_migrated', ATORA_LMS_VERSION, false );
+			return;
+		}
+		$it = new \RecursiveIteratorIterator(
+			new \RecursiveDirectoryIterator( $root, \FilesystemIterator::SKIP_DOTS )
+		);
+		foreach ( $it as $file ) {
+			$path = (string) ( $file instanceof \SplFileInfo ? $file->getPathname() : '' );
+			if ( '' === $path || '.htaccess' !== basename( $path ) ) {
+				continue;
+			}
+			\CLMS_SCORM_Zip_Extractor::ensure_protected_directory( dirname( $path ) );
+		}
+		update_option( 'atora_scorm_htaccess_migrated', ATORA_LMS_VERSION, false );
 	}
 
 	public static function register_query_var(): void {

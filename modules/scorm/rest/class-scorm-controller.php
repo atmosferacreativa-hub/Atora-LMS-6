@@ -134,12 +134,18 @@ final class SCORM_Controller extends WP_REST_Controller {
 		$user_id           = get_current_user_id();
 		$lesson_id         = absint( $request->get_param( 'lesson_id' ) );
 		$library_item_id   = absint( $request->get_param( 'library_item_id' ) );
-		$library_version_id = absint( $request->get_param( 'library_version_id' ) );
+		unset( $request );
 		if ( ! $lesson_id || ! $library_item_id ) {
 			return new WP_Error( 'atora_scorm_invalid_params', __( 'Parámetros inválidos.', 'atora-lms' ), array( 'status' => 400 ) );
 		}
 
-		$version = $this->resolve_library_version( $library_item_id, $library_version_id );
+		$resource = $this->find_scorm_resource_for_lesson( $lesson_id, $library_item_id );
+		if ( is_wp_error( $resource ) ) {
+			return $resource;
+		}
+		$resource_version_id = absint( $resource['library_version_id'] ?? 0 );
+
+		$version = $this->resolve_library_version( $library_item_id, $resource_version_id );
 		if ( is_wp_error( $version ) ) {
 			return $version;
 		}
@@ -149,7 +155,8 @@ final class SCORM_Controller extends WP_REST_Controller {
 			return $meta;
 		}
 
-		$attempt = $this->attempts->start_or_resume_attempt( $user_id, $lesson_id, $library_item_id, absint( $version['id'] ?? 0 ), (string) $meta['scorm_version'] );
+		$max_attempts = max( 0, absint( get_post_meta( $lesson_id, '_clms_scorm_max_attempts', true ) ) );
+		$attempt = $this->attempts->start_or_resume_attempt( $user_id, $lesson_id, $library_item_id, absint( $version['id'] ?? 0 ), (string) $meta['scorm_version'], $max_attempts );
 		if ( is_wp_error( $attempt ) ) {
 			return $attempt;
 		}
@@ -170,6 +177,32 @@ final class SCORM_Controller extends WP_REST_Controller {
 			),
 			201
 		);
+	}
+
+	/**
+	 * @return array<string,mixed>|WP_Error
+	 */
+	private function find_scorm_resource_for_lesson( int $lesson_id, int $library_item_id ) {
+		$lesson_id       = absint( $lesson_id );
+		$library_item_id = absint( $library_item_id );
+		if ( ! $lesson_id || ! $library_item_id ) {
+			return new WP_Error( 'atora_scorm_invalid_params', __( 'Parámetros inválidos.', 'atora-lms' ), array( 'status' => 400 ) );
+		}
+		$resources = get_post_meta( $lesson_id, '_clms_lesson_resources', true );
+		$resources = is_array( $resources ) ? $resources : array();
+		foreach ( $resources as $resource ) {
+			if ( ! is_array( $resource ) ) {
+				continue;
+			}
+			if ( 'scorm' !== (string) ( $resource['type'] ?? '' ) ) {
+				continue;
+			}
+			if ( absint( $resource['library_item_id'] ?? 0 ) !== $library_item_id ) {
+				continue;
+			}
+			return $resource;
+		}
+		return new WP_Error( 'atora_scorm_resource_not_found', __( 'El paquete no está enlazado a esta lección.', 'atora-lms' ), array( 'status' => 404 ) );
 	}
 
 	/** @param WP_REST_Request $request */

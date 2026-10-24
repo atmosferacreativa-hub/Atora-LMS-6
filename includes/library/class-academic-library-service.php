@@ -73,7 +73,15 @@ class CLMS_Academic_Library_Service {
 			return new WP_Error( 'clms_library_item_locked', __( 'El recurso no existe o está archivado.', 'atora-lms' ) );
 		}
 
-		$data          = is_array( $data ) ? $data : array();
+		$actor_id = absint( $actor_id ?: get_current_user_id() );
+		$data     = is_array( $data ) ? $data : array();
+
+		if ( 'scorm' === (string) ( $item['resource_type'] ?? '' ) ) {
+			if ( ! user_can( $actor_id, 'manage_options' ) && ! user_can( $actor_id, 'atora_upload_scorm' ) ) {
+				return new WP_Error( 'atora_scorm_forbidden_upload', __( 'No autorizado.', 'atora-lms' ), array( 'status' => 403 ) );
+			}
+		}
+
 		$attachment_id = absint( $data['attachment_id'] ?? 0 );
 		$content_url   = esc_url_raw( (string) ( $data['content_url'] ?? '' ) );
 		if ( ! $attachment_id && '' === $content_url ) {
@@ -100,7 +108,6 @@ class CLMS_Academic_Library_Service {
 			$content_url = (string) ( $payload['content_url'] ?? '' );
 			$attachment_id = absint( $payload['attachment_id'] ?? 0 );
 		}
-		$actor_id = absint( $actor_id ?: get_current_user_id() );
 		$inserted = $wpdb->insert(
 			$wpdb->prefix . 'atora_library_versions',
 			array(

@@ -651,6 +651,9 @@ trait CLMS_Metabox_Lesson_Render_Trait {
 				$r_thumb_id    = isset( $resource['thumb_id'] ) ? absint( $resource['thumb_id'] ) : 0;
 				$r_library_item_id    = isset( $resource['library_item_id'] ) ? absint( $resource['library_item_id'] ) : 0;
 				$r_library_version_id = isset( $resource['library_version_id'] ) ? absint( $resource['library_version_id'] ) : 0;
+				$r_scorm_max_attempts = isset( $resource['scorm_max_attempts'] )
+					? max( 0, absint( $resource['scorm_max_attempts'] ) )
+					: max( 0, absint( get_post_meta( $post->ID, '_clms_scorm_max_attempts', true ) ) );
 				$r_file_label  = $r_file_id ? get_the_title( $r_file_id ) : '';
 				$r_thumb_url   = $r_thumb_id ? wp_get_attachment_image_url( $r_thumb_id, 'thumbnail' ) : '';
 				?>
@@ -682,6 +685,11 @@ trait CLMS_Metabox_Lesson_Render_Trait {
 							<label><?php esc_html_e( 'Versión (ID)', 'atora-lms' ); ?></label>
 							<input type="number" min="0" step="1" name="clms_lesson_resources[<?php echo esc_attr( $index ); ?>][library_version_id]" value="<?php echo esc_attr( $r_library_version_id ); ?>">
 							<span class="clms-help"><?php esc_html_e( '0 = usar la última versión publicada.', 'atora-lms' ); ?></span>
+						</p>
+						<p class="clms-f clms-resource-scorm"<?php echo 'scorm' === $r_type ? '' : ' style="display:none"'; ?>>
+							<label><?php esc_html_e( 'Máx. intentos', 'atora-lms' ); ?></label>
+							<input type="number" min="0" step="1" name="clms_lesson_resources[<?php echo esc_attr( $index ); ?>][scorm_max_attempts]" value="<?php echo esc_attr( $r_scorm_max_attempts ); ?>">
+							<span class="clms-help"><?php esc_html_e( '0 = sin límite.', 'atora-lms' ); ?></span>
 						</p>
 						<p class="clms-f full">
 							<label><?php esc_html_e( 'Descripción', 'atora-lms' ); ?></label>

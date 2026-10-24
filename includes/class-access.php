@@ -22,6 +22,8 @@ class CLMS_Access {
 			'clms_manage_commerce',
 			'clms_manage_enrollments',
 			'clms_manage_course_access',
+			// SCORM
+			'atora_upload_scorm',
 			// Legacy: mantener por compatibilidad hacia atrás.
 			'clms_manage_enrollment_access',
 			// ── CRM — acceso y gestión (Fase 5) ──────────────────────────────

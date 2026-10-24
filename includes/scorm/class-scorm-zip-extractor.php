@@ -17,6 +17,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 final class CLMS_SCORM_Zip_Extractor {
+	private const HTACCESS_CONTENTS = "<FilesMatch \"\\.(php|phtml|phar|cgi|pl|py|rb|sh)$\">\nRequire all denied\n</FilesMatch>\nOptions -Indexes\n";
+	private const HTACCESS_CONTENTS_LEGACY = "<FilesMatch \\\"\\.(php|phtml|phar|cgi|pl|py|rb|sh)\\$\\\">\nRequire all denied\n</FilesMatch>\nOptions -Indexes\n";
 	private const DEFAULT_MAX_FILES = 4000;
 	private const DEFAULT_MAX_UNCOMPRESSED_BYTES = 200 * 1024 * 1024;
 	private const DEFAULT_MAX_COMPRESSION_RATIO = 100;
@@ -165,6 +167,14 @@ final class CLMS_SCORM_Zip_Extractor {
 		return $paths;
 	}
 
+	public static function expected_htaccess_contents(): string {
+		return self::HTACCESS_CONTENTS;
+	}
+
+	public static function ensure_protected_directory( string $dir ): void {
+		self::harden_directory( $dir );
+	}
+
 	private static function mkdir_p( string $dir ): bool {
 		if ( '' === $dir ) {
 			return false;
@@ -200,8 +210,15 @@ final class CLMS_SCORM_Zip_Extractor {
 			@file_put_contents( $index, "<!doctype html><meta charset=\"utf-8\"><title></title>" );
 		}
 		$htaccess = $dir . '/.htaccess';
-		if ( ! file_exists( $htaccess ) ) {
-			@file_put_contents( $htaccess, "<FilesMatch \\\"\\\.(php|phtml|phar|cgi|pl|py|rb|sh)\\\$\\\">\nRequire all denied\n</FilesMatch>\nOptions -Indexes\n" );
+		$should_write = ! file_exists( $htaccess );
+		if ( ! $should_write ) {
+			$current = @file_get_contents( $htaccess );
+			if ( is_string( $current ) && self::HTACCESS_CONTENTS_LEGACY === $current ) {
+				$should_write = true;
+			}
+		}
+		if ( $should_write ) {
+			@file_put_contents( $htaccess, self::HTACCESS_CONTENTS );
 		}
 	}
 }
