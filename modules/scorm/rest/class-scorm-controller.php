@@ -21,6 +21,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+require_once dirname( __DIR__, 3 ) . '/includes/scorm/class-scorm-launch-service.php';
+
 final class SCORM_Controller extends WP_REST_Controller {
 	private \CLMS_SCORM_Attempt_Service $attempts;
 
