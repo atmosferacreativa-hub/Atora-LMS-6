@@ -1,0 +1,57 @@
+.atora-scorm-player {
+	margin: 0;
+	padding: 0;
+	background: #0f172a;
+	color: #fff;
+	font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
+
+.atora-scorm-player__topbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 10px 12px;
+	background: rgba(0, 0, 0, 0.35);
+	border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.atora-scorm-player__title {
+	font-size: 14px;
+	font-weight: 600;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.atora-scorm-player__controls {
+	display: flex;
+	gap: 8px;
+}
+
+.atora-scorm-player__btn {
+	appearance: none;
+	border: 1px solid rgba(255, 255, 255, 0.18);
+	background: rgba(255, 255, 255, 0.06);
+	color: #fff;
+	padding: 6px 10px;
+	border-radius: 8px;
+	cursor: pointer;
+}
+
+.atora-scorm-player__btn:disabled {
+	opacity: 0.4;
+	cursor: not-allowed;
+}
+
+.atora-scorm-player__frame {
+	height: calc(100vh - 48px);
+}
+
+#atora-scorm-iframe {
+	width: 100%;
+	height: 100%;
+	border: 0;
+	background: #fff;
+}
+
