@@ -144,7 +144,7 @@ trait CLMS_Metabox_Lesson_Save_Trait {
 		$lesson_prerequisites = isset( $_POST['clms_lesson_prerequisite_ids'] ) ? array_map( 'absint', (array) wp_unslash( $_POST['clms_lesson_prerequisite_ids'] ) ) : array();
 
 		$resources_raw = isset( $_POST['clms_lesson_resources'] ) ? wp_unslash( $_POST['clms_lesson_resources'] ) : array();
-		$resources     = $this->sanitize_resources( $resources_raw );
+		$resources     = $this->sanitize_resources( $resources_raw, $post_id );
 
 		if ( $course_id && 'lm_course' !== get_post_type( $course_id ) ) {
 			$course_id = 0;
@@ -630,7 +630,7 @@ trait CLMS_Metabox_Lesson_Save_Trait {
 		return array_values( $clean );
 	}
 
-	protected function sanitize_resources( $resources_raw ) {
+	protected function sanitize_resources( $resources_raw, int $lesson_id = 0 ) {
 		$resources_raw = is_array( $resources_raw ) ? $resources_raw : array();
 		$clean         = array();
 		$allowed_types = array( 'pdf', 'guia', 'presentacion', 'audio', 'video', 'link', 'archivo', 'scorm' );
@@ -672,6 +672,11 @@ trait CLMS_Metabox_Lesson_Save_Trait {
 				}
 				if ( $item['library_version_id'] < 0 ) {
 					$item['library_version_id'] = 0;
+				}
+				if ( $lesson_id > 0 ) {
+					$item['url'] = '/?atora_scorm=1&lesson_id=' . absint( $lesson_id )
+						. '&library_item_id=' . absint( $item['library_item_id'] )
+						. '&library_version_id=' . absint( $item['library_version_id'] );
 				}
 			}
 

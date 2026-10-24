@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 final class CLMS_SCORM_Manifest_Parser {
 	/**
-	 * @return array{scorm_version:string,schemaversion_raw:string,launch_href:string}|WP_Error
+	 * @return array{scorm_version:string,schemaversion_raw:string,launch_href:string,sco_hrefs:string[]}|WP_Error
 	 */
 	public static function parse( string $xml ) {
 		$xml = trim( $xml );
@@ -55,19 +55,20 @@ final class CLMS_SCORM_Manifest_Parser {
 			return new WP_Error( 'clms_scorm_manifest_unsupported_version', __( 'No se pudo detectar la versión SCORM del manifiesto.', 'atora-lms' ) );
 		}
 
-		$launch_href = self::resolve_launch_href( $xpath );
-		if ( is_wp_error( $launch_href ) ) {
-			return $launch_href;
+		$sco_hrefs = self::list_sco_hrefs( $xpath );
+		if ( is_wp_error( $sco_hrefs ) ) {
+			return $sco_hrefs;
 		}
-
-		if ( ! self::is_safe_relative_path( $launch_href ) ) {
-			return new WP_Error( 'clms_scorm_manifest_unsafe_launch', __( 'El SCO inicial no es una ruta segura.', 'atora-lms' ) );
+		$launch_href = (string) ( $sco_hrefs[0] ?? '' );
+		if ( '' === $launch_href ) {
+			return new WP_Error( 'clms_scorm_manifest_missing_sco', __( 'El manifiesto no declara ningún SCO.', 'atora-lms' ) );
 		}
 
 		return array(
 			'scorm_version'     => $scorm_version,
 			'schemaversion_raw' => $schemaversion_raw,
 			'launch_href'       => $launch_href,
+			'sco_hrefs'         => $sco_hrefs,
 		);
 	}
 
@@ -88,11 +89,17 @@ final class CLMS_SCORM_Manifest_Parser {
 	/**
 	 * @return string|WP_Error
 	 */
-	private static function resolve_launch_href( DOMXPath $xpath ) {
+	/**
+	 * @return string[]|WP_Error
+	 */
+	private static function list_sco_hrefs( DOMXPath $xpath ) {
 		$resource_nodes = $xpath->query( '//*[local-name()="resource"]' );
 		if ( ! ( $resource_nodes instanceof DOMNodeList ) || 0 === $resource_nodes->length ) {
 			return new WP_Error( 'clms_scorm_manifest_missing_sco', __( 'El manifiesto no declara recursos.', 'atora-lms' ) );
 		}
+
+		$hrefs = array();
+		$by_identifier = array();
 
 		for ( $i = 0; $i < $resource_nodes->length; $i++ ) {
 			$node = $resource_nodes->item( $i );
@@ -111,12 +118,62 @@ final class CLMS_SCORM_Manifest_Parser {
 				continue;
 			}
 			$href = trim( (string) $node->getAttribute( 'href' ) );
-			if ( '' !== $href ) {
-				return $href;
+			if ( '' === $href ) {
+				continue;
+			}
+			if ( ! self::is_safe_relative_path( $href ) ) {
+				return new WP_Error( 'clms_scorm_manifest_unsafe_launch', __( 'El manifiesto declara un SCO no seguro.', 'atora-lms' ) );
+			}
+			$hrefs[] = $href;
+			$identifier = trim( (string) $node->getAttribute( 'identifier' ) );
+			if ( '' !== $identifier ) {
+				$by_identifier[ $identifier ] = $href;
 			}
 		}
 
-		return new WP_Error( 'clms_scorm_manifest_missing_sco', __( 'El manifiesto no declara ningún SCO.', 'atora-lms' ) );
+		if ( empty( $hrefs ) ) {
+			return new WP_Error( 'clms_scorm_manifest_missing_sco', __( 'El manifiesto no declara ningún SCO.', 'atora-lms' ) );
+		}
+
+		// Intentar ordenar según la organización por defecto (si existe) para habilitar navegación multi‑SCO.
+		$ordered = self::ordered_sco_hrefs_from_organization( $xpath, $by_identifier );
+		if ( ! empty( $ordered ) ) {
+			return array_values( array_unique( $ordered ) );
+		}
+
+		return array_values( array_unique( $hrefs ) );
+	}
+
+	/**
+	 * @param array<string,string> $by_identifier
+	 * @return string[]
+	 */
+	private static function ordered_sco_hrefs_from_organization( DOMXPath $xpath, array $by_identifier ): array {
+		if ( empty( $by_identifier ) ) {
+			return array();
+		}
+		$items = $xpath->query( '//*[local-name()="organization"][1]//*[local-name()="item"][@identifierref]' );
+		if ( ! ( $items instanceof DOMNodeList ) || 0 === $items->length ) {
+			return array();
+		}
+		$out = array();
+		for ( $i = 0; $i < $items->length; $i++ ) {
+			$node = $items->item( $i );
+			if ( ! ( $node instanceof DOMElement ) ) {
+				continue;
+			}
+			$ref = trim( (string) $node->getAttribute( 'identifierref' ) );
+			if ( '' === $ref || ! isset( $by_identifier[ $ref ] ) ) {
+				continue;
+			}
+			$href = $by_identifier[ $ref ];
+			$parameters = trim( (string) $node->getAttribute( 'parameters' ) );
+			if ( '' !== $parameters && str_starts_with( $parameters, '?' ) && ! str_contains( $parameters, '://' ) ) {
+				$href .= $parameters;
+			}
+			$out[] = $href;
+		}
+		return $out;
 	}
 
 	private static function is_safe_relative_path( string $path ): bool {

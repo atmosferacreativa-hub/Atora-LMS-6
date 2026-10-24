@@ -33,6 +33,7 @@ XML;
 		$this->assertFalse( is_wp_error( $parsed ) );
 		$this->assertSame( '1.2', $parsed['scorm_version'] );
 		$this->assertSame( 'index.html', $parsed['launch_href'] );
+		$this->assertSame( array( 'index.html' ), $parsed['sco_hrefs'] );
 	}
 
 	public function test_parses_scorm_2004_manifest_and_resolves_launch_href(): void {
@@ -61,6 +62,7 @@ XML;
 		$this->assertFalse( is_wp_error( $parsed ) );
 		$this->assertSame( '2004', $parsed['scorm_version'] );
 		$this->assertSame( 'story/index.html', $parsed['launch_href'] );
+		$this->assertSame( array( 'story/index.html' ), $parsed['sco_hrefs'] );
 	}
 
 	public function test_rejects_manifests_without_sco_resource(): void {

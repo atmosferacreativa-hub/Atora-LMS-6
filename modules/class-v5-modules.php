@@ -115,6 +115,12 @@ class V5_Modules {
 			self::load_h5p();
 		}
 
+		// Orden B (6.35.0): SCORM (front/rest/admin).
+		if ( ( $ctx['is_admin'] || $ctx['is_front'] || $ctx['is_rest'] )
+			&& self::module_active( 'scorm' ) ) {
+			self::load_scorm();
+		}
+
 		// Messaging: evitar carga en frontend público general.
 		if ( ( $ctx['is_admin'] || $ctx['is_cron'] || $ctx['is_rest'] || $ctx['is_ajax'] || $ctx['is_webhook'] )
 			&& self::module_active( 'messaging' ) ) {
@@ -269,6 +275,15 @@ class V5_Modules {
 
 		if ( class_exists( '\ATORA\H5P\H5P_Module' ) ) {
 			\ATORA\H5P\H5P_Module::init();
+		}
+	}
+
+	private static function load_scorm(): void {
+		$dir = ATORA_LMS_MODULES_DIR . 'scorm/';
+		self::require_file( $dir . 'rest/class-scorm-controller.php' );
+		self::require_file( $dir . 'class-scorm-module.php' );
+		if ( class_exists( '\\ATORA\\SCORM\\SCORM_Module' ) ) {
+			\ATORA\SCORM\SCORM_Module::init();
 		}
 	}
 
