@@ -19,7 +19,7 @@ class CLMS_Academic_Library_Policy {
 		'archived'  => array(),
 	);
 
-	const RESOURCE_TYPES = array( 'document', 'video', 'audio', 'image', 'link', 'dataset', 'interactive' );
+	const RESOURCE_TYPES = array( 'document', 'video', 'audio', 'image', 'link', 'dataset', 'interactive', 'scorm' );
 	const LINK_TYPES     = array( 'competency', 'evidence' );
 
 	public static function can_transition( $from, $to ) {
