@@ -10,6 +10,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+require_once __DIR__ . '/../scorm/class-scorm-package-service.php';
+
 class CLMS_Academic_Library_Service {
 
 	public function create_item( $data, $actor_id = 0 ) {
@@ -86,6 +88,18 @@ class CLMS_Academic_Library_Service {
 			'mime_type'     => CLMS_Academic_Library_Policy::normalize_mime_type( $data['mime_type'] ?? '' ),
 			'metadata'      => $metadata,
 		);
+
+		// SCORM: validar e instalar el ZIP antes de crear la versión.
+		if ( 'scorm' === (string) ( $item['resource_type'] ?? '' ) ) {
+			$prepared = $this->prepare_scorm_payload( $item, $last_version + 1, $payload );
+			if ( is_wp_error( $prepared ) ) {
+				return $prepared;
+			}
+			$payload  = $prepared;
+			$metadata = is_array( $payload['metadata'] ?? null ) ? (array) $payload['metadata'] : array();
+			$content_url = (string) ( $payload['content_url'] ?? '' );
+			$attachment_id = absint( $payload['attachment_id'] ?? 0 );
+		}
 		$actor_id = absint( $actor_id ?: get_current_user_id() );
 		$inserted = $wpdb->insert(
 			$wpdb->prefix . 'atora_library_versions',
@@ -116,6 +130,95 @@ class CLMS_Academic_Library_Service {
 		);
 		$this->log_event( 'version_created', $item_id, array( 'version_id' => $version_id, 'version_number' => $last_version + 1, 'checksum_sha256' => CLMS_Academic_Library_Policy::canonical_hash( $payload ) ), $actor_id );
 		return array( 'id' => $version_id, 'version_number' => $last_version + 1, 'checksum_sha256' => CLMS_Academic_Library_Policy::canonical_hash( $payload ) );
+	}
+
+	/**
+	 * @param array<string,mixed> $item DB row de atora_library_items.
+	 * @param array{attachment_id:int,content_url:string,mime_type:string,metadata:array<string,mixed>} $payload
+	 * @return array{attachment_id:int,content_url:string,mime_type:string,metadata:array<string,mixed>}|WP_Error
+	 */
+	private function prepare_scorm_payload( array $item, int $version_number, array $payload ) {
+		$attachment_id = absint( $payload['attachment_id'] ?? 0 );
+		if ( $attachment_id <= 0 ) {
+			return new WP_Error( 'clms_scorm_attachment_required', __( 'Los paquetes SCORM requieren un adjunto ZIP.', 'atora-lms' ) );
+		}
+		if ( ! function_exists( 'get_attached_file' ) ) {
+			return new WP_Error( 'clms_scorm_wp_required', __( 'No se pudo resolver la ruta del adjunto SCORM.', 'atora-lms' ) );
+		}
+		$zip_path = (string) get_attached_file( $attachment_id );
+		if ( '' === $zip_path || ! file_exists( $zip_path ) ) {
+			return new WP_Error( 'clms_scorm_zip_not_found', __( 'El ZIP SCORM no existe en el servidor.', 'atora-lms' ) );
+		}
+		if ( 'zip' !== strtolower( (string) pathinfo( $zip_path, PATHINFO_EXTENSION ) ) ) {
+			return new WP_Error( 'clms_scorm_zip_invalid', __( 'El adjunto SCORM debe ser un ZIP.', 'atora-lms' ) );
+		}
+		if ( ! function_exists( 'wp_upload_dir' ) ) {
+			return new WP_Error( 'clms_scorm_wp_required', __( 'No se pudo resolver el directorio de uploads.', 'atora-lms' ) );
+		}
+
+		$institution_id = absint( $item['institution_id'] ?? 0 );
+		$item_id        = absint( $item['id'] ?? 0 );
+		if ( $institution_id <= 0 || $item_id <= 0 ) {
+			return new WP_Error( 'clms_scorm_invalid_item', __( 'Recurso SCORM inválido.', 'atora-lms' ) );
+		}
+
+		$uploads = wp_upload_dir();
+		$basedir = rtrim( (string) ( $uploads['basedir'] ?? '' ), '/\\' );
+		$baseurl = rtrim( (string) ( $uploads['baseurl'] ?? '' ), '/\\' );
+		if ( '' === $basedir || '' === $baseurl ) {
+			return new WP_Error( 'clms_scorm_uploads_unavailable', __( 'No se pudo resolver uploads para SCORM.', 'atora-lms' ) );
+		}
+
+		$rel_dir  = 'atora-library/scorm/' . $institution_id . '/' . $item_id . '/v' . $version_number;
+		$dest_dir = $basedir . '/' . $rel_dir;
+
+		$installed = CLMS_SCORM_Package_Service::install_zip( $zip_path, $dest_dir );
+		if ( is_wp_error( $installed ) ) {
+			$this->cleanup_dir( $dest_dir );
+			return $installed;
+		}
+
+		$launch_href = (string) ( $installed['launch_href'] ?? '' );
+		$launch_url  = $baseurl . '/' . $rel_dir . '/' . ltrim( str_replace( '\\', '/', $launch_href ), '/' );
+		$launch_url  = esc_url_raw( $launch_url );
+
+		$metadata = is_array( $payload['metadata'] ?? null ) ? $payload['metadata'] : array();
+		$metadata['scorm'] = array(
+			'installed_at'      => current_time( 'mysql', true ),
+			'scorm_version'     => (string) $installed['scorm_version'],
+			'schemaversion_raw' => (string) $installed['schemaversion_raw'],
+			'launch_href'       => $launch_href,
+			'content_base_url'  => $baseurl . '/' . $rel_dir,
+			'launch_url'        => $launch_url,
+		);
+
+		$payload['metadata']  = $metadata;
+		$payload['mime_type'] = '' !== (string) ( $payload['mime_type'] ?? '' ) ? $payload['mime_type'] : 'application/zip';
+		$payload['content_url'] = $launch_url;
+		return $payload;
+	}
+
+	private function cleanup_dir( string $dir ): void {
+		$dir = rtrim( $dir, '/\\' );
+		if ( '' === $dir || ! is_dir( $dir ) ) {
+			return;
+		}
+		$items = scandir( $dir );
+		if ( ! is_array( $items ) ) {
+			return;
+		}
+		foreach ( $items as $item ) {
+			if ( '.' === $item || '..' === $item ) {
+				continue;
+			}
+			$path = $dir . '/' . $item;
+			if ( is_dir( $path ) ) {
+				$this->cleanup_dir( $path );
+			} else {
+				@unlink( $path );
+			}
+		}
+		@rmdir( $dir );
 	}
 
 	public function transition( $item_id, $target_status, $actor_id = 0 ) {

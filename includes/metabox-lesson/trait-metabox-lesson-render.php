@@ -649,6 +649,8 @@ trait CLMS_Metabox_Lesson_Render_Trait {
 				$r_file_id     = isset( $resource['file_id'] ) ? absint( $resource['file_id'] ) : 0;
 				$r_url         = isset( $resource['url'] ) ? $resource['url'] : '';
 				$r_thumb_id    = isset( $resource['thumb_id'] ) ? absint( $resource['thumb_id'] ) : 0;
+				$r_library_item_id    = isset( $resource['library_item_id'] ) ? absint( $resource['library_item_id'] ) : 0;
+				$r_library_version_id = isset( $resource['library_version_id'] ) ? absint( $resource['library_version_id'] ) : 0;
 				$r_file_label  = $r_file_id ? get_the_title( $r_file_id ) : '';
 				$r_thumb_url   = $r_thumb_id ? wp_get_attachment_image_url( $r_thumb_id, 'thumbnail' ) : '';
 				?>
@@ -668,7 +670,18 @@ trait CLMS_Metabox_Lesson_Render_Trait {
 								<option value="video"        <?php selected( $r_type, 'video' ); ?>><?php esc_html_e( 'Video', 'atora-lms' ); ?></option>
 								<option value="link"         <?php selected( $r_type, 'link' ); ?>><?php esc_html_e( 'Enlace', 'atora-lms' ); ?></option>
 								<option value="archivo"      <?php selected( $r_type, 'archivo' ); ?>><?php esc_html_e( 'Archivo', 'atora-lms' ); ?></option>
+								<option value="scorm"        <?php selected( $r_type, 'scorm' ); ?>><?php esc_html_e( 'SCORM', 'atora-lms' ); ?></option>
 							</select>
+						</p>
+						<p class="clms-f clms-resource-scorm"<?php echo 'scorm' === $r_type ? '' : ' style="display:none"'; ?>>
+							<label><?php esc_html_e( 'Biblioteca (ID)', 'atora-lms' ); ?></label>
+							<input type="number" min="0" step="1" name="clms_lesson_resources[<?php echo esc_attr( $index ); ?>][library_item_id]" value="<?php echo esc_attr( $r_library_item_id ); ?>">
+							<span class="clms-help"><?php esc_html_e( 'ID del ítem de Biblioteca con el paquete SCORM.', 'atora-lms' ); ?></span>
+						</p>
+						<p class="clms-f clms-resource-scorm"<?php echo 'scorm' === $r_type ? '' : ' style="display:none"'; ?>>
+							<label><?php esc_html_e( 'Versión (ID)', 'atora-lms' ); ?></label>
+							<input type="number" min="0" step="1" name="clms_lesson_resources[<?php echo esc_attr( $index ); ?>][library_version_id]" value="<?php echo esc_attr( $r_library_version_id ); ?>">
+							<span class="clms-help"><?php esc_html_e( '0 = usar la última versión publicada.', 'atora-lms' ); ?></span>
 						</p>
 						<p class="clms-f full">
 							<label><?php esc_html_e( 'Descripción', 'atora-lms' ); ?></label>

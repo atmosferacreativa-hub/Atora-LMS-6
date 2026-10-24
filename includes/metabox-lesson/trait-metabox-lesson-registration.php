@@ -772,6 +772,18 @@ trait CLMS_Metabox_Lesson_Registration_Trait {
 					    tp=row.querySelector('.clms-resource-thumb-preview'),
 					    rm=row.querySelector('.clms-remove-resource-row');
 
+					var typeSel=row.querySelector('select[name*="[type]"]');
+					function toggleScorm(){
+						var on = typeSel && typeSel.value === 'scorm';
+						row.querySelectorAll('.clms-resource-scorm').forEach(function(el){
+							el.style.display = on ? '' : 'none';
+						});
+					}
+					if(typeSel){
+						typeSel.addEventListener('change',toggleScorm);
+						toggleScorm();
+					}
+
 					if(pf&&cf&&fi&&fl){
 						var pickFile = function(){
 							openMediaFrame({title:clmsI18n.mediaResourceFile,button:clmsI18n.mediaUse},function(att){
@@ -828,7 +840,9 @@ trait CLMS_Metabox_Lesson_Registration_Trait {
 							+'<option value="pdf">'+clmsI18n.typePdf+'</option><option value="guia">'+clmsI18n.typeGuide+'</option>'
 							+'<option value="presentacion">'+clmsI18n.typePresentation+'</option><option value="audio">'+clmsI18n.typeAudio+'</option>'
 							+'<option value="video">'+clmsI18n.typeVideo+'</option><option value="link">'+clmsI18n.typeLink+'</option>'
-							+'<option value="archivo">'+clmsI18n.typeFile+'</option></select></p>'
+							+'<option value="archivo">'+clmsI18n.typeFile+'</option><option value="scorm">SCORM</option></select></p>'
+							+'<p class="clms-f clms-resource-scorm" style="display:none"><label>Biblioteca (ID)</label><input type="number" min="0" step="1" name="'+n+'[library_item_id]" value=""></p>'
+							+'<p class="clms-f clms-resource-scorm" style="display:none"><label>Versión (ID)</label><input type="number" min="0" step="1" name="'+n+'[library_version_id]" value="0"></p>'
 							+'<p class="clms-f full"><label>'+clmsI18n.labelDescription+'</label><textarea name="'+n+'[description]" rows="2"></textarea></p>'
 							+'<p class="clms-f"><label>'+clmsI18n.labelFile+'</label>'
 							+'<div class="clms-dropzone" data-clms-dropzone="resource-file" tabindex="0" role="button">'

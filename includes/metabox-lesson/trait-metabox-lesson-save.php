@@ -633,7 +633,7 @@ trait CLMS_Metabox_Lesson_Save_Trait {
 	protected function sanitize_resources( $resources_raw ) {
 		$resources_raw = is_array( $resources_raw ) ? $resources_raw : array();
 		$clean         = array();
-		$allowed_types = array( 'pdf', 'guia', 'presentacion', 'audio', 'video', 'link', 'archivo' );
+		$allowed_types = array( 'pdf', 'guia', 'presentacion', 'audio', 'video', 'link', 'archivo', 'scorm' );
 
 		foreach ( $resources_raw as $resource ) {
 			if ( ! is_array( $resource ) ) {
@@ -652,6 +652,8 @@ trait CLMS_Metabox_Lesson_Save_Trait {
 				'file_id'     => isset( $resource['file_id'] ) ? absint( $resource['file_id'] ) : 0,
 				'url'         => isset( $resource['url'] ) ? esc_url_raw( $resource['url'] ) : '',
 				'thumb_id'    => isset( $resource['thumb_id'] ) ? absint( $resource['thumb_id'] ) : 0,
+				'library_item_id'    => isset( $resource['library_item_id'] ) ? absint( $resource['library_item_id'] ) : 0,
+				'library_version_id' => isset( $resource['library_version_id'] ) ? absint( $resource['library_version_id'] ) : 0,
 			);
 
 			if ( $item['file_id'] && 'attachment' !== get_post_type( $item['file_id'] ) ) {
@@ -662,7 +664,18 @@ trait CLMS_Metabox_Lesson_Save_Trait {
 				$item['thumb_id'] = 0;
 			}
 
-			if ( '' === $item['title'] && ! $item['file_id'] && '' === $item['url'] ) {
+			if ( 'scorm' === $item['type'] ) {
+				$item['file_id']  = 0;
+				$item['url']      = '';
+				if ( $item['library_item_id'] <= 0 ) {
+					continue;
+				}
+				if ( $item['library_version_id'] < 0 ) {
+					$item['library_version_id'] = 0;
+				}
+			}
+
+			if ( '' === $item['title'] && ! $item['file_id'] && '' === $item['url'] && $item['library_item_id'] <= 0 ) {
 				continue;
 			}
 
