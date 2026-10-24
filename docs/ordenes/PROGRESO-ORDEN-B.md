@@ -41,13 +41,15 @@ PR: #90 (merge 2026-10-24).
 
 ## Bloque 2 — Reproductor y seguimiento (plugin)
 
-- [ ] Reproductor web con adaptador API (1.2 y 2004) + navegación multi-SCO.
-- [ ] Persistencia CMI por intento y reanudación.
-- [ ] Commits por lotes + resiliencia red + cierre ventana.
-- [ ] Integración académica (completitud + notas + intentos).
-- [ ] Informe docente.
-- [ ] Pruebas API 1.2/2004 + persistencia + permisos.
-- [ ] Paquetes de prueba con licencia compatible.
+- [x] Reproductor web con adaptador API (1.2 y 2004) + navegación multi-SCO.
+- [x] Persistencia CMI por intento y reanudación.
+- [x] Commits por lotes + resiliencia red + cierre ventana.
+- [x] Integración académica (completitud + notas + intentos).
+- [x] Informe docente.
+- [x] Pruebas API 1.2/2004 + persistencia + permisos.
+- [x] Paquetes de prueba con licencia compatible.
+
+PR: #92 (merge 2026-10-24).
 
 ## Bloque 3 — App 1.1.0
 
