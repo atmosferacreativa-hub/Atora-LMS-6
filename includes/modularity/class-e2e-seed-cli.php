@@ -150,10 +150,18 @@ final class ATORA_E2E_Seed_CLI {
 
 		// 6.35.0 (SCORM): lección con paquete SCORM para recorridos `scorm-*` de la app.
 		$scorm = self::lesson( $course, $teacher, 'leccion-e2e-scorm', 'SCORM', 99, array() );
+		$resources = array();
 		$scorm_resource = self::scorm_resource( $admin_id );
 		if ( ! empty( $scorm_resource ) ) {
-			update_post_meta( $scorm, '_clms_lesson_resources', array( $scorm_resource ) );
-			update_post_meta( $scorm, '_clms_scorm_max_attempts', absint( $scorm_resource['scorm_max_attempts'] ?? 0 ) );
+			$resources[] = $scorm_resource;
+		}
+		$scorm_xhr = self::scorm_xhr_resource( $admin_id );
+		if ( ! empty( $scorm_xhr ) ) {
+			$resources[] = $scorm_xhr;
+		}
+		if ( $resources ) {
+			update_post_meta( $scorm, '_clms_lesson_resources', $resources );
+			update_post_meta( $scorm, '_clms_scorm_max_attempts', 1 );
 		}
 		$task = self::lesson( $course, $teacher, 'leccion-e2e-tarea', 'Tarea', 2, array(
 			'lm_activity_type' => 'tarea',
@@ -504,6 +512,35 @@ final class ATORA_E2E_Seed_CLI {
 		return is_wp_error( $id ) ? 0 : absint( $id );
 	}
 
+	/** Paquete SCORM (fixture) que hace fetch/XHR desde sus propios archivos. */
+	private static function scorm_xhr_zip_attachment( int $author ): int {
+		$existing = get_page_by_path( 'scorm-xhr-e2e', OBJECT, 'attachment' );
+		if ( $existing ) {
+			return (int) $existing->ID;
+		}
+
+		require_once ABSPATH . 'wp-admin/includes/file.php';
+		require_once ABSPATH . 'wp-admin/includes/media.php';
+		require_once ABSPATH . 'wp-admin/includes/image.php';
+
+		$fixture = dirname( __DIR__, 2 ) . '/tests/fixtures/scorm/AtoraXHR_SCORM12.zip';
+		if ( ! file_exists( $fixture ) ) {
+			return 0;
+		}
+		$tmp = wp_tempnam( 'scorm-xhr-e2e.zip' );
+		if ( ! $tmp ) {
+			return 0;
+		}
+		copy( $fixture, $tmp );
+		$id = media_handle_sideload(
+			array( 'name' => 'scorm-xhr-e2e.zip', 'tmp_name' => $tmp ),
+			0,
+			'SCORM XHR E2E',
+			array( 'post_name' => 'scorm-xhr-e2e', 'post_author' => $author )
+		);
+		return is_wp_error( $id ) ? 0 : absint( $id );
+	}
+
 	/** @return array<string,mixed> */
 	private static function scorm_resource( int $admin_id ): array {
 		if ( ! class_exists( '\CLMS_Academic_Library_Service' ) || ! class_exists( '\ATORA\LMS\Tenant_Context' ) ) {
@@ -586,6 +623,92 @@ final class ATORA_E2E_Seed_CLI {
 					// 0 = usar la última (el cliente no elige la versión).
 					'library_version_id'=> 0,
 					'scorm_max_attempts'=> 1,
+				);
+			}
+		);
+	}
+
+	/** @return array<string,mixed> */
+	private static function scorm_xhr_resource( int $admin_id ): array {
+		if ( ! class_exists( '\CLMS_Academic_Library_Service' ) || ! class_exists( '\ATORA\LMS\Tenant_Context' ) ) {
+			return array();
+		}
+		$admin_id = absint( $admin_id );
+		if ( ! $admin_id ) {
+			return array();
+		}
+		$attachment_id = self::scorm_xhr_zip_attachment( $admin_id );
+		if ( ! $attachment_id ) {
+			return array();
+		}
+
+		$institution_id = \ATORA\LMS\Tenant_Context::current_institution_id();
+		if ( is_wp_error( $institution_id ) ) {
+			global $wpdb;
+			$institution_id = (int) $wpdb->get_var( "SELECT id FROM {$wpdb->prefix}atora_institutions ORDER BY id LIMIT 1" );
+		}
+		$institution_id = absint( $institution_id );
+		if ( ! $institution_id ) {
+			return array();
+		}
+
+		return \ATORA\LMS\Tenant_Context::with(
+			$institution_id,
+			static function() use ( $admin_id, $attachment_id ) {
+				global $wpdb;
+				$service = new \CLMS_Academic_Library_Service();
+				$item_id = (int) $wpdb->get_var(
+					$wpdb->prepare(
+						"SELECT id FROM {$wpdb->prefix}atora_library_items WHERE slug = %s LIMIT 1",
+						'scorm-xhr-e2e'
+					)
+				);
+				if ( ! $item_id ) {
+					$created = $service->create_item(
+						array(
+							'title'         => 'SCORM XHR E2E',
+							'slug'          => 'scorm-xhr-e2e',
+							'description'   => 'Paquete SCORM con fetch/XHR para pruebas de pantalla.',
+							'resource_type' => 'scorm',
+						),
+						$admin_id
+					);
+					if ( is_wp_error( $created ) || empty( $created['id'] ) ) {
+						return array();
+					}
+					$item_id = absint( $created['id'] );
+				}
+
+				$version = (array) $wpdb->get_row(
+					$wpdb->prepare(
+						"SELECT * FROM {$wpdb->prefix}atora_library_versions WHERE item_id = %d ORDER BY version_number DESC LIMIT 1",
+						$item_id
+					),
+					ARRAY_A
+				);
+				if ( empty( $version ) ) {
+					$added = $service->add_version(
+						$item_id,
+						array(
+							'attachment_id' => $attachment_id,
+							'mime_type'     => 'application/zip',
+						),
+						$admin_id
+					);
+					if ( is_wp_error( $added ) ) {
+						return array();
+					}
+					$service->transition( $item_id, 'published', $admin_id );
+					$version = is_array( $added ) ? $added : array();
+				}
+
+				return array(
+					'type'               => 'scorm',
+					'title'              => 'SCORM XHR',
+					'description'        => 'Paquete SCORM con fetch/XHR (app).',
+					'library_item_id'    => $item_id,
+					'library_version_id' => 0,
+					'scorm_max_attempts' => 1,
 				);
 			}
 		);
