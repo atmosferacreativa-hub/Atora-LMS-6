@@ -148,21 +148,16 @@ final class ATORA_E2E_Seed_CLI {
 			),
 		) );
 
-		// 6.35.0 (SCORM): lección con paquete SCORM para recorridos `scorm-*` de la app.
+		// 6.35.0 (SCORM): lección con paquetes SCORM para recorridos `scorm-*` de la app.
+		// Nota: estos recursos son obligatorios. Si no se pueden crear, el seed falla.
 		$scorm = self::lesson( $course, $teacher, 'leccion-e2e-scorm', 'SCORM', 99, array() );
-		$resources = array();
-		$scorm_resource = self::scorm_resource( $admin_id );
-		if ( ! empty( $scorm_resource ) ) {
-			$resources[] = $scorm_resource;
-		}
-		$scorm_xhr = self::scorm_xhr_resource( $admin_id );
-		if ( ! empty( $scorm_xhr ) ) {
-			$resources[] = $scorm_xhr;
-		}
-		if ( $resources ) {
-			update_post_meta( $scorm, '_clms_lesson_resources', $resources );
-			update_post_meta( $scorm, '_clms_scorm_max_attempts', 1 );
-		}
+		$resources = array(
+			self::scorm_resource( $admin_id ),
+			self::scorm_xhr_resource( $admin_id ),
+		);
+		update_post_meta( $scorm, '_clms_lesson_resources', $resources );
+		// Sin límite: el CI corre `scorm-online`, `scorm-sin-conexion` y `scorm-xhr` en la misma lección.
+		update_post_meta( $scorm, '_clms_scorm_max_attempts', 0 );
 		$task = self::lesson( $course, $teacher, 'leccion-e2e-tarea', 'Tarea', 2, array(
 			'lm_activity_type' => 'tarea',
 			'_clms_due_date'   => gmdate( 'Y-m-d', time() + 7 * DAY_IN_SECONDS ),
@@ -276,7 +271,19 @@ final class ATORA_E2E_Seed_CLI {
 			'student'    => array( 'id' => $student, 'login' => 'estudiante_e2e' ),
 			'student2'   => array( 'id' => $student2, 'login' => 'estudiante2_e2e' ),
 			'course'     => array( 'wp_id' => $course, 'id' => $table_course ? (int) $table_course['id'] : 0, 'section_id' => $section ),
-			'lessons'    => array( 'videos' => $videos, 'task' => $task, 'quiz' => $quiz, 'essay' => $essay, 'overdue' => $overdue, 'group' => $group_task ),
+			'lessons'    => array( 'videos' => $videos, 'scorm' => $scorm, 'task' => $task, 'quiz' => $quiz, 'essay' => $essay, 'overdue' => $overdue, 'group' => $group_task ),
+			'scorm_resources' => array(
+				array(
+					'title'              => (string) ( $resources[0]['title'] ?? '' ),
+					'library_item_id'    => (int) ( $resources[0]['library_item_id'] ?? 0 ),
+					'library_version_id' => (int) ( $resources[0]['library_version_id'] ?? 0 ),
+				),
+				array(
+					'title'              => (string) ( $resources[1]['title'] ?? '' ),
+					'library_item_id'    => (int) ( $resources[1]['library_item_id'] ?? 0 ),
+					'library_version_id' => (int) ( $resources[1]['library_version_id'] ?? 0 ),
+				),
+			),
 			'rubric'     => $rubric,
 			'group'      => $group,
 			'submission' => $submission,
@@ -543,27 +550,15 @@ final class ATORA_E2E_Seed_CLI {
 
 	/** @return array<string,mixed> */
 	private static function scorm_resource( int $admin_id ): array {
-		if ( ! class_exists( '\CLMS_Academic_Library_Service' ) || ! class_exists( '\ATORA\LMS\Tenant_Context' ) ) {
-			return array();
-		}
+		self::require_class( '\CLMS_Academic_Library_Service', 'SCORM E2E' );
+		self::require_class( '\ATORA\LMS\Tenant_Context', 'SCORM E2E' );
+		self::require_class( '\ATORA\LMS\Institution_Service', 'SCORM E2E' );
 		$admin_id = absint( $admin_id );
-		if ( ! $admin_id ) {
-			return array();
-		}
+		if ( ! $admin_id ) { self::seed_error( 'SCORM E2E: no se pudo resolver admin_id.' ); }
 		$attachment_id = self::scorm_zip_attachment( $admin_id );
-		if ( ! $attachment_id ) {
-			return array();
-		}
+		if ( ! $attachment_id ) { self::seed_error( 'SCORM E2E: no se pudo crear el adjunto del ZIP fixture.' ); }
 
-		$institution_id = \ATORA\LMS\Tenant_Context::current_institution_id();
-		if ( is_wp_error( $institution_id ) ) {
-			global $wpdb;
-			$institution_id = (int) $wpdb->get_var( "SELECT id FROM {$wpdb->prefix}atora_institutions ORDER BY id LIMIT 1" );
-		}
-		$institution_id = absint( $institution_id );
-		if ( ! $institution_id ) {
-			return array();
-		}
+		$institution_id = self::require_or_create_institution_id( 'SCORM E2E' );
 
 		return \ATORA\LMS\Tenant_Context::with(
 			$institution_id,
@@ -586,9 +581,10 @@ final class ATORA_E2E_Seed_CLI {
 						),
 						$admin_id
 					);
-					if ( is_wp_error( $created ) || empty( $created['id'] ) ) {
-						return array();
+					if ( is_wp_error( $created ) ) {
+						self::seed_error( 'SCORM E2E: create_item falló: ' . $created->get_error_code() . ' — ' . $created->get_error_message() );
 					}
+					if ( empty( $created['id'] ) ) { self::seed_error( 'SCORM E2E: create_item devolvió un resultado sin id.' ); }
 					$item_id = absint( $created['id'] );
 				}
 
@@ -609,10 +605,14 @@ final class ATORA_E2E_Seed_CLI {
 						$admin_id
 					);
 					if ( is_wp_error( $added ) ) {
-						return array();
+						self::seed_error( 'SCORM E2E: add_version falló: ' . $added->get_error_code() . ' — ' . $added->get_error_message() );
 					}
 					$service->transition( $item_id, 'published', $admin_id );
 					$version = is_array( $added ) ? $added : array();
+				}
+
+				if ( empty( $version['id'] ) ) {
+					self::seed_error( 'SCORM E2E: no se pudo resolver el id de versión.' );
 				}
 
 				return array(
@@ -620,9 +620,9 @@ final class ATORA_E2E_Seed_CLI {
 					'title'             => 'SCORM mínimo',
 					'description'       => 'Paquete SCORM para pruebas de pantalla (app).',
 					'library_item_id'   => $item_id,
-					// 0 = usar la última (el cliente no elige la versión).
-					'library_version_id'=> 0,
-					'scorm_max_attempts'=> 1,
+					// Fijar la versión: el cliente no elige.
+					'library_version_id'=> absint( $version['id'] ),
+					'scorm_max_attempts'=> 0,
 				);
 			}
 		);
@@ -630,27 +630,15 @@ final class ATORA_E2E_Seed_CLI {
 
 	/** @return array<string,mixed> */
 	private static function scorm_xhr_resource( int $admin_id ): array {
-		if ( ! class_exists( '\CLMS_Academic_Library_Service' ) || ! class_exists( '\ATORA\LMS\Tenant_Context' ) ) {
-			return array();
-		}
+		self::require_class( '\CLMS_Academic_Library_Service', 'SCORM XHR E2E' );
+		self::require_class( '\ATORA\LMS\Tenant_Context', 'SCORM XHR E2E' );
+		self::require_class( '\ATORA\LMS\Institution_Service', 'SCORM XHR E2E' );
 		$admin_id = absint( $admin_id );
-		if ( ! $admin_id ) {
-			return array();
-		}
+		if ( ! $admin_id ) { self::seed_error( 'SCORM XHR E2E: no se pudo resolver admin_id.' ); }
 		$attachment_id = self::scorm_xhr_zip_attachment( $admin_id );
-		if ( ! $attachment_id ) {
-			return array();
-		}
+		if ( ! $attachment_id ) { self::seed_error( 'SCORM XHR E2E: no se pudo crear el adjunto del ZIP fixture.' ); }
 
-		$institution_id = \ATORA\LMS\Tenant_Context::current_institution_id();
-		if ( is_wp_error( $institution_id ) ) {
-			global $wpdb;
-			$institution_id = (int) $wpdb->get_var( "SELECT id FROM {$wpdb->prefix}atora_institutions ORDER BY id LIMIT 1" );
-		}
-		$institution_id = absint( $institution_id );
-		if ( ! $institution_id ) {
-			return array();
-		}
+		$institution_id = self::require_or_create_institution_id( 'SCORM XHR E2E' );
 
 		return \ATORA\LMS\Tenant_Context::with(
 			$institution_id,
@@ -673,9 +661,10 @@ final class ATORA_E2E_Seed_CLI {
 						),
 						$admin_id
 					);
-					if ( is_wp_error( $created ) || empty( $created['id'] ) ) {
-						return array();
+					if ( is_wp_error( $created ) ) {
+						self::seed_error( 'SCORM XHR E2E: create_item falló: ' . $created->get_error_code() . ' — ' . $created->get_error_message() );
 					}
+					if ( empty( $created['id'] ) ) { self::seed_error( 'SCORM XHR E2E: create_item devolvió un resultado sin id.' ); }
 					$item_id = absint( $created['id'] );
 				}
 
@@ -696,10 +685,14 @@ final class ATORA_E2E_Seed_CLI {
 						$admin_id
 					);
 					if ( is_wp_error( $added ) ) {
-						return array();
+						self::seed_error( 'SCORM XHR E2E: add_version falló: ' . $added->get_error_code() . ' — ' . $added->get_error_message() );
 					}
 					$service->transition( $item_id, 'published', $admin_id );
 					$version = is_array( $added ) ? $added : array();
+				}
+
+				if ( empty( $version['id'] ) ) {
+					self::seed_error( 'SCORM XHR E2E: no se pudo resolver el id de versión.' );
 				}
 
 				return array(
@@ -707,11 +700,39 @@ final class ATORA_E2E_Seed_CLI {
 					'title'              => 'SCORM XHR',
 					'description'        => 'Paquete SCORM con fetch/XHR (app).',
 					'library_item_id'    => $item_id,
-					'library_version_id' => 0,
-					'scorm_max_attempts' => 1,
+					// Fijar la versión: el cliente no elige.
+					'library_version_id' => absint( $version['id'] ),
+					'scorm_max_attempts' => 0,
 				);
 			}
 		);
+	}
+
+	private static function seed_error( string $message ): void {
+		\WP_CLI::error( $message );
+	}
+
+	private static function require_class( string $class, string $context ): void {
+		if ( class_exists( $class ) ) {
+			return;
+		}
+		self::seed_error( $context . ': falta la clase ' . $class . ' (el plugin no la cargó en WP-CLI).' );
+	}
+
+	private static function require_or_create_institution_id( string $context ): int {
+		$institution_id = \ATORA\LMS\Tenant_Context::current_institution_id();
+		if ( is_wp_error( $institution_id ) ) {
+			$created = \ATORA\LMS\Institution_Service::ensure_default_institution();
+			if ( $created <= 0 ) {
+				self::seed_error( $context . ': no se pudo crear/resolver una institución por defecto (atora_institutions vacía o tabla ausente).' );
+			}
+			$institution_id = $created;
+		}
+		$institution_id = absint( $institution_id );
+		if ( $institution_id <= 0 ) {
+			self::seed_error( $context . ': institution_id inválido (0) tras la resolución.' );
+		}
+		return $institution_id;
 	}
 
 	/** Grupo de la tarea grupal. */
