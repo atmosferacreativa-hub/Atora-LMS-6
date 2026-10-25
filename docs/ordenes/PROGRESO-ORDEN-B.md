@@ -65,13 +65,16 @@ PR: #94 (merge 2026-10-24).
 ## Bloque 3 — App 1.1.0
 
 - [x] Plugin: API SCORM móvil (`atora-mobile/v1/scorm/*`) + commits idempotentes.
-- [ ] WebView con adaptador API + API móvil.
-- [ ] Sin conexión (descarga, reproducción local, cola commits, no retroceder).
-- [ ] Versionado de paquete descargado.
-- [ ] Pruebas Jest + recorridos pantalla (`scorm-online`, `scorm-sin-conexion`).
+- [x] WebView con adaptador API + API móvil.
+- [x] Sin conexión (descarga, reproducción local, cola commits, no retroceder).
+- [x] Versionado de paquete descargado (checksum de la versión).
+- [x] Pruebas Jest + recorridos pantalla (`scorm-online`, `scorm-sin-conexion`).
 - [ ] Cierre app 1.1.0 (tag, APK/AAB, docs).
 
-PR: #96 (merge 2026-10-24).
+PRs:
+- Plugin seed E2E SCORM (para flows): #98 (merge 2026-10-24).
+- Plugin API móvil SCORM: #96 (merge 2026-10-24).
+- App (visor + offline + flows): atora-mobile#33 (merge 2026-10-24).
 
 ## Cierre plugin — 6.35.0
 
