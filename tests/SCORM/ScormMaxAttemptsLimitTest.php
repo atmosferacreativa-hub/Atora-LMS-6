@@ -67,7 +67,12 @@ final class ScormMaxAttemptsLimitTest extends TestCase {
 			public function get_row( $sql, $output = ARRAY_A ) {
 				$sql = (string) $sql;
 				if ( false !== strpos( $sql, 'FROM wp_atora_library_items' ) ) {
-					return array( 'id' => 123, 'current_version_id' => 900 );
+					return array(
+						'id' => 123,
+						'current_version_id' => 900,
+						'status' => 'published',
+						'resource_type' => 'scorm',
+					);
 				}
 				if ( false !== strpos( $sql, 'FROM wp_atora_library_versions' ) ) {
 					return array( 'id' => 900, 'item_id' => 123, 'metadata_json' => wp_json_encode( $this->meta ) );

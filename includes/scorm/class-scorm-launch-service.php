@@ -14,6 +14,64 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 final class CLMS_SCORM_Launch_Service {
+	private const NOT_AVAILABLE_ERROR = 'atora_scorm_not_available';
+
+	/**
+	 * Reglas de disponibilidad para lanzar un paquete SCORM.
+	 *
+	 * - Estudiantes: solo lanzan ítems `published`. Si el ítem está `archived`,
+	 *   solo pueden reanudar intentos ya abiertos (no crear nuevos).
+	 * - Docente/admin (preview): puede lanzar `draft` y `review`.
+	 *
+	 * @return true|WP_Error
+	 */
+	public static function require_item_available_for_launch( int $library_item_id, int $wp_lesson_id, bool $has_open_attempt, bool $can_preview ) {
+		global $wpdb;
+		$library_item_id = absint( $library_item_id );
+		$wp_lesson_id    = absint( $wp_lesson_id );
+		if ( ! $library_item_id || ! $wp_lesson_id ) {
+			return new WP_Error( 'atora_scorm_invalid_params', __( 'Parámetros inválidos.', 'atora-lms' ), array( 'status' => 400 ) );
+		}
+		$item = (array) $wpdb->get_row(
+			$wpdb->prepare( "SELECT id, status, resource_type FROM {$wpdb->prefix}atora_library_items WHERE id = %d LIMIT 1", $library_item_id ),
+			ARRAY_A
+		);
+		if ( empty( $item ) ) {
+			return new WP_Error( self::NOT_AVAILABLE_ERROR, __( 'El paquete SCORM no está disponible.', 'atora-lms' ), array( 'status' => 404 ) );
+		}
+		$status = sanitize_key( (string) ( $item['status'] ?? '' ) );
+		$type   = sanitize_key( (string) ( $item['resource_type'] ?? '' ) );
+		if ( 'scorm' !== $type ) {
+			return new WP_Error( self::NOT_AVAILABLE_ERROR, __( 'El paquete SCORM no está disponible.', 'atora-lms' ), array( 'status' => 404 ) );
+		}
+		if ( 'published' === $status ) {
+			return true;
+		}
+		if ( 'archived' === $status ) {
+			if ( $has_open_attempt ) {
+				return true;
+			}
+			return new WP_Error( self::NOT_AVAILABLE_ERROR, __( 'El paquete SCORM no está disponible.', 'atora-lms' ), array( 'status' => 404 ) );
+		}
+		if ( in_array( $status, array( 'draft', 'review' ), true ) ) {
+			return $can_preview
+				? true
+				: new WP_Error( self::NOT_AVAILABLE_ERROR, __( 'El paquete SCORM no está disponible.', 'atora-lms' ), array( 'status' => 404 ) );
+		}
+		return new WP_Error( self::NOT_AVAILABLE_ERROR, __( 'El paquete SCORM no está disponible.', 'atora-lms' ), array( 'status' => 404 ) );
+	}
+
+	public static function current_user_can_preview_scorm( int $wp_lesson_id ): bool {
+		$wp_lesson_id = absint( $wp_lesson_id );
+		if ( function_exists( 'current_user_can' ) && current_user_can( 'manage_options' ) ) {
+			return true;
+		}
+		if ( class_exists( 'CLMS_Helper' ) && method_exists( 'CLMS_Helper', 'user_can_manage_lms' ) ) {
+			return (bool) \CLMS_Helper::user_can_manage_lms( $wp_lesson_id );
+		}
+		return false;
+	}
+
 	/**
 	 * @return array<string,mixed>|WP_Error
 	 */
