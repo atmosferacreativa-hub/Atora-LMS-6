@@ -607,9 +607,10 @@ final class ATORA_E2E_Seed_CLI {
 					if ( is_wp_error( $added ) ) {
 						self::seed_error( 'SCORM E2E: add_version falló: ' . $added->get_error_code() . ' — ' . $added->get_error_message() );
 					}
-					$service->transition( $item_id, 'published', $admin_id );
 					$version = is_array( $added ) ? $added : array();
 				}
+
+				self::ensure_library_item_published( $service, $item_id, $admin_id, 'SCORM E2E' );
 
 				if ( empty( $version['id'] ) ) {
 					self::seed_error( 'SCORM E2E: no se pudo resolver el id de versión.' );
@@ -687,9 +688,10 @@ final class ATORA_E2E_Seed_CLI {
 					if ( is_wp_error( $added ) ) {
 						self::seed_error( 'SCORM XHR E2E: add_version falló: ' . $added->get_error_code() . ' — ' . $added->get_error_message() );
 					}
-					$service->transition( $item_id, 'published', $admin_id );
 					$version = is_array( $added ) ? $added : array();
 				}
+
+				self::ensure_library_item_published( $service, $item_id, $admin_id, 'SCORM XHR E2E' );
 
 				if ( empty( $version['id'] ) ) {
 					self::seed_error( 'SCORM XHR E2E: no se pudo resolver el id de versión.' );
@@ -706,6 +708,38 @@ final class ATORA_E2E_Seed_CLI {
 				);
 			}
 		);
+	}
+
+	private static function ensure_library_item_published( \CLMS_Academic_Library_Service $service, int $item_id, int $actor_id, string $context ): void {
+		global $wpdb;
+		$item_id  = absint( $item_id );
+		$actor_id = absint( $actor_id );
+		$status = (string) $wpdb->get_var(
+			$wpdb->prepare( "SELECT status FROM {$wpdb->prefix}atora_library_items WHERE id = %d LIMIT 1", $item_id )
+		);
+		$status = sanitize_key( $status );
+		if ( '' === $status ) {
+			self::seed_error( $context . ': no se pudo leer status del item.' );
+		}
+		if ( 'published' === $status ) {
+			return;
+		}
+		// Política editorial: draft → review → published.
+		if ( 'draft' === $status ) {
+			$review = $service->transition( $item_id, 'review', $actor_id );
+			if ( is_wp_error( $review ) ) {
+				self::seed_error( $context . ': transition(draft→review) falló: ' . $review->get_error_code() . ' — ' . $review->get_error_message() );
+			}
+			$status = 'review';
+		}
+		if ( 'review' === $status ) {
+			$published = $service->transition( $item_id, 'published', $actor_id );
+			if ( is_wp_error( $published ) ) {
+				self::seed_error( $context . ': transition(review→published) falló: ' . $published->get_error_code() . ' — ' . $published->get_error_message() );
+			}
+			return;
+		}
+		self::seed_error( $context . ': status inesperado al publicar: ' . $status );
 	}
 
 	private static function seed_error( string $message ): void {
