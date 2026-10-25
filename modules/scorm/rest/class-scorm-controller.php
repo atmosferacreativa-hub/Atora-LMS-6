@@ -157,6 +157,17 @@ final class SCORM_Controller extends WP_REST_Controller {
 			return $meta;
 		}
 
+		$open = $this->attempts->find_open_attempt( $user_id, $lesson_id, $library_item_id, absint( $version['id'] ?? 0 ) );
+		$available = \CLMS_SCORM_Launch_Service::require_item_available_for_launch(
+			$library_item_id,
+			$lesson_id,
+			! empty( $open ),
+			\CLMS_SCORM_Launch_Service::current_user_can_preview_scorm( $lesson_id )
+		);
+		if ( is_wp_error( $available ) ) {
+			return $available;
+		}
+
 		$max_attempts = max( 0, absint( get_post_meta( $lesson_id, '_clms_scorm_max_attempts', true ) ) );
 		$attempt = $this->attempts->start_or_resume_attempt( $user_id, $lesson_id, $library_item_id, absint( $version['id'] ?? 0 ), (string) $meta['scorm_version'], $max_attempts );
 		if ( is_wp_error( $attempt ) ) {

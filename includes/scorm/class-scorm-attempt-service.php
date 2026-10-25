@@ -78,16 +78,7 @@ final class CLMS_SCORM_Attempt_Service {
 		}
 
 		$table = self::table_attempts();
-		$existing = (array) $wpdb->get_row(
-			$wpdb->prepare(
-				"SELECT * FROM {$table} WHERE user_id = %d AND lesson_id = %d AND library_item_id = %d AND library_version_id = %d ORDER BY attempt_number DESC LIMIT 1",
-				$user_id,
-				$lesson_id,
-				$library_item_id,
-				$library_version_id
-			),
-			ARRAY_A
-		);
+		$existing = $this->find_last_attempt_row( $user_id, $lesson_id, $library_item_id, $library_version_id );
 		if ( ! empty( $existing ) && empty( $existing['is_complete'] ) ) {
 			return $existing;
 		}
@@ -132,6 +123,33 @@ final class CLMS_SCORM_Attempt_Service {
 		$attempt_id = (int) $wpdb->insert_id;
 		$row = (array) $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d LIMIT 1", $attempt_id ), ARRAY_A );
 		return $row;
+	}
+
+	/**
+	 * Devuelve el intento abierto si existe (para que el lanzador pueda
+	 * aplicar reglas de disponibilidad sin crear intentos nuevos).
+	 *
+	 * @return array<string,mixed>
+	 */
+	public function find_open_attempt( int $user_id, int $lesson_id, int $library_item_id, int $library_version_id ): array {
+		$existing = $this->find_last_attempt_row( $user_id, $lesson_id, $library_item_id, $library_version_id );
+		return ( ! empty( $existing ) && empty( $existing['is_complete'] ) ) ? $existing : array();
+	}
+
+	/** @return array<string,mixed> */
+	private function find_last_attempt_row( int $user_id, int $lesson_id, int $library_item_id, int $library_version_id ): array {
+		global $wpdb;
+		$table = self::table_attempts();
+		return (array) $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT * FROM {$table} WHERE user_id = %d AND lesson_id = %d AND library_item_id = %d AND library_version_id = %d ORDER BY attempt_number DESC LIMIT 1",
+				absint( $user_id ),
+				absint( $lesson_id ),
+				absint( $library_item_id ),
+				absint( $library_version_id )
+			),
+			ARRAY_A
+		);
 	}
 
 	public function get_attempt_for_user( int $attempt_id, int $user_id ): array|WP_Error {

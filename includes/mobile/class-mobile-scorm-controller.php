@@ -106,6 +106,16 @@ final class ATORA_Mobile_SCORM_Controller {
 		}
 
 		$attempts = new CLMS_SCORM_Attempt_Service();
+		$open = $attempts->find_open_attempt( $user_id, $wp_lesson_id, $library_item_id, absint( $version['id'] ?? 0 ) );
+		$available = CLMS_SCORM_Launch_Service::require_item_available_for_launch(
+			$library_item_id,
+			$wp_lesson_id,
+			! empty( $open ),
+			CLMS_SCORM_Launch_Service::current_user_can_preview_scorm( $wp_lesson_id )
+		);
+		if ( is_wp_error( $available ) ) {
+			return $available;
+		}
 		$max_attempts = max( 0, absint( get_post_meta( $wp_lesson_id, '_clms_scorm_max_attempts', true ) ) );
 		$attempt = $attempts->start_or_resume_attempt( $user_id, $wp_lesson_id, $library_item_id, absint( $version['id'] ?? 0 ), (string) $meta['scorm_version'], $max_attempts );
 		if ( is_wp_error( $attempt ) ) {
@@ -239,6 +249,16 @@ final class ATORA_Mobile_SCORM_Controller {
 		}
 
 		$attempts = new CLMS_SCORM_Attempt_Service();
+		$open = $attempts->find_open_attempt( $user_id, $wp_lesson_id, $library_item_id, absint( $version['id'] ?? 0 ) );
+		$available = CLMS_SCORM_Launch_Service::require_item_available_for_launch(
+			$library_item_id,
+			$wp_lesson_id,
+			! empty( $open ),
+			CLMS_SCORM_Launch_Service::current_user_can_preview_scorm( $wp_lesson_id )
+		);
+		if ( is_wp_error( $available ) ) {
+			return $available;
+		}
 		$max_attempts = max( 0, absint( get_post_meta( $wp_lesson_id, '_clms_scorm_max_attempts', true ) ) );
 		$attempt = $attempts->start_or_resume_attempt( $user_id, $wp_lesson_id, $library_item_id, absint( $version['id'] ?? 0 ), (string) $meta['scorm_version'], $max_attempts );
 		if ( is_wp_error( $attempt ) ) {
@@ -283,6 +303,18 @@ final class ATORA_Mobile_SCORM_Controller {
 		$resolved_version = CLMS_SCORM_Launch_Service::resolve_library_version( $library_item_id, $resource_version_id );
 		if ( is_wp_error( $resolved_version ) ) {
 			return $resolved_version;
+		}
+
+		$attempts = new CLMS_SCORM_Attempt_Service();
+		$open = $attempts->find_open_attempt( $user_id, $wp_lesson_id, $library_item_id, absint( $resolved_version['id'] ?? 0 ) );
+		$available = CLMS_SCORM_Launch_Service::require_item_available_for_launch(
+			$library_item_id,
+			$wp_lesson_id,
+			! empty( $open ),
+			CLMS_SCORM_Launch_Service::current_user_can_preview_scorm( $wp_lesson_id )
+		);
+		if ( is_wp_error( $available ) ) {
+			return $available;
 		}
 		if ( absint( $resolved_version['id'] ?? 0 ) !== $library_version_id ) {
 			return new WP_Error( 'atora_scorm_download_mismatch', __( 'Versión inválida.', 'atora-lms' ), array( 'status' => 403 ) );
