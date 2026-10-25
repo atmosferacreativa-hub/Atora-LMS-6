@@ -722,6 +722,16 @@ final class ATORA_E2E_Seed_CLI {
 	private static function require_or_create_institution_id( string $context ): int {
 		$institution_id = \ATORA\LMS\Tenant_Context::current_institution_id();
 		if ( is_wp_error( $institution_id ) ) {
+			\WP_CLI::log( $context . ': Tenant_Context no pudo resolver institución: ' . $institution_id->get_error_code() . ' — ' . $institution_id->get_error_message() );
+			global $wpdb;
+			$table = $wpdb->prefix . 'atora_institutions';
+			$exists = (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) ) === $table;
+			if ( $exists ) {
+				$count = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table}" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+				\WP_CLI::log( $context . ': atora_institutions=' . $count . ' → usando ensure_default_institution().' );
+			} else {
+				\WP_CLI::log( $context . ': la tabla atora_institutions no existe → usando ensure_default_institution().' );
+			}
 			$created = \ATORA\LMS\Institution_Service::ensure_default_institution();
 			if ( $created <= 0 ) {
 				self::seed_error( $context . ': no se pudo crear/resolver una institución por defecto (atora_institutions vacía o tabla ausente).' );
