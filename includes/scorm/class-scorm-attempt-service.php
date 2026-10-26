@@ -161,11 +161,8 @@ final class CLMS_SCORM_Attempt_Service {
 		}
 		$table = self::table_attempts();
 		$row = (array) $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d LIMIT 1", $attempt_id ), ARRAY_A );
-		if ( empty( $row ) ) {
+		if ( empty( $row ) || absint( $row['user_id'] ?? 0 ) !== $user_id ) {
 			return new WP_Error( 'clms_scorm_attempt_not_found', __( 'Intento no encontrado.', 'atora-lms' ), array( 'status' => 404 ) );
-		}
-		if ( absint( $row['user_id'] ?? 0 ) !== $user_id ) {
-			return new WP_Error( 'rest_forbidden', __( 'No tienes permiso.', 'atora-lms' ), array( 'status' => 403 ) );
 		}
 		return $row;
 	}
@@ -197,6 +194,11 @@ final class CLMS_SCORM_Attempt_Service {
 			return array( 'attempt' => $attempt, 'derived' => array() );
 		}
 
+		$values = $this->filter_non_regressing_cmi_values( (array) $attempt, $values );
+		if ( empty( $values ) ) {
+			return array( 'attempt' => $attempt, 'derived' => array() );
+		}
+
 		$cmi_table = self::table_cmi();
 		foreach ( $values as $key => $value ) {
 			$ok = $wpdb->query(
@@ -221,6 +223,132 @@ final class CLMS_SCORM_Attempt_Service {
 		$attempts_table = self::table_attempts();
 		$fresh = (array) $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$attempts_table} WHERE id = %d LIMIT 1", $attempt_id ), ARRAY_A );
 		return array( 'attempt' => $fresh ?: (array) $attempt, 'derived' => $derived );
+	}
+
+	/**
+	 * Evita que commits fuera de orden degraden valores CMI clave.
+	 *
+	 * @param array<string,mixed>  $attempt
+	 * @param array<string,string> $values
+	 * @return array<string,string>
+	 */
+	private function filter_non_regressing_cmi_values( array $attempt, array $values ): array {
+		global $wpdb;
+		$attempt_id = absint( $attempt['id'] ?? 0 );
+		if ( ! $attempt_id || empty( $values ) ) {
+			return $values;
+		}
+		$scorm_version = (string) ( $attempt['scorm_version'] ?? '' );
+		$cmi_table     = self::table_cmi();
+
+		$protected_keys = array(
+			'cmi.core.lesson_status',
+			'cmi.completion_status',
+			'cmi.success_status',
+			'cmi.core.score.raw',
+			'cmi.core.score.min',
+			'cmi.core.score.max',
+			'cmi.score.raw',
+			'cmi.score.min',
+			'cmi.score.max',
+			'cmi.score.scaled',
+		);
+
+		$incoming_protected = array_values( array_intersect( array_keys( $values ), $protected_keys ) );
+		if ( empty( $incoming_protected ) ) {
+			return $values;
+		}
+
+		$placeholders = implode( ',', array_fill( 0, count( $incoming_protected ), '%s' ) );
+		$args = array_merge( array( $attempt_id ), $incoming_protected );
+		$sql = $wpdb->prepare(
+			"SELECT cmi_key, cmi_value FROM {$cmi_table} WHERE attempt_id = %d AND cmi_key IN ({$placeholders})",
+			...$args
+		);
+		$rows = (array) $wpdb->get_results( $sql, ARRAY_A );
+		$existing = array();
+		foreach ( $rows as $row ) {
+			if ( is_array( $row ) && isset( $row['cmi_key'] ) ) {
+				$existing[ (string) $row['cmi_key'] ] = (string) ( $row['cmi_value'] ?? '' );
+			}
+		}
+		if ( empty( $existing ) ) {
+			return $values;
+		}
+
+		foreach ( $incoming_protected as $key ) {
+			if ( ! array_key_exists( $key, $existing ) ) {
+				continue;
+			}
+
+			$current = trim( (string) $existing[ $key ] );
+			$next    = trim( (string) ( $values[ $key ] ?? '' ) );
+
+			if ( 'cmi.completion_status' === $key ) {
+				if ( $this->prefer_non_regressing_status( sanitize_key( $current ), sanitize_key( $next ), self::COMPLETION_STATUS_ORDER ) !== sanitize_key( $next ) ) {
+					unset( $values[ $key ] );
+				}
+				continue;
+			}
+
+			if ( 'cmi.success_status' === $key ) {
+				if ( $this->prefer_non_regressing_status( sanitize_key( $current ), sanitize_key( $next ), self::SUCCESS_STATUS_ORDER ) !== sanitize_key( $next ) ) {
+					unset( $values[ $key ] );
+				}
+				continue;
+			}
+
+			if ( 'cmi.core.lesson_status' === $key ) {
+				if ( '1.2' !== $scorm_version ) {
+					continue;
+				}
+				$cur = $this->lesson_status_ranks( $current );
+				$nxt = $this->lesson_status_ranks( $next );
+				if ( $nxt['completion'] < $cur['completion'] || $nxt['success'] < $cur['success'] ) {
+					unset( $values[ $key ] );
+				}
+				continue;
+			}
+
+			if ( in_array( $key, array( 'cmi.core.score.raw', 'cmi.core.score.min', 'cmi.core.score.max', 'cmi.score.raw', 'cmi.score.min', 'cmi.score.max', 'cmi.score.scaled' ), true ) ) {
+				if ( '' !== $current ) {
+					if ( '' === $next ) {
+						unset( $values[ $key ] );
+						continue;
+					}
+					if ( is_numeric( $current ) && ! is_numeric( $next ) ) {
+						unset( $values[ $key ] );
+						continue;
+					}
+				}
+				continue;
+			}
+		}
+
+		return $values;
+	}
+
+	/**
+	 * @return array{completion:int,success:int}
+	 */
+	private function lesson_status_ranks( string $status ): array {
+		$status = sanitize_key( strtolower( trim( $status ) ) );
+		$completion = 0;
+		$success    = 0;
+		if ( in_array( $status, array( 'completed', 'passed', 'failed' ), true ) ) {
+			$completion = 2;
+		} elseif ( in_array( $status, array( 'incomplete', 'browsed', 'notattempted' ), true ) ) {
+			$completion = 1;
+		}
+		if ( 'passed' === $status ) {
+			$success = self::SUCCESS_STATUS_ORDER['passed'];
+		} elseif ( 'failed' === $status ) {
+			$success = self::SUCCESS_STATUS_ORDER['failed'];
+		}
+		return array(
+			'completion' => $completion,
+			'success' => $success,
+		);
 	}
 
 	/**
