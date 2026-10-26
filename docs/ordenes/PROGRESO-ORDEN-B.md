@@ -114,6 +114,9 @@ Commits (bloque `block/scorm-b3-fixes`) y el fallo real que corrige cada uno:
   - Corrige: si el flush ocurre fuera del screen, el estado `SERVER:` no se refrescaba al quedar la cola vacía; ahora refresca una vez cuando detecta que se vació.
 - `5a3b8ae` E2E: delete PDF download before image steps
   - Corrige: `material-zoom` dependía del orden (PDF ya descargado y “Disponible sin conexión” contaminaba los asserts); ahora borra descargas previas y limpia el PDF antes de testear imagen.
+- `8da597f` E2E: show outbox + block browser open on failed downloads
+  - Corrige (diagnóstico): en build e2e la barra ahora muestra `OUTBOX:{pending}/{failed}` y `SCORM_ERR:HTTP ...` para ver por qué un commit pasó a fallido.
+  - Corrige (material-zoom): un registro descargado con `error` ya no cuenta como “Disponible sin conexión” ni intenta abrir el navegador al tocar el recurso; ofrece re-descargar.
 
 Estado de runs (commit `5a3b8aef7e319955df8aa07a013ee342df16e0ac`):
 
@@ -121,6 +124,12 @@ Estado de runs (commit `5a3b8aef7e319955df8aa07a013ee342df16e0ac`):
 - `40377590787` Pruebas de pantalla (e2e): ❌ failure.
   - Fallaron: `material-zoom` (no llega a `resource-ready`), `scorm-sin-conexion` (no se ve `SERVER:...STATUS:completed...SCORE:80...LESSON:OK...`).
   - El resto de recorridos: passed.
+- `ios-e2e`: skipped.
+
+Estado de runs (commit `8da597f...`):
+
+- `40396357625` Mobile CI: ✅ success.
+- `40396357626` Pruebas de pantalla (e2e): ⏳ in progress.
 - `ios-e2e`: skipped.
 
 3 verdes seguidos (sobre el mismo commit): 0/3.
