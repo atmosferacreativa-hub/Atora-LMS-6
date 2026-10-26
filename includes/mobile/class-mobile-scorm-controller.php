@@ -151,6 +151,11 @@ final class ATORA_Mobile_SCORM_Controller {
 	public static function get_values( WP_REST_Request $request ) {
 		global $wpdb;
 		$attempt_id = absint( $request->get_param( 'id' ) );
+		$service    = new CLMS_SCORM_Attempt_Service();
+		$attempt    = $service->get_attempt_for_user( $attempt_id, get_current_user_id() );
+		if ( is_wp_error( $attempt ) ) {
+			return $attempt;
+		}
 		$table      = CLMS_SCORM_Attempt_Service::table_cmi();
 		$rows       = (array) $wpdb->get_results( $wpdb->prepare( "SELECT cmi_key, cmi_value FROM {$table} WHERE attempt_id = %d", $attempt_id ), ARRAY_A );
 		$out = array();

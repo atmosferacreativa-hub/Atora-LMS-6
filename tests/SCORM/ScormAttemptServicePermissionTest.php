@@ -58,8 +58,8 @@ final class ScormAttemptServicePermissionTest extends TestCase {
 		$service = new CLMS_SCORM_Attempt_Service();
 		$result = $service->commit_values( 1, 999, array( 'cmi.core.lesson_status' => 'passed' ) );
 		$this->assertTrue( is_wp_error( $result ) );
-		$this->assertSame( 'rest_forbidden', $result->get_error_code() );
-		$this->assertSame( 403, (int) ( $result->get_error_data()['status'] ?? 0 ) );
+		$this->assertSame( 'clms_scorm_attempt_not_found', $result->get_error_code() );
+		$this->assertSame( 404, (int) ( $result->get_error_data()['status'] ?? 0 ) );
 	}
 }
 
