@@ -98,3 +98,39 @@ PRs:
 - [ ] `docs/SCORM.md`.
 - [ ] Tag `v6.35.0` + ZIP verificado + release.
 
+## Cierre (en curso)
+
+### PR atora-mobile#34
+
+Commits (bloque `block/scorm-b3-fixes`) y el fallo real que corrige cada uno:
+
+- `b09874d` SCORM: remount WebView when attemptId is known
+  - Corrige: el runtime SCORM se inyectaba con `attemptId=0` (primera renderización), y los commits quedaban encolados con `attemptId=0`.
+- `84745fb` SCORM: queue commits using native attemptId
+  - Corrige: aunque el runtime aún mande `attemptId=0`, la app usa el `attemptId` nativo como fuente de verdad al encolar.
+- `48fa388` SCORM: don't flush outbox when offline
+  - Corrige: en CI el modo avión no corta `adb reverse`, entonces el commit se intentaba flushear y no aparecía el estado pendiente; la app ahora solo flushea si `hasNetwork()` dice online.
+- `2d304eb` SCORM: refresh server state after pending queue drains
+  - Corrige: si el flush ocurre fuera del screen, el estado `SERVER:` no se refrescaba al quedar la cola vacía; ahora refresca una vez cuando detecta que se vació.
+- `5a3b8ae` E2E: delete PDF download before image steps
+  - Corrige: `material-zoom` dependía del orden (PDF ya descargado y “Disponible sin conexión” contaminaba los asserts); ahora borra descargas previas y limpia el PDF antes de testear imagen.
+
+Estado de runs (commit `5a3b8aef7e319955df8aa07a013ee342df16e0ac`):
+
+- `40377589200` Mobile CI: ✅ success.
+- `40377590787` Pruebas de pantalla (e2e): ❌ failure.
+  - Fallaron: `material-zoom` (no llega a `resource-ready`), `scorm-sin-conexion` (no se ve `SERVER:...STATUS:completed...SCORE:80...LESSON:OK...`).
+  - El resto de recorridos: passed.
+- `ios-e2e`: skipped.
+
+3 verdes seguidos (sobre el mismo commit): 0/3.
+
+### Pasos 2–6 del cierre
+
+- Medición paquete ~100 MB: pendiente.
+- Comentario en PR #34 (3 runs + recorridos + medición + “iOS NO EJECUTADO”): pendiente.
+- Merge PR #34: pendiente.
+- release/6.35.0 (Atora-LMS-6): pendiente.
+- release/1.1.0 (atora-mobile): pendiente.
+- Merge #103 (Orden C docs) y Bloque 0: pendiente.
+
