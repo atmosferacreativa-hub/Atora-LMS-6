@@ -127,11 +127,11 @@ Estado de runs (commit `5a3b8aef7e319955df8aa07a013ee342df16e0ac`):
 
 ### Pasos 2–6 del cierre
 
-- PR plugin (seguridad SCORM móvil): Atora-LMS-6#105 (`block/scorm-mobile-security`) — pendiente de CI y merge.
+- PR plugin (seguridad SCORM móvil): Atora-LMS-6#105 (`block/scorm-mobile-security`) — ✅ merged (`d03eb88`).
 - Medición paquete ~100 MB: pendiente.
 - Comentario en PR #34 (3 runs + recorridos + medición + “iOS NO EJECUTADO”): pendiente.
 - Merge PR #34: pendiente.
-- release/6.35.0 (Atora-LMS-6): pendiente (incluye merge de #105).
+- release/6.35.0 (Atora-LMS-6): pendiente.
 - release/1.1.0 (atora-mobile): pendiente.
 - Merge #103 (Orden C docs) y Bloque 0: pendiente.
 
