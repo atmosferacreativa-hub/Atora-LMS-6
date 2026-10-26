@@ -76,6 +76,22 @@ PRs:
 - Plugin API móvil SCORM: #96 (merge 2026-10-24).
 - App (visor + offline + flows): atora-mobile#33 (merge 2026-10-24).
 
+### Seguimiento PR atora-mobile#34 (post-merge #33)
+
+- Estado: en progreso (rama `block/scorm-b3-fixes`).
+- Objetivo: e2e estable en CI (incluye `scorm-online`, `scorm-sin-conexion`, `scorm-xhr`) + 3 runs verdes seguidos antes de fusionar.
+- Últimos hallazgos/correcciones (2026-10-26):
+  - `scorm-xhr`: volver del player ya deja en lista de recursos; se quitó volver a buscar lección `^SCORM$` (evita intermitencias por scroll).
+  - `scorm-sin-conexion`: el modo avión en emulador permite `adb reverse`, así que se evitó flushear outbox cuando `hasNetwork()` dice offline (para que aparezca el estado pendiente).
+  - `scorm-sin-conexion`: se refresca el estado del servidor una vez al vaciarse la cola (si el flusher corre fuera del screen).
+  - `material-zoom`: pasos idempotentes (borra descargas existentes y limpia el PDF antes de las pruebas de imagen).
+- Runs relevantes (e2e):
+  - Falló: `40342044224` (scorm-xhr, scorm-sin-conexion: sin pendiente).
+  - Falló: `40348976684` (scorm-sin-conexion: sin pendiente).
+  - Falló: `40362944152` (material-zoom: sin botón Descargar; scorm-sin-conexion: no refleja server status/score/lesson).
+  - Falló: `40370060969` (material-zoom: abrió Chrome / no `resource-ready`; scorm-sin-conexion: server status/score/lesson).
+  - En curso: `40377590787` (commit `5a3b8aef...`).
+
 ## Cierre plugin — 6.35.0
 
 - [ ] Versión 6.35.0 + changelog + `docs/ESTADO.md`.
