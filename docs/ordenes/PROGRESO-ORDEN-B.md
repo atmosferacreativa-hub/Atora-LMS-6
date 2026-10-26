@@ -90,7 +90,7 @@ PRs:
   - Falló: `40348976684` (scorm-sin-conexion: sin pendiente).
   - Falló: `40362944152` (material-zoom: sin botón Descargar; scorm-sin-conexion: no refleja server status/score/lesson).
   - Falló: `40370060969` (material-zoom: abrió Chrome / no `resource-ready`; scorm-sin-conexion: server status/score/lesson).
-  - En curso: `40377590787` (commit `5a3b8aef...`).
+  - Falló: `40377590787` (material-zoom: abre Chrome / no `resource-ready`; scorm-sin-conexion: `SERVER:LOC` y `LESSON:NO`).
 
 ## Cierre plugin — 6.35.0
 
@@ -127,10 +127,11 @@ Estado de runs (commit `5a3b8aef7e319955df8aa07a013ee342df16e0ac`):
 
 ### Pasos 2–6 del cierre
 
+- PR plugin (seguridad SCORM móvil): Atora-LMS-6#105 (`block/scorm-mobile-security`) — pendiente de CI y merge.
 - Medición paquete ~100 MB: pendiente.
 - Comentario en PR #34 (3 runs + recorridos + medición + “iOS NO EJECUTADO”): pendiente.
 - Merge PR #34: pendiente.
-- release/6.35.0 (Atora-LMS-6): pendiente.
+- release/6.35.0 (Atora-LMS-6): pendiente (incluye merge de #105).
 - release/1.1.0 (atora-mobile): pendiente.
 - Merge #103 (Orden C docs) y Bloque 0: pendiente.
 
