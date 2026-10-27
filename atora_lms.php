@@ -1328,6 +1328,10 @@ add_action( 'init', static function () {
 	atora_lms_require_module( 'includes/media/class-download-info.php' );
 	// 6.37.0: audio como recurso de la lección.
 	atora_lms_require_module( 'includes/media/class-lesson-audio.php', static function () { ATORA_Lesson_Audio::boot(); } );
+	// 6.37.0: planificación híbrida (sin IA; IA opcional).
+	atora_lms_require_module( 'includes/planning/class-hybrid-plan-service.php' );
+	atora_lms_require_module( 'includes/planning/class-hybrid-plan-rest.php', static function () { ATORA_Hybrid_Plan_REST::boot(); } );
+	atora_lms_require_module( 'includes/planning/class-hybrid-plan-admin.php', static function () { ATORA_Hybrid_Plan_Admin::boot(); } );
 	atora_lms_require_module( 'includes/mobile/class-mobile-position-service.php' );
 	atora_lms_require_module( 'includes/mobile/class-mobile-assignment-store.php' );
 	atora_lms_require_module( 'includes/mobile/class-mobile-assignment-service.php' );

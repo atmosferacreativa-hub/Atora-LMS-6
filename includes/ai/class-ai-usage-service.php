@@ -29,6 +29,8 @@ final class ATORA_AI_Usage_Service {
 
 	const ASSISTANT  = 'assistant';
 	const SUGGESTION = 'grading_suggestion';
+	/** 6.37.0: sugerencias en la planificación híbrida (desactivada por defecto). */
+	const PLANNER    = 'hybrid_planner';
 
 	const FEATURES_OPTION = 'atora_ai_features';
 	const LIMITS_OPTION   = 'atora_ai_limits';
@@ -45,6 +47,7 @@ final class ATORA_AI_Usage_Service {
 	const LABELS = array(
 		'assistant'          => 'Asistente del estudiante',
 		'grading_suggestion' => 'Sugerencia de calificación',
+		'hybrid_planner'     => 'Planificación híbrida',
 		'ai_review'          => 'Revisión con IA (SpeedGrader)',
 		'ai_grading'         => 'Corrección con IA',
 		'alerts'             => 'Alertas',
@@ -87,6 +90,7 @@ final class ATORA_AI_Usage_Service {
 		return array(
 			self::ASSISTANT  => ! empty( $saved[ self::ASSISTANT ] ),
 			self::SUGGESTION => ! empty( $saved[ self::SUGGESTION ] ),
+			self::PLANNER    => ! empty( $saved[ self::PLANNER ] ),
 		);
 	}
 
@@ -94,6 +98,7 @@ final class ATORA_AI_Usage_Service {
 		update_option( self::FEATURES_OPTION, array(
 			self::ASSISTANT  => ! empty( $features[ self::ASSISTANT ] ),
 			self::SUGGESTION => ! empty( $features[ self::SUGGESTION ] ),
+			self::PLANNER    => ! empty( $features[ self::PLANNER ] ),
 		), false );
 	}
 

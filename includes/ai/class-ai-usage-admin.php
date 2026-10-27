@@ -32,6 +32,7 @@ final class ATORA_AI_Usage_Admin {
 		ATORA_AI_Usage_Service::set_features( array(
 			ATORA_AI_Usage_Service::ASSISTANT  => ! empty( $_POST['feature_assistant'] ),
 			ATORA_AI_Usage_Service::SUGGESTION => ! empty( $_POST['feature_suggestion'] ),
+			ATORA_AI_Usage_Service::PLANNER    => ! empty( $_POST['feature_planner'] ),
 		) );
 		$cap = isset( $_POST['monthly_cost_cap'] ) ? trim( sanitize_text_field( wp_unslash( $_POST['monthly_cost_cap'] ) ) ) : '';
 		ATORA_AI_Usage_Service::set_limits( array(
@@ -90,6 +91,7 @@ final class ATORA_AI_Usage_Admin {
 		echo '<input type="hidden" name="action" value="atora_ai_settings">';
 		printf( '<p><label><input type="checkbox" name="feature_assistant" value="1" %s> %s</label></p>', checked( $features['assistant'], true, false ), esc_html__( 'Asistente del estudiante en la app', 'atora-lms' ) );
 		printf( '<p><label><input type="checkbox" name="feature_suggestion" value="1" %s> %s</label></p>', checked( $features['grading_suggestion'], true, false ), esc_html__( 'Sugerencia de calificación para el docente (app y SpeedGrader)', 'atora-lms' ) );
+		printf( '<p><label><input type="checkbox" name="feature_planner" value="1" %s> %s</label></p>', checked( $features['hybrid_planner'], true, false ), esc_html__( 'Sugerencias en la planificación híbrida (el docente revisa antes de publicar)', 'atora-lms' ) );
 		printf( '<p><label>%s <input type="number" min="0" name="student_daily" value="%d"></label></p>', esc_html__( 'Usos de IA por estudiante y día, en cada función (en el asistente: preguntas)', 'atora-lms' ), (int) $limits['student_daily'] );
 		printf( '<p><label>%s <input type="number" min="0" name="teacher_daily" value="%d"></label></p>', esc_html__( 'Usos de IA por docente y día, en cada función (en la sugerencia: sugerencias)', 'atora-lms' ), (int) $limits['teacher_daily'] );
 		printf( '<p><label>%s <input type="text" name="monthly_cost_cap" value="%s" placeholder="%s"></label></p>', esc_html__( 'Tope mensual de costo estimado de toda la IA de la academia (vacío = sin tope)', 'atora-lms' ), esc_attr( (string) $limits['monthly_cost_cap'] ), esc_attr__( 'sin tope', 'atora-lms' ) );
