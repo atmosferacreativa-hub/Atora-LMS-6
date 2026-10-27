@@ -129,7 +129,9 @@ Estado de runs (commit `5a3b8aef7e319955df8aa07a013ee342df16e0ac`):
 Estado de runs (commit `8da597f...`):
 
 - `40396357625` Mobile CI: ✅ success.
-- `40396357626` Pruebas de pantalla (e2e): ⏳ in progress.
+- `40396357626` Pruebas de pantalla (e2e): ❌ failure (infraestructura, antes de Maestro).
+  - Falla: emulador — `Unable to connect to adb daemon on port: 5037`.
+  - Nota: este fallo no cuenta para la serie de 3 verdes.
 - `ios-e2e`: skipped.
 
 3 verdes seguidos (sobre el mismo commit): 0/3.
