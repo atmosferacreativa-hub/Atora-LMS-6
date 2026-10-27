@@ -801,7 +801,7 @@ class Email_Engine {
 					"SELECT user_id FROM {$wpdb->prefix}atora_email_queue WHERE id = %d LIMIT 1",
 					$queue_id
 				) );
-				if ( $row ) {
+				if ( $row && (int) $row->user_id > 0 ) { // 6.38.0: un contacto sin cuenta no tiene preferencias (queda suprimido).
 					self::unsubscribe_all( (int) $row->user_id );
 				}
 				self::suppress_queue_recipient( $queue_id, 'spam' );
@@ -875,6 +875,15 @@ class Email_Engine {
 		if ( 'unsubscribe' === $action ) {
 			self::handle_unsubscribe( $token );
 			return;
+		}
+
+		// 6.38.0: doble opt-in del boletín.
+		if ( 'confirm_subscription' === $action && class_exists( '\\ATORA\\Newsletter\\Newsletter_Subscribers' ) ) {
+			$confirm_state = \ATORA\Newsletter\Newsletter_Subscribers::confirm( $token );
+			status_header( 'invalid' === $confirm_state ? 400 : 200 );
+			nocache_headers();
+			include ATORA_LMS_MODULES_DIR . 'email-engine/views/subscription-confirmed.php';
+			exit;
 		}
 
 		if ( 'preferences' === $action ) {

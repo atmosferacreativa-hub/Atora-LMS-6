@@ -54,6 +54,36 @@ final class Email_Unsubscribe {
 		);
 	}
 
+	/** Contacto sin cuenta (suscriptor del boletín). */
+	public static function token_for_contact( int $contact_id, string $email ): string {
+		return 'c' . $contact_id . '.' . substr( hash_hmac( 'sha256', 'atora-unsub-contact|' . $contact_id . '|' . strtolower( trim( $email ) ), wp_salt( 'auth' ) ), 0, 32 );
+	}
+
+	public static function url_for_contact( int $contact_id, string $email ): string {
+		return add_query_arg( array( 'atora_email_action' => 'unsubscribe', 'atora_email_token' => self::token_for_contact( $contact_id, $email ) ), home_url( '/' ) );
+	}
+
+	/** @return array<string,string> */
+	public static function headers_for_contact( int $contact_id, string $email ): array {
+		if ( $contact_id <= 0 || '' === $email ) {
+			return array();
+		}
+		return array(
+			'List-Unsubscribe'      => '<' . self::url_for_contact( $contact_id, $email ) . '>',
+			'List-Unsubscribe-Post' => 'List-Unsubscribe=One-Click',
+		);
+	}
+
+	/** ID del contacto si el token de contacto es válido; 0 si no. */
+	public static function verify_contact( string $token ): int {
+		global $wpdb;
+		if ( 1 !== preg_match( '/^c(\d{1,20})\.([a-f0-9]{32})$/', $token, $m ) ) {
+			return 0;
+		}
+		$email = (string) $wpdb->get_var( $wpdb->prepare( "SELECT email FROM {$wpdb->prefix}atora_contacts WHERE id = %d LIMIT 1", (int) $m[1] ) ); // phpcs:ignore WordPress.DB
+		return '' !== $email && hash_equals( self::token_for_contact( (int) $m[1], $email ), $token ) ? (int) $m[1] : 0;
+	}
+
 	/** @return array<string,string> */
 	public static function headers( int $user_id, string $email ): array {
 		if ( $user_id <= 0 || '' === $email ) {
@@ -97,9 +127,17 @@ final class Email_Unsubscribe {
 	 * Resuelve la petición. Devuelve el estado de la página: confirm | done | invalid.
 	 */
 	public static function handle( string $token, string $method ): string {
-		$user_id = self::verify( $token );
-		if ( ! $user_id ) {
+		$user_id    = self::verify( $token );
+		$contact_id = $user_id ? 0 : self::verify_contact( $token );
+		if ( ! $user_id && ! $contact_id ) {
 			return 'invalid';
+		}
+		if ( $contact_id ) {
+			if ( 'POST' !== strtoupper( $method ) ) {
+				return 'confirm';
+			}
+			self::unsubscribe_contact( $contact_id );
+			return 'done';
 		}
 		if ( 'POST' !== strtoupper( $method ) ) {
 			return 'confirm';
@@ -107,6 +145,19 @@ final class Email_Unsubscribe {
 		Email_Engine::unsubscribe_all( $user_id );
 		self::log_consent( $user_id );
 		return 'done';
+	}
+
+	/** Contacto sin cuenta: sale del boletín y su correo queda suprimido para lo comercial. */
+	private static function unsubscribe_contact( int $contact_id ): void {
+		global $wpdb;
+		$email = (string) $wpdb->get_var( $wpdb->prepare( "SELECT email FROM {$wpdb->prefix}atora_contacts WHERE id = %d LIMIT 1", $contact_id ) ); // phpcs:ignore WordPress.DB
+		if ( class_exists( '\\ATORA\\Newsletter\\Newsletter_Subscribers' ) ) {
+			\ATORA\Newsletter\Newsletter_Subscribers::unsubscribe( $contact_id );
+		}
+		if ( '' !== $email ) {
+			// INSERT IGNORE: una supresión previa más fuerte (rebote) se conserva.
+			$wpdb->query( $wpdb->prepare( "INSERT IGNORE INTO {$wpdb->prefix}atora_email_suppression (email, reason, contact_id) VALUES (%s, 'unsubscribe', %d)", $email, $contact_id ) ); // phpcs:ignore WordPress.DB
+		}
 	}
 
 	private static function log_consent( int $user_id ): void {

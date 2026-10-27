@@ -71,6 +71,22 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] ) { // phpcs:ignore WordPress.Securit
 		}
 	}
 
+	// 6.38.0: suscriptores como contactos.
+	if ( in_array( $action, array( 'migrate', 'send_confirmations', 'double_optin' ), true ) && check_admin_referer( 'atora_nl_subscribers', 'atora_nl_nonce' ) && class_exists( '\ATORA\Newsletter\Newsletter_Subscribers' ) ) {
+		if ( 'migrate' === $action ) {
+			$plan   = \ATORA\Newsletter\Newsletter_Subscribers::migrate();
+			/* translators: 1: subscribed 2: pending 3: existing */
+			$status = array( 'type' => 'success', 'message' => sprintf( __( 'Migración: %1$d suscritos, %2$d pendientes de confirmar, %3$d ya estaban.', 'atora-lms' ), $plan['subscribed'], $plan['pending'], $plan['skipped_existing'] ) );
+		} elseif ( 'send_confirmations' === $action ) {
+			$sent   = \ATORA\Newsletter\Newsletter_Subscribers::send_pending_confirmations();
+			/* translators: %d: count */
+			$status = array( 'type' => 'success', 'message' => sprintf( __( 'Correos de confirmación en cola: %d.', 'atora-lms' ), $sent ) );
+		} else {
+			update_option( \ATORA\Newsletter\Newsletter_Subscribers::OPTION_DOUBLE, empty( $_POST['double_optin'] ) ? 0 : 1 );
+			$status = array( 'type' => 'success', 'message' => __( 'Ajuste guardado.', 'atora-lms' ) );
+		}
+	}
+
 	if ( in_array( $action, array( 'pause', 'resume', 'cancel' ), true ) && check_admin_referer( 'atora_nl_control', 'atora_nl_nonce' ) ) {
 		$post_id = absint( wp_unslash( $_POST['newsletter_id'] ?? 0 ) );
 		if ( $post_id > 0 && class_exists( '\ATORA\Newsletter\Newsletter' ) ) {
@@ -120,6 +136,40 @@ $newsletters = get_posts(
 		</form>
 	</div>
 
+	<?php if ( class_exists( '\ATORA\Newsletter\Newsletter_Subscribers' ) ) : $nl_subs = '\ATORA\Newsletter\Newsletter_Subscribers'; ?>
+	<div style="background:#fff;border:1px solid #dbe0e6;border-radius:10px;padding:16px;max-width:980px;margin-top:16px;">
+		<h2 style="margin-top:0;"><?php esc_html_e( 'Suscriptores', 'atora-lms' ); ?></h2>
+		<p>
+			<?php
+			global $wpdb;
+			$nl_list   = $nl_subs::existing_list_id();
+			$nl_counts = $nl_list ? (array) $wpdb->get_results( $wpdb->prepare( "SELECT status, COUNT(*) AS n FROM {$wpdb->prefix}atora_contact_list_pivot WHERE list_id = %d GROUP BY status", $nl_list ), OBJECT_K ) : array(); // phpcs:ignore WordPress.DB
+			/* translators: 1: subscribed 2: pending 3: unsubscribed */
+			echo esc_html( sprintf( __( 'Suscritos: %1$d · Pendientes de confirmar: %2$d · Bajas: %3$d', 'atora-lms' ), (int) ( $nl_counts['subscribed']->n ?? 0 ), (int) ( $nl_counts['pending']->n ?? 0 ), (int) ( $nl_counts['unsubscribed']->n ?? 0 ) ) );
+			?>
+		</p>
+		<p class="description"><?php esc_html_e( 'Formulario público: [atora_boletin]. Solo quien dio su consentimiento queda suscrito; los pendientes no reciben nada hasta confirmar.', 'atora-lms' ); ?></p>
+		<form method="post" style="display:inline-block;margin-right:12px;">
+			<?php wp_nonce_field( 'atora_nl_subscribers', 'atora_nl_nonce' ); ?>
+			<input type="hidden" name="atora_nl_admin_action" value="double_optin">
+			<label><input type="checkbox" name="double_optin" value="1" <?php checked( $nl_subs::double_optin() ); ?>> <?php esc_html_e( 'Doble opt-in (confirmar por correo)', 'atora-lms' ); ?></label>
+			<button type="submit" class="button button-small"><?php esc_html_e( 'Guardar', 'atora-lms' ); ?></button>
+		</form>
+		<?php if ( ! get_option( 'atora_newsletter_migrated_at' ) ) : ?>
+			<form method="post" style="display:inline-block;margin-right:12px;">
+				<?php wp_nonce_field( 'atora_nl_subscribers', 'atora_nl_nonce' ); ?>
+				<input type="hidden" name="atora_nl_admin_action" value="migrate">
+				<button type="submit" class="button"><?php esc_html_e( 'Migrar suscriptores anteriores', 'atora-lms' ); ?></button>
+			</form>
+		<?php endif; ?>
+		<form method="post" style="display:inline-block;">
+			<?php wp_nonce_field( 'atora_nl_subscribers', 'atora_nl_nonce' ); ?>
+			<input type="hidden" name="atora_nl_admin_action" value="send_confirmations">
+			<button type="submit" class="button"><?php esc_html_e( 'Pedir confirmación a los pendientes', 'atora-lms' ); ?></button>
+		</form>
+	</div>
+	<?php endif; ?>
+
 	<h2 style="margin-top:20px;"><?php esc_html_e( 'Últimas newsletters', 'atora-lms' ); ?></h2>
 	<?php if ( empty( $newsletters ) ) : ?>
 		<p><?php esc_html_e( 'Aún no hay newsletters registradas.', 'atora-lms' ); ?></p>
@@ -150,7 +200,15 @@ $newsletters = get_posts(
 						</td>
 						<td><?php echo esc_html( 'commercial' === $type ? __( 'Comercial', 'atora-lms' ) : __( 'Académica', 'atora-lms' ) ); ?></td>
 						<td><?php echo esc_html( '' !== $status_nl ? $status_nl : __( 'draft', 'atora-lms' ) ); ?></td>
-						<td><?php echo esc_html( (string) $sent ); ?></td>
+						<td>
+							<?php echo esc_html( (string) $sent ); ?>
+							<?php if ( in_array( $status_nl, array( 'sending', 'sent', 'paused', 'cancelled' ), true ) ) : $m = \ATORA\Newsletter\Newsletter::metrics( $newsletter->ID ); ?>
+								<br><small><?php
+								/* translators: 1: delivered 2: opened 3: clicked 4: bounced 5: unsubscribed */
+								echo esc_html( sprintf( __( 'Entregados %1$d · Aperturas %2$d · Clics %3$d · Rebotes %4$d · Bajas %5$d', 'atora-lms' ), $m['delivered'], $m['opened'], $m['clicked'], $m['bounced'], $m['unsubscribed'] ) );
+								?></small>
+							<?php endif; ?>
+						</td>
 						<td><?php echo esc_html( date_i18n( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), strtotime( (string) $newsletter->post_date ) ) ); ?></td>
 						<td>
 							<a class="button button-small" href="<?php echo esc_url( get_edit_post_link( $newsletter->ID ) ?: '' ); ?>"><?php esc_html_e( 'Editar', 'atora-lms' ); ?></a>

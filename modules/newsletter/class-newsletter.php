@@ -221,33 +221,41 @@ class Newsletter {
 			$cursor  = absint( get_post_meta( $post_id, 'atora_nl_cursor', true ) );
 			$counts  = self::counts( $post_id );
 			$segment = json_decode( (string) get_post_meta( $post_id, 'atora_nl_segment', true ), true );
-			$ids     = self::subscriber_ids_page( is_array( $segment ) ? $segment : array(), $cursor, self::BATCH_SIZE );
+			$rows    = Newsletter_Subscribers::page( is_array( $segment ) ? $segment : array(), $cursor, self::BATCH_SIZE );
 
 			$ab_enabled = (bool) get_post_meta( $post_id, 'atora_nl_ab_enabled', true );
 			$variants   = json_decode( (string) get_post_meta( $post_id, 'atora_nl_ab_variants', true ), true );
 			$variants   = is_array( $variants ) ? $variants : array();
 			$title      = get_the_title( $post_id );
-			$already    = self::already_queued( $post_id, $ids );
+			$already    = self::already_queued( $post_id, array_column( $rows, 'contact_id' ) );
 
-			foreach ( $ids as $user_id ) {
-				if ( isset( $already[ $user_id ] ) ) {
+			foreach ( $rows as $row ) {
+				$contact_id = (int) $row['contact_id'];
+				$user_id    = (int) $row['user_id'];
+				if ( isset( $already[ $contact_id ] ) ) {
 					$counts['skipped']++; // Reintento o reinicio tras cancelar: no se duplica.
-					$cursor = $user_id;
+					$cursor = $contact_id;
 					continue;
 				}
-				$variant = $ab_enabled ? ( 0 === $user_id % 2 ? 'a' : 'b' ) : '';
+				$variant = $ab_enabled ? ( 0 === $contact_id % 2 ? 'a' : 'b' ) : '';
 				$subject = '' !== $variant ? (string) ( $variants[ 'variant_' . $variant ]['subject'] ?? '' ) : '';
-				$queued  = \ATORA\EmailEngine\Email_Queue::enqueue( array(
+				$args    = array(
 					'template'              => 'newsletter',
-					'user_id'               => $user_id,
 					'priority'              => 'low',
 					'dedupe_window_minutes' => self::DEDUPE_MINUTES,
 					'metadata'              => array_filter( array(
 						'newsletter_id'  => $post_id,
+						'contact_id'     => $contact_id,
 						'custom_subject' => '' !== $subject ? $subject : $title,
 						'ab_variant'     => $variant,
 					), static fn( $v ) => '' !== $v ),
-				) );
+				);
+				if ( $user_id > 0 ) {
+					$args['user_id'] = $user_id;
+				} else {
+					$args['contact_id'] = $contact_id;
+				}
+				$queued = \ATORA\EmailEngine\Email_Queue::enqueue( $args );
 				if ( $queued ) {
 					$counts['queued']++;
 					if ( '' !== $variant ) {
@@ -256,13 +264,13 @@ class Newsletter {
 				} else {
 					$counts['skipped']++; // Suprimido, sin dirección o ya enviado.
 				}
-				$cursor = $user_id;
+				$cursor = $contact_id;
 			}
 
 			update_post_meta( $post_id, 'atora_nl_cursor', $cursor );
 			update_post_meta( $post_id, 'atora_nl_counts', wp_json_encode( $counts ) );
 
-			if ( count( $ids ) < self::BATCH_SIZE ) {
+			if ( count( $rows ) < self::BATCH_SIZE ) {
 				update_post_meta( $post_id, 'atora_nl_status', 'sent' );
 				update_post_meta( $post_id, 'atora_nl_sent_count', $counts['queued'] );
 				update_post_meta( $post_id, 'atora_nl_sent_at', current_time( 'mysql', true ) );
@@ -306,6 +314,58 @@ class Newsletter {
 		return self::send_state( $post_id );
 	}
 
+	/**
+	 * 6.38.0: métricas de un envío: en cola, enviados, entregados, aperturas, clics (y por enlace), rebotes,
+	 * quejas y bajas de quienes lo recibieron.
+	 *
+	 * @return array{queued:int,sent:int,delivered:int,opened:int,clicked:int,bounced:int,complained:int,unsubscribed:int,links:array<string,int>}
+	 */
+	public static function metrics( int $post_id ): array {
+		global $wpdb;
+		$q    = $wpdb->prefix . 'atora_email_queue';
+		$e    = $wpdb->prefix . 'atora_email_events';
+		$cond = "CAST( JSON_UNQUOTE( JSON_EXTRACT( q.metadata, '$.newsletter_id' ) ) AS UNSIGNED ) = %d";
+		// phpcs:disable WordPress.DB
+		$row = (array) $wpdb->get_row( $wpdb->prepare(
+			"SELECT COUNT(*) AS queued,
+			        SUM( q.status IN ('sent','bounced') ) AS sent,
+			        SUM( EXISTS( SELECT 1 FROM {$e} d WHERE d.queue_id = q.id AND d.event_type = 'delivered' ) ) AS delivered,
+			        SUM( q.opened_at IS NOT NULL ) AS opened,
+			        SUM( q.clicked_at IS NOT NULL ) AS clicked,
+			        SUM( q.status = 'bounced' OR EXISTS( SELECT 1 FROM {$e} b WHERE b.queue_id = q.id AND b.event_type = 'bounced' ) ) AS bounced,
+			        SUM( EXISTS( SELECT 1 FROM {$e} c WHERE c.queue_id = q.id AND c.event_type = 'complained' ) ) AS complained
+			 FROM {$q} q WHERE {$cond}",
+			$post_id
+		), ARRAY_A );
+		$started = (string) get_post_meta( $post_id, 'atora_nl_started_at', true );
+		$unsub   = (int) $wpdb->get_var( $wpdb->prepare(
+			"SELECT COUNT(DISTINCT p.contact_id) FROM {$wpdb->prefix}atora_contact_list_pivot p
+			 JOIN {$q} q ON CAST( JSON_UNQUOTE( JSON_EXTRACT( q.metadata, '$.contact_id' ) ) AS UNSIGNED ) = p.contact_id
+			 WHERE {$cond} AND p.status = 'unsubscribed' AND p.updated_at >= %s",
+			$post_id,
+			'' !== $started ? $started : '1970-01-01 00:00:00'
+		) );
+		$events = (array) $wpdb->get_col( $wpdb->prepare(
+			"SELECT ev.event_data FROM {$e} ev JOIN {$q} q ON q.id = ev.queue_id WHERE ev.event_type = 'clicked' AND {$cond} LIMIT 5000",
+			$post_id
+		) );
+		// phpcs:enable WordPress.DB
+		$links = array();
+		foreach ( $events as $raw ) {
+			$data = json_decode( (string) $raw, true );
+			$url  = is_array( $data ) ? (string) ( $data['url'] ?? $data['event-data']['url'] ?? $data['OriginalLink'] ?? $data['link'] ?? $data['_sns_message']['click']['link'] ?? $data['click']['link'] ?? '' ) : '';
+			if ( '' !== $url ) {
+				$links[ $url ] = ( $links[ $url ] ?? 0 ) + 1;
+			}
+		}
+		arsort( $links );
+		$out = array( 'unsubscribed' => $unsub, 'links' => $links );
+		foreach ( array( 'queued', 'sent', 'delivered', 'opened', 'clicked', 'bounced', 'complained' ) as $k ) {
+			$out[ $k ] = (int) ( $row[ $k ] ?? 0 );
+		}
+		return $out;
+	}
+
 	/** @return array{queued:int,skipped:int,failed:int,status:string} */
 	public static function send_state( int $post_id ): array {
 		return self::counts( $post_id ) + array( 'status' => (string) get_post_meta( $post_id, 'atora_nl_status', true ) );
@@ -325,22 +385,25 @@ class Newsletter {
 	}
 
 	/**
-	 * Usuarios de la lista que ya tienen este boletín en la cola (cualquier estado).
+	 * Contactos de la página que ya tienen este boletín en la cola (cualquier estado).
 	 *
-	 * @param int[] $user_ids
+	 * @param int[] $contact_ids
 	 * @return array<int,true>
 	 */
-	private static function already_queued( int $post_id, array $user_ids ): array {
+	private static function already_queued( int $post_id, array $contact_ids ): array {
 		global $wpdb;
-		if ( ! $user_ids ) {
+		if ( ! $contact_ids ) {
 			return array();
 		}
-		$in   = implode( ',', array_map( 'absint', $user_ids ) );
+		$in   = implode( ',', array_map( 'absint', $contact_ids ) );
+		// MySQL normaliza el JSON al guardarlo: se compara con JSON_EXTRACT, no con LIKE sobre el texto.
 		$rows = $wpdb->get_col( $wpdb->prepare( // phpcs:ignore WordPress.DB
-			"SELECT DISTINCT user_id FROM {$wpdb->prefix}atora_email_queue
-			 WHERE user_id IN ({$in}) AND CAST( JSON_UNQUOTE( JSON_EXTRACT( metadata, '$.newsletter_id' ) ) AS UNSIGNED ) = %d",
+			"SELECT DISTINCT CAST( JSON_UNQUOTE( JSON_EXTRACT( metadata, '$.contact_id' ) ) AS UNSIGNED )
+			 FROM {$wpdb->prefix}atora_email_queue
+			 WHERE CAST( JSON_UNQUOTE( JSON_EXTRACT( metadata, '$.newsletter_id' ) ) AS UNSIGNED ) = %d
+			   AND CAST( JSON_UNQUOTE( JSON_EXTRACT( metadata, '$.contact_id' ) ) AS UNSIGNED ) IN ({$in})",
 			$post_id
-		) ); // MySQL normaliza el JSON al guardarlo: un LIKE sobre el texto no sirve.
+		) );
 		return array_fill_keys( array_map( 'absint', (array) $rows ), true );
 	}
 
@@ -452,21 +515,37 @@ class Newsletter {
 	 * @return void
 	 */
 	private static function send_blog_notification( \WP_Post $post ): void {
-		$subscribers = self::get_newsletter_subscribers();
-		$excerpt     = wp_trim_words( $post->post_excerpt ?: $post->post_content, 25 );
+		// 6.38.0: antes se encolaba a cada suscriptor dentro de la petición que publica la entrada.
+		self::send_auto(
+			'post:' . $post->ID,
+			$post->post_title,
+			array( array( 'type' => 'article', 'title' => $post->post_title, 'content' => wp_trim_words( $post->post_excerpt ?: $post->post_content, 25 ), 'url' => get_permalink( $post->ID ) ) )
+		);
+	}
 
-		foreach ( $subscribers as $user_id ) {
-			\ATORA\EmailEngine\Email_Queue::enqueue( array(
-				'template' => 'new_course_launch',
-				'user_id'  => $user_id,
-				'priority' => 'low',
-				'metadata' => array(
-					'course_title' => $post->post_title,
-					'post_url'     => get_permalink( $post->ID ),
-					'excerpt'      => $excerpt,
-				),
-			) );
+	/**
+	 * 6.38.0: aviso automático (entrada nueva, episodio) como un boletín más: por lotes, a la lista, sin
+	 * duplicados. Un mismo origen se envía una sola vez.
+	 */
+	public static function send_auto( string $origin, string $title, array $sections ): int {
+		$existing = get_posts( array(
+			'post_type'      => 'atora_newsletter',
+			'post_status'    => 'any',
+			'posts_per_page' => 1,
+			'fields'         => 'ids',
+			'meta_key'       => 'atora_nl_origin', // phpcs:ignore WordPress.DB.SlowDBQuery
+			'meta_value'     => $origin,           // phpcs:ignore WordPress.DB.SlowDBQuery
+		) );
+		if ( $existing ) {
+			return (int) $existing[0];
 		}
+		$id = self::save( array( 'title' => $title, 'type' => 'academic', 'sections' => $sections ) );
+		if ( is_wp_error( $id ) ) {
+			return 0;
+		}
+		update_post_meta( $id, 'atora_nl_origin', $origin );
+		self::send( (int) $id );
+		return (int) $id;
 	}
 
 	// ── Integración Podcast (RSS) ─────────────────────────────────────────────
@@ -508,22 +587,16 @@ class Newsletter {
 			$enclosure = $item->get_enclosure();
 			$mp3_url   = $enclosure ? esc_url_raw( $enclosure->get_link() ) : '';
 
-			$subscribers = self::get_newsletter_subscribers();
-
-			foreach ( $subscribers as $user_id ) {
-				\ATORA\EmailEngine\Email_Queue::enqueue( array(
-					'template' => 'new_course_launch',
-					'user_id'  => $user_id,
-					'priority' => 'low',
-					'metadata' => array(
-						'course_title' => $item->get_title(),
-						'post_url'     => $item->get_permalink(),
-						'excerpt'      => wp_trim_words( $item->get_description(), 30 ),
-						'mp3_url'      => $mp3_url,
-						'duration'     => $enclosure ? $enclosure->get_duration( true ) : '',
-					),
-				) );
+			$sections = array( array(
+				'type'    => 'article',
+				'title'   => $item->get_title(),
+				'content' => wp_trim_words( wp_strip_all_tags( (string) $item->get_description() ), 30 ),
+				'url'     => $item->get_permalink(),
+			) );
+			if ( $mp3_url ) {
+				$sections[] = array( 'type' => 'cta', 'text' => __( 'Escuchar el episodio', 'atora-lms' ), 'url' => $mp3_url );
 			}
+			self::send_auto( 'podcast:' . md5( (string) $guid ), (string) $item->get_title(), $sections );
 
 			$processed[] = $guid;
 		}
@@ -560,7 +633,7 @@ class Newsletter {
 		) );
 
 		// 6.38.0: control del envío por lotes.
-		register_rest_route( 'atora/v1', '/newsletters/(?P<id>\d+)/(?P<op>pause|resume|cancel|status)', array(
+		register_rest_route( 'atora/v1', '/newsletters/(?P<id>\d+)/(?P<op>pause|resume|cancel|status|metrics)', array(
 			'methods'             => 'POST',
 			'callback'            => array( __CLASS__, 'rest_control' ),
 			'permission_callback' => static fn() => current_user_can( 'manage_options' ),
@@ -580,6 +653,8 @@ class Newsletter {
 				return rest_ensure_response( self::resume( $id ) );
 			case 'cancel':
 				return rest_ensure_response( self::cancel( $id ) );
+			case 'metrics':
+				return rest_ensure_response( self::metrics( $id ) );
 		}
 		return rest_ensure_response( self::send_state( $id ) );
 	}
@@ -752,84 +827,22 @@ class Newsletter {
 
 	// ── Helpers ───────────────────────────────────────────────────────────────
 
+	/**
+	 * Contactos que recibirían el boletín (segmento incluido). Para vistas y conteos.
+	 *
+	 * @return array<int,array{contact_id:int,user_id:int}>
+	 */
 	public static function get_recipients( int $post_id ): array {
 		$segment = json_decode( (string) get_post_meta( $post_id, 'atora_nl_segment', true ), true );
 		$segment = is_array( $segment ) ? $segment : array();
 		$all     = array();
 		$cursor  = 0;
 		do {
-			$page   = self::subscriber_ids_page( $segment, $cursor, 1000 );
+			$page   = Newsletter_Subscribers::page( $segment, $cursor, 1000 );
 			$all    = array_merge( $all, $page );
-			$cursor = $page ? (int) end( $page ) : $cursor;
+			$cursor = $page ? (int) end( $page )['contact_id'] : $cursor;
 		} while ( count( $page ) === 1000 );
 		return $all;
-	}
-
-	/**
-	 * Obtiene todos los suscriptores de la newsletter (con consent_marketing o consent_academic).
-	 *
-	 * @return int[]
-	 */
-	public static function get_newsletter_subscribers(): array {
-		$all    = array();
-		$cursor = 0;
-		do {
-			$page   = self::subscriber_ids_page( array(), $cursor, 1000 );
-			$all    = array_merge( $all, $page );
-			$cursor = $page ? (int) end( $page ) : $cursor;
-		} while ( count( $page ) === 1000 );
-		return $all;
-	}
-
-	/**
-	 * 6.38.0: una página de suscriptores resuelta en la base de datos (segmento incluido), ordenada por ID.
-	 * Antes se cargaban todos en memoria y el segmento se filtraba con una consulta por usuario.
-	 *
-	 * @param array $segment `{ rules: [ { field, operator: equals|not_equals|contains, value } ] }` sobre la
-	 *                       meta `atora_{field}`.
-	 * @return int[]
-	 */
-	public static function subscriber_ids_page( array $segment, int $after_id, int $limit ): array {
-		global $wpdb;
-		$joins  = array();
-		$wheres      = array();
-		$wheres_args = array();
-		$args        = array();
-		$n      = 0;
-		foreach ( (array) ( $segment['rules'] ?? array() ) as $rule ) {
-			$field = sanitize_key( (string) ( $rule['field'] ?? '' ) );
-			if ( '' === $field || strlen( $field ) > 50 ) {
-				continue;
-			}
-			$operator = sanitize_key( (string) ( $rule['operator'] ?? 'equals' ) );
-			$value    = sanitize_text_field( (string) ( $rule['value'] ?? '' ) );
-			$alias    = 'r' . ( ++$n );
-			$joins[]  = "LEFT JOIN {$wpdb->usermeta} {$alias} ON {$alias}.user_id = u.ID AND {$alias}.meta_key = %s";
-			$args[]   = 'atora_' . $field;
-			if ( 'not_equals' === $operator ) {
-				$wheres[] = "({$alias}.meta_value IS NULL OR {$alias}.meta_value <> %s)";
-				$wheres_args[] = $value;
-			} elseif ( 'contains' === $operator ) {
-				$wheres[] = "{$alias}.meta_value LIKE %s";
-				$wheres_args[] = '%' . $wpdb->esc_like( $value ) . '%';
-			} else {
-				$wheres[] = "{$alias}.meta_value = %s";
-				$wheres_args[] = $value;
-			}
-		}
-		$sql = "SELECT DISTINCT u.ID FROM {$wpdb->users} u
-			 LEFT JOIN {$wpdb->usermeta} m ON m.user_id = u.ID AND m.meta_key = 'atora_consent_marketing'
-			 LEFT JOIN {$wpdb->prefix}atora_email_preferences p ON p.user_id = u.ID
-			 LEFT JOIN {$wpdb->prefix}atora_email_suppression s ON s.email = u.user_email
-			 " . implode( "\n", $joins ) . "
-			 WHERE (m.meta_value = '1' OR m.meta_value IS NULL)
-			   AND (p.unsubscribed_all IS NULL OR p.unsubscribed_all = 0)
-			   AND s.id IS NULL
-			   AND u.ID > %d" . ( $wheres ? ' AND ' . implode( ' AND ', $wheres ) : '' ) . '
-			 ORDER BY u.ID ASC
-			 LIMIT %d';
-		$params = array_merge( $args, array( $after_id ), $wheres_args, array( max( 1, $limit ) ) );
-		return array_map( 'absint', (array) $wpdb->get_col( $wpdb->prepare( $sql, $params ) ) ); // phpcs:ignore WordPress.DB
 	}
 
 	/**
