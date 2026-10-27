@@ -172,9 +172,8 @@ final class ATORA_Certificate_Verify {
 	}
 
 	private static function page( array $r ): void {
-		$title = __( 'Verificación de certificado', 'atora-lms' ) . ' · ' . get_bloginfo( 'name' );
-		header( 'Content-Type: text/html; charset=utf-8' );
-		echo '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>' . esc_html( $title ) . '</title><style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#f5f7fb;color:#1f2937;margin:0;padding:24px}main{max-width:520px;margin:40px auto;background:#fff;border-radius:14px;padding:28px;box-shadow:0 4px 20px rgba(0,0,0,.06)}.academy{color:#6b7280;font-size:14px;margin-bottom:12px}.state{display:inline-block;font-size:22px;font-weight:800;padding:8px 18px;border-radius:999px;margin-bottom:16px}.ok{background:#e3f4ec;color:#11683f}.bad{background:#fdecec;color:#a11d1d}dt{font-size:13px;color:#6b7280;margin-top:12px}dd{margin:2px 0 0;font-size:17px;font-weight:600}input{padding:10px;border:1px solid #d1d5db;border-radius:8px;width:100%;max-width:360px}button{padding:10px 18px;border:0;border-radius:8px;background:#1B3A8C;color:#fff;font-weight:700;margin-top:8px}</style></head><body><main><div class="academy">' . esc_html( get_bloginfo( 'name' ) ) . '</div>' . self::content( $r ) . '</main></body></html>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- content() escapa cada dato.
+		require_once dirname( __DIR__ ) . '/frontend/class-academy-public-page.php';
+		CLMS_Academy_Public_Page::render( __( 'Verificación de certificado', 'atora-lms' ), self::content( $r ) );
 		exit;
 	}
 }

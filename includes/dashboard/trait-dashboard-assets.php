@@ -59,8 +59,8 @@ trait CLMS_Dashboard_Assets_Trait {
 	--sd-ink-2:var(--clms-ink-2,#334155);
 	--sd-muted:var(--clms-muted,#64748b);
 	--sd-border:var(--clms-border-soft,#e2e8f0);
-	--sd-accent:#6366f1;
-	--sd-accent-2:#4f46e5;
+	--sd-accent:var(--atora-accent,#6366f1);
+	--sd-accent-2:var(--atora-accent-hover,var(--atora-accent,#4f46e5));
 	--sd-success:var(--clms-badge-green-ink,#16a34a);
 	--sd-success-bg:var(--clms-badge-green-bg,#f0fdf4);
 	--sd-warn:var(--clms-badge-yellow-ink,#b45309);
@@ -84,13 +84,13 @@ trait CLMS_Dashboard_Assets_Trait {
 .clms-sd-card--accent{background:linear-gradient(135deg,#0f172a 0%,#172554 45%,#312e81 100%);color:#fff;border-color:transparent}
 .clms-sd-card__body{display:grid;gap:12px}
 .clms-sd-card__actions{margin-top:18px}
-.clms-sd-eyebrow{display:inline-flex;align-items:center;gap:8px;padding:7px 12px;border-radius:999px;background:#eef2ff;color:#4338ca;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;width:max-content;max-width:100%}
+.clms-sd-eyebrow{display:inline-flex;align-items:center;gap:8px;padding:7px 12px;border-radius:999px;background:var(--atora-accent-soft,#eef2ff);color:var(--atora-accent,#4338ca);font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;width:max-content;max-width:100%}
 .clms-sd-eyebrow--light{background:rgba(255,255,255,.12);color:#e0e7ff}
 .clms-sd-pill{display:inline-flex;align-items:center;padding:8px 14px;border-radius:999px;background:rgba(255,255,255,.12);color:#e2e8f0;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;width:max-content;max-width:100%}
 .clms-sd-title,.clms-sd-hero__title,.clms-sd-course__title,.clms-sd-list-card__title,.clms-sd-mini__title{overflow-wrap:anywhere;word-break:break-word}
 .clms-sd-title{font-size:28px;line-height:1.15;font-weight:800;letter-spacing:-.02em;margin:0;color:var(--sd-ink)}
 .clms-sd-title--light{color:#fff}
-.clms-sd-hero{display:flex;flex-wrap:wrap;align-items:start;gap:24px;padding:28px;border-radius:28px;background:radial-gradient(circle at top right, rgba(99,102,241,.28), transparent 35%),linear-gradient(135deg,#0f172a 0%,#172554 55%,#1e1b4b 100%);color:#fff;overflow:hidden}
+.clms-sd-hero{display:flex;flex-wrap:wrap;align-items:start;gap:24px;padding:28px;border-radius:28px;background:radial-gradient(circle at top right, color-mix(in srgb,var(--sd-accent) 28%,transparent), transparent 35%),linear-gradient(135deg,#0f172a 0%,#172554 55%,#1e1b4b 100%);color:#fff;overflow:hidden}
 .clms-sd-hero__copy,.clms-sd-hero__stats{min-width:0;display:grid;gap:18px;align-content:start;flex:1 1 100%}
 .clms-sd-hero__copy{flex:1.55 1 480px}
 .clms-sd-hero__stats{flex:.95 1 280px}
@@ -104,7 +104,7 @@ trait CLMS_Dashboard_Assets_Trait {
 .clms-sd-hero__actions,.clms-sd-course__actions{display:flex;flex-wrap:wrap;gap:12px}
 .clms-sd-btn{display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:0 18px;border-radius:14px;font-size:14px;font-weight:700;line-height:1;border:1px solid transparent;transition:all .18s ease;white-space:nowrap;max-width:100%}
 .clms-sd-btn:hover{transform:translateY(-1px)}
-.clms-sd-btn--primary{background:var(--sd-accent);border-color:var(--sd-accent);color:#fff;box-shadow:0 10px 24px rgba(99,102,241,.28)}
+.clms-sd-btn--primary{background:var(--sd-accent);border-color:var(--sd-accent);color:#fff;box-shadow:0 10px 24px color-mix(in srgb,var(--sd-accent) 28%,transparent)}
 .clms-sd-btn--primary:hover{background:var(--sd-accent-2);border-color:var(--sd-accent-2);color:#fff}
 .clms-sd-btn--secondary{background:var(--sd-card);border-color:var(--sd-border);color:var(--sd-ink)}
 .clms-sd-btn--ghost{background:transparent;border-color:rgba(255,255,255,.22);color:#fff}
@@ -119,11 +119,11 @@ trait CLMS_Dashboard_Assets_Trait {
 .clms-sd-stat__value--sm{font-size:28px}
 .clms-sd-progress{width:100%;height:10px;border-radius:999px;background:#e5e7eb;overflow:hidden}
 .clms-sd-stat--hero .clms-sd-progress{background:rgba(255,255,255,.16)}
-.clms-sd-progress span{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#6366f1 0%,#818cf8 100%)}
+.clms-sd-progress span{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--sd-accent) 0%,var(--sd-accent-2) 100%)}
 .clms-sd-stat--hero .clms-sd-progress span{background:linear-gradient(90deg,#ffffff 0%,#c7d2fe 100%)}
 .clms-sd-section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:18px}
-.clms-sd-card--next{border-color:rgba(99,102,241,.25);background:linear-gradient(135deg,var(--sd-card) 0%,var(--clms-accent-lt,#eef2ff) 100%)}
-.clms-sd-card--onboarding{border-color:rgba(99,102,241,.2);background:var(--sd-card)}
+.clms-sd-card--next{border-color:color-mix(in srgb,var(--sd-accent) 25%,transparent);background:linear-gradient(135deg,var(--sd-card) 0%,var(--clms-accent-lt,var(--atora-accent-soft,#eef2ff)) 100%)}
+.clms-sd-card--onboarding{border-color:color-mix(in srgb,var(--sd-accent) 20%,transparent);background:var(--sd-card)}
 .clms-sd-onboard-list{display:grid;gap:12px;margin-top:14px}
 .clms-sd-onboard-item{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;padding:12px 14px;border-radius:16px;border:1px solid var(--sd-border);background:var(--sd-card)}
 .clms-sd-onboard-item.is-done{border-color:var(--sd-success-bg);background:var(--sd-success-bg)}
@@ -143,7 +143,7 @@ trait CLMS_Dashboard_Assets_Trait {
 .clms-sd-module__progress{display:grid;gap:8px}
 .clms-sd-module__value{font-size:20px;font-weight:800;color:var(--sd-ink);text-align:right}
 .clms-sd-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
-.clms-sd-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:#eef2ff;color:#3730a3;font-size:12px;font-weight:700}
+.clms-sd-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:var(--atora-accent-soft,#eef2ff);color:var(--atora-accent,#3730a3);font-size:12px;font-weight:700}
 .clms-sd-memory-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:12px}
 .clms-sd-memory-block{display:grid;gap:8px}
 .clms-sd-profile{display:grid;gap:6px;margin-top:14px;padding:12px 14px;border-radius:16px;background:var(--clms-bg-soft,#f8fafc);border:1px solid var(--sd-border)}
@@ -241,3 +241,4 @@ trait CLMS_Dashboard_Assets_Trait {
 }';
 	}
 }
+

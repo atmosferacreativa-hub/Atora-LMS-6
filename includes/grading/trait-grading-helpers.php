@@ -297,8 +297,8 @@ trait CLMS_Grading_Helpers_Trait {
 			--sg-ink-2:#334155;
 			--sg-muted:#64748b;
 			--sg-border:#e2e8f0;
-			--sg-accent:#6366f1;
-			--sg-accent-2:#4f46e5;
+			--sg-accent:var(--atora-accent,#6366f1);
+			--sg-accent-2:var(--atora-accent-hover,var(--atora-accent,#4f46e5));
 			--sg-shadow:0 12px 32px rgba(15,23,42,.08);
 			background:var(--sg-bg);
 			min-height:100vh;
@@ -358,8 +358,8 @@ trait CLMS_Grading_Helpers_Trait {
 				width:max-content;
 				padding:2px 8px;
 				border-radius:999px;
-				background:#eef2ff;
-				color:#4338ca !important;
+				background:var(--atora-accent-soft,#eef2ff);
+				color:var(--atora-accent,#4338ca) !important;
 				font-size:11px !important;
 				font-weight:700;
 			}
@@ -376,7 +376,7 @@ trait CLMS_Grading_Helpers_Trait {
 			.clms-sg-queue-priority.is-info{background:#dbeafe;color:#1e40af !important}
 			.clms-sg-queue-priority.is-urgent{background:#fee2e2;color:#991b1b !important}
 			.clms-sg-queue-item.is-active{
-				background:#eef2ff;
+				background:var(--atora-accent-soft,#eef2ff);
 				border-left:3px solid var(--sg-accent);
 			}
 			.clms-sg-queue-hint{
@@ -427,7 +427,7 @@ trait CLMS_Grading_Helpers_Trait {
 		.clms-sg-section-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:18px}
 		.clms-sg-eyebrow{
 			display:inline-flex;align-items:center;gap:8px;
-			padding:7px 12px;border-radius:999px;background:#eef2ff;color:#4338ca;
+			padding:7px 12px;border-radius:999px;background:var(--atora-accent-soft,#eef2ff);color:var(--atora-accent,#4338ca);
 			font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
 		}
 		.clms-sg-eyebrow--light{background:rgba(255,255,255,.12);color:#e0e7ff}
@@ -526,3 +526,4 @@ trait CLMS_Grading_Helpers_Trait {
 		@keyframes clms-sg-spin{to{transform:rotate(360deg)}}';
 	}
 }
+
