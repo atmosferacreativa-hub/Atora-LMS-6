@@ -695,6 +695,17 @@ trait CLMS_Metabox_Lesson_Render_Trait {
 							<label><?php esc_html_e( 'Descripción', 'atora-lms' ); ?></label>
 							<textarea name="clms_lesson_resources[<?php echo esc_attr( $index ); ?>][description]" rows="2"><?php echo esc_textarea( $r_description ); ?></textarea>
 						</p>
+						<p class="clms-f full clms-resource-audio"<?php echo 'audio' === $r_type ? '' : ' style="display:none"'; ?>>
+							<label><?php esc_html_e( 'Transcripción o texto alternativo', 'atora-lms' ); ?></label>
+							<textarea name="clms_lesson_resources[<?php echo esc_attr( $index ); ?>][transcript]" rows="4"><?php echo esc_textarea( (string) ( $resource['transcript'] ?? '' ) ); ?></textarea>
+							<span class="clms-help"><?php
+							printf(
+								/* translators: %d: tamaño máximo en MB */
+								esc_html__( 'Audio en MP3, M4A u OGG, hasta %d MB. OGG puede no reproducirse en iPhone y Safari: para todos los dispositivos usa MP3 o M4A.', 'atora-lms' ),
+								class_exists( 'ATORA_Lesson_Audio' ) ? (int) round( ATORA_Lesson_Audio::max_bytes() / 1048576 ) : 100
+							);
+							?></span>
+						</p>
 						<p class="clms-f">
 							<label><?php esc_html_e( 'Archivo', 'atora-lms' ); ?></label>
 							<div class="clms-dropzone" data-clms-dropzone="resource-file" tabindex="0" role="button" aria-label="<?php echo esc_attr__( 'Arrastra el archivo aquí', 'atora-lms' ); ?>">

@@ -264,6 +264,8 @@ final class ATORA_Mobile_REST_Controller {
 				'agenda'             => class_exists( 'CLMS_Agenda_Service' ),
 				// 6.35.0: SCORM (Orden B).
 				'scorm'              => class_exists( 'CLMS_SCORM_Attempt_Service' ) && class_exists( 'CLMS_SCORM_Launch_Service' ),
+				// 6.37.0: recursos de audio con duración, formato, compatibilidad, transcripción y posición.
+				'lesson_audio'       => class_exists( 'ATORA_Lesson_Audio' ),
 				'today'              => class_exists( 'ATORA_Mobile_Organize_Controller' ),
 				'push_notifications' => class_exists( 'ATORA_Mobile_Push_Service' ),
 				// 6.31.0: Fase 4 — docente (hoy, cursos, estudiantes, entregas, calificar, avisos).
@@ -500,6 +502,12 @@ final class ATORA_Mobile_REST_Controller {
 			? ATORA_Download_Info::for_video( $video_url )
 			: array( 'video_downloadable' => false, 'video_bytes' => null );
 		$resources   = $wp_post_id ? self::normalize_lesson_resources( $wp_post_id ) : array();
+		// 6.37.0: posición guardada de cada audio (misma cola de posiciones que los videos).
+		foreach ( $resources as $i => $res ) {
+			if ( ! empty( $res['position_key'] ) && class_exists( 'ATORA_Mobile_Position_Service' ) ) {
+				$resources[ $i ]['resume_position_seconds'] = ATORA_Mobile_Position_Service::resume_seconds( $user_id, $lesson_id, (string) $res['position_key'], false );
+			}
+		}
 		$quiz_available = ( $wp_post_id && '1' === (string) get_post_meta( $wp_post_id, '_clms_quiz_enabled', true ) )
 			|| self::has_table_quiz( $lesson_id );
 
@@ -1654,6 +1662,10 @@ final class ATORA_Mobile_REST_Controller {
 		$video_key = (string) ( $request->get_param( 'video_key' ) ?? '' );
 		if ( '' !== $video_key ) {
 			$keys = class_exists( 'ATORA_Lesson_Videos' ) ? array_column( ATORA_Lesson_Videos::visible( absint( $lesson['wp_post_id'] ?? 0 ) ), 'key' ) : array();
+			// 6.37.0: también los audios de la lección.
+			if ( class_exists( 'ATORA_Lesson_Audio' ) ) {
+				$keys = array_merge( $keys, ATORA_Lesson_Audio::position_keys( absint( $lesson['wp_post_id'] ?? 0 ) ) );
+			}
 			if ( ! in_array( $video_key, $keys, true ) ) {
 				return new WP_Error( 'atora_mobile_video_not_found', __( 'El video no pertenece a esta lección.', 'atora-lms' ), array( 'status' => 404 ) );
 			}
@@ -1896,6 +1908,11 @@ final class ATORA_Mobile_REST_Controller {
 				'bytes'        => $download['bytes'],
 				'updated_at'   => $download['updated_at'],
 			);
+
+			// 6.37.0: audio con duración, formato, compatibilidad declarada, transcripción y clave de posición.
+			if ( 'audio' === $final_type && class_exists( 'ATORA_Lesson_Audio' ) ) {
+				$items[ count( $items ) - 1 ] += ATORA_Lesson_Audio::describe( $resource );
+			}
 		}
 
 		return array_values( $items );

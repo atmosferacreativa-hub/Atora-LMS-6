@@ -690,6 +690,19 @@ trait CLMS_Metabox_Lesson_Save_Trait {
 				}
 			}
 
+			// 6.37.0: audio como recurso propio (MP3, M4A u OGG; tamaño máximo; transcripción manual).
+			if ( 'audio' === $item['type'] && class_exists( 'ATORA_Lesson_Audio' ) ) {
+				$item['transcript'] = ATORA_Lesson_Audio::sanitize_transcript( $resource['transcript'] ?? '' );
+				if ( $item['file_id'] ) {
+					$valid = ATORA_Lesson_Audio::validate_attachment( $item['file_id'] );
+					if ( is_wp_error( $valid ) ) {
+						$label = '' !== $item['title'] ? $item['title'] : (string) get_the_title( $item['file_id'] );
+						ATORA_Lesson_Audio::queue_admin_error( $label . ': ' . $valid->get_error_message() );
+						$item['file_id'] = 0;
+					}
+				}
+			}
+
 			if ( '' === $item['title'] && ! $item['file_id'] && '' === $item['url'] && $item['library_item_id'] <= 0 ) {
 				continue;
 			}

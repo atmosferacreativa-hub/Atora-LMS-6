@@ -146,6 +146,14 @@ final class ATORA_E2E_Seed_CLI {
 				'description' => 'Imagen para pruebas de zoom (app).',
 				'file_id'     => self::image( $teacher ),
 			),
+			// 6.37.0: audio de la lección (recorridos de audio de la app 1.2.0).
+			array(
+				'type'        => 'audio',
+				'title'       => 'Audio de la clase',
+				'description' => 'Audio MP3 de 3 segundos para pruebas.',
+				'file_id'     => self::audio( $teacher ),
+				'transcript'  => 'Transcripción de prueba del audio de la clase.',
+			),
 		) );
 
 		// 6.35.0 (SCORM): lección con paquetes SCORM para recorridos `scorm-*` de la app.
@@ -491,6 +499,29 @@ final class ATORA_E2E_Seed_CLI {
 	}
 
 	/** Paquete SCORM de fixtures (tests/fixtures/scorm), como adjunto ZIP. */
+	/** 6.37.0: audio MP3 de prueba (tests/fixtures/audio/tono.mp3). */
+	private static function audio( int $author ): int {
+		$existing = get_page_by_path( 'audio-e2e', OBJECT, 'attachment' );
+		if ( $existing ) {
+			return (int) $existing->ID;
+		}
+		require_once ABSPATH . 'wp-admin/includes/file.php';
+		require_once ABSPATH . 'wp-admin/includes/media.php';
+		require_once ABSPATH . 'wp-admin/includes/image.php';
+
+		$fixture = dirname( __DIR__, 2 ) . '/tests/fixtures/audio/tono.mp3';
+		$tmp     = file_exists( $fixture ) ? wp_tempnam( 'audio-e2e.mp3' ) : '';
+		if ( ! $tmp ) {
+			self::seed_error( 'Audio E2E: falta tests/fixtures/audio/tono.mp3.' );
+		}
+		copy( $fixture, $tmp );
+		$id = media_handle_sideload( array( 'name' => 'audio-e2e.mp3', 'tmp_name' => $tmp ), 0, 'Audio E2E', array( 'post_name' => 'audio-e2e', 'post_author' => $author ) );
+		if ( is_wp_error( $id ) ) {
+			self::seed_error( 'Audio E2E: ' . $id->get_error_message() );
+		}
+		return absint( $id );
+	}
+
 	private static function scorm_zip_attachment( int $author ): int {
 		$existing = get_page_by_path( 'scorm-e2e', OBJECT, 'attachment' );
 		if ( $existing ) {
