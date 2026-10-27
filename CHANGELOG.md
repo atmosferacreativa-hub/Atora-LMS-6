@@ -1,5 +1,24 @@
 # CHANGELOG — ATORA LMS
 
+## 6.35.0 (2026-10-27)
+
+### SCORM (Orden B, `docs/ordenes/ORDEN-B-SCORM.md`)
+
+Junto con la app 1.1.0. Detalle de uso y límites en `docs/SCORM.md`.
+
+- **Paquetes en la biblioteca académica.** Tipo de recurso `scorm` (SCORM 1.2 y 2004 3.ª/4.ª edición). Al subir: validación de `imsmanifest.xml`, detección de versión y SCO de inicio; descompresión segura (rechaza `..`, rutas absolutas, enlaces simbólicos, extensiones fuera de la lista, PHP y scripts de servidor, límites de tamaño, cantidad y tasa de compresión) en `uploads/atora-library/scorm/` con `.htaccess` anti-ejecución. Cada subida nueva es una versión (`vN/`) y no rompe los intentos ya registrados. Subir o versionar exige `manage_options` o `atora_upload_scorm` (solo el administrador por defecto).
+- **Enlace a la lección** como recurso `type=scorm` en `_clms_lesson_resources`; la versión la fija el recurso (0 = la última publicada), nunca el cliente. Solo se lanzan paquetes `published`; uno archivado deja terminar los intentos abiertos pero no crea nuevos; borrador y revisión solo en vista previa del docente.
+- **Reproductor web y seguimiento.** Adaptador `window.API` (1.2) y `window.API_1484_11` (2004), varios SCO, commits por lotes con reintento y envío al cerrar la ventana. Datos CMI por intento y reanudación. Los estados y el puntaje nunca retroceden, ni en el intento ni en los valores CMI guardados, aunque los commits lleguen fuera de orden.
+- **Integración académica.** Completar marca la lección (regla por lección: finalizado, aprobado o ambos); el puntaje va al libro de notas con la regla de visibilidad existente; intentos permitidos por lección (`_clms_scorm_max_attempts`, 409 `atora_scorm_no_attempts`) y qué intento cuenta (mejor, último o primero). Informe docente por estudiante.
+- **API móvil** (`atora-mobile/v1/scorm/*`, capacidad `scorm` en `/discovery`): inicio o reanudación del intento, valores, commits idempotentes por `client_event_id` con fecha del dispositivo, enlace de descarga firmado (HMAC) y temporal. Cada intento solo lo lee y escribe su dueño.
+- **Pruebas de pantalla:** `wp atora seed-e2e` siembra los paquetes "SCORM mínimo" y "SCORM XHR" (falla con motivo si no puede) y crea la institución E2E en instalaciones limpias.
+
+### Limitación conocida
+
+- El puntaje lo reporta el paquete desde el navegador (así funciona SCORM): no sirve para evaluaciones de alto impacto.
+
+**TESTS**: `tests/SCORM/*` (manifiesto, seguridad del ZIP, `.htaccess`, versiones, permisos de subida, paquete enlazado, estado del paquete, límite de intentos, no retroceder en intento y CMI, idempotencia, autorización de lectura), `tests/integration/ScormE2ESeedTest.php`, `ScormLaunchAvailabilityTest`, `MobileScormDiscoveryTest`.
+
 ## 6.34.1 (2026-10-27)
 
 ### Fixed

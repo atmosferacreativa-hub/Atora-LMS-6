@@ -7,7 +7,7 @@ Qué está comprobado y dónde. Se actualiza en cada versión del plugin o de la
 - **Integración**: PHPUnit con WordPress (`tests/integration`).
 - **Unitaria**: PHPUnit sin WordPress o Jest en la app.
 
-Última actualización: **plugin 6.34.0 · app 1.0.1**.
+Última actualización: **plugin 6.35.0 · app 1.1.0**.
 
 > No hay registro escrito de qué se recorrió en teléfono antes de esta tabla: la columna "Teléfono" queda "por confirmar" hasta la prueba al cierre de la Fase 4, que incluye la lista acumulada de las fases 0 a 3.
 
@@ -51,6 +51,16 @@ Qué está comprobado y dónde. Se actualiza en cada versión del plugin o de la
 | Login sin quedar apagado tras cerrar la ventana de academia; inicio en blanco | 1.0.1 | pendiente (fila 52) | sí (`academia-url`, capturas antes y después) | — | Jest (colores de la marca) |
 | Bajas de sesión pendientes solo a su academia; lectura ocupada (409) se reintenta | 1.0.1 · 6.33.2 | — | — | `GradeRevisionConflictTest` | Jest (dos academias; reintento único) |
 
+## App 1.1.0 (SCORM, Orden B)
+
+| Función | Desde | Teléfono | Pantalla (CI) | Integración (plugin) | Unitaria |
+|---|---|---|---|---|---|
+| SCORM en línea (WebView con adaptador de API, token fuera del paquete) | 1.1.0 | pendiente | sí (`scorm-online`) | `MobileScormDiscoveryTest`, `ScormMobileGetValuesAuthorizationTest` | Jest (adaptador 1.2/2004, URLs locales) |
+| SCORM sin conexión: descarga, avance sin red, cola y sincronización (completed/80 llega al servidor y completa la lección) | 1.1.0 | pendiente | sí (`scorm-sin-conexion`) | `ScormAttemptServiceClientEventIdempotencyTest`, `ScormAttemptServiceCmiNeverRegressesValuesTest` | Jest (cola, base64, snapshot) |
+| Paquetes que leen sus archivos por XHR/fetch (servidor local 127.0.0.1 con token, solo la carpeta del paquete) | 1.1.0 | pendiente (Rise/Storyline real) | sí (`scorm-xhr`, también sin conexión y aislamiento `ESCAPE:OK`) | — | Jest |
+| SCORM en iPhone | 1.1.0 | pendiente | **no ejecutado** (el job `ios-e2e` no corre sin Docker en macOS) | — | — |
+| Material en línea cuando la descarga está bloqueada (solo Wi-Fi, cuota, espacio) | 1.1.0 | pendiente | sí (`material-en-linea`) | — | Jest (error con código, token solo a la API de la academia) |
+
 ## App (docente, Fase 4)
 
 | Función | Desde | Teléfono | Pantalla (CI) | Integración (plugin) | Unitaria |
@@ -92,6 +102,7 @@ Qué está comprobado y dónde. Se actualiza en cada versión del plugin o de la
 | Eliminación de cuenta (app, página pública, solicitudes; anonimizar por defecto) | 6.33.0 | `AccountDeletionTest` | Pantalla: `eliminar-cuenta` (app 1.0.0) |
 | Ajustes de la app móvil (reporte de errores desactivable) | 6.33.0 | `AccountDeletionTest` (`crash_reports`) | |
 | Multisitio (WordPress Multisite) | 6.34.0 | — | No soportado. Activación en red bloqueada; si se activa por sitio dentro de una red se muestra un aviso. |
+| SCORM 1.2/2004 en la biblioteca: subida segura, versiones, enlace a lección, reproductor web, CMI que no retrocede, nota y completitud, límite de intentos, informe | 6.35.0 | `tests/SCORM/*`, `ScormLaunchAvailabilityTest`, `ScormE2ESeedTest` | Ver `docs/SCORM.md`. El contenido corre en el mismo dominio: solo paquetes de confianza (subida solo admin). |
 | CRM v2 completo (retiro de v1) | 6.34.0 | `tests/CRM/*`, `tests/integration/*` | CRM v1 retirado; CRM v2: import/export CSV, deduplicación, auditoría, aislamiento por institución. |
 
 ## Datos históricos
