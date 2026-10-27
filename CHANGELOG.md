@@ -1,8 +1,10 @@
 # CHANGELOG — ATORA LMS
 
-## Unreleased
+## 6.34.1 (2026-10-27)
 
 ### Fixed
+- Navegación académica por rol con destinos publicados, acción de continuar destacada y accesos docentes que respetan las secciones habilitadas.
+- Mejor jerarquía de acciones, contraste del botón principal y estados vacíos orientados al siguiente paso.
 - Los paneles del estudiante, docente y SpeedGrader heredan el acento de la academia.
 - Verificación de certificados y eliminación de cuenta cargan identidad, logo y estilos de WordPress.
 - El panel docente ocupa todo el ancho cuando no hay secciones laterales activas.
