@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 6.34.1
+Stable tag: 6.35.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -50,6 +50,13 @@ No. ATORA LMS is not designed for WordPress Multisite. Network activation is blo
 4. Course overview template.
 
 == Changelog ==
+= 6.35.0 =
+* SCORM 1.2 y 2004 como recurso de la biblioteca académica: subida validada (manifiesto, zip slip, symlinks, extensiones, bombas zip), versiones sin romper intentos anteriores, reproductor web con adaptador de API, seguimiento CMI que nunca retrocede, completitud de la lección, nota en el libro con la regla de visibilidad, límite de intentos e informe docente.
+* SCORM en la app móvil: rutas `atora-mobile/v1/scorm/*` con commits idempotentes, descarga firmada y temporal, solo paquetes publicados y enlazados a la lección, y cada intento visible solo para su dueño.
+
+= 6.34.1 =
+* Navegación académica por rol y paneles enfocados; los paneles, la verificación de certificados y la eliminación de cuenta heredan la identidad de la academia.
+
 = 6.34.0 =
 * CRM: retiro completo del CRM v1; el CRM v2 queda como implementación única (sin migración de datos).
 * CRM v2: campos personalizados, importación y exportación CSV, deduplicación/fusión, auditoría y aislamiento por institución.
