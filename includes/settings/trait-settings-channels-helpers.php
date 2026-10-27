@@ -257,11 +257,23 @@ trait CLMS_Settings_Channels_Helpers_Trait {
 			'ses_access_key'              => '',
 			'ses_secret_key'              => '',
 			'ses_region'                  => 'us-east-1',
+			'dkim_selector'               => '',
 		);
+		// 6.38.0: límites de envío por proveedor (0 = sin límite).
+		foreach ( array( 'smtp', 'brevo', 'sendgrid', 'mailgun', 'ses', 'postmark' ) as $rate_provider ) {
+			$defaults[ 'rate_limit_' . $rate_provider . '_minute' ] = 0;
+			$defaults[ 'rate_limit_' . $rate_provider . '_hour' ]   = 0;
+		}
 
 		$stored = get_option( self::OPTION_EMAIL_ENGINE, array() );
 		$stored = is_array( $stored ) ? $stored : array();
 		$data   = array_merge( $defaults, $stored );
+		foreach ( array( 'smtp', 'brevo', 'sendgrid', 'mailgun', 'ses', 'postmark' ) as $rate_provider ) {
+			foreach ( array( '_minute', '_hour' ) as $rate_window ) {
+				$data[ 'rate_limit_' . $rate_provider . $rate_window ] = absint( $data[ 'rate_limit_' . $rate_provider . $rate_window ] );
+			}
+		}
+		$data['dkim_selector'] = sanitize_key( (string) $data['dkim_selector'] );
 
 		$data['provider'] = sanitize_key( (string) $data['provider'] );
 		if ( ! in_array( $data['provider'], array( 'smtp', 'brevo', 'sendgrid', 'mailgun', 'ses', 'postmark' ), true ) ) {

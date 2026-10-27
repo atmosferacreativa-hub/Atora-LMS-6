@@ -349,6 +349,14 @@ trait CLMS_Settings_Core_Trait {
 		foreach ( $text_fields as $field ) {
 			$email_settings[ $field ] = sanitize_text_field( (string) ( $email_input[ $field ] ?? $email_settings[ $field ] ) );
 		}
+		// 6.38.0: límites por proveedor y selector DKIM.
+		foreach ( array( 'smtp', 'brevo', 'sendgrid', 'mailgun', 'ses', 'postmark' ) as $rate_provider ) {
+			foreach ( array( '_minute', '_hour' ) as $rate_window ) {
+				$rate_key                    = 'rate_limit_' . $rate_provider . $rate_window;
+				$email_settings[ $rate_key ] = absint( $email_input[ $rate_key ] ?? $email_settings[ $rate_key ] ?? 0 );
+			}
+		}
+		$email_settings['dkim_selector'] = sanitize_key( (string) ( $email_input['dkim_selector'] ?? $email_settings['dkim_selector'] ?? '' ) );
 		$email_settings['smtp_pass'] = (string) ( $email_input['smtp_pass'] ?? $email_settings['smtp_pass'] );
 
 		$email_settings['brand_logo_url'] = esc_url_raw( (string) ( $email_input['brand_logo_url'] ?? $email_settings['brand_logo_url'] ) );

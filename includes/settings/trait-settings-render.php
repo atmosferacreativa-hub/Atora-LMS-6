@@ -456,6 +456,28 @@ trait CLMS_Settings_Render_Trait {
 					<p class="description"><?php esc_html_e( 'Puedes completar solo el proveedor que usarás. Los demás pueden quedar vacíos.', 'atora-lms' ); ?></p>
 				</td>
 			</tr>
+			<tr>
+				<th scope="row"><?php esc_html_e( 'Límites de envío', 'atora-lms' ); ?></th>
+				<td>
+					<table class="widefat" style="max-width:520px;">
+						<thead><tr><th><?php esc_html_e( 'Proveedor', 'atora-lms' ); ?></th><th><?php esc_html_e( 'Por minuto', 'atora-lms' ); ?></th><th><?php esc_html_e( 'Por hora', 'atora-lms' ); ?></th></tr></thead>
+						<tbody>
+						<?php foreach ( array( 'smtp' => 'SMTP', 'brevo' => 'Brevo', 'sendgrid' => 'SendGrid', 'mailgun' => 'Mailgun', 'ses' => 'Amazon SES', 'postmark' => 'Postmark' ) as $rate_provider => $rate_label ) : ?>
+							<tr>
+								<td><?php echo esc_html( $rate_label ); ?></td>
+								<?php foreach ( array( '_minute', '_hour' ) as $rate_window ) : $rate_key = 'rate_limit_' . $rate_provider . $rate_window; ?>
+									<td><input type="number" min="0" step="1" style="width:100px" name="clms_email_engine[<?php echo esc_attr( $rate_key ); ?>]" value="<?php echo esc_attr( (string) absint( $email[ $rate_key ] ?? 0 ) ); ?>"></td>
+								<?php endforeach; ?>
+							</tr>
+						<?php endforeach; ?>
+						</tbody>
+					</table>
+					<p class="description"><?php esc_html_e( '0 = sin límite. Lo que pase el límite espera al siguiente ciclo de la cola; lo transaccional sale primero.', 'atora-lms' ); ?></p>
+					<p style="margin:12px 0 6px"><strong><?php esc_html_e( 'Selector DKIM', 'atora-lms' ); ?></strong></p>
+					<input type="text" class="regular-text" name="clms_email_engine[dkim_selector]" value="<?php echo esc_attr( (string) ( $email['dkim_selector'] ?? '' ) ); ?>" placeholder="s1">
+					<p class="description"><?php esc_html_e( 'Lo indica tu proveedor (p. ej. s1 en SendGrid, mta en Mailgun). Sin él, el diagnóstico prueba los más comunes.', 'atora-lms' ); ?></p>
+				</td>
+			</tr>
 		</table>
 
 		<h3 style="margin-top:26px"><?php esc_html_e( 'WhatsApp Business', 'atora-lms' ); ?></h3>

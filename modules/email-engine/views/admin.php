@@ -1343,7 +1343,7 @@ $tabs = array(
 	'templates'   => __( 'Plantillas', 'atora-lms' ),
 	'test-send'   => __( 'Prueba de envío', 'atora-lms' ),
 	'queue-logs'  => __( 'Cola y logs', 'atora-lms' ),
-	'diagnostics' => __( 'Diagnóstico DNS', 'atora-lms' ),
+	'diagnostics' => __( 'Entregabilidad', 'atora-lms' ),
 	'invitations' => __( 'Invitaciones', 'atora-lms' ),
 	'csv-import'  => __( 'Importar CSV', 'atora-lms' ),
 );

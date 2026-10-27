@@ -31,6 +31,17 @@ class Email_Templates {
 	public static function get_catalog(): array {
 		return array(
 			// ── Académicos ──────────────────────────────────────────────────
+			// 6.38.0: bienvenida a la plataforma (base de la biblioteca; la usan las automatizaciones).
+			'welcome_account'       => array(
+				'id'          => 41,
+				'name'        => __( 'Bienvenida a la plataforma', 'atora-lms' ),
+				'subject'     => __( 'Te damos la bienvenida a {{site_name}}', 'atora-lms' ),
+				'body'        => __( 'Tu cuenta en {{site_name}} está lista. Desde tu panel verás tus cursos, tareas y novedades.', 'atora-lms' ),
+				'button_text' => __( 'Ir a mi panel', 'atora-lms' ),
+				'view'        => 'messaging',
+				'category'    => 'system',
+				'active'      => true,
+			),
 			'welcome_course'        => array(
 				'id'       => 1,
 				'name'     => __( 'Bienvenida al curso', 'atora-lms' ),
@@ -175,6 +186,119 @@ class Email_Templates {
 				'category' => 'commercial',
 				'active'   => true,
 			),
+			// 6.38.0: plantillas académicas que el enrutador de mensajes manda por correo. No estaban en el
+			// catálogo, así que la cola las rechazaba y esos correos no salían (p. ej. «nueva lección», que
+			// solo usa correo). Todas usan la vista `messaging`.
+			'atora_assignment_graded' => array(
+				'id'          => 30,
+				'name'        => __( 'Tarea calificada', 'atora-lms' ),
+				'subject'     => __( 'Tu tarea {{lesson_title}} ya tiene nota', 'atora-lms' ),
+				'body'        => __( 'Tu tarea {{lesson_title}} del curso {{course_title}} fue calificada: {{grade}}.', 'atora-lms' ),
+				'button_text' => __( 'Ver calificación', 'atora-lms' ),
+				'view'        => 'messaging',
+				'category'    => 'academic',
+				'active'      => true,
+			),
+			'atora_assignment_due_soon' => array(
+				'id'          => 31,
+				'name'        => __( 'Tarea por vencer', 'atora-lms' ),
+				'subject'     => __( 'Recordatorio: {{lesson_title}} vence pronto', 'atora-lms' ),
+				'body'        => __( 'La tarea {{lesson_title}} del curso {{course_title}} vence el {{due_at}}.', 'atora-lms' ),
+				'button_text' => __( 'Ir a la tarea', 'atora-lms' ),
+				'view'        => 'messaging',
+				'category'    => 'academic',
+				'active'      => true,
+			),
+			'atora_submission_received' => array(
+				'id'          => 32,
+				'name'        => __( 'Entrega recibida (docente)', 'atora-lms' ),
+				'subject'     => __( 'Nueva entrega de {{student_name}}', 'atora-lms' ),
+				'body'        => __( '{{student_name}} entregó {{lesson_title}} en {{course_title}}.', 'atora-lms' ),
+				'button_text' => __( 'Revisar entrega', 'atora-lms' ),
+				'view'        => 'messaging',
+				'category'    => 'academic',
+				'active'      => true,
+			),
+			'atora_student_inactive' => array(
+				'id'          => 33,
+				'name'        => __( 'Estudiante inactivo', 'atora-lms' ),
+				'subject'     => __( '{{subject}}', 'atora-lms' ),
+				'body'        => __( '{{body}}', 'atora-lms' ),
+				'button_text' => __( '{{button_text}}', 'atora-lms' ),
+				'view'        => 'messaging',
+				'category'    => 'academic',
+				'active'      => true,
+			),
+			'atora_at_risk_teacher' => array(
+				'id'          => 34,
+				'name'        => __( 'Estudiante en riesgo (docente)', 'atora-lms' ),
+				'subject'     => __( '{{student_name}} necesita acompañamiento en {{course_title}}', 'atora-lms' ),
+				'body'        => __( '{{student_name}} aparece en riesgo en {{course_title}}. Motivo: {{reason}}.', 'atora-lms' ),
+				'button_text' => __( 'Ver ficha del estudiante', 'atora-lms' ),
+				'view'        => 'messaging',
+				'category'    => 'academic',
+				'active'      => true,
+			),
+			'atora_improvement_plan' => array(
+				'id'          => 35,
+				'name'        => __( 'Plan de mejora asignado', 'atora-lms' ),
+				'subject'     => __( 'Tienes un plan de mejora en {{course_title}}', 'atora-lms' ),
+				'body'        => __( 'Tu docente te asignó un plan de mejora en {{course_title}}.', 'atora-lms' ),
+				'button_text' => __( 'Ver plan', 'atora-lms' ),
+				'view'        => 'messaging',
+				'category'    => 'academic',
+				'active'      => true,
+			),
+			'atora_lesson_published' => array(
+				'id'          => 36,
+				'name'        => __( 'Nueva lección publicada', 'atora-lms' ),
+				'subject'     => __( 'Nueva lección: {{lesson_title}}', 'atora-lms' ),
+				'body'        => __( 'Ya está disponible {{lesson_title}} en {{course_title}}.', 'atora-lms' ),
+				'button_text' => __( 'Ver lección', 'atora-lms' ),
+				'view'        => 'messaging',
+				'category'    => 'academic',
+				'active'      => true,
+			),
+			'atora_section_announcement' => array(
+				'id'          => 37,
+				'name'        => __( 'Anuncio de la sección', 'atora-lms' ),
+				'subject'     => __( '{{announcement_title}}', 'atora-lms' ),
+				'body'        => __( '{{announcement_body}}', 'atora-lms' ),
+				'button_text' => __( 'Ver anuncio', 'atora-lms' ),
+				'view'        => 'messaging',
+				'category'    => 'academic',
+				'active'      => true,
+			),
+			'atora_daily_digest_student' => array(
+				'id'          => 38,
+				'name'        => __( 'Resumen diario (estudiante)', 'atora-lms' ),
+				'subject'     => __( 'Tu resumen del día: {{count}} novedades', 'atora-lms' ),
+				'body'        => __( '{{summary}}', 'atora-lms' ),
+				'button_text' => __( 'Ver novedades', 'atora-lms' ),
+				'view'        => 'messaging',
+				'category'    => 'academic',
+				'active'      => true,
+			),
+			'atora_daily_digest_teacher' => array(
+				'id'          => 39,
+				'name'        => __( 'Resumen diario (docente)', 'atora-lms' ),
+				'subject'     => __( 'Tu día: entregas por revisar y estudiantes por acompañar', 'atora-lms' ),
+				'body'        => __( 'Entregas por revisar: {{submissions_pending}}. Estudiantes inactivos: {{students_inactive}}. Cuestionarios por revisar: {{quizzes_pending}}.', 'atora-lms' ),
+				'button_text' => __( 'Ver mi día', 'atora-lms' ),
+				'view'        => 'messaging',
+				'category'    => 'academic',
+				'active'      => true,
+			),
+			'atora_followup_occurrence_due' => array(
+				'id'          => 40,
+				'name'        => __( 'Seguimiento para hoy (docente)', 'atora-lms' ),
+				'subject'     => __( 'Hoy toca seguimiento a {{student_count}} estudiantes', 'atora-lms' ),
+				'body'        => __( 'Hoy tienes seguimiento programado con {{student_count}} estudiantes ({{section_names}}).', 'atora-lms' ),
+				'button_text' => __( 'Abrir seguimiento', 'atora-lms' ),
+				'view'        => 'messaging',
+				'category'    => 'academic',
+				'active'      => true,
+			),
 		);
 	}
 
@@ -185,6 +309,20 @@ class Email_Templates {
 	 * @return array|null
 	 */
 	public static function get( string $key ): ?array {
+		$template = self::get_original( $key );
+		// 6.38.0: asunto personalizado desde el editor de plantillas.
+		if ( $template && class_exists( Email_Template_Editor::class ) ) {
+			$override = Email_Template_Editor::override_for( $key );
+			if ( $override && '' !== (string) ( $override['subject'] ?? '' ) ) {
+				$template['subject']    = (string) $override['subject'];
+				$template['customized'] = true;
+			}
+		}
+		return $template;
+	}
+
+	/** Plantilla tal como viene en el catálogo, sin personalizar. */
+	public static function get_original( string $key ): ?array {
 		$catalog = self::get_catalog();
 		return $catalog[ $key ] ?? null;
 	}
@@ -217,7 +355,10 @@ class Email_Templates {
 			'site_name'        => $site_name,
 			'site_url'         => home_url( '/' ),
 			'dashboard_url'    => $dashboard_url,
-			'unsub_url'        => add_query_arg( 'atora_email_action', 'unsubscribe', home_url( '/' ) ),
+			// 6.38.0: enlace firmado por usuario (antes no llevaba token y no hacía nada).
+			'unsub_url'        => class_exists( Email_Unsubscribe::class )
+				? Email_Unsubscribe::url( (int) $user->ID, (string) $user->user_email )
+				: add_query_arg( 'atora_email_action', 'unsubscribe', home_url( '/' ) ),
 			'preferences_url'  => add_query_arg( 'atora_email_action', 'preferences', home_url( '/' ) ),
 			'course_title'     => $course_id ? get_the_title( $course_id ) : '',
 			'course_url'       => $course_id ? (string) get_permalink( $course_id ) : '',
@@ -299,7 +440,18 @@ class Email_Templates {
 	 * @return string
 	 */
 	private static function get_template_html_body( string $key, array $context ): string {
-		$view = ATORA_LMS_MODULES_DIR . 'email-engine/templates/' . sanitize_key( $key ) . '.php';
+		$template = self::get( $key );
+		// 6.38.0: bloques personalizados desde el editor.
+		if ( class_exists( Email_Template_Editor::class ) ) {
+			$blocks = Email_Template_Editor::active_blocks( $key );
+			if ( $blocks ) {
+				return Email_Template_Editor::render_blocks( $blocks, $context );
+			}
+		}
+		$view     = ATORA_LMS_MODULES_DIR . 'email-engine/templates/' . sanitize_key( (string) ( $template['view'] ?? $key ) ) . '.php';
+		if ( isset( $template['body'] ) ) {
+			$context['atora_template'] = $template;
+		}
 
 		if ( file_exists( $view ) ) {
 			ob_start();
@@ -344,7 +496,7 @@ class Email_Templates {
 	 * @param array  $context Contexto.
 	 * @return string
 	 */
-	private static function get_html_wrapper( string $content, array $context ): string {
+	public static function get_html_wrapper( string $content, array $context ): string {
 		$site_name = esc_html( $context['site_name'] ?? get_bloginfo( 'name' ) );
 
 		// Branding configurable desde Settings → color primario, logo y nombre.

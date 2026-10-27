@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class V5_Installer {
 
 	/** Versión del esquema. Incrementar para forzar re-instalación. */
-	const SCHEMA_VERSION = '6.38.0-email-webhooks';
+	const SCHEMA_VERSION = '6.38.0-email-engine';
 
 	/** Option key que almacena la versión instalada. */
 	const OPTION_KEY = 'atora_v5_schema_version';
@@ -1203,11 +1203,13 @@ class V5_Installer {
 			priority         TINYINT UNSIGNED NOT NULL DEFAULT 5,
 			metadata         JSON,
 			identity_key     VARCHAR(40)     NOT NULL DEFAULT 'academia',
+			locked_at        DATETIME                 DEFAULT NULL,
 			created_at       DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			PRIMARY KEY  (id),
 			KEY status_scheduled (status, scheduled_at),
 			KEY user_id     (user_id),
-			KEY priority    (priority)
+			KEY priority    (priority),
+			KEY provider_sent (provider, sent_at)
 		) $charset_collate;" );
 
 		dbDelta( "CREATE TABLE {$wpdb->prefix}atora_email_templates (

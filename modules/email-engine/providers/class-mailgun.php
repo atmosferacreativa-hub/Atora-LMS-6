@@ -41,6 +41,10 @@ class Mailgun implements Provider_Interface {
 		if ( $reply_to && is_email( $reply_to ) ) {
 			$body['h:Reply-To'] = $reply_to;
 		}
+		$extra = class_exists( '\\ATORA\\EmailEngine\\Email_Unsubscribe' ) ? \ATORA\EmailEngine\Email_Unsubscribe::clean_headers( $options['headers'] ?? array() ) : array();
+		foreach ( $extra as $name => $value ) {
+			$body[ 'h:' . $name ] = $value;
+		}
 
 		$response = wp_remote_post( $base_url, array(
 			'headers' => array(

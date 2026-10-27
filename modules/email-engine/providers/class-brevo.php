@@ -60,6 +60,8 @@ class Brevo implements Provider_Interface {
 		if ( $reply_to && is_email( $reply_to ) ) {
 			$payload['replyTo'] = array( 'email' => $reply_to );
 		}
+		$extra = class_exists( '\\ATORA\\EmailEngine\\Email_Unsubscribe' ) ? \ATORA\EmailEngine\Email_Unsubscribe::clean_headers( $options['headers'] ?? array() ) : array();
+		$payload['headers'] = array_merge( $payload['headers'], $extra );
 
 		$body = wp_json_encode( $payload );
 
