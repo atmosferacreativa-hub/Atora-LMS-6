@@ -215,6 +215,10 @@ final class ATORA_Mobile_REST_Controller {
 		}
 		wp_set_current_user( (int) $session['user_id'] );
 		$request->set_param( '_atora_mobile_session_id', (string) $session['session_id'] );
+		// 6.36.0: la actividad en la app cuenta como actividad (riesgo, recordatorios de inactividad).
+		if ( class_exists( 'CLMS_Student_Activity_Tracker' ) ) {
+			CLMS_Student_Activity_Tracker::record_app_access( (int) $session['user_id'] );
+		}
 		return true;
 	}
 
@@ -2012,6 +2016,14 @@ final class ATORA_Mobile_REST_Controller {
 		return $out;
 	}
 
+	/** 6.36.0: el acceso a un curso desde la app cuenta como actividad en ese curso. */
+	private static function record_course_activity( int $user_id, $course ): void {
+		$wp_course_id = absint( is_array( $course ) ? ( $course['wp_post_id'] ?? 0 ) : 0 );
+		if ( $wp_course_id && class_exists( 'CLMS_Student_Activity_Tracker' ) ) {
+			CLMS_Student_Activity_Tracker::record_app_access( $user_id, $wp_course_id );
+		}
+	}
+
 	public static function authorize_course_id( int $user_id, int $course_id ) {
 		$user_id   = absint( $user_id );
 		$course_id = absint( $course_id );
@@ -2029,6 +2041,7 @@ final class ATORA_Mobile_REST_Controller {
 				if ( ! $course || ! self::course_is_student_visible( $course ) ) {
 					return new WP_Error( 'atora_mobile_course_forbidden', __( 'No tienes acceso a este curso.', 'atora-lms' ), array( 'status' => 403 ) );
 				}
+				self::record_course_activity( $user_id, $course );
 				return true;
 			}
 		}
@@ -2043,6 +2056,7 @@ final class ATORA_Mobile_REST_Controller {
 			if ( $wp_course_id > 0
 				&& \ATORA\LMS\LMS_Course_Service::legacy_wp_course_post_is_public( $wp_course_id )
 				&& \CLMS_Helper::user_is_enrolled_in_course( $user_id, $wp_course_id ) ) {
+				self::record_course_activity( $user_id, $course );
 				return true;
 			}
 		}
@@ -2051,6 +2065,7 @@ final class ATORA_Mobile_REST_Controller {
 		if ( class_exists( 'ATORA_Course_Access_Service' ) && ATORA_Course_Access_Service::can_access_course_id( $user_id, $course_id ) ) {
 			$course = \ATORA\LMS\LMS_Course_Service::get( $course_id );
 			if ( $course && self::course_is_student_visible( $course ) ) {
+				self::record_course_activity( $user_id, $course );
 				return true;
 			}
 		}

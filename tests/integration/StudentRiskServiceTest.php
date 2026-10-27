@@ -20,13 +20,15 @@ final class StudentRiskServiceTest extends WP_UnitTestCase {
 	}
 
 	public function test_rule_levels_and_reasons(): void {
+		// 6.36.0: la regla es la canónica (ATORA_Academic_Risk_Rule); textos y umbrales iguales en todo el plugin.
 		$this->assertSame( array( 'bajo', array() ), $this->pick( ATORA_Student_Risk_Service::evaluate( 0, null, 0 ) ), 'Sin notas no es riesgo.' );
 		$this->assertSame( array( 'bajo', array() ), $this->pick( ATORA_Student_Risk_Service::evaluate( 0, 85, 1 ) ) );
-		$this->assertSame( array( 'medio', array( '1 entrega vencida' ) ), $this->pick( ATORA_Student_Risk_Service::evaluate( 1, 80, 0 ) ) );
-		$this->assertSame( array( 'medio', array( 'nota acumulada 65/100' ) ), $this->pick( ATORA_Student_Risk_Service::evaluate( 0, 65, 0 ) ) );
-		$this->assertSame( array( 'alto', array( '2 entregas vencidas', 'nota acumulada 48/100' ) ), $this->pick( ATORA_Student_Risk_Service::evaluate( 2, 48, 0 ) ) );
-		$this->assertSame( array( 'alto', array( 'nota acumulada 0/100' ) ), $this->pick( ATORA_Student_Risk_Service::evaluate( 0, 0, 0 ) ), 'Un cero sí es riesgo.' );
-		$this->assertSame( array( 'medio', array( '3 actividades pendientes' ) ), $this->pick( ATORA_Student_Risk_Service::evaluate( 0, null, 3 ) ) );
+		$this->assertSame( array( 'medio', array( '1 entrega vencida sin hacer.' ) ), $this->pick( ATORA_Student_Risk_Service::evaluate( 1, 80, 0 ) ) );
+		$this->assertSame( array( 'medio', array( 'Promedio 65/100, en zona de atención.' ) ), $this->pick( ATORA_Student_Risk_Service::evaluate( 0, 65, 0 ) ) );
+		$this->assertSame( array( 'medio', array( 'Promedio 55/100, en zona de atención.' ) ), $this->pick( ATORA_Student_Risk_Service::evaluate( 0, 55, 0 ) ), 'Antes 55 era alto aquí y normal en el estado académico.' );
+		$this->assertSame( array( 'alto', array( 'Promedio 48/100, por debajo de 50.', '2 entregas vencidas sin hacer.' ) ), $this->pick( ATORA_Student_Risk_Service::evaluate( 2, 48, 0 ) ) );
+		$this->assertSame( array( 'alto', array( 'Promedio 0/100, por debajo de 50.' ) ), $this->pick( ATORA_Student_Risk_Service::evaluate( 0, 0, 0 ) ), 'Un cero sí es riesgo.' );
+		$this->assertSame( array( 'medio', array( '3 actividades pendientes.' ) ), $this->pick( ATORA_Student_Risk_Service::evaluate( 0, null, 3 ) ) );
 		$this->assertSame( 'Riesgo alto', ATORA_Student_Risk_Service::evaluate( 2, null, 0 )['label'] );
 	}
 
@@ -44,7 +46,7 @@ final class StudentRiskServiceTest extends WP_UnitTestCase {
 		) );
 		$risk = ATORA_Student_Risk_Service::for_student( $student, $course, array( 'final_average' => null, 'pending_activities' => 0 ) );
 		$this->assertSame( 'alto', $risk['level'] );
-		$this->assertSame( array( '2 entregas vencidas' ), $risk['reasons'] );
+		$this->assertSame( array( '2 entregas vencidas sin hacer.' ), $risk['reasons'] );
 
 		$wpdb->update( $wpdb->prefix . 'atora_early_warning', array( 'status' => 'resolved' ), array( 'user_id' => $student ) );
 		$this->assertSame( 'bajo', ATORA_Student_Risk_Service::for_student( $student, $course, array( 'final_average' => 90 ) )['level'], 'Una alerta resuelta ya no cuenta.' );

@@ -1017,6 +1017,8 @@ add_action( 'init', static function () {
 	atora_lms_require_module( 'includes/grading/class-student-grade-visibility.php' );
 	// 6.31.0: alcance del docente (SpeedGrader web y /teacher/*).
 	atora_lms_require_module( 'includes/teacher/class-teacher-scope.php' );
+	// 6.36.0: regla canónica de riesgo académico (estado académico, API docente, SpeedGrader).
+	atora_lms_require_module( 'includes/academic/class-academic-risk-rule.php' );
 	atora_lms_require_module( 'includes/teacher/class-student-risk-service.php' );
 	atora_lms_require_module( 'includes/submission/class-web-submission-history.php', static function () { ATORA_Web_Submission_History::boot(); } );
 

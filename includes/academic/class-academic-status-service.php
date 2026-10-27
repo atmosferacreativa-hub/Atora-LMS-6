@@ -50,8 +50,10 @@ class CLMS_Academic_Status_Service {
 			$last_data = $this->get_last_feedback_and_grade( $user_id, $course_id );
 			$next_step = $this->get_next_step_label( $user_id, $lesson_ids );
 			$activity_snapshot = $this->get_activity_snapshot( $user_id, $course_id );
-			$risk      = $this->get_risk_level( $summary, $pending, $activity_snapshot );
-			$risk_data = $this->build_risk_indicators( $summary, $pending, $next_step, $activity_snapshot );
+			// 6.36.0: regla canónica (la misma que usa la API docente y SpeedGrader).
+			$risk_eval = $this->evaluate_risk( $user_id, $course_id, $summary, $pending, $activity_snapshot );
+			$risk      = (string) $risk_eval['level'];
+			$risk_data = $this->risk_indicators_from_evaluation( $risk_eval, $next_step );
 
 			$skip_improvement = ! empty( $args['skip_improvement_plan'] );
 			$improvement_plan = array();
@@ -85,8 +87,10 @@ class CLMS_Academic_Status_Service {
 				'next_step'                        => $next_step,
 				'risk_level'                       => $risk,
 				'risk_reasons'                     => isset( $risk_data['risk_reasons'] ) ? (array) $risk_data['risk_reasons'] : array(),
+				'risk_reason_codes'                => array_values( array_map( static fn( $r ) => (string) $r['code'], (array) $risk_eval['reasons'] ) ),
 				'recommended_action'               => isset( $risk_data['recommended_action'] ) ? sanitize_text_field( (string) $risk_data['recommended_action'] ) : '',
 				'last_access_at'                   => isset( $activity_snapshot['last_access'] ) ? sanitize_text_field( (string) $activity_snapshot['last_access'] ) : '',
+				'course_last_access_at'            => isset( $activity_snapshot['course_last_access'] ) ? sanitize_text_field( (string) $activity_snapshot['course_last_access'] ) : '',
 				'course_time_seconds'              => isset( $activity_snapshot['course_time_seconds'] ) ? absint( $activity_snapshot['course_time_seconds'] ) : 0,
 				'improvement_plan'                 => $improvement_plan,
 				'competencies'                     => $competencies,
@@ -409,81 +413,67 @@ class CLMS_Academic_Status_Service {
 	}
 
 	/**
-	 * Nivel de riesgo académico simple.
-	 *
-	 * @param array $summary        Resumen de curso.
-	 * @param int   $pending_count  Pendientes.
-	 * @return string
+	 * Nivel de riesgo (compatibilidad; delega en ATORA_Academic_Risk_Rule).
 	 */
 	protected function get_risk_level( $summary, $pending_count, $activity_snapshot = array() ) {
-		$summary       = is_array( $summary ) ? $summary : array();
-		$progress      = isset( $summary['progress_percent'] ) ? absint( $summary['progress_percent'] ) : 0;
-		// 6.29.5: null = sin notas; 0 es una nota (antes `> 0` dejaba fuera de riesgo a quien tenía 0).
-		$average       = isset( $summary['final_average'] ) && is_numeric( $summary['final_average'] ) ? absint( $summary['final_average'] ) : null;
-		$pending_count = absint( $pending_count );
-		$activity_snapshot = is_array( $activity_snapshot ) ? $activity_snapshot : array();
-		$is_inactive = $this->is_activity_snapshot_inactive( $activity_snapshot );
-
-		if ( null !== $average && $average < 50 ) {
-			return 'high';
-		}
-		if ( $is_inactive && ( $pending_count >= 2 || $progress < 50 ) ) {
-			return 'high';
-		}
-		if ( $pending_count >= 3 || $progress < 30 ) {
-			return 'medium';
-		}
-		if ( $is_inactive ) {
-			return 'medium';
-		}
-		return 'normal';
+		$evaluation = ATORA_Academic_Risk_Rule::evaluate( $this->risk_signals( $summary, $pending_count, $activity_snapshot ) );
+		return (string) $evaluation['level'];
 	}
 
 	/**
-	 * Construye indicadores de riesgo académicos legibles.
+	 * Indicadores de riesgo legibles (compatibilidad; sin datos de inscripción ni vencidas).
 	 *
-	 * @param array  $summary      Resumen académico.
-	 * @param int    $pending_count Actividades pendientes.
-	 * @param string $next_step    Próximo paso detectado.
 	 * @return array<string,mixed>
 	 */
 	protected function build_risk_indicators( $summary, $pending_count, $next_step = '', $activity_snapshot = array() ) {
-		$summary       = is_array( $summary ) ? $summary : array();
-		$pending_count = absint( $pending_count );
-		$next_step     = sanitize_text_field( (string) $next_step );
+		$evaluation = ATORA_Academic_Risk_Rule::evaluate( $this->risk_signals( $summary, $pending_count, $activity_snapshot ) );
+		return $this->risk_indicators_from_evaluation( $evaluation, (string) $next_step );
+	}
+
+	/**
+	 * 6.36.0: evaluación completa con la regla canónica (vencidas, inscripción, actividad web y app).
+	 *
+	 * @return array{level:string,reasons:array<int,array{code:string,text:string}>,inactive:bool}
+	 */
+	protected function evaluate_risk( $user_id, $course_id, $summary, $pending_count, $activity_snapshot ) {
+		$summary           = is_array( $summary ) ? $summary : array();
 		$activity_snapshot = is_array( $activity_snapshot ) ? $activity_snapshot : array();
-		$progress      = isset( $summary['progress_percent'] ) ? absint( $summary['progress_percent'] ) : 0;
-		$average       = isset( $summary['final_average'] ) && is_numeric( $summary['final_average'] ) ? absint( $summary['final_average'] ) : null;
-		$completed     = isset( $summary['completed_lessons'] ) ? absint( $summary['completed_lessons'] ) : 0;
-		$total         = isset( $summary['total_lessons'] ) ? absint( $summary['total_lessons'] ) : 0;
-		$is_inactive   = $this->is_activity_snapshot_inactive( $activity_snapshot );
+		$status_like       = array(
+			'final_average'         => $this->normalize_final_average( $summary ),
+			'pending_activities'    => absint( $pending_count ),
+			'progress_percent'      => isset( $summary['progress_percent'] ) ? absint( $summary['progress_percent'] ) : null,
+			'total_lessons'         => isset( $summary['total_lessons'] ) ? absint( $summary['total_lessons'] ) : 0,
+			'course_last_access_at' => (string) ( $activity_snapshot['course_last_access'] ?? '' ),
+			'last_access_at'        => (string) ( $activity_snapshot['last_access'] ?? '' ),
+		);
+		return ATORA_Academic_Risk_Rule::evaluate( ATORA_Academic_Risk_Rule::signals_from_status( absint( $user_id ), absint( $course_id ), $status_like ) );
+	}
 
-		$reasons = array();
-
-		if ( null !== $average && $average < 50 ) {
-			$reasons[] = __( 'Promedio académico bajo.', 'atora-lms' );
-		} elseif ( null !== $average && $average >= 50 && $average < 70 ) {
-			$reasons[] = __( 'Promedio en zona de atención.', 'atora-lms' );
+	/** Señales sin estudiante concreto (solo para los métodos de compatibilidad). */
+	protected function risk_signals( $summary, $pending_count, $activity_snapshot ) {
+		$summary           = is_array( $summary ) ? $summary : array();
+		$activity_snapshot = is_array( $activity_snapshot ) ? $activity_snapshot : array();
+		$last              = (string) ( $activity_snapshot['course_last_access'] ?? '' );
+		if ( '' === trim( $last ) ) {
+			$last = (string) ( $activity_snapshot['last_access'] ?? '' );
 		}
+		return array(
+			'average'          => $this->normalize_final_average( $summary ),
+			'pending'          => absint( $pending_count ),
+			'progress'         => isset( $summary['progress_percent'] ) ? absint( $summary['progress_percent'] ) : null,
+			'total_lessons'    => isset( $summary['total_lessons'] ) ? absint( $summary['total_lessons'] ) : 0,
+			'enrolled_days'    => null,
+			'last_activity_ts' => ATORA_Academic_Risk_Rule::local_mysql_to_ts( $last ),
+		);
+	}
 
-		if ( $progress > 0 && $progress < 30 ) {
-			$reasons[] = __( 'Progreso insuficiente en el curso.', 'atora-lms' );
-		}
-
-		if ( $pending_count >= 3 ) {
-			$reasons[] = __( 'Acumulación de actividades pendientes.', 'atora-lms' );
-		}
-
-		if ( $total > 0 && $completed <= 0 ) {
-			$reasons[] = __( 'Aún no registra lecciones completadas.', 'atora-lms' );
-		}
-
-		if ( $is_inactive ) {
-			$reasons[] = __( 'Sin actividad reciente en la plataforma.', 'atora-lms' );
-		}
-
-		$risk_level = $this->get_risk_level( $summary, $pending_count, $activity_snapshot );
-		$recommended_action = '';
+	/**
+	 * @param array{level:string,reasons:array} $evaluation
+	 * @return array{risk_level:string,risk_reasons:string[],recommended_action:string}
+	 */
+	protected function risk_indicators_from_evaluation( array $evaluation, $next_step = '' ) {
+		$risk_level = (string) $evaluation['level'];
+		$next_step  = sanitize_text_field( (string) $next_step );
 
 		if ( 'high' === $risk_level ) {
 			$recommended_action = __( 'Prioriza una tutoría y define un plan de mejora con evidencias concretas.', 'atora-lms' );
@@ -492,14 +482,13 @@ class CLMS_Academic_Status_Service {
 		} else {
 			$recommended_action = __( 'Mantén el ritmo y completa la siguiente actividad planificada.', 'atora-lms' );
 		}
-
 		if ( '' !== $next_step && 'normal' !== $risk_level ) {
 			$recommended_action = $next_step;
 		}
 
 		return array(
 			'risk_level'         => $risk_level,
-			'risk_reasons'       => array_values( array_unique( array_filter( array_map( 'sanitize_text_field', $reasons ) ) ) ),
+			'risk_reasons'       => array_values( array_unique( array_filter( array_map( 'sanitize_text_field', ATORA_Academic_Risk_Rule::reason_texts( $evaluation ) ) ) ) ),
 			'recommended_action' => sanitize_text_field( $recommended_action ),
 		);
 	}
