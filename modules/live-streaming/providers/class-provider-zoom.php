@@ -37,18 +37,15 @@ class Provider_Zoom implements Provider_Interface {
 			return new \WP_Error( 'zoom_auth', __( 'No se pudo autenticar con Zoom.', 'atora-lms' ) );
 		}
 
-		$body = wp_json_encode( array(
-			'topic'      => sanitize_text_field( $data['title'] ?? 'Clase ATORA LMS' ),
-			'type'       => 2, // Scheduled.
-			'start_time' => $data['start_datetime'] ?? '',
-			'duration'   => absint( $data['duration_minutes'] ?? 60 ),
-			'timezone'   => $data['timezone'] ?? 'UTC',
-			'settings'   => array(
+		$body = wp_json_encode( array_merge( self::schedule_fields( $data ), array(
+			'topic'    => sanitize_text_field( $data['title'] ?? 'Clase ATORA LMS' ),
+			'type'     => 2, // Scheduled.
+			'settings' => array(
 				'auto_recording'   => ! empty( $data['record'] ) ? 'cloud' : 'none',
 				'waiting_room'     => true,
 				'join_before_host' => false,
 			),
-		) );
+		) ) );
 
 		$response = wp_remote_post(
 			'https://api.zoom.us/v2/users/me/meetings',
@@ -79,6 +76,89 @@ class Provider_Zoom implements Provider_Interface {
 			'start_url'   => $result['start_url'],
 			'password'    => $result['password'] ?? '',
 		);
+	}
+
+	/** Hora de inicio en UTC (Zoom acepta `Z`), duración y zona para mostrar. */
+	private static function schedule_fields( array $data ): array {
+		$start = ! empty( $data['start_utc'] ) ? gmdate( 'Y-m-d\\TH:i:s\\Z', (int) $data['start_utc'] ) : (string) ( $data['start_datetime'] ?? '' );
+		return array(
+			'start_time' => $start,
+			'duration'   => absint( $data['duration_minutes'] ?? 60 ),
+			'timezone'   => (string) ( $data['timezone'] ?? 'UTC' ),
+		);
+	}
+
+	/**
+	 * 6.39.0: reprogramar la reunión existente (antes cada guardado creaba otra).
+	 *
+	 * @return array|\WP_Error
+	 */
+	public static function update_session( string $meeting_id, array $data ) {
+		$token = self::get_zoom_access_token();
+		if ( ! $token ) {
+			return new \WP_Error( 'zoom_auth', __( 'No se pudo autenticar con Zoom.', 'atora-lms' ) );
+		}
+		$response = wp_remote_request( 'https://api.zoom.us/v2/meetings/' . rawurlencode( $meeting_id ), array(
+			'method'  => 'PATCH',
+			'headers' => array( 'Authorization' => 'Bearer ' . $token, 'Content-Type' => 'application/json' ),
+			'body'    => wp_json_encode( array_merge( self::schedule_fields( $data ), array(
+				'topic'    => sanitize_text_field( $data['title'] ?? 'Clase ATORA LMS' ),
+				'settings' => array( 'auto_recording' => ! empty( $data['record'] ) ? 'cloud' : 'none' ),
+			) ) ),
+			'timeout' => 15,
+		) );
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+		$code = (int) wp_remote_retrieve_response_code( $response );
+		return $code >= 200 && $code < 300 ? array() : new \WP_Error( 'zoom_api', __( 'Zoom no aceptó el cambio de la reunión.', 'atora-lms' ) );
+	}
+
+	/**
+	 * 6.39.0: asistencia definitiva al cerrar la sesión (si el webhook no llegó).
+	 *
+	 * @param array $row Fila de atora_live_sessions.
+	 * @return true|\WP_Error
+	 */
+	public static function collect_attendance( array $row ) {
+		$participants = self::fetch_attendance( (string) $row['external_id'] );
+		if ( ! $participants ) {
+			return new \WP_Error( 'zoom_attendance_pending', __( 'Zoom aún no tiene el informe de participantes.', 'atora-lms' ) );
+		}
+		self::record_attendance( (int) $row['lesson_id'], $participants, array( 'object' => array( 'duration' => (int) $row['duration_minutes'] ) ) );
+		return true;
+	}
+
+	/**
+	 * Enlace para ver la grabación en la nube (`share_url`).
+	 *
+	 * @return array{url:string,note:string}|null
+	 */
+	public static function fetch_recording( array $row ): ?array {
+		$token = self::get_zoom_access_token();
+		if ( ! $token ) {
+			return null;
+		}
+		$response = wp_remote_get( 'https://api.zoom.us/v2/meetings/' . rawurlencode( (string) $row['external_id'] ) . '/recordings', array(
+			'headers' => array( 'Authorization' => 'Bearer ' . $token ),
+			'timeout' => 10,
+		) );
+		if ( is_wp_error( $response ) || 200 !== (int) wp_remote_retrieve_response_code( $response ) ) {
+			return null;
+		}
+		$data = json_decode( (string) wp_remote_retrieve_body( $response ), true );
+		return self::recording_from_object( is_array( $data ) ? $data : array() );
+	}
+
+	/** @return array{url:string,note:string}|null */
+	private static function recording_from_object( array $object ): ?array {
+		$url = esc_url_raw( (string) ( $object['share_url'] ?? '' ) );
+		if ( '' === $url ) {
+			return null;
+		}
+		$pass = (string) ( $object['recording_play_passcode'] ?? $object['password'] ?? '' );
+		/* translators: %s: passcode */
+		return array( 'url' => $url, 'note' => '' !== $pass ? sprintf( __( 'Código de acceso: %s', 'atora-lms' ), $pass ) : '' );
 	}
 
 	/**
@@ -140,77 +220,90 @@ class Provider_Zoom implements Provider_Interface {
 	// ── Webhooks ──────────────────────────────────────────────────────────────
 
 	/**
-	 * @param \WP_REST_Request $request
-	 * @return \WP_REST_Response
+	 * Webhook de Zoom (6.39.0).
+	 *
+	 * - Firma correcta: Zoom firma `v0:{x-zm-request-timestamp}:{cuerpo}` (antes se firmaba solo el cuerpo y ningún
+	 *   webhook real pasaba).
+	 * - Vigencia de 5 minutos y cada evento una sola vez.
+	 * - Responde la validación de URL (`endpoint.url_validation`), sin la cual Zoom no activa el webhook.
+	 * - Fin de reunión: la lección se busca por el ID de la reunión en la tabla de sesiones (antes solo entre 5).
+	 * - Grabación: si el docente eligió el enlace automático, se guarda el enlace para verla.
 	 */
 	public static function handle_webhook( \WP_REST_Request $request ): \WP_REST_Response {
-		$signature = $request->get_header( 'x-zm-signature' );
-		if ( ! self::verify_zoom_webhook_signature( $request->get_body(), $signature ) ) {
+		$timestamp = (string) $request->get_header( 'x-zm-request-timestamp' );
+		$body      = (string) $request->get_body();
+		if ( ! self::verify_zoom_webhook_signature( $body, (string) $request->get_header( 'x-zm-signature' ), $timestamp ) ) {
 			return new \WP_REST_Response( array( 'status' => 'invalid_signature' ), 403 );
 		}
+		$payload    = json_decode( $body, true );
+		$payload    = is_array( $payload ) ? $payload : array();
+		$event_type = sanitize_text_field( (string) ( $payload['event'] ?? '' ) );
 
-		$payload    = $request->get_json_params();
-		$event_type = sanitize_text_field( $payload['event'] ?? '' );
+		if ( 'endpoint.url_validation' === $event_type ) {
+			$plain = (string) ( $payload['payload']['plainToken'] ?? '' );
+			return new \WP_REST_Response( array(
+				'plainToken'     => $plain,
+				'encryptedToken' => hash_hmac( 'sha256', $plain, self::webhook_secret() ),
+			), 200 );
+		}
+
+		$key = $event_type . ':' . (string) ( $payload['payload']['object']['uuid'] ?? $payload['payload']['object']['id'] ?? '' ) . ':' . (string) ( $payload['event_ts'] ?? $timestamp );
+		if ( ! self::remember_event( $key ) ) {
+			return rest_ensure_response( array( 'status' => 'duplicate' ) );
+		}
 
 		switch ( $event_type ) {
 			case 'meeting.ended':
-				self::handle_meeting_ended( $payload['payload'] ?? array() );
+				self::handle_meeting_ended( (array) ( $payload['payload'] ?? array() ) );
 				break;
-
 			case 'recording.completed':
-				self::handle_recording_completed( $payload['payload'] ?? array() );
+				self::handle_recording_completed( (array) ( $payload['payload'] ?? array() ) );
 				break;
 		}
 
 		do_action( 'atora/live/zoom_webhook', $event_type, $payload );
-
 		return rest_ensure_response( array( 'status' => 'ok' ) );
 	}
 
-	/**
-	 * @param array $payload
-	 * @return void
-	 */
-	private static function handle_meeting_ended( array $payload ): void {
-		$meeting_id = sanitize_text_field( $payload['object']['id'] ?? '' );
-		if ( ! $meeting_id ) {
-			return;
+	/** Cada evento se procesa una vez (Zoom reintenta si no recibe 200 a tiempo). */
+	private static function remember_event( string $key ): bool {
+		$flag = 'atora_zoom_evt_' . md5( $key );
+		if ( get_transient( $flag ) ) {
+			return false;
 		}
-
-		$lessons = get_posts( array(
-			'post_type'      => 'lm_lesson',
-			'meta_key'       => \ATORA\LiveStreaming\Live_Streaming::LESSON_META,
-			'fields'         => 'ids',
-			'posts_per_page' => 5,
-		) );
-
-		foreach ( $lessons as $lesson_id ) {
-			$session = get_post_meta( $lesson_id, \ATORA\LiveStreaming\Live_Streaming::LESSON_META, true );
-			if ( ( $session['meeting_id'] ?? '' ) !== $meeting_id ) {
-				continue;
-			}
-
-			$participants = self::fetch_attendance( $meeting_id );
-			self::record_attendance( (int) $lesson_id, $participants, $payload );
-
-			do_action( 'atora/live/meeting_ended', $lesson_id, $meeting_id, $participants );
-			break;
-		}
+		set_transient( $flag, 1, HOUR_IN_SECONDS );
+		return true;
 	}
 
-	/**
-	 * @param array $payload
-	 * @return void
-	 */
-	private static function handle_recording_completed( array $payload ): void {
-		$meeting_id   = sanitize_text_field( $payload['object']['id'] ?? '' );
-		$download_url = esc_url_raw( $payload['object']['recording_files'][0]['download_url'] ?? '' );
+	/** @return array|null Fila de atora_live_sessions de una reunión de Zoom. */
+	private static function session_for_meeting( string $meeting_id ): ?array {
+		global $wpdb;
+		$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}atora_live_sessions WHERE provider = 'zoom' AND external_id = %s LIMIT 1", $meeting_id ), ARRAY_A ); // phpcs:ignore WordPress.DB
+		return $row ?: null;
+	}
 
-		if ( ! $meeting_id || ! $download_url ) {
+	private static function handle_meeting_ended( array $payload ): void {
+		$meeting_id = sanitize_text_field( (string) ( $payload['object']['id'] ?? '' ) );
+		$row        = '' !== $meeting_id ? self::session_for_meeting( $meeting_id ) : null;
+		if ( ! $row ) {
 			return;
 		}
+		$participants = self::fetch_attendance( $meeting_id );
+		self::record_attendance( (int) $row['lesson_id'], $participants, $payload );
+		global $wpdb;
+		$wpdb->update( $wpdb->prefix . 'atora_live_sessions', array( 'status' => 'ended' ), array( 'id' => (int) $row['id'] ) );
+		do_action( 'atora/live/meeting_ended', (int) $row['lesson_id'], $meeting_id, $participants );
+	}
 
-		do_action( 'atora/live/recording_available', $meeting_id, $download_url );
+	private static function handle_recording_completed( array $payload ): void {
+		$object     = (array) ( $payload['object'] ?? array() );
+		$meeting_id = sanitize_text_field( (string) ( $object['id'] ?? '' ) );
+		$row        = '' !== $meeting_id ? self::session_for_meeting( $meeting_id ) : null;
+		$rec        = self::recording_from_object( $object );
+		if ( $row && $rec ) {
+			\ATORA\LiveStreaming\Live_Streaming::store_provider_recording( (int) $row['lesson_id'], 'zoom', $rec['url'], $rec['note'] );
+		}
+		do_action( 'atora/live/recording_available', $meeting_id, $rec['url'] ?? '' );
 	}
 
 	/**
@@ -410,22 +503,21 @@ class Provider_Zoom implements Provider_Interface {
 		return $data['access_token'];
 	}
 
-	/**
-	 * @param string $body
-	 * @param string $signature
-	 * @return bool
-	 */
-	private static function verify_zoom_webhook_signature( string $body, string $signature ): bool {
-		$opts   = get_option( 'atora_live_streaming_options', array() );
-		$secret = (string) ( $opts['zoom_webhook_secret'] ?? '' );
-		$secret = trim( $secret );
+	private static function webhook_secret(): string {
+		$opts = get_option( 'atora_live_streaming_options', array() );
+		return trim( (string) ( $opts['zoom_webhook_secret'] ?? '' ) );
+	}
 
-		if ( ! $secret ) {
-			return defined( 'ATORA_DEV_MODE' ) && ATORA_DEV_MODE;
+	/** Firma de Zoom: `v0=` + HMAC-SHA256(`v0:{timestamp}:{cuerpo}`), con la marca dentro de 5 minutos. */
+	public static function verify_zoom_webhook_signature( string $body, string $signature, string $timestamp = '', ?int $now = null ): bool {
+		$secret = self::webhook_secret();
+		if ( '' === $secret || '' === $signature || ! ctype_digit( $timestamp ) ) {
+			return false; // 6.39.0: sin secreto se rechaza siempre (antes el modo desarrollo lo dejaba pasar).
 		}
-
-		$expected = hash_hmac( 'sha256', $body, $secret );
-
-		return hash_equals( 'v0=' . $expected, $signature );
+		$now = $now ?? time();
+		if ( abs( $now - (int) $timestamp ) > 300 ) {
+			return false;
+		}
+		return hash_equals( 'v0=' . hash_hmac( 'sha256', 'v0:' . $timestamp . ':' . $body, $secret ), $signature );
 	}
 }

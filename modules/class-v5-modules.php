@@ -356,6 +356,9 @@ class V5_Modules {
 		self::require_file( $dir . 'class-live-session-repository.php' );
 		self::require_file( $dir . 'providers/class-provider-interface.php' );
 		self::require_file( $dir . 'providers/class-provider-zoom.php' );
+		// 6.39.0: Teams por Microsoft Graph (credenciales de aplicación de la academia).
+		self::require_file( $dir . 'providers/class-provider-teams.php' );
+		self::require_file( $dir . 'class-live-settings.php' );
 		// P8 (6.13.0): Meet reusa el OAuth de Calendar — requiere que ese
 		// módulo ya esté cargado (gateado arriba, antes de live-streaming).
 		if ( class_exists( 'ATORA\Calendar\Calendar_Sync' ) ) {
