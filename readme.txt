@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 6.36.0
+Stable tag: 6.37.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -50,6 +50,10 @@ No. ATORA LMS is not designed for WordPress Multisite. Network activation is blo
 4. Course overview template.
 
 == Changelog ==
+= 6.37.0 =
+* Audio como recurso de la lección: MP3, M4A y OGG validados por contenido, transcripción manual, reproductor web con velocidad y posición, datos para la app (duración, formato, compatibilidad, posición).
+* Planificación híbrida completa sin IA: objetivo, encuentro presencial, trabajo a distancia, recursos, evidencia y acompañamiento; vista previa y publicación que crea o actualiza las lecciones sin duplicar; IA opcional solo para sugerir.
+
 = 6.36.0 =
 * Riesgo académico único: la misma regla y los mismos motivos en informes, gradebook, CRM, analíticas, SpeedGrader y la app docente; los recién inscritos ya no salen en riesgo y la actividad en la app cuenta.
 * Seguridad: los informes académicos y la exportación de riesgo respetan el alcance docente e institucional (antes cualquier instructor veía los de cualquier curso).
