@@ -418,6 +418,8 @@ trait CLMS_Metabox_Lesson_Registration_Trait {
 			'typeGuide'           => __( 'Guía', 'atora-lms' ),
 			'typePresentation'    => __( 'Presentación', 'atora-lms' ),
 			'typeAudio'           => __( 'Audio', 'atora-lms' ),
+			'labelTranscript'     => __( 'Transcripción o texto alternativo', 'atora-lms' ),
+			'helpAudio'           => __( 'Audio en MP3, M4A u OGG. OGG puede no reproducirse en iPhone y Safari: para todos los dispositivos usa MP3 o M4A.', 'atora-lms' ),
 			'typeVideo'           => __( 'Video', 'atora-lms' ),
 			'typeLink'            => __( 'Enlace', 'atora-lms' ),
 			'typeFile'            => __( 'Archivo', 'atora-lms' ),
@@ -778,6 +780,10 @@ trait CLMS_Metabox_Lesson_Registration_Trait {
 						row.querySelectorAll('.clms-resource-scorm').forEach(function(el){
 							el.style.display = on ? '' : 'none';
 						});
+						var audio = typeSel && typeSel.value === 'audio';
+						row.querySelectorAll('.clms-resource-audio').forEach(function(el){
+							el.style.display = audio ? '' : 'none';
+						});
 					}
 					if(typeSel){
 						typeSel.addEventListener('change',toggleScorm);
@@ -844,6 +850,7 @@ trait CLMS_Metabox_Lesson_Registration_Trait {
 							+'<p class="clms-f clms-resource-scorm" style="display:none"><label>Biblioteca (ID)</label><input type="number" min="0" step="1" name="'+n+'[library_item_id]" value=""></p>'
 							+'<p class="clms-f clms-resource-scorm" style="display:none"><label>Versión (ID)</label><input type="number" min="0" step="1" name="'+n+'[library_version_id]" value="0"></p>'
 							+'<p class="clms-f full"><label>'+clmsI18n.labelDescription+'</label><textarea name="'+n+'[description]" rows="2"></textarea></p>'
+							+'<p class="clms-f full clms-resource-audio" style="display:none"><label>'+clmsI18n.labelTranscript+'</label><textarea name="'+n+'[transcript]" rows="4"></textarea><span class="clms-help">'+clmsI18n.helpAudio+'</span></p>'
 							+'<p class="clms-f"><label>'+clmsI18n.labelFile+'</label>'
 							+'<div class="clms-dropzone" data-clms-dropzone="resource-file" tabindex="0" role="button">'
 							+'<span class="clms-dropzone-title">'+clmsI18n.helpDropTitle+'</span>'

@@ -888,7 +888,9 @@ class CLMS_UI_Lesson_Sections {
 							<?php if ( $r_desc ) : ?>
 								<p class="atora-resource-desc"><?php echo esc_html( $r_desc ); ?></p>
 							<?php endif; ?>
-							<?php if ( $embed ) : ?>
+							<?php if ( 'audio' === $r_type && $href && class_exists( 'ATORA_Lesson_Audio' ) ) : ?>
+								<?php ATORA_Lesson_Audio::render_web_player( $resource, $href, (int) $ctx->entity_id ); ?>
+							<?php elseif ( $embed ) : ?>
 								<div class="atora-resource-embed">
 									<?php echo $embed; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 								</div>
