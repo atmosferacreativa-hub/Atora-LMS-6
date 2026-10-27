@@ -1,5 +1,17 @@
 # CHANGELOG — ATORA LMS
 
+## 6.36.0 (2026-10-27)
+
+### Analíticas y riesgo académico (`docs/ordenes/ORDEN-ANALITICAS.md`)
+
+- **Una sola regla de riesgo** (`ATORA_Academic_Risk_Rule`). Antes había dos con umbrales distintos: un 55 de promedio era "alto" en la app docente y SpeedGrader y "normal" en los informes. Ahora: promedio < 50 alto, 50–69 medio; 2+ entregas vencidas alto, 1 medio; 3+ pendientes medio; progreso < 30 % medio solo pasados 14 días desde la inscripción; inactividad (web o app) 14 días medio, alto si además hay pendientes o poco progreso. Motivos con código y texto, iguales en todos los consumidores. Las entregas vencidas cuentan también en el estado académico.
+- **Recién inscritos**: el progreso 0 % y "sin accesos" del primer día ya no son riesgo. Sin datos de inscripción no se castiga "nunca activo". Una nota ausente sigue sin contar como cero.
+- **La app registra actividad**: las peticiones autenticadas de la app actualizan el último acceso (global y por curso, una escritura cada 5 min como mucho). Antes quien estudiaba solo en la app aparecía inactivo, subía su riesgo y recibía recordatorios de inactividad. El motivo de inactividad aclara que lo hecho sin conexión se registra al sincronizar.
+- **Informes con alcance** (seguridad): los informes académicos y la exportación de riesgo usan `ATORA_Teacher_Scope` (secciones, autoría, delegación). Con varias instituciones el administrador solo ve cursos y perfiles de la suya. Antes `clms_access_admin` —que también tienen los instructores— daba acceso a los informes de cualquier curso.
+- **Participación no es riesgo**: la puntuación de correo de `Analytics_Engine` se publica como participación (`atora/analytics/engagement_updated`); el hook anterior se mantiene.
+
+**TESTS**: `tests/Academic/AcademicRiskRuleTest.php`, `AcademicRiskConsistencyTest`, `AcademicReportScopeTest`, `StudentRiskServiceTest` (textos nuevos).
+
 ## 6.35.0 (2026-10-27)
 
 ### SCORM (Orden B, `docs/ordenes/ORDEN-B-SCORM.md`)

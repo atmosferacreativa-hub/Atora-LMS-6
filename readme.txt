@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 6.35.0
+Stable tag: 6.36.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -50,6 +50,10 @@ No. ATORA LMS is not designed for WordPress Multisite. Network activation is blo
 4. Course overview template.
 
 == Changelog ==
+= 6.36.0 =
+* Riesgo académico único: la misma regla y los mismos motivos en informes, gradebook, CRM, analíticas, SpeedGrader y la app docente; los recién inscritos ya no salen en riesgo y la actividad en la app cuenta.
+* Seguridad: los informes académicos y la exportación de riesgo respetan el alcance docente e institucional (antes cualquier instructor veía los de cualquier curso).
+
 = 6.35.0 =
 * SCORM 1.2 y 2004 como recurso de la biblioteca académica: subida validada (manifiesto, zip slip, symlinks, extensiones, bombas zip), versiones sin romper intentos anteriores, reproductor web con adaptador de API, seguimiento CMI que nunca retrocede, completitud de la lección, nota en el libro con la regla de visibilidad, límite de intentos e informe docente.
 * SCORM en la app móvil: rutas `atora-mobile/v1/scorm/*` con commits idempotentes, descarga firmada y temporal, solo paquetes publicados y enlazados a la lección, y cada intento visible solo para su dueño.

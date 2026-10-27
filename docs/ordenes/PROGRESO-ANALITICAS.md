@@ -20,14 +20,16 @@ Orden: `docs/ordenes/ORDEN-ANALITICAS.md`. Inicio: 2026-10-27.
 - Evidencia: `AcademicRiskConsistencyTest::test_app_requests_count_as_activity`.
 
 ## Bloque 3 — Separar lo comercial
-- [ ] Pendiente.
+- [x] `Analytics_Engine`: participación (`atora/analytics/engagement_updated`), no riesgo académico. PR #111.
 
 ## Bloque 4 — Panel institucional y consistencia
-- [ ] Pendiente.
+- [x] Informes y exportación de riesgo con `ATORA_Teacher_Scope` y aislamiento institucional. Hallazgo: los
+  instructores tienen `clms_access_admin`, que daba acceso a informes de cualquier curso. PR #111.
+- Evidencia: `AcademicReportScopeTest`, `AcademicRiskConsistencyTest` (integración, también en local con WP 6.8).
 
 ## Cierre
-- [ ] 6.36.0.
+- [x] 6.36.0 (PRs #110, #111 y este cierre).
 
 ## Validación real
-- No ejecutada. Pendiente: revisar en un sitio con estudiantes reales cuántos cambian de nivel (script de solo
-  lectura en el cierre).
+- No ejecutada. Al actualizar un sitio con estudiantes reales: `wp eval-file scripts/risk-level-report.php`
+  (solo lectura: estudiantes por nivel y motivo, por curso) antes de que lo vean los docentes.

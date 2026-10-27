@@ -27,8 +27,8 @@ Un documento fusionado no es una función terminada.
 
 | # | Orden (archivo) | Alias anteriores | Versión prevista | Estado |
 |---|---|---|---|---|
-| 1 | `ORDEN-ANALITICAS` — riesgo académico único y panel institucional | "C Analíticas" (lista vieja), "D" (lista ejecutada) | 6.36.0 | por escribir |
-| 2 | `ORDEN-AUDIO-PLANIFICACION` — audio en la lección y planificación híbrida (web y app 1.2.0) | — | 6.37.0 · app 1.2.0 | por escribir |
+| 1 | `ORDEN-ANALITICAS` — riesgo académico único y panel institucional | "C Analíticas" (lista vieja), "D" (lista ejecutada) | 6.36.0 | **cerrada en código y pruebas**; sin validación real |
+| 2 | `ORDEN-AUDIO-PLANIFICACION` — audio en la lección y planificación híbrida (web y app 1.2.0) | — | 6.37.0 · app 1.2.0 | en curso |
 | 3 | `ORDEN-C-COMUNICACION` — Email Engine, Newsletter, Automatización | "C" (lista ejecutada) | 6.38.0 (antes 6.36.0) | escrita, bloques pendientes |
 | 4 | `ORDEN-CLASES-EN-VIVO` — Zoom, Meet y Microsoft Teams; grabación a decisión del docente | "E Streaming" (lista vieja), "F" (lista ejecutada) | 6.39.0 | por escribir |
 
