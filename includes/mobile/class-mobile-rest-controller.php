@@ -266,6 +266,7 @@ final class ATORA_Mobile_REST_Controller {
 				'scorm'              => class_exists( 'CLMS_SCORM_Attempt_Service' ) && class_exists( 'CLMS_SCORM_Launch_Service' ),
 				// 6.37.0: recursos de audio con duración, formato, compatibilidad, transcripción y posición.
 				'lesson_audio'       => class_exists( 'ATORA_Lesson_Audio' ),
+				'live_classes'       => class_exists( 'ATORA_Live_Session_Service' ),
 				'today'              => class_exists( 'ATORA_Mobile_Organize_Controller' ),
 				'push_notifications' => class_exists( 'ATORA_Mobile_Push_Service' ),
 				// 6.31.0: Fase 4 — docente (hoy, cursos, estudiantes, entregas, calificar, avisos).
@@ -536,6 +537,8 @@ final class ATORA_Mobile_REST_Controller {
 				'quiz_available'=> $quiz_available,
 				'assignment_available' => $wp_post_id > 0 && self::lesson_has_assignment( $wp_post_id ),
 				'resources'      => $resources,
+				// 6.39.0: clase en vivo (estado, hora UTC, enlace solo con la clase abierta, grabación).
+				'live'           => $wp_post_id && class_exists( 'ATORA_Live_Session_Service' ) ? ATORA_Live_Session_Service::join_info( $wp_post_id, $user_id ) : null,
 			),
 		), 200 );
 	}

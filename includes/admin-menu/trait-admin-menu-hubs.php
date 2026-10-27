@@ -1193,6 +1193,7 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 				'edit.php?post_type=clms_rubric',
 				'atora-analytics',
 				'atora-live-streaming',
+				'atora-live-classes',
 				// Entradas reubicadas al Panel ATORA (tarjetas + acceso rápido).
 				'atora-early-warning',
 				'atora-learning-analytics',
@@ -1269,8 +1270,8 @@ trait CLMS_Admin_Menu_Hubs_Trait {
 		if ( class_exists( '\ATORA\LiveStreaming\Live_Streaming' ) ) {
 			$links[] = $this->build_nav_item(
 				__( '🎥 Zoom / Meet / Teams', 'atora-lms' ),
-				__( 'Clases en vivo y sesiones: configuración por lección + asistencia y recordatorios.', 'atora-lms' ),
-				admin_url( 'admin.php?page=atora-communication-hub' )
+				__( 'Credenciales de Zoom y Teams, webhook de Zoom; cada clase se crea desde la lección.', 'atora-lms' ),
+				admin_url( 'admin.php?page=atora-live-classes' )
 			);
 		}
 

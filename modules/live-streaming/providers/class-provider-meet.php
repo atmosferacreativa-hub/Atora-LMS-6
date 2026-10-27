@@ -254,53 +254,95 @@ class Provider_Meet implements Provider_Interface {
 	 * @return string[]
 	 */
 	public static function supports(): array {
-		return array( 'create', 'attendance' );
+		return array( 'create', 'attendance', 'recording' );
 	}
 
 	/**
-	 * Fallback de polling — enganchado al cron de 5 minutos que ya existe
-	 * en Live_Streaming (atora_live_reminders_cron), en vez de crear uno
-	 * nuevo (P8.4). Preferir Workspace Events API queda documentado como
-	 * mejora futura; esto es lo que funciona hoy sin infraestructura de
-	 * Pub/Sub adicional.
+	 * 6.39.0: reprogramar el evento de Calendar (y con él la reunión de Meet).
 	 *
-	 * @return void
+	 * @return array|\WP_Error
 	 */
-	public static function poll_active_sessions(): void {
+	public static function update_session( string $meeting_id, array $data ) {
 		global $wpdb;
-
-		$table = $wpdb->prefix . 'atora_live_sessions';
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		$sessions = $wpdb->get_results(
-			"SELECT * FROM {$table} WHERE provider = 'meet' AND status != 'ended' AND start_datetime < UTC_TIMESTAMP() LIMIT 20"
-		);
-
-		foreach ( (array) $sessions as $session ) {
-			$participants = self::fetch_attendance( (string) $session->external_id );
-			if ( is_wp_error( $participants ) || ! $participants ) {
-				continue;
-			}
-
-			foreach ( $participants as $p ) {
-				$user = ! empty( $p['email'] ) ? get_user_by( 'email', $p['email'] ) : false;
-
-				Live_Session_Repository::record_attendance( array(
-					'user_id'                 => $user ? $user->ID : 0,
-					'session_id'              => (int) $session->id,
-					'external_participant_id' => (string) ( $p['external_participant_id'] ?? '' ),
-					'display_name'            => (string) ( $p['display_name'] ?? '' ),
-					'course_id'               => (int) $session->course_id,
-					'source'                  => 'meet',
-					'joined_at'               => $p['joined_at'] ?? null,
-					'left_at'                 => $p['left_at'] ?? null,
-					'duration_seconds'        => (int) ( $p['duration_seconds'] ?? 0 ),
-					// P8.3: sin identidad → "presente" pero user_id = 0,
-					// el docente lo ve como "no identificado" en la UI.
-					'status'                  => 'presente',
-				) );
-			}
-
-			$wpdb->update( $table, array( 'status' => 'ended' ), array( 'id' => $session->id ) );
+		$event_id = (string) ( $data['calendar_event_id'] ?? '' );
+		$actor    = absint( $data['created_by_user_id'] ?? $data['actor_user_id'] ?? 0 );
+		$token    = $actor ? Calendar_Sync::get_valid_access_token( $actor, 'google' ) : null;
+		if ( '' === $event_id || ! $token ) {
+			return new \WP_Error( 'meet_no_calendar_token', __( 'No se pudo reprogramar en Google Calendar (falta la conexión de quien creó la clase).', 'atora-lms' ) );
 		}
+		$start    = (int) ( $data['start_utc'] ?? 0 );
+		$end      = $start + absint( $data['duration_minutes'] ?? 60 ) * MINUTE_IN_SECONDS;
+		$response = wp_remote_request( 'https://www.googleapis.com/calendar/v3/calendars/primary/events/' . rawurlencode( $event_id ), array(
+			'method'  => 'PATCH',
+			'headers' => array( 'Authorization' => 'Bearer ' . $token, 'Content-Type' => 'application/json' ),
+			'body'    => wp_json_encode( array(
+				'summary' => sanitize_text_field( $data['title'] ?? 'Clase ATORA LMS' ),
+				'start'   => array( 'dateTime' => gmdate( 'Y-m-d\\TH:i:s\\Z', $start ) ),
+				'end'     => array( 'dateTime' => gmdate( 'Y-m-d\\TH:i:s\\Z', $end ) ),
+			) ),
+			'timeout' => 15,
+		) );
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+		$code = (int) wp_remote_retrieve_response_code( $response );
+		return $code >= 200 && $code < 300 ? array() : new \WP_Error( 'meet_api', __( 'Google Calendar no aceptó el cambio.', 'atora-lms' ) );
+	}
+
+	/**
+	 * 6.39.0: asistencia definitiva al terminar la clase, con estado por tiempo conectado (antes todos «presente»
+	 * y la sesión se cerraba en la primera consulta, apenas empezaba).
+	 *
+	 * @param array $row Fila de atora_live_sessions.
+	 * @return true|\WP_Error
+	 */
+	public static function collect_attendance( array $row ) {
+		$participants = self::fetch_attendance( (string) $row['external_id'] );
+		if ( is_wp_error( $participants ) ) {
+			return $participants;
+		}
+		if ( ! $participants ) {
+			return new \WP_Error( 'meet_attendance_pending', __( 'Meet aún no tiene el registro de la reunión.', 'atora-lms' ) );
+		}
+		$class_seconds = max( 60, absint( $row['duration_minutes'] ?? 60 ) * 60 );
+		foreach ( $participants as $p ) {
+			$user  = ! empty( $p['email'] ) ? get_user_by( 'email', (string) $p['email'] ) : false;
+			$ratio = (int) ( $p['duration_seconds'] ?? 0 ) / $class_seconds;
+			Live_Session_Repository::record_attendance( array(
+				'user_id'                 => $user ? $user->ID : 0,
+				'session_id'              => (int) $row['id'],
+				'external_participant_id' => $user ? '' : (string) ( $p['external_participant_id'] ?? '' ),
+				'display_name'            => $user ? '' : (string) ( $p['display_name'] ?? '' ),
+				'course_id'               => (int) $row['course_id'],
+				'source'                  => 'meet',
+				'joined_at'               => $p['joined_at'] ?? null,
+				'left_at'                 => $p['left_at'] ?? null,
+				'duration_seconds'        => (int) ( $p['duration_seconds'] ?? 0 ),
+				'status'                  => $ratio >= 0.8 ? 'presente' : ( $ratio >= 0.5 ? 'tarde' : 'ausente' ),
+			) );
+		}
+		return true;
+	}
+
+	/**
+	 * Grabación de Meet: la inicia quien organiza (la API de Calendar no puede activarla). Si existe, se toma el
+	 * enlace del archivo en Drive.
+	 *
+	 * @return array{url:string,note:string}|null
+	 */
+	public static function fetch_recording( array $row ): ?array {
+		$actor = absint( $row['created_by_user_id'] ?? 0 );
+		$token = $actor ? Calendar_Sync::get_valid_access_token( $actor, 'google' ) : null;
+		if ( ! $token ) {
+			return null;
+		}
+		$records = wp_remote_get( 'https://meet.googleapis.com/v2/conferenceRecords?' . http_build_query( array( 'filter' => 'space.meeting_code="' . (string) $row['external_id'] . '"' ) ), array( 'headers' => array( 'Authorization' => 'Bearer ' . $token ), 'timeout' => 10 ) );
+		$name    = is_wp_error( $records ) ? '' : (string) ( json_decode( (string) wp_remote_retrieve_body( $records ), true )['conferenceRecords'][0]['name'] ?? '' );
+		if ( '' === $name ) {
+			return null;
+		}
+		$list = wp_remote_get( "https://meet.googleapis.com/v2/{$name}/recordings", array( 'headers' => array( 'Authorization' => 'Bearer ' . $token ), 'timeout' => 10 ) );
+		$url  = is_wp_error( $list ) ? '' : (string) ( json_decode( (string) wp_remote_retrieve_body( $list ), true )['recordings'][0]['driveDestination']['exportUri'] ?? '' );
+		return '' === $url ? null : array( 'url' => esc_url_raw( $url ), 'note' => __( 'Está en Google Drive de quien organizó la clase; se ve si está compartida con el curso.', 'atora-lms' ) );
 	}
 }
