@@ -34,6 +34,10 @@ class SMTP implements Provider_Interface {
 		if ( $reply_to && is_email( $reply_to ) ) {
 			$headers[] = 'Reply-To: ' . $reply_to;
 		}
+		$extra = class_exists( '\\ATORA\\EmailEngine\\Email_Unsubscribe' ) ? \ATORA\EmailEngine\Email_Unsubscribe::clean_headers( $options['headers'] ?? array() ) : array();
+		foreach ( $extra as $name => $value ) {
+			$headers[] = $name . ': ' . $value;
+		}
 		$sent    = wp_mail( $to, $subject, $body_html, $headers );
 
 		remove_action( 'phpmailer_init', array( __CLASS__, 'configure_phpmailer' ), 10 );

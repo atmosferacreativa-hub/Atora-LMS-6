@@ -44,6 +44,10 @@ class SendGrid implements Provider_Interface {
 		if ( $reply_to && is_email( $reply_to ) ) {
 			$payload['reply_to'] = array( 'email' => $reply_to );
 		}
+		$extra = class_exists( '\\ATORA\\EmailEngine\\Email_Unsubscribe' ) ? \ATORA\EmailEngine\Email_Unsubscribe::clean_headers( $options['headers'] ?? array() ) : array();
+		if ( $extra ) {
+			$payload['headers'] = $extra;
+		}
 
 		$body = wp_json_encode( $payload );
 

@@ -217,7 +217,10 @@ class Email_Templates {
 			'site_name'        => $site_name,
 			'site_url'         => home_url( '/' ),
 			'dashboard_url'    => $dashboard_url,
-			'unsub_url'        => add_query_arg( 'atora_email_action', 'unsubscribe', home_url( '/' ) ),
+			// 6.38.0: enlace firmado por usuario (antes no llevaba token y no hacía nada).
+			'unsub_url'        => class_exists( Email_Unsubscribe::class )
+				? Email_Unsubscribe::url( (int) $user->ID, (string) $user->user_email )
+				: add_query_arg( 'atora_email_action', 'unsubscribe', home_url( '/' ) ),
 			'preferences_url'  => add_query_arg( 'atora_email_action', 'preferences', home_url( '/' ) ),
 			'course_title'     => $course_id ? get_the_title( $course_id ) : '',
 			'course_url'       => $course_id ? (string) get_permalink( $course_id ) : '',

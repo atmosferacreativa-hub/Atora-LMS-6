@@ -924,21 +924,15 @@ class Email_Engine {
 	 * @return void
 	 */
 	private static function handle_unsubscribe( string $token ): void {
-		global $wpdb;
-
-		if ( ! $token ) {
-			return;
+		// 6.38.0: token firmado por usuario. El ID de la cola (consecutivo) ya no sirve como token.
+		$method = isset( $_SERVER['REQUEST_METHOD'] ) ? sanitize_key( wp_unslash( (string) $_SERVER['REQUEST_METHOD'] ) ) : 'get';
+		if ( '' === $token && isset( $_POST['atora_email_token'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing -- el token firmado es la autorización.
+			$token = sanitize_text_field( wp_unslash( (string) $_POST['atora_email_token'] ) );
 		}
-
-		$row = $wpdb->get_row( $wpdb->prepare(
-			"SELECT user_id FROM {$wpdb->prefix}atora_email_queue WHERE id = %s LIMIT 1",
-			$token
-		) );
-
-		if ( $row ) {
-			self::unsubscribe_all( (int) $row->user_id );
-		}
-
+		$unsub_state = Email_Unsubscribe::handle( $token, $method );
+		$unsub_token = $token;
+		status_header( 'invalid' === $unsub_state ? 400 : 200 );
+		nocache_headers();
 		include ATORA_LMS_MODULES_DIR . 'email-engine/views/unsubscribed.php';
 		exit;
 	}

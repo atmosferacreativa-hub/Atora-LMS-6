@@ -94,8 +94,13 @@ class Email_Queue {
 		if ( class_exists( '\\ATORA\\EmailEngine\\Email_Engine' ) && method_exists( '\\ATORA\\EmailEngine\\Email_Engine', 'suppression_reason' ) ) {
 			$suppressed = Email_Engine::suppression_reason( (string) $user->user_email );
 			$category   = sanitize_key( (string) ( $template['category'] ?? '' ) );
-			if ( 'bounce' === $suppressed || ( '' !== $suppressed && in_array( $category, array( 'commercial', 'affiliates', 'newsletter', 'marketing' ), true ) ) ) {
+			if ( 'bounce' === $suppressed || ( '' !== $suppressed && in_array( $category, Email_Unsubscribe::COMMERCIAL, true ) ) ) {
 				do_action( 'atora/email/suppressed_skip', $user_id, $template_key, $suppressed );
+				return false;
+			}
+			// 6.38.0: la baja por enlace corta lo comercial (antes solo la miraba el boletín).
+			if ( in_array( $category, Email_Unsubscribe::COMMERCIAL, true ) && Email_Unsubscribe::is_unsubscribed( $user_id ) ) {
+				do_action( 'atora/email/suppressed_skip', $user_id, $template_key, 'unsubscribed' );
 				return false;
 			}
 		}
@@ -206,32 +211,103 @@ class Email_Queue {
 	 * @return void
 	 */
 	public static function process_batch(): void {
-		// Cron lock: evitar ejecuciones concurrentes (Fase 8)
-		$lock_key = 'atora_eq_cron_lock';
-		if ( get_transient( $lock_key ) ) {
-			return; // Ya hay un batch en proceso
-		}
-		set_transient( $lock_key, 1, 4 * MINUTE_IN_SECONDS );
-		
 		global $wpdb;
 
-		$rows = $wpdb->get_results( $wpdb->prepare(
-			"SELECT * FROM {$wpdb->prefix}atora_email_queue
-			 WHERE status = 'pending'
-			   AND scheduled_at <= %s
-			   AND retry_count < %d
-			 ORDER BY priority ASC, scheduled_at ASC
-			 LIMIT %d",
-			current_time( 'mysql', true ),
-			self::MAX_RETRIES,
-			self::BATCH_SIZE
-		) );
-
-		foreach ( $rows as $row ) {
-			self::send_row( $row );
+		// 6.38.0: bloqueo de base de datos (el transient no era atómico: dos cron podían entrar a la vez).
+		// Aun así cada fila se reclama con un UPDATE condicional, así que nunca se envía dos veces.
+		if ( 1 !== (int) $wpdb->get_var( "SELECT GET_LOCK('atora_email_queue_batch', 0)" ) ) {
+			return;
 		}
 
-		delete_transient( $lock_key ); // liberar lock
+		try {
+			self::recover_stuck();
+
+			$rows = $wpdb->get_results( $wpdb->prepare(
+				"SELECT * FROM {$wpdb->prefix}atora_email_queue
+				 WHERE status = 'pending'
+				   AND scheduled_at <= %s
+				   AND retry_count < %d
+				 ORDER BY priority ASC, scheduled_at ASC
+				 LIMIT %d",
+				current_time( 'mysql', true ),
+				self::MAX_RETRIES,
+				self::BATCH_SIZE
+			) );
+
+			$budget = array();
+			foreach ( $rows as $row ) {
+				$provider = sanitize_key( (string) ( $row->provider ?? '' ) );
+				if ( ! array_key_exists( $provider, $budget ) ) {
+					$budget[ $provider ] = self::provider_budget( $provider );
+				}
+				if ( null !== $budget[ $provider ] && $budget[ $provider ] <= 0 ) {
+					continue; // Límite del proveedor alcanzado: queda pendiente para el próximo ciclo.
+				}
+				self::send_row( $row );
+				if ( null !== $budget[ $provider ] ) {
+					$budget[ $provider ]--;
+				}
+			}
+		} finally {
+			$wpdb->query( "SELECT RELEASE_LOCK('atora_email_queue_batch')" );
+		}
+	}
+
+	/** Minutos tras los que una fila en "sending" se da por interrumpida. */
+	const STUCK_MINUTES = 30;
+
+	/**
+	 * 6.38.0: una fila que quedó en "sending" (el proceso murió a mitad del envío) no se reintenta sola, porque
+	 * el proveedor pudo haberla aceptado: se marca como fallida con la causa, para revisarla y reintentar a mano.
+	 */
+	public static function recover_stuck(): int {
+		global $wpdb;
+		$table = $wpdb->prefix . 'atora_email_queue';
+		$ids   = array_map( 'absint', (array) $wpdb->get_col( $wpdb->prepare(
+			"SELECT id FROM {$table} WHERE status = 'sending' AND ( locked_at IS NULL OR locked_at < %s ) LIMIT 200",
+			gmdate( 'Y-m-d H:i:s', time() - self::STUCK_MINUTES * MINUTE_IN_SECONDS )
+		) ) );
+		foreach ( $ids as $id ) {
+			$done = $wpdb->update(
+				$table,
+				array( 'status' => 'failed', 'error_message' => __( 'Envío interrumpido: revisa en el proveedor si llegó antes de reintentarlo.', 'atora-lms' ) ),
+				array( 'id' => $id, 'status' => 'sending' ),
+				array( '%s', '%s' ),
+				array( '%d', '%s' )
+			);
+			if ( $done ) {
+				self::log_event( $id, 'interrupted', array() );
+			}
+		}
+		return count( $ids );
+	}
+
+	/**
+	 * 6.38.0: cuántos correos puede mandar ya el proveedor según sus límites por minuto y por hora
+	 * (`rate_limit_{proveedor}_minute` y `_hour` en los ajustes; 0 o vacío = sin límite). null = sin límite.
+	 */
+	public static function provider_budget( string $provider ): ?int {
+		global $wpdb;
+		$settings = self::get_email_engine_settings();
+		$limits   = array(
+			MINUTE_IN_SECONDS => absint( $settings[ 'rate_limit_' . $provider . '_minute' ] ?? 0 ),
+			HOUR_IN_SECONDS   => absint( $settings[ 'rate_limit_' . $provider . '_hour' ] ?? 0 ),
+		);
+		$budget = null;
+		foreach ( $limits as $window => $limit ) {
+			if ( $limit <= 0 ) {
+				continue;
+			}
+			$used = (int) $wpdb->get_var( $wpdb->prepare(
+				"SELECT COUNT(*) FROM {$wpdb->prefix}atora_email_queue
+				 WHERE provider = %s AND ( ( status IN ('sent','bounced') AND sent_at >= %s ) OR status = 'sending' )",
+				$provider,
+				gmdate( 'Y-m-d H:i:s', time() - $window )
+			) );
+			$left   = max( 0, $limit - $used );
+			$budget = null === $budget ? $left : min( $budget, $left );
+		}
+		return $budget;
 	}
 
 	/**
@@ -253,9 +329,9 @@ class Email_Queue {
 		// Marcar como procesando para evitar doble envío.
 		$updated = $wpdb->update(
 			"{$wpdb->prefix}atora_email_queue",
-			array( 'status' => 'sending' ),
+			array( 'status' => 'sending', 'locked_at' => current_time( 'mysql', true ) ),
 			array( 'id' => $row->id, 'status' => 'pending' ),
-			array( '%s' ),
+			array( '%s', '%s' ),
 			array( '%d', '%s' )
 		);
 
@@ -305,6 +381,7 @@ class Email_Queue {
 			'email_identity' => $identity_key,
 			'identity'       => $identity_key,
 			'identity_key'   => $identity_key,
+			'headers'        => self::list_headers( $row, $metadata ),
 		);
 
 		if ( $provider_class && class_exists( $provider_class ) && method_exists( $provider_class, 'send' ) ) {
@@ -333,6 +410,9 @@ class Email_Queue {
 			// Último intento: fallback a wp_mail si el provider externo falló.
 			if ( $retry >= self::MAX_RETRIES && $body_html && $row->recipient_email ) {
 				$headers      = array( 'Content-Type: text/html; charset=UTF-8' );
+				foreach ( $provider_options['headers'] as $name => $value ) {
+					$headers[] = $name . ': ' . $value;
+				}
 				$reply_to     = (string) ( $sender_profile['reply_to'] ?? '' );
 				if ( '' !== $reply_to ) {
 					$headers[] = 'Reply-To: ' . $reply_to;
@@ -396,6 +476,20 @@ class Email_Queue {
 				)
 			);
 		}
+	}
+
+	/**
+	 * 6.38.0: List-Unsubscribe (y un clic, RFC 8058) en lo comercial con destinatario registrado.
+	 *
+	 * @return array<string,string>
+	 */
+	private static function list_headers( object $row, array $metadata ): array {
+		$template = Email_Templates::get( sanitize_key( (string) ( $metadata['template'] ?? '' ) ) );
+		$category = sanitize_key( (string) ( $template['category'] ?? '' ) );
+		if ( ! in_array( $category, Email_Unsubscribe::COMMERCIAL, true ) ) {
+			return array();
+		}
+		return Email_Unsubscribe::headers( (int) ( $row->user_id ?? 0 ), (string) ( $row->recipient_email ?? '' ) );
 	}
 
 	/**

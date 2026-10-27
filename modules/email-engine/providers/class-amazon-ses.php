@@ -46,6 +46,14 @@ class Amazon_SES implements Provider_Interface {
 		if ( $reply_to && is_email( $reply_to ) ) {
 			$payload_data['ReplyToAddresses'] = array( $reply_to );
 		}
+		// 6.38.0: la cabecera de la cola permite enlazar los eventos SNS con el envío (antes no se mandaba).
+		$extra = class_exists( '\\ATORA\\EmailEngine\\Email_Unsubscribe' ) ? \ATORA\EmailEngine\Email_Unsubscribe::clean_headers( $options['headers'] ?? array() ) : array();
+		$extra = array( 'X-Atora-Queue-ID' => (string) ( $options['atora_queue_id'] ?? '' ) ) + $extra;
+		foreach ( $extra as $name => $value ) {
+			if ( '' !== $value ) {
+				$payload_data['Content']['Simple']['Headers'][] = array( 'Name' => $name, 'Value' => $value );
+			}
+		}
 
 		$payload = wp_json_encode( $payload_data );
 

@@ -323,6 +323,7 @@ class V5_Modules {
 	/** @return void */
 	private static function load_email_engine(): void {
 		$dir = ATORA_LMS_MODULES_DIR . 'email-engine/';
+		self::require_file( $dir . 'class-email-unsubscribe.php' );
 		self::require_file( $dir . 'class-email-templates.php' );
 		self::require_file( $dir . 'class-email-queue.php' );
 		self::require_file( $dir . 'class-email-engine.php' );
