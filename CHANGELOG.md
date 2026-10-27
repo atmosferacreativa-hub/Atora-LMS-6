@@ -1,5 +1,12 @@
 # CHANGELOG — ATORA LMS
 
+## Unreleased
+
+### Fixed
+- Los paneles del estudiante, docente y SpeedGrader heredan el acento de la academia.
+- Verificación de certificados y eliminación de cuenta cargan identidad, logo y estilos de WordPress.
+- El panel docente ocupa todo el ancho cuando no hay secciones laterales activas.
+
 ## 6.34.0 (2026-10-23)
 
 ### CRM: retiro de v1 y cierre de paridad
@@ -983,3 +990,4 @@ hasta que un administrador elija explícitamente lo contrario.
 ## 5.27.1 (anterior)
 
 Ver historial de commits.
+

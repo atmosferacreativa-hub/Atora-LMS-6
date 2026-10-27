@@ -74,9 +74,9 @@ trait CLMS_Teacher_Dashboard_Assets_Trait {
 			--td-ink-2:#334155;
 			--td-muted:#64748b;
 			--td-border:#e2e8f0;
-			--td-accent:#6366f1;
-			--td-accent-2:#4f46e5;
-			--td-accent-soft:#eef2ff;
+			--td-accent:var(--atora-accent,#6366f1);
+			--td-accent-2:var(--atora-accent-hover,var(--atora-accent,#4f46e5));
+			--td-accent-soft:var(--atora-accent-soft,#eef2ff);
 			--td-success:#15803d;
 			--td-success-bg:#dcfce7;
 			--td-warning:#a16207;
@@ -100,6 +100,7 @@ trait CLMS_Teacher_Dashboard_Assets_Trait {
 			gap:24px;
 			align-items:start;
 		}
+		.clms-td-layout--single{grid-template-columns:minmax(0,1fr)}
 		.clms-td-main,
 		.clms-td-side{
 			min-width:0;
@@ -128,8 +129,8 @@ trait CLMS_Teacher_Dashboard_Assets_Trait {
 			gap:8px;
 			padding:7px 12px;
 			border-radius:999px;
-			background:#eef2ff;
-			color:#4338ca;
+			background:var(--atora-accent-soft,#eef2ff);
+			color:var(--atora-accent,#4338ca);
 			font-size:12px;
 			font-weight:700;
 			letter-spacing:.06em;
@@ -180,7 +181,7 @@ trait CLMS_Teacher_Dashboard_Assets_Trait {
 			padding:28px;
 			border-radius:28px;
 			background:
-				radial-gradient(circle at top right, rgba(99,102,241,.28), transparent 35%),
+				radial-gradient(circle at top right, color-mix(in srgb,var(--td-accent) 28%,transparent), transparent 35%),
 				linear-gradient(135deg,#0f172a 0%, #172554 55%, #1e1b4b 100%);
 			color:#fff;
 			overflow:hidden;
@@ -254,7 +255,7 @@ trait CLMS_Teacher_Dashboard_Assets_Trait {
 			background:var(--td-accent);
 			border-color:var(--td-accent);
 			color:#fff;
-			box-shadow:0 10px 24px rgba(99,102,241,.28);
+			box-shadow:0 10px 24px color-mix(in srgb,var(--td-accent) 28%,transparent);
 		}
 		.clms-td-btn--primary:hover{
 			background:var(--td-accent-2);
@@ -846,7 +847,7 @@ trait CLMS_Teacher_Dashboard_Assets_Trait {
 		#clms-td-bulk-count{
 			font-size:13px;
 			font-weight:700;
-			color:#3730a3;
+			color:var(--atora-accent,#3730a3);
 			margin-right:6px;
 		}
 		.clms-td-bulk-danger{
@@ -919,3 +920,4 @@ trait CLMS_Teacher_Dashboard_Assets_Trait {
 		}';
 	}
 }
+

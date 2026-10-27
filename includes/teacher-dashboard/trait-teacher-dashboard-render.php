@@ -105,6 +105,7 @@ trait CLMS_Teacher_Dashboard_Render_Trait {
 		$show_summary        = $this->is_section_enabled( $schema, 'summary' );
 		$show_notifications  = $this->is_section_enabled( $schema, 'notifications' );
 		$show_students       = $this->is_section_enabled( $schema, 'courses' );
+		$has_sidebar         = $show_priority || $show_incidents || $show_summary || $show_notifications;
 		$show_grid           = $show_reviewed || $show_recent_lessons;
 		$completion_rate     = absint( $group_overview['completion_rate'] ?? 0 );
 		$enrolled_count      = absint( $group_overview['enrolled'] ?? 0 );
@@ -258,7 +259,7 @@ trait CLMS_Teacher_Dashboard_Render_Trait {
 			</section>
 			<?php endif; ?>
 
-			<div class="clms-td-layout">
+			<div class="clms-td-layout<?php echo $has_sidebar ? '' : ' clms-td-layout--single'; ?>">
 				<main class="clms-td-main">
 					<?php if ( $show_quick_access ) : ?>
 					<section class="clms-td-card">
@@ -931,6 +932,7 @@ trait CLMS_Teacher_Dashboard_Render_Trait {
 					<?php endif; ?>
 				</main>
 
+				<?php if ( $has_sidebar ) : ?>
 				<aside class="clms-td-side">
 					<?php if ( $show_priority ) : ?>
 					<section class="clms-td-card clms-td-card--accent">
@@ -1071,6 +1073,7 @@ trait CLMS_Teacher_Dashboard_Render_Trait {
 					</section>
 					<?php endif; ?>
 				</aside>
+				<?php endif; ?>
 			</div>
 		</div>
 
@@ -1345,3 +1348,4 @@ trait CLMS_Teacher_Dashboard_Render_Trait {
 	}
 
 }
+

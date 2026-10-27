@@ -429,8 +429,8 @@ final class ATORA_Account_Deletion {
 	}
 
 	private static function page( array $r ): void {
-		header( 'Content-Type: text/html; charset=utf-8' );
-		echo '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>' . esc_html( __( 'Eliminar mi cuenta', 'atora-lms' ) . ' · ' . get_bloginfo( 'name' ) ) . '</title><style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#f5f7fb;color:#1f2937;margin:0;padding:24px}main{max-width:540px;margin:40px auto;background:#fff;border-radius:14px;padding:28px;box-shadow:0 4px 20px rgba(0,0,0,.06)}.academy{color:#6b7280;font-size:14px}input,textarea{padding:10px;border:1px solid #d1d5db;border-radius:8px;width:100%;box-sizing:border-box}button{padding:12px 18px;border:0;border-radius:8px;background:#a11d1d;color:#fff;font-weight:700;min-height:44px}</style></head><body><main><div class="academy">' . esc_html( get_bloginfo( 'name' ) ) . '</div>' . self::content( $r ) . '</main></body></html>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- content() escapa cada dato.
+		require_once dirname( __DIR__ ) . '/frontend/class-academy-public-page.php';
+		CLMS_Academy_Public_Page::render( __( 'Eliminar mi cuenta', 'atora-lms' ), self::content( $r ) );
 		exit;
 	}
 }
