@@ -89,6 +89,17 @@ class Email_Queue {
 			return false;
 		}
 
+		// 6.38.0: lista de supresión. Rebote permanente: no se envía nada. Queja o baja: solo lo
+		// transaccional (sistema, seguridad, académico); lo comercial y de afiliados, no.
+		if ( class_exists( '\\ATORA\\EmailEngine\\Email_Engine' ) && method_exists( '\\ATORA\\EmailEngine\\Email_Engine', 'suppression_reason' ) ) {
+			$suppressed = Email_Engine::suppression_reason( (string) $user->user_email );
+			$category   = sanitize_key( (string) ( $template['category'] ?? '' ) );
+			if ( 'bounce' === $suppressed || ( '' !== $suppressed && in_array( $category, array( 'commercial', 'affiliates', 'newsletter', 'marketing' ), true ) ) ) {
+				do_action( 'atora/email/suppressed_skip', $user_id, $template_key, $suppressed );
+				return false;
+			}
+		}
+
 		$metadata = is_array( $data['metadata'] ?? null ) ? $data['metadata'] : array();
 		$resolved_identity = self::normalize_email_identity(
 			(string) (

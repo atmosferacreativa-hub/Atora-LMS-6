@@ -106,6 +106,7 @@ $atora_tables = array(
 	'atora_email_sequences',
 	'atora_email_suppression',
 	'atora_email_templates',
+	'atora_email_webhook_events',
 	'atora_enrollments',
 	'atora_form_entries',
 	'atora_grade_rectifications',

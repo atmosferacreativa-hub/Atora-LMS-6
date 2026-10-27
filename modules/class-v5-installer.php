@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class V5_Installer {
 
 	/** Versión del esquema. Incrementar para forzar re-instalación. */
-	const SCHEMA_VERSION = '6.37.0-hybrid-plans';
+	const SCHEMA_VERSION = '6.38.0-email-webhooks';
 
 	/** Option key que almacena la versión instalada. */
 	const OPTION_KEY = 'atora_v5_schema_version';
@@ -2669,6 +2669,17 @@ class V5_Installer {
 			UNIQUE KEY attempt_event (attempt_id, client_event_id),
 			KEY attempt_id (attempt_id)
 		) $charset_collate;" );
+		// 6.38.0: webhooks de correo procesados (protección contra repetición).
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_email_webhook_events (
+			id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			provider    VARCHAR(40) NOT NULL,
+			event_key   VARCHAR(190) NOT NULL,
+			received_at DATETIME NOT NULL,
+			PRIMARY KEY (id),
+			UNIQUE KEY provider_event (provider, event_key),
+			KEY received_at (received_at)
+		) $charset_collate;" );
+
 		// 6.37.0: planificación híbrida (docs/ordenes/ORDEN-AUDIO-PLANIFICACION.md).
 		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_hybrid_plans (
 			id                 BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
