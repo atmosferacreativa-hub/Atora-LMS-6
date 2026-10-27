@@ -76,9 +76,103 @@ PRs:
 - Plugin API móvil SCORM: #96 (merge 2026-10-24).
 - App (visor + offline + flows): atora-mobile#33 (merge 2026-10-24).
 
+### Seguimiento PR atora-mobile#34 (post-merge #33)
+
+- Estado: en progreso (rama `block/scorm-b3-fixes`).
+- Objetivo: e2e estable en CI (incluye `scorm-online`, `scorm-sin-conexion`, `scorm-xhr`) + 3 runs verdes seguidos antes de fusionar.
+- Últimos hallazgos/correcciones (2026-10-26):
+  - `scorm-xhr`: volver del player ya deja en lista de recursos; se quitó volver a buscar lección `^SCORM$` (evita intermitencias por scroll).
+  - `scorm-sin-conexion`: el modo avión en emulador permite `adb reverse`, así que se evitó flushear outbox cuando `hasNetwork()` dice offline (para que aparezca el estado pendiente).
+  - `scorm-sin-conexion`: se refresca el estado del servidor una vez al vaciarse la cola (si el flusher corre fuera del screen).
+  - `material-zoom`: pasos idempotentes (borra descargas existentes y limpia el PDF antes de las pruebas de imagen).
+- Runs relevantes (e2e):
+  - Falló: `40342044224` (scorm-xhr, scorm-sin-conexion: sin pendiente).
+  - Falló: `40348976684` (scorm-sin-conexion: sin pendiente).
+  - Falló: `40362944152` (material-zoom: sin botón Descargar; scorm-sin-conexion: no refleja server status/score/lesson).
+  - Falló: `40370060969` (material-zoom: abrió Chrome / no `resource-ready`; scorm-sin-conexion: server status/score/lesson).
+  - Falló: `40377590787` (material-zoom: abre Chrome / no `resource-ready`; scorm-sin-conexion: `SERVER:LOC` y `LESSON:NO`).
+
 ## Cierre plugin — 6.35.0
 
 - [ ] Versión 6.35.0 + changelog + `docs/ESTADO.md`.
 - [ ] `docs/SCORM.md`.
 - [ ] Tag `v6.35.0` + ZIP verificado + release.
+
+## Cierre (en curso)
+
+### PR atora-mobile#34
+
+Commits (bloque `block/scorm-b3-fixes`) y el fallo real que corrige cada uno:
+
+- `b09874d` SCORM: remount WebView when attemptId is known
+  - Corrige: el runtime SCORM se inyectaba con `attemptId=0` (primera renderización), y los commits quedaban encolados con `attemptId=0`.
+- `84745fb` SCORM: queue commits using native attemptId
+  - Corrige: aunque el runtime aún mande `attemptId=0`, la app usa el `attemptId` nativo como fuente de verdad al encolar.
+- `48fa388` SCORM: don't flush outbox when offline
+  - Corrige: en CI el modo avión no corta `adb reverse`, entonces el commit se intentaba flushear y no aparecía el estado pendiente; la app ahora solo flushea si `hasNetwork()` dice online.
+- `2d304eb` SCORM: refresh server state after pending queue drains
+  - Corrige: si el flush ocurre fuera del screen, el estado `SERVER:` no se refrescaba al quedar la cola vacía; ahora refresca una vez cuando detecta que se vació.
+- `5a3b8ae` E2E: delete PDF download before image steps
+  - Corrige: `material-zoom` dependía del orden (PDF ya descargado y “Disponible sin conexión” contaminaba los asserts); ahora borra descargas previas y limpia el PDF antes de testear imagen.
+- `8da597f` E2E: show outbox + block browser open on failed downloads
+  - Corrige (diagnóstico): en build e2e la barra ahora muestra `OUTBOX:{pending}/{failed}` y `SCORM_ERR:HTTP ...` para ver por qué un commit pasó a fallido.
+  - Corrige (material-zoom): un registro descargado con `error` ya no cuenta como “Disponible sin conexión” ni intenta abrir el navegador al tocar el recurso; ofrece re-descargar.
+- `832382d` CI(e2e): cache AVD + retry SDK/ADB and mark INFRA
+  - Endurece el job e2e ante fallas intermitentes del runner (SDK/system image corrupta, ADB/daemon, boot incompleto).
+  - Cambios: cache de AVD + system-image, snapshot warm-up en cache miss, reintentos de sdkmanager, reinicio de adb, marca `INFRA` en el summary si falla antes de Maestro.
+
+- `9b49c2e` CI(e2e): ensure Android SDK tools + fallback AVD recreate
+  - Corrige (CI): agrega `sdkmanager` y `platform-tools` al PATH vía setup previo y, si el AVD cacheado no arranca, reintenta recreando el AVD.
+  - Nota: este commit introdujo un error de YAML (dos puntos en el nombre del step) que evitaba iniciar el workflow.
+
+- `a590e4b` CI(e2e): fix YAML (quote step name with colon)
+  - Corrige (CI): el workflow volvía a correr (el run fallaba antes por YAML inválido).
+
+- `109a3c8` CI(e2e): drop setup-android; add sdkmanager to PATH
+  - Corrige (CI): `android-actions/setup-android@v3` fallaba al intentar instalar el paquete obsoleto `tools`; se eliminó y se usa el `sdkmanager` preinstalado (con PATH explícito).
+
+Estado de runs (commit `5a3b8aef7e319955df8aa07a013ee342df16e0ac`):
+
+- `40377589200` Mobile CI: ✅ success.
+- `40377590787` Pruebas de pantalla (e2e): ❌ failure.
+  - Fallaron: `material-zoom` (no llega a `resource-ready`), `scorm-sin-conexion` (no se ve `SERVER:...STATUS:completed...SCORE:80...LESSON:OK...`).
+  - El resto de recorridos: passed.
+- `ios-e2e`: skipped.
+
+Estado de runs (commit `8da597f...`):
+
+- `40396357625` Mobile CI: ✅ success.
+- `40396357626` Pruebas de pantalla (e2e): ❌ failure (infraestructura, antes de Maestro).
+  - Falla: emulador — `Unable to connect to adb daemon on port: 5037`.
+  - Nota: este fallo no cuenta para la serie de 3 verdes.
+- `ios-e2e`: skipped.
+
+Estado de runs (commit `832382d844eab9bae254f73da46a42f9508a6852`):
+
+- `40438032137` Mobile CI: ✅ success.
+- `40438032110` Pruebas de pantalla (e2e): ❌ failure (infraestructura, antes de Maestro).
+  - Falla: `sdkmanager: command not found` (no estaba en PATH).
+
+Estado de runs (commit `a590e4bf9534e05fb03fd8067b74892a3473e69b`):
+
+- `40440823574` Mobile CI: ✅ success.
+- `40440823516` Pruebas de pantalla (e2e): ❌ failure (infraestructura, antes de Maestro).
+  - Falla: `android-actions/setup-android@v3` intentando instalar el paquete obsoleto `tools`.
+
+Estado de runs (commit `109a3c8228119a67dad65601c9ab236f3a1bef04`):
+
+- `40441214748` Mobile CI: ⏳ queued.
+- `40441214745` Pruebas de pantalla (e2e): ⏳ en curso.
+
+3 verdes seguidos (sobre el mismo commit): 0/3.
+
+### Pasos 2–6 del cierre
+
+- PR plugin (seguridad SCORM móvil): Atora-LMS-6#105 (`block/scorm-mobile-security`) — ✅ merged (`d03eb88`).
+- Medición paquete ~100 MB: pendiente.
+- Comentario en PR #34 (3 runs + recorridos + medición + “iOS NO EJECUTADO”): pendiente.
+- Merge PR #34: pendiente.
+- release/6.35.0 (Atora-LMS-6): pendiente.
+- release/1.1.0 (atora-mobile): pendiente.
+- Merge #103 (Orden C docs) y Bloque 0: pendiente.
 
