@@ -175,6 +175,119 @@ class Email_Templates {
 				'category' => 'commercial',
 				'active'   => true,
 			),
+			// 6.38.0: plantillas académicas que el enrutador de mensajes manda por correo. No estaban en el
+			// catálogo, así que la cola las rechazaba y esos correos no salían (p. ej. «nueva lección», que
+			// solo usa correo). Todas usan la vista `messaging`.
+			'atora_assignment_graded' => array(
+				'id'          => 30,
+				'name'        => __( 'Tarea calificada', 'atora-lms' ),
+				'subject'     => __( 'Tu tarea {{lesson_title}} ya tiene nota', 'atora-lms' ),
+				'body'        => __( 'Tu tarea {{lesson_title}} del curso {{course_title}} fue calificada: {{grade}}.', 'atora-lms' ),
+				'button_text' => __( 'Ver calificación', 'atora-lms' ),
+				'view'        => 'messaging',
+				'category'    => 'academic',
+				'active'      => true,
+			),
+			'atora_assignment_due_soon' => array(
+				'id'          => 31,
+				'name'        => __( 'Tarea por vencer', 'atora-lms' ),
+				'subject'     => __( 'Recordatorio: {{lesson_title}} vence pronto', 'atora-lms' ),
+				'body'        => __( 'La tarea {{lesson_title}} del curso {{course_title}} vence el {{due_at}}.', 'atora-lms' ),
+				'button_text' => __( 'Ir a la tarea', 'atora-lms' ),
+				'view'        => 'messaging',
+				'category'    => 'academic',
+				'active'      => true,
+			),
+			'atora_submission_received' => array(
+				'id'          => 32,
+				'name'        => __( 'Entrega recibida (docente)', 'atora-lms' ),
+				'subject'     => __( 'Nueva entrega de {{student_name}}', 'atora-lms' ),
+				'body'        => __( '{{student_name}} entregó {{lesson_title}} en {{course_title}}.', 'atora-lms' ),
+				'button_text' => __( 'Revisar entrega', 'atora-lms' ),
+				'view'        => 'messaging',
+				'category'    => 'academic',
+				'active'      => true,
+			),
+			'atora_student_inactive' => array(
+				'id'          => 33,
+				'name'        => __( 'Estudiante inactivo', 'atora-lms' ),
+				'subject'     => __( '{{subject}}', 'atora-lms' ),
+				'body'        => __( '{{body}}', 'atora-lms' ),
+				'button_text' => __( '{{button_text}}', 'atora-lms' ),
+				'view'        => 'messaging',
+				'category'    => 'academic',
+				'active'      => true,
+			),
+			'atora_at_risk_teacher' => array(
+				'id'          => 34,
+				'name'        => __( 'Estudiante en riesgo (docente)', 'atora-lms' ),
+				'subject'     => __( '{{student_name}} necesita acompañamiento en {{course_title}}', 'atora-lms' ),
+				'body'        => __( '{{student_name}} aparece en riesgo en {{course_title}}. Motivo: {{reason}}.', 'atora-lms' ),
+				'button_text' => __( 'Ver ficha del estudiante', 'atora-lms' ),
+				'view'        => 'messaging',
+				'category'    => 'academic',
+				'active'      => true,
+			),
+			'atora_improvement_plan' => array(
+				'id'          => 35,
+				'name'        => __( 'Plan de mejora asignado', 'atora-lms' ),
+				'subject'     => __( 'Tienes un plan de mejora en {{course_title}}', 'atora-lms' ),
+				'body'        => __( 'Tu docente te asignó un plan de mejora en {{course_title}}.', 'atora-lms' ),
+				'button_text' => __( 'Ver plan', 'atora-lms' ),
+				'view'        => 'messaging',
+				'category'    => 'academic',
+				'active'      => true,
+			),
+			'atora_lesson_published' => array(
+				'id'          => 36,
+				'name'        => __( 'Nueva lección publicada', 'atora-lms' ),
+				'subject'     => __( 'Nueva lección: {{lesson_title}}', 'atora-lms' ),
+				'body'        => __( 'Ya está disponible {{lesson_title}} en {{course_title}}.', 'atora-lms' ),
+				'button_text' => __( 'Ver lección', 'atora-lms' ),
+				'view'        => 'messaging',
+				'category'    => 'academic',
+				'active'      => true,
+			),
+			'atora_section_announcement' => array(
+				'id'          => 37,
+				'name'        => __( 'Anuncio de la sección', 'atora-lms' ),
+				'subject'     => __( '{{announcement_title}}', 'atora-lms' ),
+				'body'        => __( '{{announcement_body}}', 'atora-lms' ),
+				'button_text' => __( 'Ver anuncio', 'atora-lms' ),
+				'view'        => 'messaging',
+				'category'    => 'academic',
+				'active'      => true,
+			),
+			'atora_daily_digest_student' => array(
+				'id'          => 38,
+				'name'        => __( 'Resumen diario (estudiante)', 'atora-lms' ),
+				'subject'     => __( 'Tu resumen del día: {{count}} novedades', 'atora-lms' ),
+				'body'        => __( '{{summary}}', 'atora-lms' ),
+				'button_text' => __( 'Ver novedades', 'atora-lms' ),
+				'view'        => 'messaging',
+				'category'    => 'academic',
+				'active'      => true,
+			),
+			'atora_daily_digest_teacher' => array(
+				'id'          => 39,
+				'name'        => __( 'Resumen diario (docente)', 'atora-lms' ),
+				'subject'     => __( 'Tu día: entregas por revisar y estudiantes por acompañar', 'atora-lms' ),
+				'body'        => __( 'Entregas por revisar: {{submissions_pending}}. Estudiantes inactivos: {{students_inactive}}. Cuestionarios por revisar: {{quizzes_pending}}.', 'atora-lms' ),
+				'button_text' => __( 'Ver mi día', 'atora-lms' ),
+				'view'        => 'messaging',
+				'category'    => 'academic',
+				'active'      => true,
+			),
+			'atora_followup_occurrence_due' => array(
+				'id'          => 40,
+				'name'        => __( 'Seguimiento para hoy (docente)', 'atora-lms' ),
+				'subject'     => __( 'Hoy toca seguimiento a {{student_count}} estudiantes', 'atora-lms' ),
+				'body'        => __( 'Hoy tienes seguimiento programado con {{student_count}} estudiantes ({{section_names}}).', 'atora-lms' ),
+				'button_text' => __( 'Abrir seguimiento', 'atora-lms' ),
+				'view'        => 'messaging',
+				'category'    => 'academic',
+				'active'      => true,
+			),
 		);
 	}
 
@@ -302,7 +415,11 @@ class Email_Templates {
 	 * @return string
 	 */
 	private static function get_template_html_body( string $key, array $context ): string {
-		$view = ATORA_LMS_MODULES_DIR . 'email-engine/templates/' . sanitize_key( $key ) . '.php';
+		$template = self::get( $key );
+		$view     = ATORA_LMS_MODULES_DIR . 'email-engine/templates/' . sanitize_key( (string) ( $template['view'] ?? $key ) ) . '.php';
+		if ( isset( $template['body'] ) ) {
+			$context['atora_template'] = $template;
+		}
 
 		if ( file_exists( $view ) ) {
 			ob_start();
