@@ -145,12 +145,17 @@ final class CLMS_Agenda_Service {
 				if ( ! $wp_lesson || 'publish' !== get_post_status( $wp_lesson ) ) {
 					continue;
 				}
-				$tz    = (string) get_post_meta( $wp_lesson, '_clms_live_class_timezone', true );
-				$start = self::local_ts( str_replace( 'T', ' ', (string) get_post_meta( $wp_lesson, '_clms_live_class_starts_at', true ) ), '', $tz );
+				// 6.39.0: también las clases creadas por el módulo de clases en vivo (antes solo la carga manual).
+				$live = class_exists( 'ATORA_Live_Session_Service' ) ? ATORA_Live_Session_Service::get( $wp_lesson ) : null;
+				if ( ! $live ) {
+					continue;
+				}
+				$tz    = $live['timezone'];
+				$start = (int) $live['start_utc'];
 				if ( ! $start || $start < $from || $start > $to ) {
 					continue;
 				}
-				$end     = self::local_ts( str_replace( 'T', ' ', (string) get_post_meta( $wp_lesson, '_clms_live_class_ends_at', true ) ), '', $tz );
+				$end     = (int) $live['end_utc'];
 				$items[] = array(
 					'type'      => 'live_class',
 					'title'     => sanitize_text_field( (string) ( $lesson['title'] ?? get_the_title( $wp_lesson ) ) ),

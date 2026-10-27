@@ -69,7 +69,8 @@ $google_connected = class_exists( '\ATORA\Calendar\Calendar_Sync' ) && \ATORA\Ca
 		</label>
 		<label>
 			<?php esc_html_e( 'Zona horaria', 'atora-lms' ); ?>
-			<input type="text" name="atora_live_tz" value="<?php echo esc_attr( (string) ( $session['timezone'] ?? 'UTC' ) ); ?>" style="display:block;width:100%">
+			<input type="text" name="atora_live_tz" list="atora-live-tz-list" value="<?php echo esc_attr( \ATORA_Live_Session_Service::tz( (string) ( $session['timezone'] ?? '' ) ) ); ?>" style="display:block;width:100%">
+			<datalist id="atora-live-tz-list"><?php foreach ( array( 'America/Caracas', 'America/Bogota', 'America/Mexico_City', 'America/Lima', 'America/Santiago', 'America/Argentina/Buenos_Aires', 'America/New_York', 'Europe/Madrid', 'UTC' ) as $tz_option ) : ?><option value="<?php echo esc_attr( $tz_option ); ?>"><?php endforeach; ?></datalist>
 		</label>
 		<label>
 			<?php esc_html_e( 'Máx. participantes (opcional)', 'atora-lms' ); ?>
@@ -77,12 +78,50 @@ $google_connected = class_exists( '\ATORA\Calendar\Calendar_Sync' ) && \ATORA\Ca
 		</label>
 	</div>
 
-	<label style="display:flex;align-items:center;gap:8px">
-		<input type="checkbox" name="atora_live_record" value="1" <?php checked( ! empty( $session['record'] ) ); ?>>
-		<?php esc_html_e( 'Grabar la sesión (si el proveedor lo soporta)', 'atora-lms' ); ?>
+	<?php
+	$live_error   = (string) get_post_meta( $post->ID, '_atora_live_provider_error', true );
+	$live_info    = \ATORA_Live_Session_Service::get( $post->ID );
+	$rec_mode     = \ATORA_Live_Session_Service::recording_mode( $session );
+	$rec_now      = \ATORA_Live_Session_Service::recording( $post->ID );
+	$teams_ready  = class_exists( '\\ATORA\\LiveStreaming\\Providers\\Provider_Teams' ) && \ATORA\LiveStreaming\Providers\Provider_Teams::configured();
+	?>
+	<?php if ( '' !== $live_error ) : ?>
+		<div class="notice notice-error inline" style="margin:0"><p><?php echo esc_html( sprintf( /* translators: %s: error */ __( 'El proveedor no creó o no actualizó la reunión: %s', 'atora-lms' ), $live_error ) ); ?></p></div>
+	<?php endif; ?>
+	<?php if ( 'teams' === $provider && ! $teams_ready ) : ?>
+		<div class="notice notice-warning inline" style="margin:0"><p><?php esc_html_e( 'Teams no está configurado para la academia (ATORA → Integraciones → Clases en vivo).', 'atora-lms' ); ?></p></div>
+	<?php endif; ?>
+	<?php if ( $live_info && $live_info['start_utc'] ) : ?>
+		<p style="margin:0;color:#475569;font-size:12px"><?php echo esc_html( sprintf( /* translators: 1: date in class tz 2: tz 3: utc */ __( 'Empieza %1$s (%2$s) · %3$s UTC', 'atora-lms' ), wp_date( 'Y-m-d H:i', $live_info['start_utc'], new DateTimeZone( $live_info['timezone'] ) ), $live_info['timezone'], gmdate( 'Y-m-d H:i', $live_info['start_utc'] ) ) ); ?></p>
+	<?php endif; ?>
+
+	<label>
+		<?php esc_html_e( 'Indicaciones para estudiantes (opcional)', 'atora-lms' ); ?>
+		<textarea name="atora_live_notes" rows="2" style="display:block;width:100%"><?php echo esc_textarea( (string) ( $session['notes'] ?? '' ) ); ?></textarea>
 	</label>
 
-	<div id="atora-live-custom-url-wrap" style="<?php echo 'custom' === $provider ? '' : 'display:none'; ?>">
+	<fieldset style="border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px">
+		<legend style="font-weight:600;padding:0 4px"><?php esc_html_e( 'Grabación (decisión del docente)', 'atora-lms' ); ?></legend>
+		<label style="display:block;margin:4px 0"><input type="radio" name="atora_live_recording_mode" value="none" <?php checked( $rec_mode, 'none' ); ?>> <?php esc_html_e( 'Sin grabación', 'atora-lms' ); ?></label>
+		<label style="display:block;margin:4px 0"><input type="radio" name="atora_live_recording_mode" value="upload" <?php checked( $rec_mode, 'upload' ); ?>> <?php esc_html_e( 'La subo o enlazo después', 'atora-lms' ); ?></label>
+		<label style="display:block;margin:4px 0"><input type="radio" name="atora_live_recording_mode" value="provider" <?php checked( $rec_mode, 'provider' ); ?>> <?php esc_html_e( 'Enlace automático del proveedor', 'atora-lms' ); ?>
+			<span style="color:#64748b;font-size:12px"><?php esc_html_e( '(Zoom y Teams graban solos; en Meet la grabación la inicia quien organiza)', 'atora-lms' ); ?></span></label>
+		<div style="margin-top:8px;padding-top:8px;border-top:1px solid #e2e8f0">
+			<?php if ( $rec_now ) : ?>
+				<p style="margin:0 0 6px"><?php esc_html_e( 'Publicada:', 'atora-lms' ); ?> <a href="<?php echo esc_url( $rec_now['url'] ); ?>" target="_blank" rel="noopener"><?php echo esc_html( 'video' === $rec_now['type'] ? __( 'video subido', 'atora-lms' ) : $rec_now['url'] ); ?></a>
+					<?php if ( '' !== $rec_now['note'] ) : ?><br><span style="color:#64748b;font-size:12px"><?php echo esc_html( $rec_now['note'] ); ?></span><?php endif; ?></p>
+				<label><input type="checkbox" name="atora_live_recording_clear" value="1"> <?php esc_html_e( 'Quitar la grabación', 'atora-lms' ); ?></label>
+			<?php else : ?>
+				<p style="margin:0 0 6px;color:#64748b;font-size:12px"><?php esc_html_e( 'Puedes publicar una grabación en cualquier momento, aunque hayas elegido «sin grabación».', 'atora-lms' ); ?></p>
+			<?php endif; ?>
+			<label style="display:block;margin-top:6px"><?php esc_html_e( 'Enlace de la grabación', 'atora-lms' ); ?>
+				<input type="url" name="atora_live_recording_url" placeholder="https://..." style="display:block;width:100%"></label>
+			<label style="display:block;margin-top:6px"><?php esc_html_e( 'O subir el video (MP4, WebM, MOV)', 'atora-lms' ); ?>
+				<input type="file" name="atora_live_recording_file" accept="video/mp4,video/webm,video/quicktime,video/x-m4v" style="display:block"></label>
+		</div>
+	</fieldset>
+
+	<div id="atora-live-custom-url-wrap" style="<?php echo in_array( $provider, array( 'custom', 'youtube' ), true ) ? '' : 'display:none'; ?>">
 		<label>
 			<?php esc_html_e( 'URL de la reunión', 'atora-lms' ); ?>
 			<input type="url" name="atora_live_custom_url" value="<?php echo esc_attr( (string) ( $session['custom_url'] ?? '' ) ); ?>" style="display:block;width:100%" placeholder="https://...">
@@ -94,7 +133,8 @@ $google_connected = class_exists( '\ATORA\Calendar\Calendar_Sync' ) && \ATORA\Ca
 		var wrap = document.getElementById('atora-live-custom-url-wrap');
 		radios.forEach(function(r){
 			r.addEventListener('change', function(){
-				wrap.style.display = ( r.value === 'custom' && r.checked ) ? '' : ( document.querySelector('input[name="atora_live_provider"]:checked').value === 'custom' ? '' : 'none' );
+				var chosen = document.querySelector('input[name="atora_live_provider"]:checked');
+				wrap.style.display = chosen && ( chosen.value === 'custom' || chosen.value === 'youtube' ) ? '' : 'none';
 			});
 		});
 	})();
@@ -166,7 +206,7 @@ $google_connected = class_exists( '\ATORA\Calendar\Calendar_Sync' ) && \ATORA\Ca
 							<td><?php echo esc_html( $name ); ?></td>
 							<td><?php echo esc_html( (string) ( $row['joined_at'] ?? '—' ) ); ?></td>
 							<td><?php echo esc_html( (string) ( $row['left_at'] ?? '—' ) ); ?></td>
-							<td><?php echo esc_html( gmdate( 'i:s', (int) ( $row['duration_seconds'] ?? 0 ) ) ); ?></td>
+							<td><?php echo esc_html( sprintf( /* translators: %d: minutes */ __( '%d min', 'atora-lms' ), (int) round( (int) ( $row['duration_seconds'] ?? 0 ) / 60 ) ) ); ?></td>
 							<td><?php echo esc_html( (string) ( $row['status'] ?? '' ) ); ?></td>
 						</tr>
 					<?php endforeach; ?>

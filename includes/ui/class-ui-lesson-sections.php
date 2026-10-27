@@ -597,67 +597,83 @@ class CLMS_UI_Lesson_Sections {
 		self::render_tips_block( $tips );
 	}
 
+	/**
+	 * Clase en vivo (6.39.0): lee la reunión creada por ATORA (Zoom, Meet, Teams) o la carga manual, en la hora real
+	 * de la clase; el botón aparece solo con la clase abierta (10 min antes, hasta 15 min después del final) y luego
+	 * se muestra la grabación si el docente la publicó.
+	 */
 	public static function render_live_class( array $section, CLMS_UI_Template_Context $ctx, array $schema ): void {
 		unset( $section, $schema );
 		$d = self::data( $ctx->entity_id );
 		if ( empty( $d['can_access'] ) ) {
 			return;
 		}
-
-		$lesson_id   = absint( $ctx->entity_id );
-		$session_raw = class_exists( 'CLMS_Helper' )
-			? (string) CLMS_Helper::get_post_meta_first( $lesson_id, array( 'lm_session_type' ), 'asincrono' )
-			: (string) get_post_meta( $lesson_id, 'lm_session_type', true );
-		$session_type = sanitize_key( $session_raw );
-		$provider     = sanitize_key( (string) get_post_meta( $lesson_id, '_clms_live_class_provider', true ) );
-		$url          = esc_url( (string) get_post_meta( $lesson_id, '_clms_live_class_url', true ) );
-		$starts_at    = self::format_live_datetime( (string) get_post_meta( $lesson_id, '_clms_live_class_starts_at', true ) );
-		$ends_at      = self::format_live_datetime( (string) get_post_meta( $lesson_id, '_clms_live_class_ends_at', true ) );
-		$timezone     = sanitize_text_field( (string) get_post_meta( $lesson_id, '_clms_live_class_timezone', true ) );
-		$notes        = sanitize_textarea_field( (string) get_post_meta( $lesson_id, '_clms_live_class_notes', true ) );
-
-		$is_live_session = in_array( $session_type, array( 'sincrono', 'hibrido' ), true );
-		$has_live_data   = '' !== $url || '' !== $starts_at || '' !== $ends_at || '' !== $notes;
-		if ( ! $is_live_session && ! $has_live_data ) {
+		$lesson_id = absint( $ctx->entity_id );
+		$info      = class_exists( 'ATORA_Live_Session_Service' ) ? ATORA_Live_Session_Service::join_info( $lesson_id, get_current_user_id() ) : null;
+		if ( ! $info ) {
+			$session_raw = class_exists( 'CLMS_Helper' )
+				? (string) CLMS_Helper::get_post_meta_first( $lesson_id, array( 'lm_session_type' ), 'asincrono' )
+				: (string) get_post_meta( $lesson_id, 'lm_session_type', true );
+			if ( in_array( sanitize_key( $session_raw ), array( 'sincrono', 'hibrido' ), true ) ) {
+				echo '<section class="atora-lesson-live-class"><p class="atora-lesson-live-class__eyebrow">' . esc_html__( 'Clase en vivo', 'atora-lms' ) . '</p><p class="atora-lesson-live-class__pending">' . esc_html__( 'Tu docente publicará el enlace de la clase en vivo pronto.', 'atora-lms' ) . '</p></section>';
+			}
 			return;
 		}
-
-		$provider_labels = array(
-			'zoom'         => __( 'Zoom', 'atora-lms' ),
-			'google_meet'  => __( 'Google Meet', 'atora-lms' ),
-			'youtube_live' => __( 'YouTube Live', 'atora-lms' ),
-			'custom'       => __( 'Enlace externo', 'atora-lms' ),
-		);
-		$provider_label = $provider_labels[ $provider ] ?? __( 'Clase en vivo', 'atora-lms' );
+		$zone_name = (string) get_user_meta( get_current_user_id(), 'atora_timezone', true );
+		$zone_name = ATORA_Live_Session_Service::tz( '' !== $zone_name ? $zone_name : $info['timezone'] );
+		$zone      = new DateTimeZone( $zone_name );
+		$fmt       = get_option( 'date_format' ) . ' ' . get_option( 'time_format' );
+		$start     = $info['starts_at'] ? wp_date( $fmt, (int) strtotime( $info['starts_at'] ), $zone ) : '';
+		$end       = $info['ends_at'] ? wp_date( get_option( 'time_format' ), (int) strtotime( $info['ends_at'] ), $zone ) : '';
+		$rec       = $info['recording'];
 		?>
-		<section class="atora-lesson-live-class">
+		<section class="atora-lesson-live-class" data-live-status="<?php echo esc_attr( $info['status'] ); ?>">
 			<div class="atora-lesson-live-class__head">
 				<p class="atora-lesson-live-class__eyebrow"><?php esc_html_e( 'Clase en vivo', 'atora-lms' ); ?></p>
-				<span class="atora-lesson-live-class__provider"><?php echo esc_html( $provider_label ); ?></span>
+				<span class="atora-lesson-live-class__provider"><?php echo esc_html( $info['provider_label'] ); ?></span>
 			</div>
-			<?php if ( $starts_at || $ends_at ) : ?>
+			<?php if ( '' !== $start ) : ?>
 				<p class="atora-lesson-live-class__schedule">
-					<?php if ( $starts_at && $ends_at ) : ?>
-						<?php printf( esc_html__( 'Horario: %1$s a %2$s', 'atora-lms' ), esc_html( $starts_at ), esc_html( $ends_at ) ); ?>
-					<?php elseif ( $starts_at ) : ?>
-						<?php printf( esc_html__( 'Inicia: %s', 'atora-lms' ), esc_html( $starts_at ) ); ?>
-					<?php else : ?>
-						<?php printf( esc_html__( 'Finaliza: %s', 'atora-lms' ), esc_html( $ends_at ) ); ?>
-					<?php endif; ?>
-					<?php if ( '' !== $timezone ) : ?>
-						<?php echo esc_html( ' · ' . $timezone ); ?>
-					<?php endif; ?>
+					<?php /* translators: 1: start 2: end time 3: timezone */ printf( esc_html__( 'Horario: %1$s a %2$s · %3$s', 'atora-lms' ), esc_html( $start ), esc_html( $end ), esc_html( $zone_name ) ); ?>
 				</p>
 			<?php endif; ?>
-			<?php if ( '' !== $notes ) : ?>
-				<p class="atora-lesson-live-class__notes"><?php echo esc_html( $notes ); ?></p>
+			<?php if ( '' !== $info['notes'] ) : ?>
+				<p class="atora-lesson-live-class__notes"><?php echo esc_html( $info['notes'] ); ?></p>
 			<?php endif; ?>
-			<?php if ( '' !== $url ) : ?>
-				<a class="atora-btn atora-btn-primary" href="<?php echo esc_url( $url ); ?>" target="_blank" rel="noopener noreferrer">
-					<?php esc_html_e( 'Abrir clase en vivo', 'atora-lms' ); ?>
+
+			<?php if ( '' !== $info['join_url'] ) : ?>
+				<a class="atora-btn atora-btn-primary" href="<?php echo esc_url( $info['join_url'] ); ?>" target="_blank" rel="noopener noreferrer">
+					<?php echo $info['is_host'] ? esc_html__( 'Iniciar la clase (anfitrión)', 'atora-lms' ) : esc_html__( 'Unirse a la clase', 'atora-lms' ); ?>
 				</a>
-			<?php else : ?>
+			<?php elseif ( 'scheduled' === $info['status'] ) : ?>
+				<p class="atora-lesson-live-class__pending"><?php esc_html_e( 'El botón para unirte aparece 10 minutos antes de empezar.', 'atora-lms' ); ?></p>
+			<?php elseif ( 'ended' === $info['status'] && ! $rec ) : ?>
+				<p class="atora-lesson-live-class__pending">
+					<?php
+					echo 'none' === $info['recording_mode']
+						? esc_html__( 'La clase terminó. Esta clase no se grabó.', 'atora-lms' )
+						: esc_html__( 'La clase terminó. La grabación se publicará aquí.', 'atora-lms' );
+					?>
+				</p>
+			<?php elseif ( '' === $info['join_url'] && 'open' === $info['status'] ) : ?>
 				<p class="atora-lesson-live-class__pending"><?php esc_html_e( 'Tu docente publicará el enlace de la clase en vivo pronto.', 'atora-lms' ); ?></p>
+			<?php endif; ?>
+
+			<?php if ( $rec ) : ?>
+				<div class="atora-lesson-live-class__recording">
+					<p class="atora-lesson-live-class__eyebrow"><?php esc_html_e( 'Grabación', 'atora-lms' ); ?></p>
+					<?php if ( 'video' === $rec['type'] ) : ?>
+						<video controls preload="metadata" src="<?php echo esc_url( $rec['url'] ); ?>" style="width:100%;max-width:720px"></video>
+					<?php else : ?>
+						<a class="atora-btn" href="<?php echo esc_url( $rec['url'] ); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Ver la grabación', 'atora-lms' ); ?></a>
+						<?php if ( '' !== $rec['note'] ) : ?>
+							<p class="atora-lesson-live-class__notes"><?php echo esc_html( $rec['note'] ); ?></p>
+						<?php endif; ?>
+						<?php if ( in_array( $rec['source'], array( 'zoom', 'meet', 'teams' ), true ) ) : ?>
+							<p class="atora-lesson-live-class__notes"><?php esc_html_e( 'La grabación está en el servicio de la clase: si no abre, es por cómo está compartida allí; avísale a tu docente.', 'atora-lms' ); ?></p>
+						<?php endif; ?>
+					<?php endif; ?>
+				</div>
 			<?php endif; ?>
 		</section>
 		<?php
@@ -1069,19 +1085,6 @@ class CLMS_UI_Lesson_Sections {
 		return false;
 	}
 
-	private static function format_live_datetime( string $value ): string {
-		$value = trim( $value );
-		if ( '' === $value ) {
-			return '';
-		}
-
-		$ts = strtotime( str_replace( 'T', ' ', $value ) );
-		if ( ! $ts ) {
-			return '';
-		}
-
-		return wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $ts );
-	}
 
 	public static function register_callbacks(): void {
 		if ( ! class_exists( 'CLMS_UI_Section_Registry' ) ) {

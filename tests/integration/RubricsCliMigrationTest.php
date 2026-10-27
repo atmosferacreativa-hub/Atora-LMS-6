@@ -15,8 +15,11 @@ final class RubricsCliMigrationTest extends WP_UnitTestCase {
 		}
 		\ATORA\V5_Installer::force_install();
 
-		// Estado limpio.
+		// Estado limpio. La tabla propia sobrevive al rollback (force_install hace DDL y confirma la transacción):
+		// otras pruebas del mismo proceso de base de datos pueden haber dejado filas.
 		delete_option( 'atora_rubric_source' );
+		global $wpdb;
+		$wpdb->query( "DELETE FROM {$wpdb->prefix}atora_rubrics" ); // phpcs:ignore WordPress.DB
 	}
 
 	public function test_migrate_dry_run_does_not_write_and_verify_passes_after_migrate(): void {

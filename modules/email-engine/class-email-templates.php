@@ -301,6 +301,17 @@ class Email_Templates {
 				'category'    => 'academic',
 				'active'      => true,
 			),
+			// 6.39.0: recordatorio de clase en vivo (antes se armaba a mano y se enviaba fuera de la cola).
+			'atora_live_reminder' => array(
+				'id'          => 43,
+				'name'        => __( 'Recordatorio de clase en vivo', 'atora-lms' ),
+				'subject'     => __( 'Clase en vivo: {{lesson_title}} — {{starts_at}}', 'atora-lms' ),
+				'body'        => __( 'Tu clase en vivo «{{lesson_title}}» ({{provider_label}}) empieza el {{starts_at}}. El botón para unirte aparece en la lección 10 minutos antes.', 'atora-lms' ),
+				'button_text' => __( 'Ir a la lección', 'atora-lms' ),
+				'view'        => 'messaging',
+				'category'    => 'academic',
+				'active'      => true,
+			),
 			'atora_followup_occurrence_due' => array(
 				'id'          => 40,
 				'name'        => __( 'Seguimiento para hoy (docente)', 'atora-lms' ),

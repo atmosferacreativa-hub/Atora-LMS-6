@@ -53,7 +53,8 @@ class Live_Session_Repository {
 			// múltiples NULL, no múltiples ''.
 			'external_id'        => '' !== $external_id ? $external_id : null,
 			'join_url'           => esc_url_raw( (string) ( $session['join_url'] ?? $session['custom_url'] ?? '' ) ),
-			'start_datetime'     => ! empty( $session['start_datetime'] ) ? gmdate( 'Y-m-d H:i:s', strtotime( (string) $session['start_datetime'] ) ) : null,
+			// 6.39.0: en UTC de verdad (antes la hora local de la clase se guardaba como si fuera UTC).
+			'start_datetime'     => ! empty( $session['start_utc'] ) ? gmdate( 'Y-m-d H:i:s', (int) $session['start_utc'] ) : ( ! empty( $session['start_datetime'] ) ? gmdate( 'Y-m-d H:i:s', strtotime( (string) $session['start_datetime'] ) ) : null ),
 			'duration_minutes'   => absint( $session['duration_minutes'] ?? 60 ),
 			'timezone'           => sanitize_text_field( (string) ( $session['timezone'] ?? 'UTC' ) ),
 			'recording_url'      => esc_url_raw( (string) ( $session['recording_url'] ?? '' ) ),
@@ -80,6 +81,11 @@ class Live_Session_Repository {
 		}
 
 		if ( $existing_id ) {
+			// 6.39.0: guardar la lección sin reprogramar no reabre una sesión ya terminada.
+			$current = $wpdb->get_row( $wpdb->prepare( "SELECT start_datetime, status FROM {$table} WHERE id = %d", $existing_id ), ARRAY_A ); // phpcs:ignore WordPress.DB
+			if ( $current && (string) $current['start_datetime'] === (string) $row['start_datetime'] && empty( $session['status'] ) ) {
+				$row['status'] = $current['status'];
+			}
 			$wpdb->update( $table, $row, array( 'id' => $existing_id ) );
 			return $existing_id;
 		}
