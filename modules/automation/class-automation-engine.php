@@ -1228,6 +1228,14 @@ class Automation_Engine {
 		global $wpdb;
 		$id     = absint( wp_unslash( $_POST['id'] ?? 0 ) );
 		$active = absint( wp_unslash( $_POST['active'] ?? 0 ) );
+		// 6.38.0: un flujo inválido no se activa.
+		if ( $active ) {
+			$row    = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}atora_automations WHERE id = %d", $id ) );
+			$errors = $row ? Automation_Flows::validate( Automation_Flows::definition_from_row( $row ) ) : array( __( 'No existe.', 'atora-lms' ) );
+			if ( $errors ) {
+				wp_send_json_error( array( 'errors' => $errors ) );
+			}
+		}
 		$wpdb->update( "{$wpdb->prefix}atora_automations", array( 'active' => $active ), array( 'id' => $id ), array( '%d' ), array( '%d' ) );
 		wp_send_json_success();
 	}
