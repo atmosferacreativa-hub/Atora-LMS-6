@@ -141,6 +141,7 @@ $atora_tables = array(
 	'atora_h5p_content',
 	'atora_h5p_tracking',
 	'atora_h5p_library',
+	'atora_hybrid_plans',
 	'clms_badges',
 	'clms_gamification_profiles',
 	'clms_grade_appeals',

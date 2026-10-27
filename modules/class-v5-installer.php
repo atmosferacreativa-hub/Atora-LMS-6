@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class V5_Installer {
 
 	/** Versión del esquema. Incrementar para forzar re-instalación. */
-	const SCHEMA_VERSION = '6.35.0-scorm-b';
+	const SCHEMA_VERSION = '6.37.0-hybrid-plans';
 
 	/** Option key que almacena la versión instalada. */
 	const OPTION_KEY = 'atora_v5_schema_version';
@@ -2668,6 +2668,28 @@ class V5_Installer {
 			PRIMARY KEY (id),
 			UNIQUE KEY attempt_event (attempt_id, client_event_id),
 			KEY attempt_id (attempt_id)
+		) $charset_collate;" );
+		// 6.37.0: planificación híbrida (docs/ordenes/ORDEN-AUDIO-PLANIFICACION.md).
+		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_hybrid_plans (
+			id                 BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			institution_id     BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			wp_course_id       BIGINT UNSIGNED NOT NULL,
+			author_id          BIGINT UNSIGNED NOT NULL,
+			updated_by         BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			title              VARCHAR(200) NOT NULL DEFAULT '',
+			status             VARCHAR(20) NOT NULL DEFAULT 'draft',
+			data_json          LONGTEXT NULL DEFAULT NULL,
+			revision           INT UNSIGNED NOT NULL DEFAULT 1,
+			published_revision INT UNSIGNED NOT NULL DEFAULT 0,
+			lesson_map_json    LONGTEXT NULL DEFAULT NULL,
+			published_at       DATETIME NULL DEFAULT NULL,
+			published_by       BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			created_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			KEY course_updated (wp_course_id, updated_at),
+			KEY institution_id (institution_id),
+			KEY author_id (author_id)
 		) $charset_collate;" );
 		// Calificaciones finales por alumno/curso (D-002; migra _clms_gradebook_course_{id}).
 		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_gradebook (

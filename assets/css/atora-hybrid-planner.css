@@ -1,0 +1,22 @@
+/* Planificación híbrida (6.37.0). Pensado también para el teléfono. */
+.atora-planner-wrap { max-width: 900px; }
+.atora-planner-field label { display: flex; flex-direction: column; gap: 4px; }
+.atora-planner-field input[type="text"],
+.atora-planner-field input[type="url"],
+.atora-planner-field textarea,
+.atora-planner-field select { width: 100%; max-width: 100%; font-size: 16px; }
+.atora-planner-steps { display: flex; flex-wrap: wrap; gap: 6px 14px; list-style: none; margin: 12px 0; padding: 0; }
+.atora-planner-steps .is-current button { font-weight: 700; text-decoration: underline; }
+.atora-planner-steps button, .atora-planner-bar .button { min-height: 44px; }
+.atora-planner-bar { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+.atora-planner-resource { border: 1px solid #dcdcde; border-radius: 6px; padding: 8px 12px; margin: 0 0 12px; }
+.atora-planner-status { font-weight: 600; }
+.atora-planner-status.local { color: #9a5b00; }
+.atora-planner-status.server { color: #00692c; }
+.atora-planner-status.error { color: #b32d2e; }
+.atora-planner-ai { margin: 8px 0 16px; }
+.atora-planner-ai pre { white-space: pre-wrap; background: #f6f7f7; padding: 8px; }
+.atora-planner-list li, .atora-planner-preview li { margin-bottom: 10px; }
+@media (max-width: 600px) {
+	.atora-planner-bar { position: sticky; bottom: 0; background: #f0f0f1; padding: 8px 0; }
+}
