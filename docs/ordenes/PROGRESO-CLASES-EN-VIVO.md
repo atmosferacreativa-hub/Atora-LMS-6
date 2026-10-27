@@ -24,9 +24,13 @@ Hallazgo adicional al cerrar el bloque: en `main` los recordatorios de clase en 
 
 Las 12 pruebas fallan con el código de `main` y pasan con este.
 
+PR #120 fusionado.
+
 ## Bloque 4 — App 1.2.0
-- Pendiente: tarjeta de clase en vivo en la lección (zona del teléfono, cuenta regresiva, «Unirse» solo abierta,
-  grabación) y recorrido Maestro.
+- Código: tarjeta de clase en vivo (`src/components/LiveClassCard.tsx`, `src/live/liveClass.ts`); prueba Jest y
+  recorrido Maestro `clase-en-vivo` con la semilla del plugin. PR app #38.
+- Validación real: filas 66–67 de `docs/PRUEBA-TELEFONO.md` (pendiente).
 
 ## Cierre
-- Pendiente: 6.39.0, changelog, `docs/CLASES-EN-VIVO.md`, ESTADO, ZIP verificado. Etiquetas: el titular.
+- 6.39.0 (incluye Comunicación, planeada como 6.38.0), changelog, `docs/CLASES-EN-VIVO.md`, ESTADO. Etiqueta: el
+  titular.

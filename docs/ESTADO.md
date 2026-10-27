@@ -7,7 +7,7 @@ Qué está comprobado y dónde. Se actualiza en cada versión del plugin o de la
 - **Integración**: PHPUnit con WordPress (`tests/integration`).
 - **Unitaria**: PHPUnit sin WordPress o Jest en la app.
 
-Última actualización: **plugin 6.37.0 · app 1.1.0**.
+Última actualización: **plugin 6.39.0 · app 1.1.0** (app 1.2.0 en preparación).
 
 > No hay registro escrito de qué se recorrió en teléfono antes de esta tabla: la columna "Teléfono" queda "por confirmar" hasta la prueba al cierre de la Fase 4, que incluye la lista acumulada de las fases 0 a 3.
 
@@ -105,6 +105,10 @@ Qué está comprobado y dónde. Se actualiza en cada versión del plugin o de la
 | SCORM 1.2/2004 en la biblioteca: subida segura, versiones, enlace a lección, reproductor web, CMI que no retrocede, nota y completitud, límite de intentos, informe | 6.35.0 | `tests/SCORM/*`, `ScormLaunchAvailabilityTest`, `ScormE2ESeedTest` | Ver `docs/SCORM.md`. El contenido corre en el mismo dominio: solo paquetes de confianza (subida solo admin). |
 | Audio en la lección (MP3/M4A/OGG, transcripción, reproductor web con velocidad y posición) | 6.37.0 | `LessonAudioTest`, `LessonAudioUnitTest` | Matriz de compatibilidad declarada, sin pruebas en dispositivos. App: 1.2.0. |
 | Planificación híbrida sin IA (borrador local y servidor, vista previa, publicar sin duplicar, permisos de docente y asistente) | 6.37.0 | `HybridPlanServiceTest`, `HybridPlanRestTest` | Pantalla web también para el navegador del teléfono; sin validación en teléfono real. IA opcional apagada por defecto. |
+| Correo: webhooks firmados por proveedor, baja segura con un clic, cola con límites y bloqueo, plantillas editables con variables validadas, entregabilidad | 6.39.0 | `EmailWebhookSecurityTest`, `EmailEngineDeliveryTest`, `MessagingEmailTemplatesTest`, `EmailTemplateEditorTest`, `EmailDeliverabilityTest` | Proveedores simulados; sin validación con cuentas reales ni DNS real. |
+| Boletín por lotes, suscriptores como contactos, doble opt-in, segmentos en BD, métricas | 6.39.0 | `NewsletterSendTest` | Prueba de 10.000 contactos en CI; sin envío real. |
+| Automatización: disparadores unificados, flujos con versiones, protecciones, editor | 6.39.0 | `AutomationFlowsTest`, `AutomationEditorViewTest` | Editor revisado en Chromium (también 375 px) con `scripts/flow-editor-browser-check.cjs`. |
+| Clases en vivo (Zoom, Meet, Teams): una reunión por clase, hora UTC, ventana del enlace, recordatorios, grabación a elección del docente, asistencia | 6.39.0 | `LiveClassesTest` | Todo con HTTP simulado; sin cuentas reales de Zoom, Google ni Microsoft 365. App: 1.2.0. |
 | Riesgo académico único (regla canónica, motivos con código), actividad desde la app, informes con alcance docente e institucional | 6.36.0 | `AcademicRiskRuleTest`, `AcademicRiskConsistencyTest`, `AcademicReportScopeTest` | Cambian niveles respecto a versiones anteriores (ver "Datos históricos"). Sin validación con estudiantes reales. |
 | CRM v2 completo (retiro de v1) | 6.34.0 | `tests/CRM/*`, `tests/integration/*` | CRM v1 retirado; CRM v2: import/export CSV, deduplicación, auditoría, aislamiento por institución. |
 

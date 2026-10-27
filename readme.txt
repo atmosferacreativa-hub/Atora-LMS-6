@@ -4,7 +4,7 @@ Tags: lms, learning, courses, education, ai, grading, certificates
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 6.37.0
+Stable tag: 6.39.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -50,6 +50,10 @@ No. ATORA LMS is not designed for WordPress Multisite. Network activation is blo
 4. Course overview template.
 
 == Changelog ==
+= 6.39.0 =
+* Comunicación: webhooks firmados en los seis proveedores, baja segura con un clic, cola con límites por proveedor, editor de plantillas con variables validadas, panel de entregabilidad (SPF/DKIM/DMARC), boletín por lotes con suscriptores como contactos y doble opt-in, y automatizaciones con disparadores unificados, versiones y protecciones.
+* Clases en vivo (Zoom, Google Meet, Microsoft Teams): una reunión por clase, hora en UTC, enlace con ventana, recordatorios que sí salen y grabación a elección del docente. Integración con proveedores externos, no transmisión propia.
+
 = 6.37.0 =
 * Audio como recurso de la lección: MP3, M4A y OGG validados por contenido, transcripción manual, reproductor web con velocidad y posición, datos para la app (duración, formato, compatibilidad, posición).
 * Planificación híbrida completa sin IA: objetivo, encuentro presencial, trabajo a distancia, recursos, evidencia y acompañamiento; vista previa y publicación que crea o actualiza las lecciones sin duplicar; IA opcional solo para sugerir.

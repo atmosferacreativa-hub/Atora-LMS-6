@@ -1,5 +1,49 @@
 # CHANGELOG — ATORA LMS
 
+## 6.39.0 (2026-10-27)
+
+Incluye lo planeado como 6.38.0 (Comunicación): las dos ramas se fusionaron en el orden inverso y no hubo un punto de
+`main` con solo Comunicación para publicarla aparte. No existe una versión 6.38.0 publicada.
+
+### Comunicación (`docs/ordenes/ORDEN-C-COMUNICACION.md`; detalle en `docs/EMAIL.md`, `docs/NEWSLETTER.md`, `docs/AUTOMATIZACION.md`)
+
+**Fallos graves corregidos**
+- El boletín usaba una plantilla de correo que no existía: no se enviaba a nadie. Además, los acentos de su contenido se corrompían al guardar.
+- El enlace «Cancelar suscripción» no llevaba token (no hacía nada) y el token aceptado era el ID consecutivo de la cola: cualquiera podía dar de baja a otra persona.
+- Los avisos académicos que el enrutador manda por correo (`atora_*`, p. ej. «nueva lección») no estaban en el catálogo y la cola los rechazaba.
+- Nada emitía `clms_user_enrolled_in_course`: al matricular no salía el correo de bienvenida al curso ni se disparaban automatizaciones, webhooks salientes ni el refresco del CRM.
+- El aviso interno de las automatizaciones no hacía nada; los disparadores del CRM sin usuario tomaban al administrador como destinatario.
+
+**Correo**
+- Webhooks con firma por proveedor (SendGrid, Mailgun, Postmark por HTTP Basic, Amazon SES por SNS, Brevo), vigencia y cada evento una sola vez. Rebote permanente o queja suprimen la dirección.
+- Baja con token firmado por usuario: abrir el enlace confirma, el botón (o el «un clic» de Gmail y Yahoo, `List-Unsubscribe-Post`) da de baja. La baja corta lo comercial; lo de cuenta y cursos sigue llegando.
+- Cola con bloqueo real, límites por minuto y hora por proveedor, y filas interrumpidas marcadas como fallidas (no se reenvían solas).
+- Editor de plantillas por bloques con vista previa en escritorio y móvil; una variable desconocida no se puede guardar.
+- Panel de entregabilidad: envíos, entregas, rebotes, quejas, aperturas y clics por día y proveedor; verificador SPF, DKIM y DMARC con la corrección concreta.
+
+**Boletín**
+- Envío por lotes con pausa, reanudación y cancelación, sin duplicados.
+- Un suscriptor es un contacto del CRM; doble opt-in configurable y registro del consentimiento. Migración: solo el consentimiento explícito queda suscrito (decisión del titular); informe previo de solo lectura `scripts/newsletter-subscribers-report.php`.
+- Segmentos resueltos en la base de datos y métricas por envío.
+
+**Automatización**
+- Un solo conjunto de disparadores; varias fuentes del mismo hecho disparan una vez. Migración idempotente de los nombres retirados.
+- Flujos con espera, condición sí/no y objetivo; quien está dentro sigue la versión con la que entró; no reingreso, bucles bloqueados, límite diario y reanudación sin repetir acciones. Editor con lienzo y simulación.
+
+### Clases en vivo (`docs/ordenes/ORDEN-CLASES-EN-VIVO.md`; detalle en `docs/CLASES-EN-VIVO.md`)
+
+Integración con proveedores externos: ATORA crea la reunión, entrega el enlace y registra asistencia y grabación. No es transmisión propia.
+- Una reunión por clase: guardar no duplica; reprogramar actualiza la existente.
+- Hora en UTC con la zona de la clase (en Caracas todo corría 4 horas).
+- Enlace abierto de 10 min antes a 15 min después del final; el docente recibe el de anfitrión.
+- Webhook de Zoom con la firma correcta, vigencia, una vez y validación de URL.
+- Cierre y asistencia solo al terminar la clase (Meet la cerraba al empezar).
+- Recordatorios de 24 h y 1 h por la cola de correo, reiniciados al reprogramar. Antes no salían: llamaban a un método inexistente.
+- Grabación a elección del docente: sin grabación, la sube después (video validado o enlace) o enlace automático del proveedor.
+- Microsoft Teams por Microsoft Graph con credenciales por academia: crear, reprogramar, asistencia y grabación. Probado con respuestas simuladas, sin cuenta real.
+
+**TESTS**: `EmailWebhookSecurityTest`, `EmailEngineDeliveryTest`, `MessagingEmailTemplatesTest`, `EmailTemplateEditorTest`, `EmailDeliverabilityTest`, `NewsletterSendTest`, `AutomationFlowsTest`, `AutomationEditorViewTest`, `LiveClassesTest`.
+
 ## 6.37.0 (2026-10-27)
 
 ### Audio en la lección y planificación híbrida (`docs/ordenes/ORDEN-AUDIO-PLANIFICACION.md`)
