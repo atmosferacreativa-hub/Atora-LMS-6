@@ -568,6 +568,9 @@ trait CLMS_Helper_Academic_Trait {
 		}
 
 		do_action( 'clms_user_enrolled', $user_id, $course_id );
+		// 6.38.0: automatizaciones, webhooks salientes, el correo de bienvenida al curso y la caché del CRM
+		// escuchaban este nombre, pero nada lo disparaba. Solo en matrículas reales (no en reparaciones).
+		do_action( 'clms_user_enrolled_in_course', $user_id, $course_id );
 
 		return true;
 	}

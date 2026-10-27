@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class V5_Installer {
 
 	/** Versión del esquema. Incrementar para forzar re-instalación. */
-	const SCHEMA_VERSION = '6.38.0-newsletter-contacts';
+	const SCHEMA_VERSION = '6.38.0-automation-flows';
 
 	/** Option key que almacena la versión instalada. */
 	const OPTION_KEY = 'atora_v5_schema_version';
@@ -1583,6 +1583,56 @@ class V5_Installer {
 				KEY status_execute (status, execute_at),
 				KEY automation_id  (automation_id)
 			) $charset_collate;" );
+
+		// 6.38.0: motor de flujos — versiones, recorridos por contacto y pasos ejecutados.
+		dbDelta( "CREATE TABLE {$wpdb->prefix}atora_automation_versions (
+			id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			automation_id INT UNSIGNED    NOT NULL,
+			version       INT UNSIGNED    NOT NULL,
+			definition    LONGTEXT        NOT NULL,
+			created_at    DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			created_by    BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			PRIMARY KEY  (id),
+			UNIQUE KEY automation_version (automation_id, version)
+		) $charset_collate;" );
+
+		dbDelta( "CREATE TABLE {$wpdb->prefix}atora_automation_runs (
+			id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			automation_id INT UNSIGNED    NOT NULL,
+			version       INT UNSIGNED    NOT NULL DEFAULT 0,
+			user_id       BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			contact_id    BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			status        VARCHAR(20)     NOT NULL DEFAULT 'waiting' COMMENT 'waiting|running|completed|exited|failed|blocked',
+			current_step  VARCHAR(60)     NOT NULL DEFAULT '',
+			wake_at       DATETIME        NOT NULL,
+			attempts      TINYINT UNSIGNED NOT NULL DEFAULT 0,
+			context       LONGTEXT        NULL,
+			chain         VARCHAR(255)    NOT NULL DEFAULT '',
+			is_test       TINYINT(1)      NOT NULL DEFAULT 0,
+			exit_reason   VARCHAR(80)     NOT NULL DEFAULT '',
+			locked_at     DATETIME                 DEFAULT NULL,
+			started_at    DATETIME        NOT NULL,
+			updated_at    DATETIME        NOT NULL,
+			finished_at   DATETIME                 DEFAULT NULL,
+			PRIMARY KEY  (id),
+			KEY status_wake (status, wake_at),
+			KEY flow_user (automation_id, user_id),
+			KEY flow_contact (automation_id, contact_id)
+		) $charset_collate;" );
+
+		dbDelta( "CREATE TABLE {$wpdb->prefix}atora_automation_run_steps (
+			id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			run_id      BIGINT UNSIGNED NOT NULL,
+			step_id     VARCHAR(60)     NOT NULL,
+			step_type   VARCHAR(20)     NOT NULL DEFAULT '',
+			action_type VARCHAR(40)     NOT NULL DEFAULT '',
+			status      VARCHAR(20)     NOT NULL DEFAULT 'done',
+			detail      VARCHAR(255)    NOT NULL DEFAULT '',
+			executed_at DATETIME        NOT NULL,
+			PRIMARY KEY  (id),
+			UNIQUE KEY run_step (run_id, step_id),
+			KEY executed (executed_at)
+		) $charset_collate;" );
 
 		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_automation_execution_log (
 			id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
