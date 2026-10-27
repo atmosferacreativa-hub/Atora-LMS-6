@@ -31,6 +31,17 @@ class Email_Templates {
 	public static function get_catalog(): array {
 		return array(
 			// ── Académicos ──────────────────────────────────────────────────
+			// 6.38.0: bienvenida a la plataforma (base de la biblioteca; la usan las automatizaciones).
+			'welcome_account'       => array(
+				'id'          => 41,
+				'name'        => __( 'Bienvenida a la plataforma', 'atora-lms' ),
+				'subject'     => __( 'Te damos la bienvenida a {{site_name}}', 'atora-lms' ),
+				'body'        => __( 'Tu cuenta en {{site_name}} está lista. Desde tu panel verás tus cursos, tareas y novedades.', 'atora-lms' ),
+				'button_text' => __( 'Ir a mi panel', 'atora-lms' ),
+				'view'        => 'messaging',
+				'category'    => 'system',
+				'active'      => true,
+			),
 			'welcome_course'        => array(
 				'id'       => 1,
 				'name'     => __( 'Bienvenida al curso', 'atora-lms' ),
@@ -298,6 +309,20 @@ class Email_Templates {
 	 * @return array|null
 	 */
 	public static function get( string $key ): ?array {
+		$template = self::get_original( $key );
+		// 6.38.0: asunto personalizado desde el editor de plantillas.
+		if ( $template && class_exists( Email_Template_Editor::class ) ) {
+			$override = Email_Template_Editor::override_for( $key );
+			if ( $override && '' !== (string) ( $override['subject'] ?? '' ) ) {
+				$template['subject']    = (string) $override['subject'];
+				$template['customized'] = true;
+			}
+		}
+		return $template;
+	}
+
+	/** Plantilla tal como viene en el catálogo, sin personalizar. */
+	public static function get_original( string $key ): ?array {
 		$catalog = self::get_catalog();
 		return $catalog[ $key ] ?? null;
 	}
@@ -416,6 +441,13 @@ class Email_Templates {
 	 */
 	private static function get_template_html_body( string $key, array $context ): string {
 		$template = self::get( $key );
+		// 6.38.0: bloques personalizados desde el editor.
+		if ( class_exists( Email_Template_Editor::class ) ) {
+			$blocks = Email_Template_Editor::active_blocks( $key );
+			if ( $blocks ) {
+				return Email_Template_Editor::render_blocks( $blocks, $context );
+			}
+		}
 		$view     = ATORA_LMS_MODULES_DIR . 'email-engine/templates/' . sanitize_key( (string) ( $template['view'] ?? $key ) ) . '.php';
 		if ( isset( $template['body'] ) ) {
 			$context['atora_template'] = $template;
@@ -464,7 +496,7 @@ class Email_Templates {
 	 * @param array  $context Contexto.
 	 * @return string
 	 */
-	private static function get_html_wrapper( string $content, array $context ): string {
+	public static function get_html_wrapper( string $content, array $context ): string {
 		$site_name = esc_html( $context['site_name'] ?? get_bloginfo( 'name' ) );
 
 		// Branding configurable desde Settings → color primario, logo y nombre.

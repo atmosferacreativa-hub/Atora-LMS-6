@@ -27,7 +27,8 @@ $atora_headline = ! empty( $atora_ctx['headline'] ) && is_scalar( $atora_ctx['he
 	: esc_html( (string) ( $atora_template['name'] ?? '' ) );
 $atora_body     = \ATORA\EmailEngine\Email_Templates::render_string( (string) ( $atora_template['body'] ?? '' ), $atora_ctx );
 $atora_button   = \ATORA\EmailEngine\Email_Templates::render_string( (string) ( $atora_template['button_text'] ?? '' ), $atora_ctx );
-$atora_url      = ! empty( $atora_ctx['button_url'] ) && is_scalar( $atora_ctx['button_url'] ) ? esc_url( (string) $atora_ctx['button_url'] ) : '';
+$atora_link     = ! empty( $atora_ctx['button_url'] ) ? $atora_ctx['button_url'] : ( $atora_ctx['dashboard_url'] ?? '' );
+$atora_url      = is_scalar( $atora_link ) ? esc_url( (string) $atora_link ) : '';
 ?>
 <h1 style="color:#0f172a;font-size:22px;margin:0 0 16px;"><?php echo $atora_headline; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escapado arriba. ?></h1>
 <?php if ( '' !== $atora_name ) : ?>

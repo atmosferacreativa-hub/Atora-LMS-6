@@ -325,6 +325,8 @@ class V5_Modules {
 		$dir = ATORA_LMS_MODULES_DIR . 'email-engine/';
 		self::require_file( $dir . 'class-email-unsubscribe.php' );
 		self::require_file( $dir . 'class-email-templates.php' );
+		self::require_file( $dir . 'class-email-template-editor.php' );
+		self::require_file( $dir . 'class-email-deliverability.php' );
 		self::require_file( $dir . 'class-email-queue.php' );
 		self::require_file( $dir . 'class-email-engine.php' );
 		if ( class_exists( 'ATORA\EmailEngine\Email_Engine' ) ) {
