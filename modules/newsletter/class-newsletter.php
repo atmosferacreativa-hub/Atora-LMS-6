@@ -338,10 +338,9 @@ class Newsletter {
 		$in   = implode( ',', array_map( 'absint', $user_ids ) );
 		$rows = $wpdb->get_col( $wpdb->prepare( // phpcs:ignore WordPress.DB
 			"SELECT DISTINCT user_id FROM {$wpdb->prefix}atora_email_queue
-			 WHERE user_id IN ({$in}) AND (metadata LIKE %s OR metadata LIKE %s)",
-			'%"newsletter_id":' . $post_id . ',%',
-			'%"newsletter_id":' . $post_id . '}%'
-		) );
+			 WHERE user_id IN ({$in}) AND CAST( JSON_UNQUOTE( JSON_EXTRACT( metadata, '$.newsletter_id' ) ) AS UNSIGNED ) = %d",
+			$post_id
+		) ); // MySQL normaliza el JSON al guardarlo: un LIKE sobre el texto no sirve.
 		return array_fill_keys( array_map( 'absint', (array) $rows ), true );
 	}
 

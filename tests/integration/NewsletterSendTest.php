@@ -61,8 +61,8 @@ final class NewsletterSendTest extends WP_UnitTestCase {
 	private function queued( int $newsletter ): array {
 		global $wpdb;
 		$rows = $wpdb->get_results( $wpdb->prepare(
-			"SELECT user_id, COUNT(*) AS n FROM {$wpdb->prefix}atora_email_queue WHERE metadata LIKE %s GROUP BY user_id",
-			'%"newsletter_id":' . $newsletter . ',%'
+			"SELECT user_id, COUNT(*) AS n FROM {$wpdb->prefix}atora_email_queue WHERE CAST( JSON_UNQUOTE( JSON_EXTRACT( metadata, '$.newsletter_id' ) ) AS UNSIGNED ) = %d GROUP BY user_id",
+			$newsletter
 		) );
 		$out = array();
 		foreach ( $rows as $row ) {
