@@ -65,9 +65,17 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] ) { // phpcs:ignore WordPress.Securit
 			$counts = \ATORA\Newsletter\Newsletter::send( $post_id );
 			$status = array(
 				'type'    => 'success',
-				/* translators: 1: sent count 2: failed count */
-				'message' => sprintf( __( 'Envío ejecutado. Enviados: %1$d · Fallidos: %2$d', 'atora-lms' ), absint( $counts['sent'] ?? 0 ), absint( $counts['failed'] ?? 0 ) ),
+				/* translators: 1: queued count 2: skipped count */
+				'message' => sprintf( __( 'Envío iniciado por lotes. En cola: %1$d · Omitidos: %2$d. El resto continúa en segundo plano.', 'atora-lms' ), absint( $counts['queued'] ?? 0 ), absint( $counts['skipped'] ?? 0 ) ),
 			);
+		}
+	}
+
+	if ( in_array( $action, array( 'pause', 'resume', 'cancel' ), true ) && check_admin_referer( 'atora_nl_control', 'atora_nl_nonce' ) ) {
+		$post_id = absint( wp_unslash( $_POST['newsletter_id'] ?? 0 ) );
+		if ( $post_id > 0 && class_exists( '\ATORA\Newsletter\Newsletter' ) ) {
+			\ATORA\Newsletter\Newsletter::$action( $post_id );
+			$status = array( 'type' => 'success', 'message' => __( 'Estado del envío actualizado.', 'atora-lms' ) );
 		}
 	}
 }
@@ -132,7 +140,8 @@ $newsletters = get_posts(
 					<?php
 					$type      = sanitize_key( (string) get_post_meta( $newsletter->ID, 'atora_nl_type', true ) );
 					$status_nl = sanitize_key( (string) get_post_meta( $newsletter->ID, 'atora_nl_status', true ) );
-					$sent      = absint( get_post_meta( $newsletter->ID, 'atora_nl_sent_count', true ) );
+					$state     = \ATORA\Newsletter\Newsletter::send_state( $newsletter->ID );
+					$sent      = absint( $state['queued'] );
 					?>
 					<tr>
 						<td>
@@ -149,8 +158,24 @@ $newsletters = get_posts(
 								<?php wp_nonce_field( 'atora_nl_send_now', 'atora_nl_nonce' ); ?>
 								<input type="hidden" name="atora_nl_admin_action" value="send_now">
 								<input type="hidden" name="newsletter_id" value="<?php echo esc_attr( (string) absint( $newsletter->ID ) ); ?>">
-								<button type="submit" class="button button-small"><?php esc_html_e( 'Enviar ahora', 'atora-lms' ); ?></button>
+								<button type="submit" class="button button-small" <?php disabled( in_array( $status_nl, array( 'sent', 'sending' ), true ) ); ?>><?php esc_html_e( 'Enviar ahora', 'atora-lms' ); ?></button>
 							</form>
+							<?php
+							$controls = array();
+							if ( 'sending' === $status_nl ) {
+								$controls = array( 'pause' => __( 'Pausar', 'atora-lms' ), 'cancel' => __( 'Cancelar', 'atora-lms' ) );
+							} elseif ( 'paused' === $status_nl ) {
+								$controls = array( 'resume' => __( 'Reanudar', 'atora-lms' ), 'cancel' => __( 'Cancelar', 'atora-lms' ) );
+							}
+							foreach ( $controls as $op => $label ) :
+								?>
+								<form method="post" style="display:inline;">
+									<?php wp_nonce_field( 'atora_nl_control', 'atora_nl_nonce' ); ?>
+									<input type="hidden" name="atora_nl_admin_action" value="<?php echo esc_attr( $op ); ?>">
+									<input type="hidden" name="newsletter_id" value="<?php echo esc_attr( (string) absint( $newsletter->ID ) ); ?>">
+									<button type="submit" class="button button-small"><?php echo esc_html( $label ); ?></button>
+								</form>
+							<?php endforeach; ?>
 						</td>
 					</tr>
 				<?php endforeach; ?>

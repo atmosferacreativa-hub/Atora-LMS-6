@@ -42,6 +42,9 @@ class Newsletter {
 			wp_schedule_event( time(), 'hourly', 'atora_newsletter_cron' );
 		}
 
+		// 6.38.0: envío por lotes.
+		add_action( 'atora_nl_send_batch', array( __CLASS__, 'process_send_batch' ) );
+
 		// Cron: importar blog/podcast (cada hora).
 		add_action( 'atora_newsletter_feed_cron', array( __CLASS__, 'process_feeds' ) );
 		if ( ! wp_next_scheduled( 'atora_newsletter_feed_cron' ) ) {
@@ -135,8 +138,15 @@ class Newsletter {
 			'atora_nl_ab_variants'     => wp_json_encode( $data['ab_variants'] ?? array() ),
 		);
 
+		// 6.38.0: editar un boletín en envío o ya enviado no reinicia su estado.
+		$current = (string) get_post_meta( $post_id, 'atora_nl_status', true );
+		if ( in_array( $current, array( 'sending', 'paused', 'sent' ), true ) ) {
+			unset( $meta['atora_nl_status'] );
+		}
+
 		foreach ( $meta as $key => $value ) {
-			update_post_meta( $post_id, $key, $value );
+			// 6.38.0: update_post_meta quita barras; sin wp_slash el JSON perdía los acentos ("boletu00edn").
+			update_post_meta( $post_id, $key, is_string( $value ) ? wp_slash( $value ) : $value );
 		}
 
 		return $post_id;
@@ -162,100 +172,176 @@ class Newsletter {
 
 	// ── Envío ─────────────────────────────────────────────────────────────────
 
+	/** Destinatarios por lote (cada lote es una petición corta; el resto sigue por cron). */
+	const BATCH_SIZE = 200;
+
+	/** Ventana de deduplicación: un boletín nunca llega dos veces a la misma persona. */
+	const DEDUPE_MINUTES = 43200;
+
 	/**
-	 * Envía una newsletter a su audiencia.
+	 * Inicia el envío de un boletín (6.38.0): por lotes a través de la cola de correo.
+	 * Antes se encolaba a todos en una sola petición (y con una plantilla inexistente, a nadie).
+	 * Se puede pausar, reanudar y cancelar; reanudar o reintentar no duplica envíos.
 	 *
 	 * @param int $post_id ID de la newsletter.
-	 * @return array { sent: int, failed: int }
+	 * @return array{queued:int,skipped:int,failed:int,status:string}
 	 */
 	public static function send( int $post_id ): array {
-		$ab_enabled = (bool) get_post_meta( $post_id, 'atora_nl_ab_enabled', true );
-
-		if ( $ab_enabled ) {
-			return self::send_ab_test( $post_id );
+		$status = (string) get_post_meta( $post_id, 'atora_nl_status', true );
+		if ( 'sent' === $status ) {
+			return self::send_state( $post_id ); // Ya enviado: no se repite.
 		}
-
-		$recipients = self::get_recipients( $post_id );
-		$counts     = array( 'sent' => 0, 'failed' => 0, 'skipped' => 0 );
-
-		foreach ( $recipients as $user_id ) {
-			// Fase 10: verificar suppression list antes de enviar
-			$user_obj = get_userdata( $user_id );
-			if ( $user_obj && class_exists( '\ATORA\CRM_V2\Services\Sequence_Service' ) ) {
-				if ( \ATORA\CRM_V2\Services\Sequence_Service::is_suppressed( $user_obj->user_email ) ) {
-					$counts['skipped'] = ( $counts['skipped'] ?? 0 ) + 1;
-					continue;
-				}
-			}
-			$queued = \ATORA\EmailEngine\Email_Queue::enqueue( array(
-				'template' => 'newsletter',
-				'user_id'  => $user_id,
-				'priority' => 'medium',
-				'metadata' => array( 'newsletter_id' => $post_id ),
-			) );
-
-			$queued ? $counts['sent']++ : $counts['failed']++;
+		if ( 'paused' === $status ) {
+			return self::resume( $post_id );
 		}
-
-		update_post_meta( $post_id, 'atora_nl_sent_count', $counts['sent'] );
-		update_post_meta( $post_id, 'atora_nl_sent_at', current_time( 'mysql', true ) );
-		update_post_meta( $post_id, 'atora_nl_status', 'sent' );
-
-		do_action( 'atora/newsletter/sent', $post_id, $counts );
-
-		return $counts;
+		if ( 'sending' !== $status ) {
+			update_post_meta( $post_id, 'atora_nl_cursor', 0 );
+			update_post_meta( $post_id, 'atora_nl_counts', wp_json_encode( array( 'queued' => 0, 'skipped' => 0, 'failed' => 0, 'ab_a' => 0, 'ab_b' => 0 ) ) );
+			update_post_meta( $post_id, 'atora_nl_status', 'sending' );
+			update_post_meta( $post_id, 'atora_nl_started_at', current_time( 'mysql', true ) );
+		}
+		return self::process_send_batch( $post_id );
 	}
 
 	/**
-	 * Envía una newsletter con A/B testing (50/50 split inicial).
+	 * Procesa un lote. Lo llama `send()` y luego el cron (`atora_nl_send_batch`) hasta terminar.
 	 *
-	 * @param int $post_id ID de la newsletter.
-	 * @return array
+	 * @return array{queued:int,skipped:int,failed:int,status:string}
 	 */
-	private static function send_ab_test( int $post_id ): array {
-		$recipients = self::get_recipients( $post_id );
-		$half       = (int) ceil( count( $recipients ) / 2 );
-		$group_a    = array_slice( $recipients, 0, $half );
-		$group_b    = array_slice( $recipients, $half );
-
-		$ab_variants = json_decode( get_post_meta( $post_id, 'atora_nl_ab_variants', true ), true );
-
-		// Enviar variante A.
-		foreach ( $group_a as $user_id ) {
-			\ATORA\EmailEngine\Email_Queue::enqueue( array(
-				'template' => 'newsletter',
-				'user_id'  => $user_id,
-				'priority' => 'medium',
-				'metadata' => array(
-					'newsletter_id' => $post_id,
-					'ab_variant'    => 'a',
-					'subject'       => $ab_variants['variant_a']['subject'] ?? '',
-				),
-			) );
+	public static function process_send_batch( int $post_id ): array {
+		global $wpdb;
+		$lock = 'atora_nl_send_' . $post_id;
+		if ( 1 !== (int) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 0)', $lock ) ) ) {
+			return self::send_state( $post_id );
 		}
+		try {
+			if ( 'sending' !== (string) get_post_meta( $post_id, 'atora_nl_status', true ) ) {
+				return self::send_state( $post_id );
+			}
+			$cursor  = absint( get_post_meta( $post_id, 'atora_nl_cursor', true ) );
+			$counts  = self::counts( $post_id );
+			$segment = json_decode( (string) get_post_meta( $post_id, 'atora_nl_segment', true ), true );
+			$ids     = self::subscriber_ids_page( is_array( $segment ) ? $segment : array(), $cursor, self::BATCH_SIZE );
 
-		// Enviar variante B.
-		foreach ( $group_b as $user_id ) {
-			\ATORA\EmailEngine\Email_Queue::enqueue( array(
-				'template' => 'newsletter',
-				'user_id'  => $user_id,
-				'priority' => 'medium',
-				'metadata' => array(
-					'newsletter_id' => $post_id,
-					'ab_variant'    => 'b',
-					'subject'       => $ab_variants['variant_b']['subject'] ?? '',
-				),
-			) );
+			$ab_enabled = (bool) get_post_meta( $post_id, 'atora_nl_ab_enabled', true );
+			$variants   = json_decode( (string) get_post_meta( $post_id, 'atora_nl_ab_variants', true ), true );
+			$variants   = is_array( $variants ) ? $variants : array();
+			$title      = get_the_title( $post_id );
+			$already    = self::already_queued( $post_id, $ids );
+
+			foreach ( $ids as $user_id ) {
+				if ( isset( $already[ $user_id ] ) ) {
+					$counts['skipped']++; // Reintento o reinicio tras cancelar: no se duplica.
+					$cursor = $user_id;
+					continue;
+				}
+				$variant = $ab_enabled ? ( 0 === $user_id % 2 ? 'a' : 'b' ) : '';
+				$subject = '' !== $variant ? (string) ( $variants[ 'variant_' . $variant ]['subject'] ?? '' ) : '';
+				$queued  = \ATORA\EmailEngine\Email_Queue::enqueue( array(
+					'template'              => 'newsletter',
+					'user_id'               => $user_id,
+					'priority'              => 'low',
+					'dedupe_window_minutes' => self::DEDUPE_MINUTES,
+					'metadata'              => array_filter( array(
+						'newsletter_id'  => $post_id,
+						'custom_subject' => '' !== $subject ? $subject : $title,
+						'ab_variant'     => $variant,
+					), static fn( $v ) => '' !== $v ),
+				) );
+				if ( $queued ) {
+					$counts['queued']++;
+					if ( '' !== $variant ) {
+						$counts[ 'ab_' . $variant ]++;
+					}
+				} else {
+					$counts['skipped']++; // Suprimido, sin dirección o ya enviado.
+				}
+				$cursor = $user_id;
+			}
+
+			update_post_meta( $post_id, 'atora_nl_cursor', $cursor );
+			update_post_meta( $post_id, 'atora_nl_counts', wp_json_encode( $counts ) );
+
+			if ( count( $ids ) < self::BATCH_SIZE ) {
+				update_post_meta( $post_id, 'atora_nl_status', 'sent' );
+				update_post_meta( $post_id, 'atora_nl_sent_count', $counts['queued'] );
+				update_post_meta( $post_id, 'atora_nl_sent_at', current_time( 'mysql', true ) );
+				if ( $ab_enabled ) {
+					$variants['variant_a']['sent_to'] = $counts['ab_a'];
+					$variants['variant_b']['sent_to'] = $counts['ab_b'];
+					update_post_meta( $post_id, 'atora_nl_ab_variants', wp_slash( wp_json_encode( $variants ) ) );
+					wp_schedule_single_event( time() + DAY_IN_SECONDS, 'atora_nl_ab_pick_winner', array( $post_id ) );
+				}
+				do_action( 'atora/newsletter/sent', $post_id, $counts );
+			} elseif ( ! wp_next_scheduled( 'atora_nl_send_batch', array( $post_id ) ) ) {
+				wp_schedule_single_event( time() + 30, 'atora_nl_send_batch', array( $post_id ) );
+			}
+			return self::send_state( $post_id );
+		} finally {
+			$wpdb->query( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock ) );
 		}
+	}
 
-		$ab_variants['variant_a']['sent_to'] = count( $group_a );
-		$ab_variants['variant_b']['sent_to'] = count( $group_b );
-		update_post_meta( $post_id, 'atora_nl_ab_variants', wp_json_encode( $ab_variants ) );
+	public static function pause( int $post_id ): array {
+		if ( 'sending' === (string) get_post_meta( $post_id, 'atora_nl_status', true ) ) {
+			update_post_meta( $post_id, 'atora_nl_status', 'paused' );
+			wp_clear_scheduled_hook( 'atora_nl_send_batch', array( $post_id ) );
+		}
+		return self::send_state( $post_id );
+	}
 
-		// Programar elección del ganador en 24h.
-		wp_schedule_single_event( time() + DAY_IN_SECONDS, 'atora_nl_ab_pick_winner', array( $post_id ) );
+	public static function resume( int $post_id ): array {
+		if ( 'paused' === (string) get_post_meta( $post_id, 'atora_nl_status', true ) ) {
+			update_post_meta( $post_id, 'atora_nl_status', 'sending' );
+			return self::process_send_batch( $post_id );
+		}
+		return self::send_state( $post_id );
+	}
 
-		return array( 'sent' => count( $recipients ), 'failed' => 0 );
+	public static function cancel( int $post_id ): array {
+		if ( in_array( (string) get_post_meta( $post_id, 'atora_nl_status', true ), array( 'sending', 'paused' ), true ) ) {
+			update_post_meta( $post_id, 'atora_nl_status', 'cancelled' );
+			wp_clear_scheduled_hook( 'atora_nl_send_batch', array( $post_id ) );
+		}
+		return self::send_state( $post_id );
+	}
+
+	/** @return array{queued:int,skipped:int,failed:int,status:string} */
+	public static function send_state( int $post_id ): array {
+		return self::counts( $post_id ) + array( 'status' => (string) get_post_meta( $post_id, 'atora_nl_status', true ) );
+	}
+
+	/** @return array{queued:int,skipped:int,failed:int} */
+	private static function counts( int $post_id ): array {
+		$counts = json_decode( (string) get_post_meta( $post_id, 'atora_nl_counts', true ), true );
+		$counts = is_array( $counts ) ? $counts : array();
+		return array(
+			'queued'  => (int) ( $counts['queued'] ?? 0 ),
+			'skipped' => (int) ( $counts['skipped'] ?? 0 ),
+			'failed'  => (int) ( $counts['failed'] ?? 0 ),
+			'ab_a'    => (int) ( $counts['ab_a'] ?? 0 ),
+			'ab_b'    => (int) ( $counts['ab_b'] ?? 0 ),
+		);
+	}
+
+	/**
+	 * Usuarios de la lista que ya tienen este boletín en la cola (cualquier estado).
+	 *
+	 * @param int[] $user_ids
+	 * @return array<int,true>
+	 */
+	private static function already_queued( int $post_id, array $user_ids ): array {
+		global $wpdb;
+		if ( ! $user_ids ) {
+			return array();
+		}
+		$in   = implode( ',', array_map( 'absint', $user_ids ) );
+		$rows = $wpdb->get_col( $wpdb->prepare( // phpcs:ignore WordPress.DB
+			"SELECT DISTINCT user_id FROM {$wpdb->prefix}atora_email_queue
+			 WHERE user_id IN ({$in}) AND CAST( JSON_UNQUOTE( JSON_EXTRACT( metadata, '$.newsletter_id' ) ) AS UNSIGNED ) = %d",
+			$post_id
+		) ); // MySQL normaliza el JSON al guardarlo: un LIKE sobre el texto no sirve.
+		return array_fill_keys( array_map( 'absint', (array) $rows ), true );
 	}
 
 	// ── Cron: envío programado ────────────────────────────────────────────────
@@ -472,6 +558,30 @@ class Newsletter {
 			'callback'            => array( __CLASS__, 'rest_send' ),
 			'permission_callback' => static fn() => current_user_can( 'manage_options' ),
 		) );
+
+		// 6.38.0: control del envío por lotes.
+		register_rest_route( 'atora/v1', '/newsletters/(?P<id>\d+)/(?P<op>pause|resume|cancel|status)', array(
+			'methods'             => 'POST',
+			'callback'            => array( __CLASS__, 'rest_control' ),
+			'permission_callback' => static fn() => current_user_can( 'manage_options' ),
+		) );
+	}
+
+	/** @param \WP_REST_Request $r Request. */
+	public static function rest_control( \WP_REST_Request $r ): \WP_REST_Response {
+		$id = absint( $r->get_param( 'id' ) );
+		if ( ! $id || 'atora_newsletter' !== get_post_type( $id ) ) {
+			return new \WP_REST_Response( array( 'code' => 'atora_newsletter_not_found' ), 404 );
+		}
+		switch ( (string) $r->get_param( 'op' ) ) {
+			case 'pause':
+				return rest_ensure_response( self::pause( $id ) );
+			case 'resume':
+				return rest_ensure_response( self::resume( $id ) );
+			case 'cancel':
+				return rest_ensure_response( self::cancel( $id ) );
+		}
+		return rest_ensure_response( self::send_state( $id ) );
 	}
 
 	/** @param \WP_REST_Request $r Request. */
@@ -642,21 +752,17 @@ class Newsletter {
 
 	// ── Helpers ───────────────────────────────────────────────────────────────
 
-	/**
-	 * Obtiene los destinatarios de una newsletter según su segmento.
-	 *
-	 * @param int $post_id ID de la newsletter.
-	 * @return int[] IDs de usuarios.
-	 */
 	public static function get_recipients( int $post_id ): array {
-		$segment = json_decode( get_post_meta( $post_id, 'atora_nl_segment', true ), true );
-
-		if ( empty( $segment ) ) {
-			return self::get_newsletter_subscribers();
-		}
-
-		// Segmento específico: aplicar filtros.
-		return self::apply_segment_filters( $segment );
+		$segment = json_decode( (string) get_post_meta( $post_id, 'atora_nl_segment', true ), true );
+		$segment = is_array( $segment ) ? $segment : array();
+		$all     = array();
+		$cursor  = 0;
+		do {
+			$page   = self::subscriber_ids_page( $segment, $cursor, 1000 );
+			$all    = array_merge( $all, $page );
+			$cursor = $page ? (int) end( $page ) : $cursor;
+		} while ( count( $page ) === 1000 );
+		return $all;
 	}
 
 	/**
@@ -665,47 +771,65 @@ class Newsletter {
 	 * @return int[]
 	 */
 	public static function get_newsletter_subscribers(): array {
-		global $wpdb;
-
-		$ids = $wpdb->get_col(
-			"SELECT DISTINCT u.ID FROM {$wpdb->users} u
-			 LEFT JOIN {$wpdb->usermeta} m ON m.user_id = u.ID AND m.meta_key = 'atora_consent_marketing'
-			 LEFT JOIN {$wpdb->prefix}atora_email_preferences p ON p.user_id = u.ID
-			 LEFT JOIN {$wpdb->prefix}atora_email_suppression s ON s.email = u.user_email
-			 WHERE (m.meta_value = '1' OR m.meta_value IS NULL)
-			   AND (p.unsubscribed_all IS NULL OR p.unsubscribed_all = 0)
-			   AND s.id IS NULL" /* excluir suprimidos (Fase 10) */
-		);
-
-		return array_map( 'absint', (array) $ids );
+		$all    = array();
+		$cursor = 0;
+		do {
+			$page   = self::subscriber_ids_page( array(), $cursor, 1000 );
+			$all    = array_merge( $all, $page );
+			$cursor = $page ? (int) end( $page ) : $cursor;
+		} while ( count( $page ) === 1000 );
+		return $all;
 	}
 
 	/**
-	 * Aplica filtros de segmento a la lista de usuarios.
+	 * 6.38.0: una página de suscriptores resuelta en la base de datos (segmento incluido), ordenada por ID.
+	 * Antes se cargaban todos en memoria y el segmento se filtraba con una consulta por usuario.
 	 *
-	 * @param array $segment Configuración del segmento.
+	 * @param array $segment `{ rules: [ { field, operator: equals|not_equals|contains, value } ] }` sobre la
+	 *                       meta `atora_{field}`.
 	 * @return int[]
 	 */
-	private static function apply_segment_filters( array $segment ): array {
-		$base = self::get_newsletter_subscribers();
-
-		foreach ( $segment['rules'] ?? array() as $rule ) {
-			$field    = sanitize_key( $rule['field'] ?? '' );
-			$operator = sanitize_key( $rule['operator'] ?? 'equals' );
-			$value    = sanitize_text_field( $rule['value'] ?? '' );
-
-			$base = array_filter( $base, static function ( $user_id ) use ( $field, $operator, $value ) {
-				$user_val = get_user_meta( $user_id, 'atora_' . $field, true );
-				switch ( $operator ) {
-					case 'equals':     return $user_val === $value;
-					case 'not_equals': return $user_val !== $value;
-					case 'contains':   return str_contains( (string) $user_val, $value );
-					default:           return true;
-				}
-			} );
+	public static function subscriber_ids_page( array $segment, int $after_id, int $limit ): array {
+		global $wpdb;
+		$joins  = array();
+		$wheres      = array();
+		$wheres_args = array();
+		$args        = array();
+		$n      = 0;
+		foreach ( (array) ( $segment['rules'] ?? array() ) as $rule ) {
+			$field = sanitize_key( (string) ( $rule['field'] ?? '' ) );
+			if ( '' === $field || strlen( $field ) > 50 ) {
+				continue;
+			}
+			$operator = sanitize_key( (string) ( $rule['operator'] ?? 'equals' ) );
+			$value    = sanitize_text_field( (string) ( $rule['value'] ?? '' ) );
+			$alias    = 'r' . ( ++$n );
+			$joins[]  = "LEFT JOIN {$wpdb->usermeta} {$alias} ON {$alias}.user_id = u.ID AND {$alias}.meta_key = %s";
+			$args[]   = 'atora_' . $field;
+			if ( 'not_equals' === $operator ) {
+				$wheres[] = "({$alias}.meta_value IS NULL OR {$alias}.meta_value <> %s)";
+				$wheres_args[] = $value;
+			} elseif ( 'contains' === $operator ) {
+				$wheres[] = "{$alias}.meta_value LIKE %s";
+				$wheres_args[] = '%' . $wpdb->esc_like( $value ) . '%';
+			} else {
+				$wheres[] = "{$alias}.meta_value = %s";
+				$wheres_args[] = $value;
+			}
 		}
-
-		return array_values( $base );
+		$sql = "SELECT DISTINCT u.ID FROM {$wpdb->users} u
+			 LEFT JOIN {$wpdb->usermeta} m ON m.user_id = u.ID AND m.meta_key = 'atora_consent_marketing'
+			 LEFT JOIN {$wpdb->prefix}atora_email_preferences p ON p.user_id = u.ID
+			 LEFT JOIN {$wpdb->prefix}atora_email_suppression s ON s.email = u.user_email
+			 " . implode( "\n", $joins ) . "
+			 WHERE (m.meta_value = '1' OR m.meta_value IS NULL)
+			   AND (p.unsubscribed_all IS NULL OR p.unsubscribed_all = 0)
+			   AND s.id IS NULL
+			   AND u.ID > %d" . ( $wheres ? ' AND ' . implode( ' AND ', $wheres ) : '' ) . '
+			 ORDER BY u.ID ASC
+			 LIMIT %d';
+		$params = array_merge( $args, array( $after_id ), $wheres_args, array( max( 1, $limit ) ) );
+		return array_map( 'absint', (array) $wpdb->get_col( $wpdb->prepare( $sql, $params ) ) ); // phpcs:ignore WordPress.DB
 	}
 
 	/**
@@ -716,9 +840,18 @@ class Newsletter {
 	 * @return string
 	 */
 	public static function render_newsletter_html( int $post_id, int $user_id ): string {
-		$nl      = get_post( $post_id );
 		$user    = get_userdata( $user_id );
 		$context = \ATORA\EmailEngine\Email_Templates::build_context( $user, array() );
+		$footer  = \ATORA\EmailEngine\Email_Templates::get_compliance_footer( $context );
+		return \ATORA\EmailEngine\Email_Templates::get_html_wrapper( self::render_body( $post_id ) . $footer, $context );
+	}
+
+	/** 6.38.0: cuerpo del boletín (lo usa también la plantilla de correo `newsletter`). */
+	public static function render_body( int $post_id ): string {
+		$nl = get_post( $post_id );
+		if ( ! $nl ) {
+			return '';
+		}
 
 		$sections_raw = get_post_meta( $post_id, 'atora_nl_sections', true );
 		$sections     = json_decode( $sections_raw, true );
@@ -756,8 +889,6 @@ class Newsletter {
 			}
 		}
 
-		$footer = \ATORA\EmailEngine\Email_Templates::get_compliance_footer( $context );
-
-		return \ATORA\EmailEngine\Email_Templates::get_html_wrapper( $body . $footer, $context );
+		return $body;
 	}
 }

@@ -430,6 +430,7 @@ trait CLMS_Settings_Render_Trait {
 				<td>
 					<p style="margin:0 0 6px"><strong><?php esc_html_e( 'Brevo', 'atora-lms' ); ?></strong></p>
 					<input type="password" class="regular-text" autocomplete="off" name="clms_email_engine[brevo_api_key]" value="<?php echo esc_attr( (string) $email['brevo_api_key'] ); ?>" placeholder="<?php esc_attr_e( 'API key Brevo', 'atora-lms' ); ?>">
+					<input type="password" class="regular-text" autocomplete="off" name="clms_email_engine[brevo_webhook_token]" value="<?php echo esc_attr( (string) ( $email['brevo_webhook_token'] ?? '' ) ); ?>" placeholder="<?php esc_attr_e( 'Token del webhook (cabecera X-Atora-Webhook-Token)', 'atora-lms' ); ?>">
 					<p style="margin:12px 0 6px"><strong><?php esc_html_e( 'SendGrid', 'atora-lms' ); ?></strong></p>
 					<input type="password" class="regular-text" autocomplete="off" name="clms_email_engine[sendgrid_api_key]" value="<?php echo esc_attr( (string) $email['sendgrid_api_key'] ); ?>" placeholder="<?php esc_attr_e( 'API key SendGrid', 'atora-lms' ); ?>">
 					<input type="text" class="regular-text" name="clms_email_engine[sendgrid_webhook_key]" value="<?php echo esc_attr( (string) $email['sendgrid_webhook_key'] ); ?>" placeholder="<?php esc_attr_e( 'Webhook signing key', 'atora-lms' ); ?>">
@@ -443,11 +444,15 @@ trait CLMS_Settings_Render_Trait {
 					<input type="text" class="regular-text" name="clms_email_engine[mailgun_webhook_signing_key]" value="<?php echo esc_attr( (string) $email['mailgun_webhook_signing_key'] ); ?>" placeholder="<?php esc_attr_e( 'Webhook signing key', 'atora-lms' ); ?>">
 					<p style="margin:12px 0 6px"><strong><?php esc_html_e( 'Postmark', 'atora-lms' ); ?></strong></p>
 					<input type="password" class="regular-text" autocomplete="off" name="clms_email_engine[postmark_api_key]" value="<?php echo esc_attr( (string) $email['postmark_api_key'] ); ?>" placeholder="<?php esc_attr_e( 'API key Postmark', 'atora-lms' ); ?>">
-					<input type="text" class="regular-text" name="clms_email_engine[postmark_webhook_secret]" value="<?php echo esc_attr( (string) $email['postmark_webhook_secret'] ); ?>" placeholder="<?php esc_attr_e( 'Webhook secret', 'atora-lms' ); ?>">
+					<input type="text" class="regular-text" name="clms_email_engine[postmark_webhook_user]" value="<?php echo esc_attr( (string) ( $email['postmark_webhook_user'] ?? '' ) ); ?>" placeholder="<?php esc_attr_e( 'Usuario del webhook (HTTP Basic)', 'atora-lms' ); ?>">
+					<input type="password" class="regular-text" autocomplete="off" name="clms_email_engine[postmark_webhook_pass]" value="<?php echo esc_attr( (string) ( $email['postmark_webhook_pass'] ?? '' ) ); ?>" placeholder="<?php esc_attr_e( 'Contraseña del webhook (HTTP Basic)', 'atora-lms' ); ?>">
+					<p class="description"><?php esc_html_e( 'Postmark no firma sus webhooks: configura en Postmark la URL con usuario y contraseña (https://usuario:contraseña@…/wp-json/atora/v1/webhooks/postmark).', 'atora-lms' ); ?></p>
 					<p style="margin:12px 0 6px"><strong><?php esc_html_e( 'Amazon SES', 'atora-lms' ); ?></strong></p>
 					<input type="text" class="regular-text" name="clms_email_engine[ses_access_key]" value="<?php echo esc_attr( (string) $email['ses_access_key'] ); ?>" placeholder="<?php esc_attr_e( 'Access key', 'atora-lms' ); ?>">
 					<input type="password" class="regular-text" autocomplete="off" name="clms_email_engine[ses_secret_key]" value="<?php echo esc_attr( (string) $email['ses_secret_key'] ); ?>" placeholder="<?php esc_attr_e( 'Secret key', 'atora-lms' ); ?>">
 					<input type="text" class="regular-text" name="clms_email_engine[ses_region]" value="<?php echo esc_attr( (string) $email['ses_region'] ); ?>" placeholder="us-east-1">
+					<input type="text" class="regular-text" name="clms_email_engine[ses_topic_arn]" value="<?php echo esc_attr( (string) ( $email['ses_topic_arn'] ?? '' ) ); ?>" placeholder="<?php esc_attr_e( 'ARN del tema SNS de eventos', 'atora-lms' ); ?>">
+					<p class="description"><?php esc_html_e( 'Los eventos de SES llegan por SNS: se verifica la firma de Amazon y que el tema sea este.', 'atora-lms' ); ?></p>
 					<p class="description"><?php esc_html_e( 'Puedes completar solo el proveedor que usarás. Los demás pueden quedar vacíos.', 'atora-lms' ); ?></p>
 				</td>
 			</tr>

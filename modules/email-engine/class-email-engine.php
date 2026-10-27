@@ -21,6 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 require_once __DIR__ . '/class-email-identity-resolver.php';
+require_once __DIR__ . '/class-email-webhook-security.php';
 
 /**
  * Class Email_Engine
@@ -44,6 +45,11 @@ class Email_Engine {
 		// P2 (6.12.0): gateado por módulo 'email-engine'.
 		if ( ! class_exists( '\CLMS_Module_Registry' ) || \CLMS_Module_Registry::is_active( 'email-engine' ) ) {
 			add_action( 'rest_api_init', array( __CLASS__, 'register_webhook_routes' ) );
+			// 6.38.0: limpieza diaria del registro de webhooks procesados.
+			add_action( 'atora_email_webhook_cleanup', array( Email_Webhook_Security::class, 'cleanup' ) );
+			if ( ! wp_next_scheduled( 'atora_email_webhook_cleanup' ) ) {
+				wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', 'atora_email_webhook_cleanup' );
+			}
 		}
 
 		// Endpoints de compliance (unsub, preferences).
@@ -647,14 +653,14 @@ class Email_Engine {
 	 */
 	private static function verify_provider_webhook_signature( string $provider, \WP_REST_Request $request ): bool {
 		$opts = (array) get_option( 'atora_email_engine_options', array() );
+		$dev  = defined( 'ATORA_DEV_MODE' ) && ATORA_DEV_MODE;
 
 		switch ( $provider ) {
 			case 'sendgrid':
 				// SendGrid usa ECDSA sobre timestamp + body (Event Webhook Signature Verification).
-				$key = (string) ( $opts['sendgrid_webhook_key'] ?? '' );
-				$key = trim( $key );
+				$key = trim( (string) ( $opts['sendgrid_webhook_key'] ?? '' ) );
 				if ( ! $key ) {
-					return defined( 'ATORA_DEV_MODE' ) && ATORA_DEV_MODE;
+					return $dev;
 				}
 				if ( false === strpos( $key, 'BEGIN PUBLIC KEY' ) ) {
 					$normalized = preg_replace( '/\s+/', '', $key );
@@ -671,43 +677,62 @@ class Email_Engine {
 				if ( '' === $timestamp || '' === $signature || false === $decoded || ! function_exists( 'openssl_verify' ) ) {
 					return false;
 				}
+				// 6.38.0: una firma vieja no se acepta (repetición).
+				if ( ! Email_Webhook_Security::fresh( $timestamp ) ) {
+					return false;
+				}
 
 				$payload = $timestamp . $request->get_body();
-				$result  = openssl_verify( $payload, $decoded, $key, OPENSSL_ALGO_SHA256 ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
-				return 1 === $result;
+				return 1 === openssl_verify( $payload, $decoded, $key, OPENSSL_ALGO_SHA256 );
 
 			case 'mailgun':
 				// Mailgun firma con HMAC-SHA256 del timestamp + token.
 				$signing_key = sanitize_text_field( $opts['mailgun_webhook_signing_key'] ?? '' );
 				if ( ! $signing_key ) {
-					return defined( 'ATORA_DEV_MODE' ) && ATORA_DEV_MODE;
+					return $dev;
 				}
 				$body      = $request->get_json_params();
 				$timestamp = sanitize_text_field( $body['signature']['timestamp'] ?? '' );
 				$token     = sanitize_text_field( $body['signature']['token'] ?? '' );
 				$sig       = sanitize_text_field( $body['signature']['signature'] ?? '' );
 				$expected  = hash_hmac( 'sha256', $timestamp . $token, $signing_key );
-				return hash_equals( $expected, $sig );
+				if ( '' === $sig || ! hash_equals( $expected, $sig ) ) {
+					return false;
+				}
+				// 6.38.0: marca de tiempo reciente y token de un solo uso (repetición).
+				return Email_Webhook_Security::fresh( $timestamp ) && Email_Webhook_Security::remember_once( 'mailgun-token', $token );
 
 			case 'postmark':
-				// Postmark usa un header X-Postmark-Signature con clave HMAC.
-				$key = sanitize_text_field( $opts['postmark_webhook_secret'] ?? '' );
-				if ( ! $key ) {
-					return defined( 'ATORA_DEV_MODE' ) && ATORA_DEV_MODE;
+				// 6.38.0: Postmark no firma sus webhooks; se protegen con HTTP Basic en la URL del webhook.
+				$user = (string) ( $opts['postmark_webhook_user'] ?? '' );
+				$pass = (string) ( $opts['postmark_webhook_pass'] ?? '' );
+				if ( '' === $user || '' === $pass ) {
+					return $dev;
 				}
-				$sig      = (string) $request->get_header( 'x-postmark-signature' );
-				$expected = base64_encode( hash_hmac( 'sha256', $request->get_body(), $key, true ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
-				return hash_equals( $expected, $sig );
+				return Email_Webhook_Security::verify_basic_auth( $request, $user, $pass );
+
+			case 'ses':
+				// 6.38.0: SES llega por SNS, firmado con un certificado de amazonaws.com.
+				$message = json_decode( (string) $request->get_body(), true );
+				if ( ! is_array( $message ) ) {
+					return false;
+				}
+				$topic = (string) ( $opts['ses_topic_arn'] ?? '' );
+				$token = sanitize_text_field( $opts['ses_webhook_token'] ?? '' );
+				if ( '' === $topic && '' === $token ) {
+					return $dev;
+				}
+				if ( '' !== $token && ! Email_Webhook_Security::verify_token( $request, $token ) ) {
+					return false;
+				}
+				return Email_Webhook_Security::verify_sns( $message, $topic );
 
 			case 'brevo':
-			case 'ses':
-				// Brevo y SES no exponen una firma estándar simple; confiar en IP allowlist o clave de query.
-				$token = sanitize_text_field( $opts[ $provider . '_webhook_token' ] ?? '' );
+				$token = sanitize_text_field( $opts['brevo_webhook_token'] ?? '' );
 				if ( ! $token ) {
-					return defined( 'ATORA_DEV_MODE' ) && ATORA_DEV_MODE;
+					return $dev;
 				}
-				$provided = sanitize_text_field( $request->get_param( 'token' ) ?? '' );
-				return hash_equals( $token, $provided );
+				return Email_Webhook_Security::verify_token( $request, $token );
 
 			default:
 				return false;
@@ -728,6 +753,18 @@ class Email_Engine {
 			return new \WP_REST_Response( array( 'status' => 'invalid_signature' ), 403 );
 		}
 
+		// 6.38.0: SES/SNS pide confirmar la suscripción al tema (solo URL de amazonaws.com, ya verificada).
+		if ( 'ses' === $provider ) {
+			$sns = json_decode( (string) $request->get_body(), true );
+			if ( is_array( $sns ) && 'SubscriptionConfirmation' === ( $sns['Type'] ?? '' ) ) {
+				$url = (string) ( $sns['SubscribeURL'] ?? '' );
+				if ( Email_Webhook_Security::is_aws_sns_url( $url ) ) {
+					wp_remote_get( $url, array( 'timeout' => 10, 'redirection' => 0 ) );
+				}
+				return rest_ensure_response( array( 'status' => 'subscription_confirmed' ) );
+			}
+		}
+
 		$events = self::parse_webhook_events( $provider, $request );
 
 		foreach ( $events as $event ) {
@@ -735,6 +772,11 @@ class Email_Engine {
 			$event_type = sanitize_key( $event['type'] ?? '' );
 
 			if ( ! $queue_id || ! $event_type ) {
+				continue;
+			}
+
+			// 6.38.0: cada evento se procesa una sola vez (reintentos del proveedor o repetición).
+			if ( ! Email_Webhook_Security::remember_once( $provider, Email_Webhook_Security::event_key( $provider, (array) ( $event['raw'] ?? array() ) ) ) ) {
 				continue;
 			}
 
@@ -748,6 +790,10 @@ class Email_Engine {
 				$update = array( 'clicked_at' => current_time( 'mysql', true ) );
 			} elseif ( 'bounced' === $event_type ) {
 				$update = array( 'status' => 'bounced' );
+				// 6.38.0: un rebote permanente suprime la dirección; uno temporal no.
+				if ( Email_Webhook_Security::is_hard_bounce( $provider, (array) ( $event['raw'] ?? array() ) ) ) {
+					self::suppress_queue_recipient( $queue_id, 'bounce' );
+				}
 			} elseif ( 'complained' === $event_type ) {
 				$update = array( 'status' => 'failed' );
 				// Auto-unsub.
@@ -758,6 +804,7 @@ class Email_Engine {
 				if ( $row ) {
 					self::unsubscribe_all( (int) $row->user_id );
 				}
+				self::suppress_queue_recipient( $queue_id, 'spam' );
 			}
 
 			if ( $update ) {
@@ -960,6 +1007,31 @@ class Email_Engine {
 	 * @param int $user_id ID del usuario.
 	 * @return void
 	 */
+	/**
+	 * 6.38.0: suprime la dirección de un envío (rebote permanente o queja).
+	 */
+	private static function suppress_queue_recipient( int $queue_id, string $reason ): void {
+		global $wpdb;
+		$email = (string) $wpdb->get_var( $wpdb->prepare( "SELECT recipient_email FROM {$wpdb->prefix}atora_email_queue WHERE id = %d LIMIT 1", $queue_id ) );
+		if ( '' !== $email && class_exists( '\\ATORA\\CRM_V2\\Services\\Sequence_Service' ) ) {
+			\ATORA\CRM_V2\Services\Sequence_Service::suppress( $email, $reason );
+		}
+	}
+
+	/**
+	 * 6.38.0: ¿se puede enviar a esta dirección? Rebote permanente: nada. Queja o baja: solo lo
+	 * transaccional (seguridad, sistema).
+	 */
+	public static function suppression_reason( string $email ): string {
+		global $wpdb;
+		$table = $wpdb->prefix . 'atora_email_suppression';
+		$email = sanitize_email( $email );
+		if ( '' === $email || (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) ) !== $table ) {
+			return '';
+		}
+		return (string) $wpdb->get_var( $wpdb->prepare( "SELECT reason FROM {$table} WHERE email = %s LIMIT 1", $email ) ); // phpcs:ignore WordPress.DB
+	}
+
 	public static function unsubscribe_all( int $user_id ): void {
 		global $wpdb;
 
@@ -1147,10 +1219,20 @@ class Email_Engine {
 			default:
 				// SES usa SNS, se parsea el cuerpo SNS.
 				$sns_message = json_decode( $body['Message'] ?? '{}', true );
-				$events[]    = array(
-					'type'     => self::normalize_event_type( $sns_message['notificationType'] ?? '' ),
-					'queue_id' => absint( $sns_message['mail']['headers'][0]['value'] ?? 0 ),
-					'raw'      => $body,
+				$sns_message = is_array( $sns_message ) ? $sns_message : array();
+				$queue_id    = 0;
+				foreach ( (array) ( $sns_message['mail']['headers'] ?? array() ) as $header ) {
+					if ( is_array( $header ) && 'x-atora-queue-id' === strtolower( (string) ( $header['name'] ?? '' ) ) ) {
+						$queue_id = absint( $header['value'] ?? 0 );
+					}
+				}
+				if ( ! $queue_id ) {
+					$queue_id = absint( $sns_message['mail']['tags']['atora_queue_id'][0] ?? ( $sns_message['mail']['headers'][0]['value'] ?? 0 ) );
+				}
+				$events[] = array(
+					'type'     => self::normalize_event_type( (string) ( $sns_message['notificationType'] ?? $sns_message['eventType'] ?? '' ) ),
+					'queue_id' => $queue_id,
+					'raw'      => $body + array( '_sns_message' => $sns_message ),
 				);
 				break;
 		}
@@ -1188,6 +1270,9 @@ class Email_Engine {
 			'bounced'    => 'bounced',
 			'Bounce'     => 'bounced',
 			'hard_bounce'=> 'bounced',
+			'soft_bounce'=> 'bounced',
+			'failed'     => 'bounced',
+			'HardBounce' => 'bounced',
 
 			// Spam complaints.
 			'spam'       => 'complained',
