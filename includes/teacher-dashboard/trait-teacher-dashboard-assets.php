@@ -93,6 +93,8 @@ trait CLMS_Teacher_Dashboard_Assets_Trait {
 			padding:0 0 24px;
 		}
 		.clms-td a{text-decoration:none}
+		.clms-td section[id]{scroll-margin-top:110px}
+		.clms-td-stat--hero > .clms-td-link{color:inherit;text-decoration:underline}
 		.clms-td img{max-width:100%;height:auto;display:block}
 		.clms-td-layout{
 			display:grid;

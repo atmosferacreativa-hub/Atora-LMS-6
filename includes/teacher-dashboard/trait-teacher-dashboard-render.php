@@ -209,7 +209,10 @@ trait CLMS_Teacher_Dashboard_Render_Trait {
 					</p>
 
 					<div class="clms-td-hero__actions">
-						<a class="clms-td-btn clms-td-btn--primary" href="#clms-td-inbox"><?php esc_html_e( 'Revisar entregas', 'atora-lms' ); ?></a>
+						<?php if ( $show_courses ) : ?><a class="clms-td-btn clms-td-btn--ghost" href="#clms-td-courses"><?php esc_html_e( 'Mis cursos', 'atora-lms' ); ?></a><?php endif; ?>
+						<?php if ( $show_notifications ) : ?><a class="clms-td-btn clms-td-btn--ghost" href="#clms-td-notifications"><?php esc_html_e( 'Notificaciones', 'atora-lms' ); ?></a><?php endif; ?>
+
+						<?php if ( $show_inbox ) : ?><a class="clms-td-btn clms-td-btn--primary" href="#clms-td-inbox"><?php esc_html_e( 'Revisar entregas', 'atora-lms' ); ?></a><?php endif; ?>
 						<?php if ( current_user_can( 'clms_grade_submissions' ) ) : ?>
 							<a class="clms-td-btn clms-td-btn--ghost" href="<?php echo esc_url( admin_url( 'admin.php?page=clms-speedgrader' ) ); ?>"><?php esc_html_e( 'Abrir SpeedGrade', 'atora-lms' ); ?></a>
 						<?php endif; ?>
@@ -223,6 +226,7 @@ trait CLMS_Teacher_Dashboard_Render_Trait {
 
 				<div class="clms-td-hero__stats">
 					<div class="clms-td-stat clms-td-stat--hero">
+						<?php if ( $show_inbox ) : ?><a class="clms-td-link" href="#clms-td-inbox"><?php esc_html_e( 'Revisar entregas', 'atora-lms' ); ?></a><?php endif; ?>
 						<div class="clms-td-stat__label"><?php esc_html_e( 'Pendientes por revisar', 'atora-lms' ); ?></div>
 						<div class="clms-td-stat__value"><?php echo esc_html( $metrics['pending_reviews'] ); ?></div>
 						<div class="clms-td-stat__hint"><?php esc_html_e( 'Cola actual de revisión', 'atora-lms' ); ?></div>
@@ -230,7 +234,7 @@ trait CLMS_Teacher_Dashboard_Render_Trait {
 
 					<div class="clms-td-stat clms-td-stat--hero">
 						<div class="clms-td-stat__label"><?php esc_html_e( 'Entregas revisadas', 'atora-lms' ); ?></div>
-						<div class="clms-td-stat__value"><?php echo esc_html( $metrics['reviewed'] ); ?></div>
+						<?php if ( $show_reviewed ) : ?><a class="clms-td-link" href="#clms-td-reviewed"><?php endif; ?><div class="clms-td-stat__value"><?php echo esc_html( $metrics['reviewed'] ); ?></div><?php if ( $show_reviewed ) : ?></a><?php endif; ?>
 						<div class="clms-td-stat__hint"><?php esc_html_e( 'Actividad reciente', 'atora-lms' ); ?></div>
 					</div>
 
@@ -262,7 +266,7 @@ trait CLMS_Teacher_Dashboard_Render_Trait {
 			<div class="clms-td-layout<?php echo $has_sidebar ? '' : ' clms-td-layout--single'; ?>">
 				<main class="clms-td-main">
 					<?php if ( $show_quick_access ) : ?>
-					<section class="clms-td-card">
+					<section class="clms-td-card" id="clms-td-quick-access">
 						<div class="clms-td-section-head">
 							<div>
 								<div class="clms-td-eyebrow"><?php esc_html_e( 'Centro operativo', 'atora-lms' ); ?></div>
@@ -271,7 +275,7 @@ trait CLMS_Teacher_Dashboard_Render_Trait {
 						</div>
 
 						<div class="clms-td-quick-grid">
-							<?php if ( empty( $quick_actions ) ) : ?>
+							<?php if ( empty( $quick_actions ) && $show_inbox ) : ?>
 								<a class="clms-td-quick" href="#clms-td-inbox">
 									<span class="clms-td-quick__title"><?php esc_html_e( 'Bandeja de entregas', 'atora-lms' ); ?></span>
 									<span class="clms-td-quick__text"><?php esc_html_e( 'Entra directo a la cola de revisión y prioriza entregas pendientes.', 'atora-lms' ); ?></span>
@@ -624,7 +628,7 @@ trait CLMS_Teacher_Dashboard_Render_Trait {
 							<div class="atora-empty-state">
 								<svg class="atora-empty-state__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
 								<p class="atora-empty-state__title"><?php esc_html_e( 'Sin entregas pendientes', 'atora-lms' ); ?></p>
-								<p class="atora-empty-state__text"><?php esc_html_e( 'Tus estudiantes están al día. Vuelve a revisar más tarde.', 'atora-lms' ); ?></p>
+								<p class="atora-empty-state__text"><?php esc_html_e( 'No hay entregas en esta vista. Puedes ajustar los filtros o revisar tus cursos.', 'atora-lms' ); ?></p>
 							</div>
 						<?php else : ?>
 							<div class="clms-td-table-wrap">
@@ -1035,7 +1039,7 @@ trait CLMS_Teacher_Dashboard_Render_Trait {
 					<?php endif; ?>
 
 					<?php if ( $show_notifications ) : ?>
-					<section class="clms-td-card">
+					<section class="clms-td-card" id="clms-td-notifications">
 						<div class="clms-td-section-head">
 							<div>
 								<div class="clms-td-eyebrow"><?php esc_html_e( 'Notificaciones', 'atora-lms' ); ?></div>
@@ -1044,7 +1048,7 @@ trait CLMS_Teacher_Dashboard_Render_Trait {
 						</div>
 
 						<?php if ( empty( $notifications ) ) : ?>
-							<p class="clms-td-text clms-td-text--muted"><?php esc_html_e( 'No tienes notificaciones pendientes.', 'atora-lms' ); ?></p>
+							<p class="clms-td-text clms-td-text--muted"><?php esc_html_e( 'No tienes notificaciones pendientes. Puedes revisar tus cursos y las próximas actividades.', 'atora-lms' ); ?></p>
 						<?php else : ?>
 							<details class="clms-td-details">
 								<summary><?php esc_html_e( 'Ver notificaciones', 'atora-lms' ); ?></summary>

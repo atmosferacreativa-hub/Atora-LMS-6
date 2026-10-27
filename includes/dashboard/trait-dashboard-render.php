@@ -178,7 +178,7 @@ trait CLMS_Dashboard_Render_Trait {
 			<section class="clms-sd-hero">
 				<div class="clms-sd-hero__copy">
 					<div class="clms-sd-pill"><?php esc_html_e( 'Tu aprendizaje hoy', 'atora-lms' ); ?></div>
-					<h1 class="clms-sd-hero__title"><?php esc_html_e( 'Continúa donde lo dejaste', 'atora-lms' ); ?></h1>
+					<h1 class="clms-sd-hero__title"><?php esc_html_e( 'Continuar aprendiendo', 'atora-lms' ); ?></h1>
 					<?php if ( ! empty( $hero_state['status_label'] ) ) : ?>
 						<p class="clms-sd-hero__meta"><?php echo esc_html( $hero_state['status_label'] ); ?></p>
 					<?php endif; ?>
@@ -287,7 +287,7 @@ trait CLMS_Dashboard_Render_Trait {
 				</div>
 
 				<?php if ( empty( $next_step ) ) : ?>
-					<p class="clms-sd-text clms-sd-text--muted"><?php esc_html_e( 'No hay pasos urgentes. Cuando tengas pendientes, aparecerán aquí.', 'atora-lms' ); ?></p>
+					<p class="clms-sd-text clms-sd-text--muted"><?php esc_html_e( 'No tienes actividades urgentes. Puedes continuar con tus cursos o revisar tu ruta de aprendizaje.', 'atora-lms' ); ?></p>
 				<?php else : ?>
 						<div class="clms-sd-step">
 							<div>
@@ -1091,12 +1091,30 @@ trait CLMS_Dashboard_Render_Trait {
 		$sections_output['s8_widgets'] = ob_get_clean();
 
 		$ordered_sections = $this->resolve_dashboard_sections( $schema, array_keys( $sections_output ) );
+		$shortcut_targets = array(
+			'progress' => array( 'id' => 'clms-sd-courses', 'label' => __( 'Mis cursos', 'atora-lms' ) ),
+			'academic' => array( 'id' => 'clms-sd-academic-status', 'label' => __( 'Calificaciones', 'atora-lms' ) ),
+			'alerts' => array( 'id' => 'clms-sd-alerts', 'label' => __( 'Pendientes', 'atora-lms' ) ),
+		);
+		ob_start();
+		?>
+		<nav class="clms-sd-shortcuts" aria-label="<?php esc_attr_e( 'Mi aprendizaje', 'atora-lms' ); ?>">
+			<?php foreach ( $shortcut_targets as $key => $target ) : ?>
+				<?php if ( in_array( $key, $ordered_sections, true ) ) : ?>
+					<a class="clms-sd-btn clms-sd-btn--secondary" href="#<?php echo esc_attr( $target['id'] ); ?>"><?php echo esc_html( $target['label'] ); ?></a>
+				<?php endif; ?>
+			<?php endforeach; ?>
+		</nav>
+		<?php
+		$shortcuts_html = ob_get_clean();
 		?>
 		<div class="clms-sd">
 			<?php
+			if ( ! in_array( 'hero', $ordered_sections, true ) ) { echo $shortcuts_html; } // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 			foreach ( $ordered_sections as $section_id ) {
 				if ( isset( $sections_output[ $section_id ] ) ) {
 					echo $sections_output[ $section_id ]; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+					if ( 'hero' === $section_id ) { echo $shortcuts_html; } // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 				}
 			}
 			?>
