@@ -249,6 +249,28 @@ final class AutomationFlowsTest extends WP_UnitTestCase {
 		$this->assertSame( array( 1, 2 ), array( (int) $this->flow_run( $flow, $early )->version, (int) $this->flow_run( $flow, $late )->version ) );
 	}
 
+	public function test_reordered_json_does_not_create_a_new_version(): void {
+		global $wpdb;
+		$user = $this->student();
+		$flow = $this->flow( 'course_enrolled', array( $this->tag( 'a', 'uno', 'b' ), $this->tag( 'b', 'dos' ) ) );
+		// MySQL 8 guarda las columnas JSON normalizadas (claves en otro orden). Se simula aquí para que la prueba
+		// valga también en MariaDB, que guarda el texto tal cual.
+		$actions  = json_decode( (string) $wpdb->get_var( $wpdb->prepare( "SELECT actions FROM {$wpdb->prefix}atora_automations WHERE id = %d", $flow ) ), true );
+		$reversed = static function ( $v ) use ( &$reversed ) {
+			if ( ! is_array( $v ) ) {
+				return $v;
+			}
+			$v = array_map( $reversed, $v );
+			return array_keys( $v ) === range( 0, count( $v ) - 1 ) ? $v : array_reverse( $v, true );
+		};
+		$wpdb->update( $wpdb->prefix . 'atora_automations', array( 'actions' => wp_json_encode( $reversed( $actions ) ) ), array( 'id' => $flow ) );
+
+		$this->enroll( $user, 10 );
+		Flows::process();
+		$this->assertSame( 1, (int) $this->flow_run( $flow, $user )->version );
+		$this->assertSame( 1, (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}atora_automation_versions WHERE automation_id = %d", $flow ) ), 'Misma definición, misma versión.' );
+	}
+
 	public function test_daily_action_limit_postpones(): void {
 		update_option( Flows::OPTION_LIMIT, 2 );
 		$user = $this->student();

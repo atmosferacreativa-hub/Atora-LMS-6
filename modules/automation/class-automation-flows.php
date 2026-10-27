@@ -241,9 +241,12 @@ final class Automation_Flows {
 	public static function snapshot( int $automation_id, array $def ): int {
 		global $wpdb;
 		$table = self::t( 'atora_automation_versions' );
-		$json  = wp_json_encode( $def );
+		$json  = self::canonical_json( $def );
 		$last  = $wpdb->get_row( $wpdb->prepare( "SELECT version, definition FROM {$table} WHERE automation_id = %d ORDER BY version DESC LIMIT 1", $automation_id ) ); // phpcs:ignore WordPress.DB
-		if ( $last && hash_equals( (string) $last->definition, (string) $json ) ) {
+		// Comparación canónica: la definición puede volver de una columna JSON de MySQL 8, que reordena las claves;
+		// comparar el texto tal cual creaba una versión nueva en cada inscripción.
+		$previous = $last ? json_decode( (string) $last->definition, true ) : null;
+		if ( $last && is_array( $previous ) && hash_equals( self::canonical_json( $previous ), $json ) ) {
 			return (int) $last->version;
 		}
 		$version = $last ? (int) $last->version + 1 : 1;
@@ -256,6 +259,24 @@ final class Automation_Flows {
 			get_current_user_id()
 		) );
 		return $version;
+	}
+
+	/** JSON con las claves de cada objeto ordenadas (las listas conservan su orden). */
+	public static function canonical_json( array $value ): string {
+		return (string) wp_json_encode( self::sort_keys( $value ) );
+	}
+
+	/** @param mixed $value */
+	private static function sort_keys( $value ) {
+		if ( ! is_array( $value ) ) {
+			return $value;
+		}
+		$is_list = array_keys( $value ) === range( 0, count( $value ) - 1 );
+		$value   = array_map( array( __CLASS__, 'sort_keys' ), $value );
+		if ( ! $is_list ) {
+			ksort( $value, SORT_STRING );
+		}
+		return $value;
 	}
 
 	public static function version_definition( int $automation_id, int $version ): ?array {
