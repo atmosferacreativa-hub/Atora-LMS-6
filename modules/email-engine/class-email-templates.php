@@ -160,6 +160,14 @@ class Email_Templates {
 				'category' => 'system',
 				'active'   => true,
 			),
+			// 6.38.0: el boletín usaba una plantilla `newsletter` que no existía y no se enviaba a nadie.
+			'newsletter'           => array(
+				'id'       => 20,
+				'name'     => __( 'Boletín', 'atora-lms' ),
+				'subject'  => __( '{{custom_subject}}', 'atora-lms' ),
+				'category' => 'newsletter',
+				'active'   => true,
+			),
 			'crm_campaign'         => array(
 				'id'       => 19,
 				'name'     => __( 'Campaña CRM', 'atora-lms' ),
