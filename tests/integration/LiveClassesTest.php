@@ -374,9 +374,10 @@ final class LiveClassesTest extends WP_UnitTestCase {
 
 	public function test_e2e_seed_has_an_open_live_class_with_recording(): void {
 		$this->assertTrue( class_exists( 'ATORA_E2E_Seed_CLI' ) );
-		$out     = ATORA_E2E_Seed_CLI::seed( '', 'atora-e2e-2026' );
-		$lesson  = (int) $out['live_lesson'];
-		$student = (int) $out['student']['id'];
+		// Solo la parte de la semilla que crea la clase (la semilla completa deja filas en tablas propias).
+		$lesson  = ATORA_E2E_Seed_CLI::live_lesson( $this->course, $this->teacher );
+		$student = self::factory()->user->create();
+		CLMS_Helper::enroll_user_in_course( $student, $this->course );
 		$info    = ATORA_Live_Session_Service::join_info( $lesson, $student, time() + 2 * HOUR_IN_SECONDS );
 		$this->assertSame( 'open', $info['status'], 'Sigue abierta durante toda la suite de la app.' );
 		$this->assertSame( 'https://example.org/clase-en-vivo-e2e', $info['join_url'] );

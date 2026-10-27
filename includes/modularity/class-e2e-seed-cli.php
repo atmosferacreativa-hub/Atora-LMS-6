@@ -80,6 +80,26 @@ final class ATORA_E2E_Seed_CLI {
 		\WP_CLI::line( (string) wp_json_encode( $out, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) );
 	}
 
+	/**
+	 * 6.39.0: clase en vivo abierta (recorrido `clase-en-vivo` de la app 1.2.0). Enlace externo cargado a mano;
+	 * empieza 5 min después de sembrar y dura 4 h para que siga abierta durante toda la suite.
+	 */
+	public static function live_lesson( int $course, int $teacher ): int {
+		$live_start = time() + 5 * MINUTE_IN_SECONDS;
+		$live       = self::lesson( $course, $teacher, 'leccion-e2e-en-vivo', 'Clase en vivo', 11, array(
+			'lm_session_type'            => 'sincrono',
+			'_clms_live_class_provider'  => 'custom',
+			'_clms_live_class_url'       => 'https://example.org/clase-en-vivo-e2e',
+			'_clms_live_class_starts_at' => gmdate( 'Y-m-d\TH:i', $live_start ),
+			'_clms_live_class_ends_at'   => gmdate( 'Y-m-d\TH:i', $live_start + 4 * HOUR_IN_SECONDS ),
+			'_clms_live_class_timezone'  => 'UTC',
+		) );
+		if ( class_exists( 'ATORA_Live_Session_Service' ) ) {
+			ATORA_Live_Session_Service::set_recording( $live, array( 'url' => 'https://example.org/grabacion-e2e', 'note' => 'Grabación de la clase anterior.' ), $teacher );
+		}
+		return $live;
+	}
+
 	/** 6.33.0: curso con 100 lecciones para medir listas largas en un teléfono de gama baja. */
 	public static function large_course( int $student, int $teacher ): int {
 		$existing = get_page_by_path( 'curso-e2e-grande', OBJECT, 'lm_course' );
@@ -213,20 +233,8 @@ final class ATORA_E2E_Seed_CLI {
 		$drive = self::lesson( $course, $teacher, 'leccion-e2e-drive', 'Video de Drive', 10, array(
 			'_clms_lesson_extra_videos' => array( array( 'source' => 'drive', 'url' => self::DRIVE_VIDEO, 'title' => 'Video de Drive' ) ),
 		) );
-		// 6.39.0: clase en vivo abierta (recorrido `clase-en-vivo` de la app 1.2.0). Enlace externo cargado a mano;
-		// empieza 5 min después de sembrar y dura 4 h para que siga abierta durante toda la suite.
-		$live_start = time() + 5 * MINUTE_IN_SECONDS;
-		$live       = self::lesson( $course, $teacher, 'leccion-e2e-en-vivo', 'Clase en vivo', 11, array(
-			'lm_session_type'            => 'sincrono',
-			'_clms_live_class_provider'  => 'custom',
-			'_clms_live_class_url'       => 'https://example.org/clase-en-vivo-e2e',
-			'_clms_live_class_starts_at' => gmdate( 'Y-m-d\TH:i', $live_start ),
-			'_clms_live_class_ends_at'   => gmdate( 'Y-m-d\TH:i', $live_start + 4 * HOUR_IN_SECONDS ),
-			'_clms_live_class_timezone'  => 'UTC',
-		) );
-		if ( class_exists( 'ATORA_Live_Session_Service' ) ) {
-			ATORA_Live_Session_Service::set_recording( $live, array( 'url' => 'https://example.org/grabacion-e2e', 'note' => 'Grabación de la clase anterior.' ), $teacher );
-		}
+		$live = self::live_lesson( $course, $teacher );
+
 		// 6.33.2 (orden 1.0.1, punto 1): estudiante inscrito SOLO en un programa (recorrido programa-acceso).
 		$program_access = self::program_only( $teacher, $password );
 
