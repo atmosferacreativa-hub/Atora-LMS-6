@@ -400,6 +400,13 @@ class CLMS_Drip {
 		return false;
 	}
 
+	/**
+	 * 6.36.0: marca de tiempo de la inscripción vigente (0 si no se conoce). Pública para la regla de riesgo.
+	 */
+	public static function enrollment_timestamp( $user_id, $course_id ) {
+		return (int) self::get_enrollment_timestamp( $user_id, $course_id );
+	}
+
 	protected static function get_enrollment_timestamp( $user_id, $course_id ) {
 		$user_id   = absint( $user_id );
 		$course_id = absint( $course_id );

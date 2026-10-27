@@ -174,6 +174,40 @@ class CLMS_Student_Activity_Tracker {
 	}
 
 	/**
+	 * 6.36.0: acceso desde la app móvil (peticiones autenticadas a `atora-mobile/v1`).
+	 *
+	 * Antes solo el navegador registraba actividad y quien estudiaba en la app aparecía
+	 * "sin actividad reciente". Solo avanza la fecha (nunca la retrocede) y escribe como mucho
+	 * una vez cada `$min_interval` segundos por clave para no escribir en cada petición.
+	 *
+	 * @param int $user_id      Usuario.
+	 * @param int $wp_course_id Curso (post de WordPress), 0 para solo el acceso global.
+	 */
+	public static function record_app_access( $user_id, $wp_course_id = 0, $min_interval = 300 ) {
+		$user_id      = absint( $user_id );
+		$wp_course_id = absint( $wp_course_id );
+		if ( ! $user_id ) {
+			return;
+		}
+		$now_ts    = time();
+		$now_mysql = current_time( 'mysql' );
+		$keys      = array( self::USER_META_LAST_ACCESS );
+		if ( $wp_course_id ) {
+			$keys[] = self::USER_META_COURSE_LAST_PREFIX . $wp_course_id;
+		}
+		foreach ( $keys as $key ) {
+			$previous = (string) get_user_meta( $user_id, $key, true );
+			if ( '' !== $previous ) {
+				$previous_ts = class_exists( 'ATORA_Academic_Risk_Rule' ) ? ATORA_Academic_Risk_Rule::local_mysql_to_ts( $previous ) : strtotime( $previous );
+				if ( $previous_ts && ( $now_ts - (int) $previous_ts ) < (int) $min_interval ) {
+					continue;
+				}
+			}
+			update_user_meta( $user_id, $key, $now_mysql );
+		}
+	}
+
+	/**
 	 * Resumen de actividad de un estudiante.
 	 *
 	 * @param int $user_id   Usuario.
