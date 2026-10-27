@@ -117,6 +117,9 @@ Commits (bloque `block/scorm-b3-fixes`) y el fallo real que corrige cada uno:
 - `8da597f` E2E: show outbox + block browser open on failed downloads
   - Corrige (diagnóstico): en build e2e la barra ahora muestra `OUTBOX:{pending}/{failed}` y `SCORM_ERR:HTTP ...` para ver por qué un commit pasó a fallido.
   - Corrige (material-zoom): un registro descargado con `error` ya no cuenta como “Disponible sin conexión” ni intenta abrir el navegador al tocar el recurso; ofrece re-descargar.
+- `832382d` CI(e2e): cache AVD + retry SDK/ADB and mark INFRA
+  - Endurece el job e2e ante fallas intermitentes del runner (SDK/system image corrupta, ADB/daemon, boot incompleto).
+  - Cambios: cache de AVD + system-image, snapshot warm-up en cache miss, reintentos de sdkmanager, reinicio de adb, marca `INFRA` en el summary si falla antes de Maestro.
 
 Estado de runs (commit `5a3b8aef7e319955df8aa07a013ee342df16e0ac`):
 
@@ -133,6 +136,10 @@ Estado de runs (commit `8da597f...`):
   - Falla: emulador — `Unable to connect to adb daemon on port: 5037`.
   - Nota: este fallo no cuenta para la serie de 3 verdes.
 - `ios-e2e`: skipped.
+
+Estado de runs (commit `832382d...`):
+
+- Mobile CI / e2e: ⏳ en cola/pendiente (`40438032137`, `40438032110`).
 
 3 verdes seguidos (sobre el mismo commit): 0/3.
 
