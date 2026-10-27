@@ -1,8 +1,8 @@
-# Progreso — Orden C — Comunicación (plugin 6.38.0; la orden decía 6.36.0)
+# Progreso — Orden C — Comunicación (publicada en 6.39.0; la orden decía 6.36.0)
 
 ## Estado
-- Inicio: 2026-10-26. Bloques 0–3 en código y pruebas (2026-10-27). Cierre 6.38.0 pendiente.
-- PR: #116 (webhooks + boletín por lotes), #117 (Email Engine), #118 (boletín: contactos), PR de automatización.
+- Inicio: 2026-10-26. Bloques 0–3 en código y pruebas (2026-10-27). Publicado dentro de 6.39.0 (no hubo 6.38.0).
+- PR fusionados: #116 (webhooks + boletín por lotes), #117 (Email Engine), #118 (boletín: contactos), #119 (automatización).
 
 ## Bloque 0 — Lectura
 - **Mapa de envíos.** Una sola cola de correo (`atora_email_queue`, `Email_Queue`); el enrutador de mensajes

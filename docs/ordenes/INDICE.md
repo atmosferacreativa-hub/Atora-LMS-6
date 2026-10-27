@@ -28,9 +28,9 @@ Un documento fusionado no es una función terminada.
 | # | Orden (archivo) | Alias anteriores | Versión prevista | Estado |
 |---|---|---|---|---|
 | 1 | `ORDEN-ANALITICAS` — riesgo académico único y panel institucional | "C Analíticas" (lista vieja), "D" (lista ejecutada) | 6.36.0 | **cerrada en código y pruebas**; sin validación real |
-| 2 | `ORDEN-AUDIO-PLANIFICACION` — audio en la lección y planificación híbrida (web y app 1.2.0) | — | 6.37.0 · app 1.2.0 | en curso |
-| 3 | `ORDEN-C-COMUNICACION` — Email Engine, Newsletter, Automatización | "C" (lista ejecutada) | 6.38.0 (antes 6.36.0) | **bloques 0–3 en código y pruebas**; cierre pendiente; sin validación real |
-| 4 | `ORDEN-CLASES-EN-VIVO` — Zoom, Meet y Microsoft Teams; grabación a decisión del docente | "E Streaming" (lista vieja), "F" (lista ejecutada) | 6.39.0 | por escribir |
+| 2 | `ORDEN-AUDIO-PLANIFICACION` — audio en la lección y planificación híbrida (web y app 1.2.0) | — | 6.37.0 · app 1.2.0 | plugin publicado en 6.37.0; app 1.2.0 en preparación (audio fusionado, PR #37); planificador nativo pendiente; sin validación real |
+| 3 | `ORDEN-C-COMUNICACION` — Email Engine, Newsletter, Automatización | "C" (lista ejecutada) | publicada en 6.39.0 (planeada 6.38.0) | **cerrada en código y pruebas** (#116–#119); sin validación real con proveedores |
+| 4 | `ORDEN-CLASES-EN-VIVO` — Zoom, Meet y Microsoft Teams; grabación a decisión del docente | "E Streaming" (lista vieja), "F" (lista ejecutada) | 6.39.0 · app 1.2.0 | plugin **cerrado en código y pruebas** (#120); app: PR #38; sin validación con cuentas reales |
 
 **Pospuestas** (no se ejecutan hasta nueva decisión):
 
