@@ -489,6 +489,8 @@ class V5_Modules {
 		$dir = ATORA_LMS_MODULES_DIR . 'automation/';
 		self::require_file( $dir . 'class-outbound-webhooks.php' );
 		self::require_file( $dir . 'class-automation-engine.php' );
+		self::require_file( $dir . 'class-automation-triggers.php' );
+		self::require_file( $dir . 'class-automation-flows.php' );
 		if ( class_exists( 'ATORA\Automation\Automation_Engine' ) ) {
 			\ATORA\Automation\Automation_Engine::init();
 		}

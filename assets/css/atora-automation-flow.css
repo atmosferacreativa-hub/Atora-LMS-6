@@ -1,0 +1,34 @@
+/* Editor de flujos de automatización (6.38.0). */
+.atora-flow-meta { display: flex; flex-wrap: wrap; gap: 0 24px; align-items: flex-end; }
+.atora-flow-version { font-weight: 400; color: #50575e; margin-left: 8px; }
+.atora-flow-columns { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+.atora-flow-canvas-wrap { flex: 1 1 380px; min-width: 0; }
+.atora-flow-steps-wrap { flex: 1 1 420px; min-width: 0; }
+.atora-flow-canvas { border: 1px solid #dcdcde; border-radius: 8px; padding: 12px; background: #f6f7f7; overflow-x: auto; }
+.atora-flow-chain { list-style: none; margin: 0; padding: 0; }
+.atora-flow-chain > li { position: relative; margin: 0 0 18px; }
+.atora-flow-chain > li:not(:last-child)::after { content: ""; position: absolute; left: 20px; bottom: -16px; height: 14px; border-left: 2px solid #8c8f94; }
+.atora-flow-node { background: #fff; border: 1px solid #c3c4c7; border-left-width: 4px; border-radius: 6px; padding: 8px 10px; }
+.atora-flow-node code { font-size: 11px; }
+.atora-flow-start { display: inline-block; margin-bottom: 18px; border-left-color: #2271b1; font-weight: 600; }
+.atora-flow-action { border-left-color: #00a32a; }
+.atora-flow-wait { border-left-color: #dba617; }
+.atora-flow-condition { border-left-color: #8c5cbf; }
+.atora-flow-end { border-left-color: #50575e; color: #50575e; display: inline-block; }
+.atora-flow-jump { color: #50575e; font-style: italic; }
+.atora-flow-branches { display: flex; gap: 12px; margin-top: 10px; flex-wrap: wrap; }
+.atora-flow-branch { flex: 1 1 160px; border: 1px dashed #c3c4c7; border-radius: 6px; padding: 8px; background: #fbfbfc; min-width: 0; }
+.atora-flow-branch > strong { display: block; margin-bottom: 6px; }
+.atora-flow-warning { color: #b32d2e; }
+.atora-flow-step { border: 1px solid #dcdcde; border-left-width: 4px; border-radius: 6px; padding: 8px 12px 4px; margin: 0 0 12px; background: #fff; }
+.atora-flow-step legend { padding: 0 4px; font-weight: 600; }
+.atora-flow-field { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 6px 0; }
+.atora-flow-field > span { min-width: 120px; }
+.atora-flow-field input, .atora-flow-field select { min-height: 32px; max-width: 100%; }
+.atora-flow-rule { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.atora-flow-tools { display: flex; gap: 8px; }
+.atora-flow-box { border: 1px solid #dcdcde; border-radius: 6px; padding: 8px 12px; margin: 12px 0; }
+.atora-flow-path li { margin: 4px 0; }
+@media (max-width: 600px) {
+	.atora-flow-field > span { min-width: 0; width: 100%; }
+}

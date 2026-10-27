@@ -79,6 +79,9 @@ class CLMS_Assignment_Due_Reminder_Service {
 					continue;
 				}
 
+				// 6.38.0: disparador de automatización «tarea por vencer».
+				do_action( 'atora/academic/assignment_due_soon', $student_id, $lesson_id, $course_id, $this->get_due_date( $lesson_id ) );
+
 				// PT-3.7: tope de seguridad, independiente del dedupe_key.
 				if ( ! \ATORA\Messaging\Messaging_Router::under_recipient_cap( $student_id ) ) {
 					continue;

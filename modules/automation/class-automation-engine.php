@@ -57,7 +57,10 @@ class Automation_Engine {
 	const ACTION_TYPES = array(
 		// Existentes
 		'send_email', 'send_whatsapp', 'send_telegram', 'add_tag', 'remove_tag',
-		'internal_notification', 'webhook', 'enroll_course', 'unenroll_course',
+		'internal_notification', 'webhook', 'enroll_course',
+		// 6.38.0: set_custom_field tenía código pero no estaba aquí (nunca se encolaba); unenroll_course estaba
+		// aquí pero no tenía código (fallaba siempre): se quita.
+		'set_custom_field', 'inbox_message', 'teacher_task',
 		// Fase 7 — nuevas acciones
 		'start_email_sequence',
 		'move_pipeline_stage',
@@ -76,13 +79,15 @@ class Automation_Engine {
 		// Registrar intervalo antes de programar cron para evitar dependencia externa.
 		add_filter( 'cron_schedules', array( __CLASS__, 'add_cron_intervals' ) );
 
-		// Registrar listeners para todos los triggers.
-		self::register_trigger_hooks();
+		// 6.38.0: un solo conjunto de disparadores y el motor de flujos (recorridos por contacto).
+		if ( '6.38.0' !== get_option( 'atora_automation_migrated' ) ) {
+			self::migrate_6380();
+		}
+		Automation_Triggers::register();
+		Automation_Flows::init();
 
-		// Cron: procesar acciones pendientes (cada 5 min).
+		// Cron: la cola anterior sigue procesándose hasta vaciarse (cada 5 min).
 		add_action( 'atora_automation_cron', array( __CLASS__, 'process_pending_actions' ) );
-		// Inactividad académica — verificación diaria
-		add_action( 'atora_daily_cron', array( __CLASS__, 'on_check_academic_inactivity' ) );
 		if ( ! wp_next_scheduled( 'atora_automation_cron' ) ) {
 			wp_schedule_event( time(), 'every_5_minutes', 'atora_automation_cron' );
 		}
@@ -125,50 +130,42 @@ class Automation_Engine {
 
 	// ── Registro de triggers ──────────────────────────────────────────────────
 
-	/**
-	 * Conecta cada trigger con el handler correspondiente.
-	 *
-	 * @return void
-	 */
-	private static function register_trigger_hooks(): void {
-		$map = array(
-			'user_register'                   => 'user_registered',
-			'clms_user_enrolled_in_course'    => 'course_enrolled',
-			'clms_lesson_completed'           => 'lesson_completed',
-			'clms_course_completed'           => 'course_completed',
-			'clms_submission_graded'          => 'grade_published',
-			'woocommerce_order_status_completed' => 'purchase_completed',
-			'atora/email/webhook_event'       => 'email_event_proxy',
-				'atora_daily_cron'                => 'check_inactivity',
-				'atora/crm/tag_added'             => 'tag_added',
-				'atora/crm/tag_removed'           => 'tag_removed',
-				'atora/forms/submitted'           => 'form_submitted',
-			// Fase 7 — nuevos hooks
-			'atora/crm/deal_stage_changed'    => 'deal_stage_changed',
-			'atora/crm/contact_created'       => 'contact_created',
-			// Fase 10
-			'atora/cart/abandoned'            => 'cart_abandoned',
-			'atora/contact/ltv_updated'       => 'ltv_updated',
-			// Fase 11 — LMS propio
-			'atora/lms/lesson_completed'        => 'lesson_completed_v2',
-			'atora/lms/course_completed'        => 'course_completed_v2',
-			'atora/lms/enrolled'                => 'enrollment_v2',
-			// Fase III S9 — Gamificación
-			'atora/gamification/badge_earned'   => 'badge_earned',
-			// Fase III S10 — Learning Paths
-			'atora/lms/learning_path_updated'   => 'learning_path_updated',
-			'atora/email/opened'              => 'campaign_opened',
-			'clms_submission_graded'          => 'grade_below_threshold_check',
-			'clms_lesson_completed'           => 'inactivity_academic_check',
-			'clms_user_enrolled_in_course'    => 'enrollment_completed',
-			);
+	/** Plantillas que los ajustes predefinidos usaban y nunca existieron => la que existe. */
+	const TEMPLATE_FIXES = array(
+		'cart_recovery'      => 'cart_abandonment',
+		'certificate_issued' => 'certificate_ready',
+	);
 
-		foreach ( $map as $wp_hook => $handler ) {
-			$method = 'on_' . $handler;
-			if ( method_exists( __CLASS__, $method ) ) {
-				add_action( $wp_hook, array( __CLASS__, $method ), 20, PHP_INT_MAX );
+	/**
+	 * 6.38.0: migra disparadores retirados y plantillas inexistentes. Idempotente; deja el resultado en
+	 * `atora_automation_migration_report`.
+	 *
+	 * @return array{triggers:array<string,int>,templates:int}
+	 */
+	public static function migrate_6380(): array {
+		global $wpdb;
+		$report = array( 'triggers' => Automation_Triggers::migrate_aliases(), 'templates' => 0 );
+		$rows   = (array) $wpdb->get_results( "SELECT id, actions FROM {$wpdb->prefix}atora_automations" ); // phpcs:ignore WordPress.DB
+		foreach ( $rows as $row ) {
+			// Se decodifica: MySQL guarda el JSON normalizado y un reemplazo de texto no serviría.
+			$data    = json_decode( (string) $row->actions, true );
+			$changed = false;
+			if ( is_array( $data ) ) {
+				array_walk_recursive( $data, static function ( &$value, $key ) use ( &$changed ) {
+					if ( 'template' === $key && is_string( $value ) && isset( self::TEMPLATE_FIXES[ $value ] ) ) {
+						$value   = self::TEMPLATE_FIXES[ $value ];
+						$changed = true;
+					}
+				} );
+			}
+			if ( $changed ) {
+				$wpdb->update( "{$wpdb->prefix}atora_automations", array( 'actions' => wp_json_encode( $data ) ), array( 'id' => (int) $row->id ) );
+				$report['templates']++;
 			}
 		}
+		update_option( 'atora_automation_migration_report', $report, false );
+		update_option( 'atora_automation_migrated', '6.38.0', false );
+		return $report;
 	}
 
 	/**
@@ -607,6 +604,12 @@ class Automation_Engine {
 	 * @return void
 	 */
 	public static function fire_trigger( string $trigger, int $user_id, array $context = array() ): void {
+		// 6.38.0: todo disparo entra por el registro único y el motor de flujos.
+		Automation_Triggers::fire( $trigger, $user_id, absint( $context['contact_id'] ?? 0 ), $context );
+	}
+
+	/** @deprecated 6.38.0 Encolado de la versión anterior; se conserva solo para referencia de la migración. */
+	private static function legacy_fire_trigger( string $trigger, int $user_id, array $context = array() ): void {
 		global $wpdb;
 
 		$automations = $wpdb->get_results( $wpdb->prepare(
@@ -773,16 +776,34 @@ class Automation_Engine {
 	private static function execute_action( object $row ): void {
 		global $wpdb;
 
-		$wpdb->update(
+		$claimed = $wpdb->update(
 			"{$wpdb->prefix}atora_automation_queue",
 			array( 'status' => 'running' ),
 			array( 'id' => $row->id, 'status' => 'pending' ),
 			array( '%s' ), array( '%d', '%s' )
 		);
+		if ( ! $claimed ) {
+			return; // 6.38.0: otro proceso ya la tomó (antes se ejecutaba igual y la acción salía dos veces).
+		}
 
 		$action  = self::decode_json_array( (string) ( $row->action_data ?? '{}' ), array() );
 		$context = self::decode_json_array( (string) ( $row->context ?? '{}' ), array() );
 		$user_id = (int) $row->user_id;
+		$type    = sanitize_key( $action['type'] ?? '' );
+		$success = self::perform_action( $action, $user_id, $context );
+
+		self::finish_legacy_row( $row, $type, $success, $user_id, $context );
+	}
+
+	/**
+	 * Ejecuta una acción. La usan la cola anterior y los recorridos de flujo (6.38.0).
+	 *
+	 * @param array $action  Acción ({type, …}).
+	 * @param int   $user_id Usuario (0 si es un contacto sin cuenta).
+	 * @param array $context Contexto del disparador (contact_id, course_id, …).
+	 */
+	public static function perform_action( array $action, int $user_id, array $context ): bool {
+		global $wpdb;
 		$type    = sanitize_key( $action['type'] ?? '' );
 		$success = false;
 
@@ -794,13 +815,19 @@ class Automation_Engine {
 						$email_metadata['source'] = 'automation';
 					}
 
-					$success = (bool) \ATORA\EmailEngine\Email_Queue::enqueue( array(
+					$email_args = array(
 						'template' => sanitize_key( $action['template'] ?? '' ),
-						'user_id'  => $user_id,
 						'priority' => 'medium',
 						'metadata' => $email_metadata,
 						'source'   => 'automation',
-					) );
+					);
+					// 6.38.0: un contacto sin cuenta también recibe (antes se usaba al usuario 1 = administrador).
+					if ( $user_id > 0 ) {
+						$email_args['user_id'] = $user_id;
+					} else {
+						$email_args['contact_id'] = absint( $context['contact_id'] ?? 0 );
+					}
+					$success = (bool) \ATORA\EmailEngine\Email_Queue::enqueue( $email_args );
 					break;
 
 				case 'send_whatsapp':
@@ -868,12 +895,44 @@ class Automation_Engine {
 				break;
 
 			case 'internal_notification':
-				$message = self::interpolate_string( $action['message'] ?? '', $user_id, $context );
-				do_action( 'atora/notification/add', $user_id, array(
-					'type'    => 'automation',
-					'message' => sanitize_text_field( $message ),
-				) );
-				$success = true;
+			case 'inbox_message':
+				// 6.38.0: antes se disparaba un hook que nadie escuchaba y se daba por hecho. Ahora va al buzón
+				// ("Avisos") del usuario.
+				$notifications = function_exists( 'clms_core' ) ? clms_core( 'CLMS_Notifications' ) : null;
+				if ( $user_id > 0 && $notifications && method_exists( $notifications, 'add_notification' ) ) {
+					$success = (bool) $notifications->add_notification( $user_id, array(
+						'type'       => 'automation',
+						'title'      => sanitize_text_field( self::interpolate_string( (string) ( $action['title'] ?? __( 'Aviso', 'atora-lms' ) ), $user_id, $context ) ),
+						'message'    => sanitize_textarea_field( self::interpolate_string( (string) ( $action['message'] ?? '' ), $user_id, $context ) ),
+						'link'       => esc_url_raw( (string) ( $action['link'] ?? '' ) ),
+						'course_id'  => absint( $context['course_id'] ?? 0 ),
+						'dedupe_key' => sanitize_key( (string) ( $context['_atora_step_key'] ?? '' ) ),
+					) );
+				}
+				break;
+
+			case 'teacher_task':
+				// 6.38.0: aviso al docente del estudiante en ese curso (no al estudiante).
+				$course_id = absint( $context['course_id'] ?? 0 );
+				$teacher   = 0;
+				if ( $user_id > 0 && $course_id && class_exists( '\\ATORA\\LMS\\Section_Service' ) ) {
+					$teacher = (int) \ATORA\LMS\Section_Service::get_effective_instructor( $user_id, $course_id );
+				}
+				if ( ! $teacher && $course_id ) {
+					$teacher = (int) get_post_field( 'post_author', $course_id );
+				}
+				$notifications = function_exists( 'clms_core' ) ? clms_core( 'CLMS_Notifications' ) : null;
+				if ( $teacher > 0 && $teacher !== $user_id && $notifications && method_exists( $notifications, 'add_notification' ) ) {
+					$student = get_userdata( $user_id );
+					$success = (bool) $notifications->add_notification( $teacher, array(
+						'type'       => 'early_warning',
+						'title'      => sanitize_text_field( self::interpolate_string( (string) ( $action['title'] ?? __( 'Tarea de seguimiento', 'atora-lms' ) ), $user_id, $context ) ),
+						'message'    => sanitize_textarea_field( self::interpolate_string( (string) ( $action['message'] ?? '' ), $user_id, $context ) . ( $student ? ' — ' . $student->display_name : '' ) ),
+						'link'       => admin_url( 'admin.php?page=atora-student-profile&student_id=' . $user_id . '&course_id=' . $course_id ),
+						'course_id'  => $course_id,
+						'dedupe_key' => sanitize_key( (string) ( $context['_atora_step_key'] ?? '' ) ),
+					) );
+				}
 				break;
 
 			case 'enroll_course':
@@ -940,6 +999,12 @@ class Automation_Engine {
 				break;
 		}
 
+		return $success;
+	}
+
+	/** Cierra una fila de la cola anterior (reintento con espera creciente o fin). */
+	private static function finish_legacy_row( object $row, string $type, bool $success, int $user_id, array $context ): void {
+		global $wpdb;
 		$status = $success ? 'completed' : 'failed';
 		$retry  = $success ? (int) $row->retry_count : (int) $row->retry_count + 1;
 
@@ -1073,8 +1138,8 @@ class Automation_Engine {
 				'trigger_type' => 'cart_abandoned', // Fase V S17: corregido de 'form_submitted'
 				'conditions'   => array(),
 				'actions'      => array(
-					array( 'type' => 'send_email', 'template' => 'cart_recovery',  'delay_minutes' => 60    ),
-					array( 'type' => 'send_email', 'template' => 'cart_recovery',  'delay_minutes' => 1440  ),
+					array( 'type' => 'send_email', 'template' => 'cart_abandonment',  'delay_minutes' => 60    ),
+					array( 'type' => 'send_email', 'template' => 'cart_abandonment',  'delay_minutes' => 1440  ),
 					array( 'type' => 'send_email', 'template' => 'special_offer',  'delay_minutes' => 4320  ),
 				),
 			),
@@ -1087,7 +1152,7 @@ class Automation_Engine {
 				'conditions'   => array(),
 				'actions'      => array(
 					array( 'type' => 'add_tag',             'tag'      => '#egresado',          'delay_minutes' => 0 ),
-					array( 'type' => 'send_email',          'template' => 'certificate_issued', 'delay_minutes' => 0 ),
+					array( 'type' => 'send_email',          'template' => 'certificate_ready', 'delay_minutes' => 0 ),
 					array( 'type' => 'move_pipeline_stage', 'pipeline' => 'academic', 'stage' => 'alumni', 'delay_minutes' => 0 ),
 					array( 'type' => 'send_email',          'template' => 'special_offer',      'delay_minutes' => 4320 ),
 				),
@@ -1096,7 +1161,7 @@ class Automation_Engine {
 			'grade_recovery' => array(
 				'name'         => __( 'Recuperación académica — nota baja', 'atora-lms' ),
 				'description'  => __( 'Detecta notas bajas y asigna tutoría + notificación al instructor.', 'atora-lms' ),
-				'trigger_type' => 'grade_below_threshold',
+				'trigger_type' => 'grade_published', // 6.38.0: con la condición de nota < 60.
 				'conditions'   => array(
 					'operator' => 'AND',
 					'rules'    => array(
@@ -1163,6 +1228,14 @@ class Automation_Engine {
 		global $wpdb;
 		$id     = absint( wp_unslash( $_POST['id'] ?? 0 ) );
 		$active = absint( wp_unslash( $_POST['active'] ?? 0 ) );
+		// 6.38.0: un flujo inválido no se activa.
+		if ( $active ) {
+			$row    = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}atora_automations WHERE id = %d", $id ) );
+			$errors = $row ? Automation_Flows::validate( Automation_Flows::definition_from_row( $row ) ) : array( __( 'No existe.', 'atora-lms' ) );
+			if ( $errors ) {
+				wp_send_json_error( array( 'errors' => $errors ) );
+			}
+		}
 		$wpdb->update( "{$wpdb->prefix}atora_automations", array( 'active' => $active ), array( 'id' => $id ), array( '%d' ), array( '%d' ) );
 		wp_send_json_success();
 	}

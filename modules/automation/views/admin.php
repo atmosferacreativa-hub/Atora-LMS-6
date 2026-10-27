@@ -152,9 +152,33 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] && ! empty( $_POST['atora_automation_
 		);
 	}
 
+	// 6.38.0: plantillas de flujo y reintento de recorridos.
+	if ( 'create_flow_template' === $action && class_exists( '\\ATORA\\Automation\\Automation_Flows' ) ) {
+		$created = \ATORA\Automation\Automation_Flows::create_from_template( sanitize_key( (string) wp_unslash( $_POST['template'] ?? '' ) ) );
+		$status  = is_wp_error( $created )
+			? array( 'type' => 'error', 'message' => $created->get_error_message() )
+			: array( 'type' => 'success', 'message' => __( 'Flujo creado (inactivo). Revísalo y actívalo en el editor.', 'atora-lms' ) );
+	}
+	if ( 'retry_run' === $action && class_exists( '\\ATORA\\Automation\\Automation_Flows' ) ) {
+		$ok     = \ATORA\Automation\Automation_Flows::retry( absint( $_POST['run_id'] ?? 0 ) );
+		$status = array( 'type' => $ok ? 'success' : 'error', 'message' => $ok ? __( 'Recorrido reanudado desde el paso que falló.', 'atora-lms' ) : __( 'Ese recorrido no estaba fallido.', 'atora-lms' ) );
+	}
+
 	if ( 'toggle_workflow' === $action ) {
 		$id     = absint( wp_unslash( $_POST['id'] ?? 0 ) );
 		$active = ! empty( $_POST['active'] ) ? 1 : 0;
+		// 6.38.0: un flujo inválido no se activa.
+		$flow_errors = array();
+		if ( $active && class_exists( '\\ATORA\\Automation\\Automation_Flows' ) ) {
+			$flow_row    = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}atora_automations WHERE id = %d", $id ) );
+			$flow_errors = $flow_row ? \ATORA\Automation\Automation_Flows::validate( \ATORA\Automation\Automation_Flows::definition_from_row( $flow_row ) ) : array( __( 'No existe.', 'atora-lms' ) );
+		}
+		if ( $flow_errors ) {
+			$status = array( 'type' => 'error', 'message' => __( 'No se activó:', 'atora-lms' ) . ' ' . implode( ' ', $flow_errors ) );
+			$action = '';
+		}
+	}
+	if ( 'toggle_workflow' === $action ) {
 		$updated = $wpdb->update(
 			"{$wpdb->prefix}atora_automations",
 			array( 'active' => $active, 'updated_at' => current_time( 'mysql', true ) ),
@@ -172,8 +196,9 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] && ! empty( $_POST['atora_automation_
 $tab = isset( $_GET['tab'] ) ? sanitize_key( (string) wp_unslash( $_GET['tab'] ) ) : 'workflows'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 $tabs = array(
 	'workflows' => __( 'Workflows activos', 'atora-lms' ),
-	'editor'    => __( 'Crear workflow', 'atora-lms' ),
+	'editor'    => __( 'Editor de flujos', 'atora-lms' ),
 	'templates' => __( 'Plantillas recomendadas', 'atora-lms' ),
+	'runs'      => __( 'Recorridos', 'atora-lms' ),
 	'queue'     => __( 'Cola', 'atora-lms' ),
 	'logs'      => __( 'Logs', 'atora-lms' ),
 	'errors'    => __( 'Errores', 'atora-lms' ),
@@ -229,8 +254,30 @@ $errors_rows = array_values(
 			<?php require __DIR__ . '/editor.php'; ?>
 		<?php elseif ( in_array( $tab, array( 'logs', 'queue', 'errors' ), true ) ) : ?>
 			<?php require __DIR__ . '/logs.php'; ?>
+		<?php elseif ( 'runs' === $tab ) : ?>
+			<?php require __DIR__ . '/runs.php'; ?>
 		<?php elseif ( 'templates' === $tab ) : ?>
-			<h2><?php esc_html_e( 'Plantillas recomendadas', 'atora-lms' ); ?></h2>
+			<h2><?php esc_html_e( 'Plantillas de flujo', 'atora-lms' ); ?></h2>
+			<table class="widefat striped" style="margin-bottom:24px;">
+				<thead><tr><th><?php esc_html_e( 'Flujo', 'atora-lms' ); ?></th><th><?php esc_html_e( 'Disparador', 'atora-lms' ); ?></th><th><span class="screen-reader-text"><?php esc_html_e( 'Acciones', 'atora-lms' ); ?></span></th></tr></thead>
+				<tbody>
+					<?php foreach ( \ATORA\Automation\Automation_Flows::templates() as $flow_key => $flow_template ) : ?>
+						<tr>
+							<td><strong><?php echo esc_html( $flow_template['name'] ); ?></strong><br><span class="description"><?php echo esc_html( $flow_template['description'] ); ?></span></td>
+							<td><?php echo esc_html( \ATORA\Automation\Automation_Triggers::catalog()[ $flow_template['trigger_type'] ]['label'] ?? $flow_template['trigger_type'] ); ?></td>
+							<td>
+								<form method="post" style="margin:0;">
+									<?php wp_nonce_field( 'atora_automation_admin_action', 'atora_automation_nonce' ); ?>
+									<input type="hidden" name="atora_automation_action" value="create_flow_template">
+									<input type="hidden" name="template" value="<?php echo esc_attr( $flow_key ); ?>">
+									<button type="submit" class="button button-small"><?php esc_html_e( 'Usar', 'atora-lms' ); ?></button>
+								</form>
+							</td>
+						</tr>
+					<?php endforeach; ?>
+				</tbody>
+			</table>
+			<h2><?php esc_html_e( 'Plantillas anteriores', 'atora-lms' ); ?></h2>
 			<?php if ( empty( $presets ) ) : ?>
 				<p><?php esc_html_e( 'No hay presets disponibles.', 'atora-lms' ); ?></p>
 			<?php else : ?>
@@ -270,6 +317,7 @@ $errors_rows = array_values(
 										<input type="hidden" name="id" value="<?php echo esc_attr( (string) absint( $row->id ?? 0 ) ); ?>">
 										<input type="hidden" name="active" value="<?php echo esc_attr( ! empty( $row->active ) ? '0' : '1' ); ?>">
 										<button type="submit" class="button button-small"><?php echo esc_html( ! empty( $row->active ) ? __( 'Desactivar', 'atora-lms' ) : __( 'Activar', 'atora-lms' ) ); ?></button>
+										<a class="button button-small" href="<?php echo esc_url( admin_url( 'admin.php?page=atora-automations&tab=editor&flow=' . absint( $row->id ?? 0 ) ) ); ?>"><?php esc_html_e( 'Editar', 'atora-lms' ); ?></a>
 									</form>
 								</td>
 							</tr>
