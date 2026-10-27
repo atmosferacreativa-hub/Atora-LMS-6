@@ -121,6 +121,16 @@ Commits (bloque `block/scorm-b3-fixes`) y el fallo real que corrige cada uno:
   - Endurece el job e2e ante fallas intermitentes del runner (SDK/system image corrupta, ADB/daemon, boot incompleto).
   - Cambios: cache de AVD + system-image, snapshot warm-up en cache miss, reintentos de sdkmanager, reinicio de adb, marca `INFRA` en el summary si falla antes de Maestro.
 
+- `9b49c2e` CI(e2e): ensure Android SDK tools + fallback AVD recreate
+  - Corrige (CI): agrega `sdkmanager` y `platform-tools` al PATH vía setup previo y, si el AVD cacheado no arranca, reintenta recreando el AVD.
+  - Nota: este commit introdujo un error de YAML (dos puntos en el nombre del step) que evitaba iniciar el workflow.
+
+- `a590e4b` CI(e2e): fix YAML (quote step name with colon)
+  - Corrige (CI): el workflow volvía a correr (el run fallaba antes por YAML inválido).
+
+- `109a3c8` CI(e2e): drop setup-android; add sdkmanager to PATH
+  - Corrige (CI): `android-actions/setup-android@v3` fallaba al intentar instalar el paquete obsoleto `tools`; se eliminó y se usa el `sdkmanager` preinstalado (con PATH explícito).
+
 Estado de runs (commit `5a3b8aef7e319955df8aa07a013ee342df16e0ac`):
 
 - `40377589200` Mobile CI: ✅ success.
@@ -137,9 +147,22 @@ Estado de runs (commit `8da597f...`):
   - Nota: este fallo no cuenta para la serie de 3 verdes.
 - `ios-e2e`: skipped.
 
-Estado de runs (commit `832382d...`):
+Estado de runs (commit `832382d844eab9bae254f73da46a42f9508a6852`):
 
-- Mobile CI / e2e: ⏳ en cola/pendiente (`40438032137`, `40438032110`).
+- `40438032137` Mobile CI: ✅ success.
+- `40438032110` Pruebas de pantalla (e2e): ❌ failure (infraestructura, antes de Maestro).
+  - Falla: `sdkmanager: command not found` (no estaba en PATH).
+
+Estado de runs (commit `a590e4bf9534e05fb03fd8067b74892a3473e69b`):
+
+- `40440823574` Mobile CI: ✅ success.
+- `40440823516` Pruebas de pantalla (e2e): ❌ failure (infraestructura, antes de Maestro).
+  - Falla: `android-actions/setup-android@v3` intentando instalar el paquete obsoleto `tools`.
+
+Estado de runs (commit `109a3c8228119a67dad65601c9ab236f3a1bef04`):
+
+- `40441214748` Mobile CI: ⏳ queued.
+- `40441214745` Pruebas de pantalla (e2e): ⏳ en curso.
 
 3 verdes seguidos (sobre el mismo commit): 0/3.
 
