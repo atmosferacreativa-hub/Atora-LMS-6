@@ -1562,7 +1562,7 @@ class CLMS_Academic_Report_Service {
 		if ( $viewer_id === $student_id ) {
 			return true;
 		}
-		$is_admin = user_can( $viewer_id, 'manage_options' ) || user_can( $viewer_id, 'clms_access_admin' );
+		$is_admin = user_can( $viewer_id, 'manage_options' );
 		$multi    = class_exists( 'ATORA_Teacher_Scope' ) && ATORA_Teacher_Scope::multi_institution();
 		if ( $is_admin && ! $multi ) {
 			return true;
@@ -1603,7 +1603,8 @@ class CLMS_Academic_Report_Service {
 			if ( ATORA_Teacher_Scope::can_access_course( $viewer_id, $course_id ) ) {
 				return true;
 			}
-			if ( in_array( $viewer_id, $teacher_ids, true ) || user_can( $viewer_id, 'clms_access_admin' ) ) {
+			// `clms_access_admin` lo tienen también los instructores: no da acceso a cursos ajenos.
+			if ( in_array( $viewer_id, $teacher_ids, true ) ) {
 				return ATORA_Teacher_Scope::in_tenant( $viewer_id, $course_id );
 			}
 			return false;
