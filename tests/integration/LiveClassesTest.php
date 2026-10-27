@@ -372,6 +372,17 @@ final class LiveClassesTest extends WP_UnitTestCase {
 		$this->assertStringNotContainsString( 'zoom.test/j/', $html, 'Terminada: ya no se ofrece unirse.' );
 	}
 
+	public function test_e2e_seed_has_an_open_live_class_with_recording(): void {
+		$this->assertTrue( class_exists( 'ATORA_E2E_Seed_CLI' ) );
+		$out     = ATORA_E2E_Seed_CLI::seed( '', 'atora-e2e-2026' );
+		$lesson  = (int) $out['live_lesson'];
+		$student = (int) $out['student']['id'];
+		$info    = ATORA_Live_Session_Service::join_info( $lesson, $student, time() + 2 * HOUR_IN_SECONDS );
+		$this->assertSame( 'open', $info['status'], 'Sigue abierta durante toda la suite de la app.' );
+		$this->assertSame( 'https://example.org/clase-en-vivo-e2e', $info['join_url'] );
+		$this->assertSame( 'https://example.org/grabacion-e2e', $info['recording']['url'] );
+	}
+
 	public function test_settings_keep_secrets_when_left_blank(): void {
 		\ATORA\LiveStreaming\Live_Settings::save( array( 'zoom_account_id' => 'nuevo', 'zoom_client_secret' => '', 'teams_client_secret' => '', 'clear_teams_client_secret' => '1' ) );
 		$opts = get_option( 'atora_live_streaming_options' );
