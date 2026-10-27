@@ -171,6 +171,18 @@ class Email_Templates {
 				'category' => 'system',
 				'active'   => true,
 			),
+			// 6.38.0: doble opt-in del boletín. Es de sistema: debe llegar aunque aún no esté suscrito.
+			'newsletter_confirm'   => array(
+				'id'          => 42,
+				'name'        => __( 'Confirmar suscripción al boletín', 'atora-lms' ),
+				'subject'     => __( 'Confirma tu suscripción al boletín de {{site_name}}', 'atora-lms' ),
+				'body'        => __( 'Recibimos una solicitud para suscribir este correo al boletín de {{site_name}}. Si fuiste tú, confírmalo con el botón. Si no, ignora este mensaje: no te enviaremos nada.', 'atora-lms' ),
+				'button_text' => __( 'Confirmar suscripción', 'atora-lms' ),
+				'button_var'  => 'confirm_url',
+				'view'        => 'messaging',
+				'category'    => 'system',
+				'active'      => true,
+			),
 			// 6.38.0: el boletín usaba una plantilla `newsletter` que no existía y no se enviaba a nadie.
 			'newsletter'           => array(
 				'id'       => 20,
@@ -356,9 +368,11 @@ class Email_Templates {
 			'site_url'         => home_url( '/' ),
 			'dashboard_url'    => $dashboard_url,
 			// 6.38.0: enlace firmado por usuario (antes no llevaba token y no hacía nada).
-			'unsub_url'        => class_exists( Email_Unsubscribe::class )
-				? Email_Unsubscribe::url( (int) $user->ID, (string) $user->user_email )
-				: add_query_arg( 'atora_email_action', 'unsubscribe', home_url( '/' ) ),
+			'unsub_url'        => ! class_exists( Email_Unsubscribe::class )
+				? add_query_arg( 'atora_email_action', 'unsubscribe', home_url( '/' ) )
+				: ( (int) $user->ID <= 0 && ! empty( $metadata['contact_id'] )
+					? Email_Unsubscribe::url_for_contact( absint( $metadata['contact_id'] ), (string) $user->user_email )
+					: Email_Unsubscribe::url( (int) $user->ID, (string) $user->user_email ) ),
 			'preferences_url'  => add_query_arg( 'atora_email_action', 'preferences', home_url( '/' ) ),
 			'course_title'     => $course_id ? get_the_title( $course_id ) : '',
 			'course_url'       => $course_id ? (string) get_permalink( $course_id ) : '',

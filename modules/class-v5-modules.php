@@ -381,6 +381,10 @@ class V5_Modules {
 		if ( class_exists( 'ATORA\Newsletter\Newsletter' ) ) {
 			\ATORA\Newsletter\Newsletter::init();
 		}
+		self::require_file( $dir . 'class-newsletter-subscribers.php' );
+		if ( class_exists( 'ATORA\Newsletter\Newsletter_Subscribers' ) ) {
+			\ATORA\Newsletter\Newsletter_Subscribers::init();
+		}
 	}
 
 	/** @return void */

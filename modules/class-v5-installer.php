@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class V5_Installer {
 
 	/** Versión del esquema. Incrementar para forzar re-instalación. */
-	const SCHEMA_VERSION = '6.38.0-email-engine';
+	const SCHEMA_VERSION = '6.38.0-newsletter-contacts';
 
 	/** Option key que almacena la versión instalada. */
 	const OPTION_KEY = 'atora_v5_schema_version';
@@ -1280,6 +1280,17 @@ class V5_Installer {
 			UNIQUE KEY period (period_type, period_start)
 		) $charset_collate;" );
 
+		// 6.38.0: la cola y el boletín la consultan siempre; antes solo la creaba el módulo CRM v2.
+		dbDelta( "CREATE TABLE {$wpdb->prefix}atora_email_suppression (
+			id         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			email      VARCHAR(190)    NOT NULL DEFAULT '',
+			reason     VARCHAR(20)     NOT NULL DEFAULT 'manual',
+			contact_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			created_at DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY  (id),
+			UNIQUE KEY email (email)
+		) $charset_collate;" );
+
 		dbDelta( "CREATE TABLE {$wpdb->prefix}atora_email_events (
 			id         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 			queue_id   BIGINT UNSIGNED NOT NULL,
@@ -1430,7 +1441,7 @@ class V5_Installer {
 		} // /messaging
 
 		// P3 (6.12.0): gateado por módulo 'crm' (bandeja omnicanal + contactos).
-		if ( self::module_wants_tables( 'crm' ) ) {
+		if ( self::module_wants_tables( 'crm' ) || self::module_wants_tables( 'newsletter' ) ) { // 6.38.0: el boletín usa contactos y listas.
 
 		dbDelta( "CREATE TABLE {$wpdb->prefix}atora_conversations (
 			id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -1598,7 +1609,7 @@ class V5_Installer {
 		} // /automation
 
 		// P3 (6.12.0): gateado por módulo 'crm' (empresas y listas).
-		if ( self::module_wants_tables( 'crm' ) ) {
+		if ( self::module_wants_tables( 'crm' ) || self::module_wants_tables( 'newsletter' ) ) { // 6.38.0: el boletín usa contactos y listas.
 
 		dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}atora_companies (
 			id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,

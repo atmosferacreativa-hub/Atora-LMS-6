@@ -78,6 +78,15 @@ class Email_Queue {
 		$user_id  = absint( $data['user_id'] ?? 0 );
 		$user     = $user_id ? get_userdata( $user_id ) : null;
 
+		// 6.38.0: contacto sin cuenta (suscriptor del boletín). Se arma un destinatario sin ID de usuario.
+		if ( ! $user && empty( $data['user_id'] ) && ! empty( $data['contact_id'] ) ) {
+			$user = self::contact_recipient( absint( $data['contact_id'] ) );
+			if ( $user ) {
+				$data['metadata']               = is_array( $data['metadata'] ?? null ) ? $data['metadata'] : array();
+				$data['metadata']['contact_id'] = absint( $data['contact_id'] );
+			}
+		}
+
 		if ( ! $user ) {
 			return false;
 		}
@@ -478,6 +487,21 @@ class Email_Queue {
 		}
 	}
 
+	/** Destinatario a partir de un contacto del CRM sin cuenta (ID 0). */
+	private static function contact_recipient( int $contact_id ): ?\WP_User {
+		global $wpdb;
+		$row = $wpdb->get_row( $wpdb->prepare( "SELECT email, name FROM {$wpdb->prefix}atora_contacts WHERE id = %d LIMIT 1", $contact_id ) ); // phpcs:ignore WordPress.DB
+		if ( ! $row || ! is_email( (string) $row->email ) ) {
+			return null;
+		}
+		$user               = new \WP_User();
+		$user->ID           = 0;
+		$user->user_email   = (string) $row->email;
+		$user->display_name = '' !== (string) $row->name ? (string) $row->name : (string) $row->email;
+		$user->user_login   = '';
+		return $user;
+	}
+
 	/**
 	 * 6.38.0: List-Unsubscribe (y un clic, RFC 8058) en lo comercial con destinatario registrado.
 	 *
@@ -488,6 +512,9 @@ class Email_Queue {
 		$category = sanitize_key( (string) ( $template['category'] ?? '' ) );
 		if ( ! in_array( $category, Email_Unsubscribe::COMMERCIAL, true ) ) {
 			return array();
+		}
+		if ( (int) ( $row->user_id ?? 0 ) <= 0 && ! empty( $metadata['contact_id'] ) ) {
+			return Email_Unsubscribe::headers_for_contact( absint( $metadata['contact_id'] ), (string) ( $row->recipient_email ?? '' ) );
 		}
 		return Email_Unsubscribe::headers( (int) ( $row->user_id ?? 0 ), (string) ( $row->recipient_email ?? '' ) );
 	}
