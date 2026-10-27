@@ -1,5 +1,25 @@
 # CHANGELOG — ATORA LMS
 
+## 6.37.0 (2026-10-27)
+
+### Audio en la lección y planificación híbrida (`docs/ordenes/ORDEN-AUDIO-PLANIFICACION.md`)
+
+**Audio** (detalle en `docs/AUDIO.md`):
+- Recurso de audio con MP3, M4A u OGG (WAV no). Se valida el contenido real del archivo (WordPress no lo comprueba para audio y registra `.m4a` como `audio/mpeg`), el tamaño (100 MB por defecto, `atora_audio_max_mb`) y que sea un adjunto. Un audio rechazado se quita del recurso al guardar y el editor dice por qué.
+- Transcripción o texto alternativo manual.
+- Web: controles nativos, ±15 s, velocidad 0,75× a 2×, posición recordada en el navegador, duración, tamaño y formato visibles, aviso para OGG en iPhone/Safari, descarga y transcripción.
+- API móvil: `duration_seconds`, `audio_format`, `compatibility`, `transcript`, `position_key`, `resume_position_seconds`; la cola de posiciones acepta la clave del audio; capacidad `lesson_audio`.
+- Aceptar un formato no garantiza reproducirlo: la matriz de compatibilidad es declarada y no está comprobada en dispositivos.
+
+**Planificación híbrida** (ATORA → Planificación híbrida, REST `atora/v1/hybrid-plans`):
+- Recorrido guiado: objetivo, encuentro presencial, trabajo a distancia, recursos (incluido audio), evidencia y acompañamiento. Completo sin IA: crear, guardar, editar, duplicar, vista previa y publicar.
+- Guardado visible en dos niveles: borrador en el navegador mientras se escribe y guardado en el servidor con número de revisión (409 si otra persona guardó antes); recuperación del borrador local.
+- Publicar crea o actualiza hasta tres lecciones (trabajo a distancia con recursos, encuentro presencial, evidencia como tarea con fecha y rúbrica opcional). No duplica: mapa plan → lecciones guardado tras cada lección y bloqueo por plan. Republicar actualiza las mismas lecciones; la rúbrica de una evidencia con entregas no se cambia.
+- Permisos: edita quien gestiona lecciones y tiene el curso en su alcance; publica el docente; el asistente con delegación prepara pero no publica ni cambia la evidencia; el coordinador no tiene acceso.
+- IA opcional, apagada por defecto (Uso de IA → "Sugerencias en la planificación híbrida"): solo sugiere texto, el docente lo revisa.
+
+**TESTS**: `tests/Media/LessonAudioUnitTest.php`, `LessonAudioTest`, `HybridPlanServiceTest`, `HybridPlanRestTest`.
+
 ## 6.36.0 (2026-10-27)
 
 ### Analíticas y riesgo académico (`docs/ordenes/ORDEN-ANALITICAS.md`)
