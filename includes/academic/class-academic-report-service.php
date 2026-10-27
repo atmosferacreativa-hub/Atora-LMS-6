@@ -1562,16 +1562,26 @@ class CLMS_Academic_Report_Service {
 		if ( $viewer_id === $student_id ) {
 			return true;
 		}
-		if ( current_user_can( 'manage_options' ) || current_user_can( 'clms_access_admin' ) ) {
+		$is_admin = user_can( $viewer_id, 'manage_options' ) || user_can( $viewer_id, 'clms_access_admin' );
+		$multi    = class_exists( 'ATORA_Teacher_Scope' ) && ATORA_Teacher_Scope::multi_institution();
+		if ( $is_admin && ! $multi ) {
 			return true;
 		}
 		if ( ! class_exists( 'CLMS_Helper' ) ) {
 			return false;
 		}
-		$courses = (array) ( class_exists('\\ATORA\\LMS\\LMS_Enrollment_Service') ? array_column( (array) \ATORA\LMS\LMS_Enrollment_Service::get_user_enrollments( $student_id ), 'course_id' ) : \CLMS_Helper::get_user_enrolled_courses( $student_id ) );
+		// 6.36.0: con varias instituciones, el administrador ve el perfil si el estudiante tiene un curso
+		// de su institución; el docente, si tiene un curso del estudiante en su alcance.
+		$courses = (array) \CLMS_Helper::get_user_enrolled_courses( $student_id );
 		foreach ( $courses as $course_id ) {
 			$course_id = absint( $course_id );
-			if ( $course_id && CLMS_Helper::user_can_manage_lms( $course_id ) ) {
+			if ( ! $course_id ) {
+				continue;
+			}
+			if ( $is_admin && ATORA_Teacher_Scope::in_tenant( $viewer_id, $course_id ) ) {
+				return true;
+			}
+			if ( $this->viewer_can_access_course_report( $viewer_id, $course_id ) ) {
 				return true;
 			}
 		}
@@ -1584,11 +1594,24 @@ class CLMS_Academic_Report_Service {
 		if ( ! $viewer_id || ! $course_id ) {
 			return false;
 		}
+		$teacher_ids = get_post_meta( $course_id, '_clms_course_teacher_ids', true );
+		$teacher_ids = array_values( array_filter( array_map( 'absint', (array) $teacher_ids ) ) );
+
+		// 6.36.0: misma regla que SpeedGrader y `/teacher/*` (secciones, delegación) y, con varias
+		// instituciones, el administrador solo ve los informes de los cursos de su institución.
+		if ( class_exists( 'ATORA_Teacher_Scope' ) ) {
+			if ( ATORA_Teacher_Scope::can_access_course( $viewer_id, $course_id ) ) {
+				return true;
+			}
+			if ( in_array( $viewer_id, $teacher_ids, true ) || user_can( $viewer_id, 'clms_access_admin' ) ) {
+				return ATORA_Teacher_Scope::in_tenant( $viewer_id, $course_id );
+			}
+			return false;
+		}
+
 		if ( $viewer_id === absint( get_post_field( 'post_author', $course_id ) ) ) {
 			return true;
 		}
-		$teacher_ids = get_post_meta( $course_id, '_clms_course_teacher_ids', true );
-		$teacher_ids = array_values( array_filter( array_map( 'absint', (array) $teacher_ids ) ) );
 		if ( in_array( $viewer_id, $teacher_ids, true ) ) {
 			return true;
 		}

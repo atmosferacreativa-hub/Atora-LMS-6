@@ -415,7 +415,11 @@ class Analytics_Engine {
 
 		$score = max( 0, min( 100, $score ) );
 
-		$risk = $score >= 80 ? 'low' : ( $score >= 40 ? 'medium' : 'high' );
+		// Participación con los correos (captación/comercial). No es riesgo académico: ese lo
+		// calcula ATORA_Academic_Risk_Rule (6.36.0). La columna `risk_level` se conserva por
+		// compatibilidad y significa "riesgo de desconexión del correo".
+		$risk       = $score >= 80 ? 'low' : ( $score >= 40 ? 'medium' : 'high' );
+		$engagement = $score >= 80 ? 'high' : ( $score >= 40 ? 'medium' : 'low' );
 
 		$wpdb->replace(
 			"{$wpdb->prefix}atora_user_engagement",
@@ -432,6 +436,11 @@ class Analytics_Engine {
 			array( '%d','%d','%d','%d','%s','%d','%s','%s' )
 		);
 
+		/**
+		 * 6.36.0: participación con el correo (alta, media, baja). Úsese en lugar de
+		 * `atora/analytics/score_updated`, cuyo tercer argumento se llamaba "risk" y no es académico.
+		 */
+		do_action( 'atora/analytics/engagement_updated', $user_id, $score, $engagement );
 		do_action( 'atora/analytics/score_updated', $user_id, $score, $risk );
 
 		return $score;
