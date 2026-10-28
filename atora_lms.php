@@ -1345,6 +1345,8 @@ add_action( 'init', static function () {
 	atora_lms_require_module( 'includes/mobile/class-mobile-push-service.php', static function () { ATORA_Mobile_Push_Service::boot(); } );
 	atora_lms_require_module( 'includes/mobile/class-mobile-organize-controller.php' );
 	atora_lms_require_module( 'includes/mobile/class-mobile-teacher-controller.php' );
+	// 6.40.0: app del docente — contenido del curso.
+	atora_lms_require_module( 'includes/mobile/class-mobile-teacher-content-controller.php' );
 	atora_lms_require_module( 'includes/mobile/class-mobile-ai-controller.php' );
 	// 6.32.0: Fase 5 — IA (asistente y sugerencia de calificación, sin AJAX).
 	atora_lms_require_module( 'includes/ai/class-ai-assistant-service.php' );
@@ -1370,6 +1372,9 @@ add_action( 'init', static function () {
 		add_action( 'rest_api_init', array( 'ATORA_Mobile_Organize_Controller', 'register_routes' ) );
 		// 6.31.0: Fase 4 — docente.
 		add_action( 'rest_api_init', array( 'ATORA_Mobile_Teacher_Controller', 'register_routes' ) );
+		if ( class_exists( 'ATORA_Mobile_Teacher_Content_Controller' ) ) {
+			add_action( 'rest_api_init', array( 'ATORA_Mobile_Teacher_Content_Controller', 'register_routes' ) );
+		}
 		// 6.32.0: Fase 5 — IA.
 		add_action( 'rest_api_init', array( 'ATORA_Mobile_AI_Controller', 'register_routes' ) );
 	}

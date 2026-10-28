@@ -485,12 +485,17 @@ final class ATORA_Mobile_REST_Controller {
 		$user_id   = get_current_user_id();
 		$lesson_id = absint( $request['lesson_id'] );
 		$lesson    = \ATORA\LMS\LMS_Course_Service::get_lesson( $lesson_id );
-		if ( ! $lesson || 'published' !== (string) ( $lesson['status'] ?? '' ) ) {
+		$course_id = $lesson ? absint( $lesson['course_id'] ) : 0;
+		// 6.40.0: el docente del curso ve la lección (también oculta) en vista de estudiante, sin contar como
+		// actividad de estudiante.
+		$preview = $lesson && self::teacher_preview( $user_id, $course_id );
+		if ( ! $lesson || ( 'published' !== (string) ( $lesson['status'] ?? '' ) && ! $preview ) ) {
 			return new WP_Error( 'atora_mobile_lesson_not_found', __( 'Lección no encontrada.', 'atora-lms' ), array( 'status' => 404 ) );
 		}
-		$course_id = absint( $lesson['course_id'] );
-		$auth = self::authorize_course_id( $user_id, $course_id );
-		if ( is_wp_error( $auth ) ) { return $auth; }
+		if ( ! $preview ) {
+			$auth = self::authorize_course_id( $user_id, $course_id );
+			if ( is_wp_error( $auth ) ) { return $auth; }
+		}
 
 		$wp_post_id   = absint( $lesson['wp_post_id'] ?? 0 );
 		$raw_content  = $wp_post_id ? (string) get_post_field( 'post_content', $wp_post_id ) : '';
@@ -539,6 +544,8 @@ final class ATORA_Mobile_REST_Controller {
 				'resources'      => $resources,
 				// 6.39.0: clase en vivo (estado, hora UTC, enlace solo con la clase abierta, grabación).
 				'live'           => $wp_post_id && class_exists( 'ATORA_Live_Session_Service' ) ? ATORA_Live_Session_Service::join_info( $wp_post_id, $user_id ) : null,
+				// 6.40.0: el docente la ve en vista de estudiante (puede estar oculta).
+				'teacher_preview' => $preview,
 			),
 		), 200 );
 	}
@@ -2042,6 +2049,16 @@ final class ATORA_Mobile_REST_Controller {
 		if ( $wp_course_id && class_exists( 'CLMS_Student_Activity_Tracker' ) ) {
 			CLMS_Student_Activity_Tracker::record_app_access( $user_id, $wp_course_id );
 		}
+	}
+
+	/** 6.40.0: ¿el usuario es docente con este curso (de tabla) en su alcance? */
+	public static function teacher_preview( int $user_id, int $table_course_id ): bool {
+		if ( $user_id <= 0 || $table_course_id <= 0 || ! class_exists( 'ATORA_Teacher_Scope' ) || ! ATORA_Teacher_Scope::has_teacher_role( $user_id ) ) {
+			return false;
+		}
+		$course = \ATORA\LMS\LMS_Course_Service::get( $table_course_id );
+		$wp     = $course ? absint( $course['wp_post_id'] ?? 0 ) : 0;
+		return $wp > 0 && ATORA_Teacher_Scope::can_access_course( $user_id, $wp );
 	}
 
 	public static function authorize_course_id( int $user_id, int $course_id ) {
