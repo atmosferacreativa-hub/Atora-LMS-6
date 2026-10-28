@@ -392,6 +392,10 @@ final class ATORA_Mobile_Teacher_Content_Controller {
 				'source'           => (string) $row['source'],
 			);
 		}
+		// Orden estable (la base no garantiza uno): primero estudiantes del curso, luego invitados; por nombre.
+		usort( $items, static function ( $a, $b ) {
+			return array( $a['registered'] ? 0 : 1, strtolower( remove_accents( (string) $a['name'] ) ) ) <=> array( $b['registered'] ? 0 : 1, strtolower( remove_accents( (string) $b['name'] ) ) );
+		} );
 		return new WP_REST_Response( array( 'items' => $items, 'session_status' => $session ? (string) ( $session['status'] ?? '' ) : null ), 200 );
 	}
 
