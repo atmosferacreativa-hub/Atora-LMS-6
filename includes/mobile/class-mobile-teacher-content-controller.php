@@ -118,6 +118,10 @@ final class ATORA_Mobile_Teacher_Content_Controller {
 			'visible'             => in_array( $status, array( 'publish', 'private' ), true ),
 			'status'              => $status,
 			'due_at'              => self::due_iso( $wp_lesson ),
+			// Fecha y hora tal como las guarda el sitio (zona del sitio), para editarlas.
+			'due_date'            => self::due_iso( $wp_lesson ) ? (string) get_post_meta( $wp_lesson, '_clms_due_date', true ) : null,
+			'due_time'            => self::due_iso( $wp_lesson ) ? ( 1 === preg_match( '/^\d{2}:\d{2}$/', (string) get_post_meta( $wp_lesson, '_clms_due_time', true ) ) ? (string) get_post_meta( $wp_lesson, '_clms_due_time', true ) : '23:59' ) : null,
+			'site_timezone'       => wp_timezone_string(),
 			'pending_submissions' => self::pending_count( $wp_lesson ),
 			'in_person'           => '1' === (string) get_post_meta( $wp_lesson, '_atora_in_person', true ),
 			'live'                => $live,

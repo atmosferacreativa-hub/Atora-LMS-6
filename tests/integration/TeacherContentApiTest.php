@@ -123,6 +123,8 @@ final class TeacherContentApiTest extends WP_UnitTestCase {
 		$this->assertSame( 'tarea', $data['items'][1]['type'] );
 		$expected = ( new DateTimeImmutable( '2026-11-10 18:00', wp_timezone() ) )->getTimestamp();
 		$this->assertSame( gmdate( 'c', $expected ), $data['items'][1]['due_at'], 'Vencimiento con la zona del sitio.' );
+		$this->assertSame( array( '2026-11-10', '18:00' ), array( $data['items'][1]['due_date'], $data['items'][1]['due_time'] ), 'Para editar: fecha y hora del sitio.' );
+		$this->assertNull( $data['items'][0]['due_date'] );
 		$this->assertTrue( $data['can_manage'] );
 
 		$this->assertSame( 404, $this->call( $this->stranger, 'GET', '/teacher/courses/' . $this->course . '/lessons' )->get_status(), 'Docente sin el curso.' );
