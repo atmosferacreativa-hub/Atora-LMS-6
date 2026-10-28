@@ -22,3 +22,13 @@ Las 4 pruebas fallan con `main` y pasan con este bloque. App: pendiente (PR apar
 
 Las tablas de sesiones y asistencia se crean aunque el módulo de clases en vivo esté apagado (`migrate_6400_attendance`).
 Las 6 pruebas fallan con `main` y pasan con este bloque.
+
+## Bloque 3 — Clases en vivo del docente
+| Punto | Código | Prueba automática | Real |
+|---|---|---|---|
+| Hoy del docente: la clase en vivo trae el enlace (de anfitrión si existe) al abrir la ventana | `ATORA_Mobile_Teacher_Controller::today` | `TeacherLiveApiTest::test_today_brings_the_join_link_when_the_class_opens` | Pendiente |
+| Grabación desde la app: publicar enlace, quitar (el proveedor no la repone), inválida 400, permisos | `POST /teacher/lessons/{id}/recording` | `test_teacher_publishes_and_clears_the_recording` | Pendiente |
+| Asistencia del proveedor para el docente | `GET /teacher/lessons/{id}/live-attendance` | `test_teacher_sees_provider_attendance` | Pendiente |
+| Regresión: guardar la clase en vivo no pisa la sesión presencial de la misma lección | `Live_Session_Repository` excluye `presencial` | `test_saving_the_live_class_does_not_overwrite_in_person_attendance` | — |
+
+Las 4 pruebas fallan con `main` y pasan con este bloque.

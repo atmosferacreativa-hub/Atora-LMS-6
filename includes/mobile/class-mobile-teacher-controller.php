@@ -204,8 +204,13 @@ final class ATORA_Mobile_Teacher_Controller {
 
 		$from   = CLMS_Agenda_Service::local_ts( wp_date( 'Y-m-d' ), '00:00:00' );
 		$agenda = class_exists( 'CLMS_Agenda_Service' ) ? CLMS_Agenda_Service::for_courses( $user_id, $from, $from + DAY_IN_SECONDS - 1, $courses ) : array();
-		$agenda = array_map( static function ( $item ) {
+		$agenda = array_map( static function ( $item ) use ( $user_id ) {
 			unset( $item['done'] );
+			// 6.40.0: clase en vivo con el enlace de anfitrión cuando abre la ventana.
+			if ( 'live_class' === ( $item['type'] ?? '' ) && ! empty( $item['link']['id'] ) && class_exists( 'ATORA_Live_Session_Service' ) ) {
+				$lesson       = \ATORA\LMS\LMS_Course_Service::get_lesson( absint( $item['link']['id'] ) );
+				$item['live'] = $lesson ? ATORA_Live_Session_Service::join_info( absint( $lesson['wp_post_id'] ?? 0 ), $user_id ) : null;
+			}
 			return $item;
 		}, $agenda );
 

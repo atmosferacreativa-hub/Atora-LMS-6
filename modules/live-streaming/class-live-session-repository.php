@@ -76,7 +76,8 @@ class Live_Session_Repository {
 		}
 		if ( ! $existing_id ) {
 			$existing_id = (int) $wpdb->get_var(
-				$wpdb->prepare( "SELECT id FROM {$table} WHERE lesson_id = %d ORDER BY id DESC LIMIT 1", $lesson_id ) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				// 6.40.0: nunca la sesión presencial (asistencia del aula) de la misma lección.
+				$wpdb->prepare( "SELECT id FROM {$table} WHERE lesson_id = %d AND provider <> 'presencial' ORDER BY id DESC LIMIT 1", $lesson_id ) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			);
 		}
 
@@ -109,7 +110,7 @@ class Live_Session_Repository {
 		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE lesson_id = %d ORDER BY id DESC LIMIT 1", $lesson_id ), ARRAY_A );
+		$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE lesson_id = %d AND provider <> 'presencial' ORDER BY id DESC LIMIT 1", $lesson_id ), ARRAY_A );
 
 		return $row ?: null;
 	}
