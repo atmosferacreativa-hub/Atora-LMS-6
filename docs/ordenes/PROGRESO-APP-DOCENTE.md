@@ -8,7 +8,7 @@
 | Publicar u ocultar y cambiar la fecha de entrega con aviso opcional, idempotente | `update_lesson` | `test_publish_hide_and_change_due_date_idempotent_with_notice` | Pendiente |
 | El asistente con delegación ve pero no gestiona; fecha inválida 400 | `can_manage` | `test_assistant_and_invalid_input_are_rejected` | — |
 
-Las 4 pruebas fallan con `main` y pasan con este bloque. App: pendiente (PR aparte cuando el plugin esté en `main`).
+Las 4 pruebas fallan con `main` y pasan con este bloque. App: #40.
 
 ## Bloque 2 — Asistencia presencial
 | Punto | Código | Prueba automática | Real |
@@ -41,3 +41,9 @@ Las 4 pruebas fallan con `main` y pasan con este bloque.
 | Subir audio del teléfono: validado por contenido, reintento devuelve el mismo adjunto, disfrazado y WAV rechazados sin quedar en la biblioteca, estudiante 403, entra al plan como recurso | `POST /teacher/media` | `test_audio_upload_is_validated_and_idempotent` | Pendiente |
 
 Las 3 pruebas fallan con `main` (rutas inexistentes) y pasan con este bloque.
+
+## Cierre — 6.40.0 · app 1.3.0
+- Plugin: #122 (contenido), #123 (asistencia), #124 (clase en vivo), #125 (planificación y subida).
+- App: #40, #41, #42, #43 con sus recorridos de pantalla (`docente-contenido`, `docente-asistencia`, `docente-clase-en-vivo`, `docente-planificacion`).
+- Columna «Real»: nada recorrido en teléfono ni en aula. Filas nuevas en `atora-mobile/docs/PRUEBA-TELEFONO.md`.
+- Pendiente aparte (CI de la app): `leccion`, `docente-calificar` y `docente-sugerencia-ia` fallaron de forma intermitente en algunas corridas completas y pasaron en otras con el mismo código; se agregó un diagnóstico (texto de las capturas de fallo) para encontrar la causa.

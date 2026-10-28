@@ -7,7 +7,7 @@ Qué está comprobado y dónde. Se actualiza en cada versión del plugin o de la
 - **Integración**: PHPUnit con WordPress (`tests/integration`).
 - **Unitaria**: PHPUnit sin WordPress o Jest en la app.
 
-Última actualización: **plugin 6.39.0 · app 1.1.0** (app 1.2.0 en preparación).
+Última actualización: **plugin 6.40.0 · app 1.2.0** (app 1.3.0 en preparación).
 
 > No hay registro escrito de qué se recorrió en teléfono antes de esta tabla: la columna "Teléfono" queda "por confirmar" hasta la prueba al cierre de la Fase 4, que incluye la lista acumulada de las fases 0 a 3.
 
@@ -109,6 +109,10 @@ Qué está comprobado y dónde. Se actualiza en cada versión del plugin o de la
 | Boletín por lotes, suscriptores como contactos, doble opt-in, segmentos en BD, métricas | 6.39.0 | `NewsletterSendTest` | Prueba de 10.000 contactos en CI; sin envío real. |
 | Automatización: disparadores unificados, flujos con versiones, protecciones, editor | 6.39.0 | `AutomationFlowsTest`, `AutomationEditorViewTest` | Editor revisado en Chromium (también 375 px) con `scripts/flow-editor-browser-check.cjs`. |
 | Clases en vivo (Zoom, Meet, Teams): una reunión por clase, hora UTC, ventana del enlace, recordatorios, grabación a elección del docente, asistencia | 6.39.0 | `LiveClassesTest` | Todo con HTTP simulado; sin cuentas reales de Zoom, Google ni Microsoft 365. App: 1.2.0. |
+| App del docente: lecciones del curso con vista de estudiante, publicar u ocultar, fechas de entrega con aviso | 6.40.0 | `TeacherContentApiTest` | App 1.3.0 (`docente-contenido`). Sin validación en teléfono real. |
+| Asistencia presencial (app y web), la marca más reciente gana, racha de ausencias | 6.40.0 | `AttendanceTest` | App 1.3.0 (`docente-asistencia`). Sin validación en aula real. |
+| Clase en vivo para el docente: enlace en Hoy, grabación y asistencia del proveedor | 6.40.0 | `TeacherLiveApiTest` | Proveedor `custom` en las pruebas; sin cuentas reales. |
+| Planificación híbrida y subida de audio desde la app | 6.40.0 | `TeacherPlanApiTest` | App 1.3.0 (`docente-planificacion`; la subida desde el selector del sistema no se recorre en pantalla). |
 | Riesgo académico único (regla canónica, motivos con código), actividad desde la app, informes con alcance docente e institucional | 6.36.0 | `AcademicRiskRuleTest`, `AcademicRiskConsistencyTest`, `AcademicReportScopeTest` | Cambian niveles respecto a versiones anteriores (ver "Datos históricos"). Sin validación con estudiantes reales. |
 | CRM v2 completo (retiro de v1) | 6.34.0 | `tests/CRM/*`, `tests/integration/*` | CRM v1 retirado; CRM v2: import/export CSV, deduplicación, auditoría, aislamiento por institución. |
 
