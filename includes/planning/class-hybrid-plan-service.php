@@ -160,7 +160,11 @@ final class ATORA_Hybrid_Plan_Service {
 				'content'   => $objective
 					. ( $info ? self::paragraph( implode( ' · ', $info ) ) : '' )
 					. ( '' !== $data['in_person']['activities'] ? self::section( self::t( 'Qué haremos en el aula' ), $data['in_person']['activities'] ) : '' ),
-				'meta'      => array(),
+				// 6.40.0: marca de encuentro presencial (la app ofrece tomar lista en esta lección y ese día).
+				'meta'      => array_filter( array(
+					'_atora_in_person'      => '1',
+					'_atora_in_person_date' => 1 === preg_match( '/^\d{4}-\d{2}-\d{2}$/', (string) $data['in_person']['date'] ) ? (string) $data['in_person']['date'] : '',
+				) ),
 				'resources' => array(),
 			);
 		}

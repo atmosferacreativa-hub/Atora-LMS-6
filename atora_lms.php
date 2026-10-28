@@ -1346,6 +1346,9 @@ add_action( 'init', static function () {
 	atora_lms_require_module( 'includes/mobile/class-mobile-organize-controller.php' );
 	atora_lms_require_module( 'includes/mobile/class-mobile-teacher-controller.php' );
 	// 6.40.0: app del docente — contenido del curso.
+	// 6.40.0: asistencia presencial.
+	atora_lms_require_module( 'includes/attendance/class-attendance-service.php' );
+	atora_lms_require_module( 'includes/attendance/class-attendance-admin.php', static function () { ATORA_Attendance_Admin::boot(); } );
 	atora_lms_require_module( 'includes/mobile/class-mobile-teacher-content-controller.php' );
 	atora_lms_require_module( 'includes/mobile/class-mobile-ai-controller.php' );
 	// 6.32.0: Fase 5 — IA (asistente y sugerencia de calificación, sin AJAX).
