@@ -455,7 +455,7 @@ final class Automation_Flows {
 				continue;
 			}
 			if ( self::over_daily_limit( $user_id, $contact ) ) {
-				self::park( $run_id, $step_id, strtotime( 'tomorrow' ) + 300, (int) $run->attempts, $context, 'daily_limit' );
+				self::park( $run_id, $step_id, self::next_utc_day( time() ) + 300, (int) $run->attempts, $context, 'daily_limit' );
 				return true;
 			}
 			$action                     = (array) ( $step['action'] ?? array() );
@@ -567,6 +567,14 @@ final class Automation_Flows {
 		}
 		$wpdb->query( $wpdb->prepare( 'DELETE FROM ' . self::t( 'atora_automation_run_steps' ) . " WHERE run_id = %d AND step_id = %s AND status = 'failed'", $run_id, $step ) ); // phpcs:ignore WordPress.DB
 		return (bool) $wpdb->update( self::t( 'atora_automation_runs' ), array( 'status' => 'waiting', 'attempts' => 0, 'wake_at' => current_time( 'mysql', true ), 'exit_reason' => '', 'finished_at' => null ), array( 'id' => $run_id ) );
+	}
+
+	/**
+	 * Inicio del día UTC siguiente. El límite diario cuenta por día UTC (`over_daily_limit`); `strtotime( 'tomorrow' )`
+	 * dependía de la zona horaria de PHP y cerca de la medianoche UTC podía devolver una hora ya pasada.
+	 */
+	public static function next_utc_day( int $now ): int {
+		return (int) gmmktime( 0, 0, 0, (int) gmdate( 'n', $now ), (int) gmdate( 'j', $now ) + 1, (int) gmdate( 'Y', $now ) );
 	}
 
 	private static function over_daily_limit( int $user_id, int $contact_id ): bool {

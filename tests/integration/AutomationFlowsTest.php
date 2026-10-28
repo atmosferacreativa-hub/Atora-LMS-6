@@ -280,7 +280,20 @@ final class AutomationFlowsTest extends WP_UnitTestCase {
 		$run = $this->flow_run( $flow, $user );
 		$this->assertSame( array( 't1', 't2' ), $this->tags( $user ) );
 		$this->assertSame( array( 'waiting', 'c', 'daily_limit' ), array( $run->status, $run->current_step, $run->exit_reason ) );
-		$this->assertGreaterThan( time() + 3600, strtotime( $run->wake_at . ' UTC' ), 'Sigue mañana, no se pierde.' );
+		$this->assertSame( Flows::next_utc_day( time() ) + 300, strtotime( $run->wake_at . ' UTC' ), 'Sigue mañana (día UTC, como el contador), no se pierde.' );
+	}
+
+	public function test_next_utc_day_is_always_the_following_utc_midnight(): void {
+		// Cerca de la medianoche UTC y con PHP en otra zona: siempre el día UTC siguiente, nunca una hora pasada.
+		$previous = date_default_timezone_get();
+		date_default_timezone_set( 'America/Caracas' );
+		try {
+			$this->assertSame( gmmktime( 0, 0, 0, 10, 30, 2026 ), Flows::next_utc_day( gmmktime( 0, 39, 39, 10, 29, 2026 ) ) );
+			$this->assertSame( gmmktime( 0, 0, 0, 10, 29, 2026 ), Flows::next_utc_day( gmmktime( 23, 59, 59, 10, 28, 2026 ) ) );
+			$this->assertSame( gmmktime( 0, 0, 0, 1, 1, 2027 ), Flows::next_utc_day( gmmktime( 12, 0, 0, 12, 31, 2026 ) ) );
+		} finally {
+			date_default_timezone_set( $previous );
+		}
 	}
 
 	public function test_goal_exits_the_flow(): void {
