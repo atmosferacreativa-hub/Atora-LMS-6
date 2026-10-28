@@ -1350,6 +1350,7 @@ add_action( 'init', static function () {
 	atora_lms_require_module( 'includes/attendance/class-attendance-service.php' );
 	atora_lms_require_module( 'includes/attendance/class-attendance-admin.php', static function () { ATORA_Attendance_Admin::boot(); } );
 	atora_lms_require_module( 'includes/mobile/class-mobile-teacher-content-controller.php' );
+	atora_lms_require_module( 'includes/mobile/class-mobile-teacher-plan-controller.php' );
 	atora_lms_require_module( 'includes/mobile/class-mobile-ai-controller.php' );
 	// 6.32.0: Fase 5 — IA (asistente y sugerencia de calificación, sin AJAX).
 	atora_lms_require_module( 'includes/ai/class-ai-assistant-service.php' );
@@ -1377,6 +1378,9 @@ add_action( 'init', static function () {
 		add_action( 'rest_api_init', array( 'ATORA_Mobile_Teacher_Controller', 'register_routes' ) );
 		if ( class_exists( 'ATORA_Mobile_Teacher_Content_Controller' ) ) {
 			add_action( 'rest_api_init', array( 'ATORA_Mobile_Teacher_Content_Controller', 'register_routes' ) );
+		}
+		if ( class_exists( 'ATORA_Mobile_Teacher_Plan_Controller' ) ) {
+			add_action( 'rest_api_init', array( 'ATORA_Mobile_Teacher_Plan_Controller', 'register_routes' ) );
 		}
 		// 6.32.0: Fase 5 — IA.
 		add_action( 'rest_api_init', array( 'ATORA_Mobile_AI_Controller', 'register_routes' ) );
