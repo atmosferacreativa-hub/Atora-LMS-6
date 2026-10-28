@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class V5_Installer {
 
 	/** Versión del esquema. Incrementar para forzar re-instalación. */
-	const SCHEMA_VERSION = '6.38.0-automation-flows';
+	const SCHEMA_VERSION = '6.40.0-attendance';
 
 	/** Option key que almacena la versión instalada. */
 	const OPTION_KEY = 'atora_v5_schema_version';
@@ -56,7 +56,8 @@ class V5_Installer {
 			&& self::migrate_6265_content_revisions()
 			&& self::migrate_6280_lesson_content_hash()
 			&& self::migrate_6282_video_positions()
-			&& self::migrate_6131_schema_fixes() ) {
+			&& self::migrate_6131_schema_fixes()
+			&& self::migrate_6400_attendance() ) {
 			update_option( self::OPTION_KEY, self::SCHEMA_VERSION );
 		}
 	}
@@ -85,9 +86,81 @@ class V5_Installer {
 			&& self::migrate_6265_content_revisions()
 			&& self::migrate_6280_lesson_content_hash()
 			&& self::migrate_6282_video_positions()
-			&& self::migrate_6131_schema_fixes() ) {
+			&& self::migrate_6131_schema_fixes()
+			&& self::migrate_6400_attendance() ) {
 			update_option( self::OPTION_KEY, self::SCHEMA_VERSION );
 		}
+	}
+
+	/**
+	 * 6.40.0: asistencia presencial. Las tablas de sesiones y asistencia existen aunque el módulo de clases en vivo
+	 * esté apagado (la asistencia del aula no depende de Zoom), y la asistencia guarda nota, cuándo se tomó en el
+	 * teléfono (la última toma gana) y cuándo se actualizó. dbDelta no altera tablas con `IF NOT EXISTS`: se agregan
+	 * las columnas a mano.
+	 *
+	 * @return bool
+	 */
+	private static function migrate_6400_attendance(): bool {
+		global $wpdb;
+		$charset  = $wpdb->get_charset_collate();
+		$sessions = $wpdb->prefix . 'atora_live_sessions';
+		$table    = $wpdb->prefix . 'atora_attendance';
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$wpdb->query( "CREATE TABLE IF NOT EXISTS {$sessions} (
+			id                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			lesson_id           BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			course_id           BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			provider            VARCHAR(20)     NOT NULL DEFAULT 'zoom',
+			external_id         VARCHAR(120)    NULL     DEFAULT NULL,
+			join_url            VARCHAR(500)    NOT NULL DEFAULT '',
+			start_datetime      DATETIME                 DEFAULT NULL,
+			duration_minutes    INT UNSIGNED    NOT NULL DEFAULT 60,
+			timezone            VARCHAR(60)     NOT NULL DEFAULT 'UTC',
+			recording_url       VARCHAR(500)    NOT NULL DEFAULT '',
+			status              VARCHAR(20)     NOT NULL DEFAULT 'scheduled',
+			created_by_user_id  BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			created_at          DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			KEY lesson_id (lesson_id),
+			KEY course_id (course_id),
+			KEY start_datetime (start_datetime),
+			UNIQUE KEY provider_external (provider, external_id)
+		) {$charset}" );
+		$wpdb->query( "CREATE TABLE IF NOT EXISTS {$table} (
+			id                       BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			user_id                  BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			session_id               BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			external_participant_id  VARCHAR(160)    NOT NULL DEFAULT '',
+			display_name             VARCHAR(200)    NOT NULL DEFAULT '',
+			course_id                BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			source                   VARCHAR(20)     NOT NULL DEFAULT 'manual',
+			joined_at                DATETIME                 DEFAULT NULL,
+			left_at                  DATETIME                 DEFAULT NULL,
+			duration_seconds         INT UNSIGNED    NOT NULL DEFAULT 0,
+			status                   VARCHAR(20)     NOT NULL DEFAULT 'ausente',
+			recorded_by              BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			created_at               DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			KEY course_user (course_id, user_id),
+			UNIQUE KEY session_participant (session_id, user_id, external_participant_id)
+		) {$charset}" );
+		$columns = array(
+			'note'       => "ALTER TABLE {$table} ADD COLUMN note VARCHAR(255) NOT NULL DEFAULT '' AFTER status",
+			'marked_at'  => "ALTER TABLE {$table} ADD COLUMN marked_at DATETIME NULL DEFAULT NULL AFTER recorded_by",
+			'updated_at' => "ALTER TABLE {$table} ADD COLUMN updated_at DATETIME NULL DEFAULT NULL AFTER created_at",
+		);
+		foreach ( $columns as $column => $ddl ) {
+			$exists = (int) $wpdb->get_var( $wpdb->prepare(
+				'SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND COLUMN_NAME = %s',
+				$table,
+				$column
+			) );
+			if ( ! $exists ) {
+				$wpdb->query( $ddl );
+			}
+		}
+		// phpcs:enable
+		return '' === $wpdb->last_error;
 	}
 
 	/**

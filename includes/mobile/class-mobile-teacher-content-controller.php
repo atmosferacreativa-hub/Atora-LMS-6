@@ -31,6 +31,11 @@ final class ATORA_Mobile_Teacher_Content_Controller {
 			'callback'            => array( __CLASS__, 'lessons' ),
 			'permission_callback' => $auth,
 		) );
+		// 6.40.0: asistencia presencial.
+		register_rest_route( $ns, '/teacher/courses/(?P<course_id>\d+)/attendance', array(
+			array( 'methods' => 'GET', 'callback' => array( __CLASS__, 'attendance' ), 'permission_callback' => $auth ),
+			array( 'methods' => 'POST', 'callback' => array( __CLASS__, 'record_attendance' ), 'permission_callback' => $auth ),
+		) );
 		register_rest_route( $ns, '/teacher/lessons/(?P<lesson_id>\d+)', array(
 			'methods'             => 'POST',
 			'callback'            => array( __CLASS__, 'update_lesson' ),
@@ -230,6 +235,95 @@ final class ATORA_Mobile_Teacher_Content_Controller {
 		update_post_meta( $wp, $done_key, array( 'at' => gmdate( 'c' ), 'changes' => $changes ) );
 		clean_post_cache( $wp );
 		return new WP_REST_Response( array( 'lesson' => self::lesson_row( $user_id, $wp ), 'replayed' => false ), 200 );
+	}
+
+	// ── Asistencia presencial ──────────────────────────────────────────────
+
+	private static function wp_lesson_for( int $table_lesson, int $wp_course ): int {
+		if ( $table_lesson <= 0 ) {
+			return 0;
+		}
+		$lesson = \ATORA\LMS\LMS_Course_Service::get_lesson( $table_lesson );
+		$wp     = $lesson ? absint( $lesson['wp_post_id'] ?? 0 ) : 0;
+		return $wp && absint( get_post_meta( $wp, '_clms_course_id', true ) ) === $wp_course ? $wp : -1;
+	}
+
+	private static function attendance_out( array $roster, int $table_course ): array {
+		$session              = $roster['session'];
+		$session['course_id'] = $table_course;
+		$session['lesson_id'] = $session['lesson_id'] ? self::table_lesson( (int) $session['lesson_id'] ) : 0;
+		return array( 'session' => $session, 'students' => $roster['students'] );
+	}
+
+	private static function table_lesson( int $wp_lesson ): int {
+		$row = \ATORA\LMS\LMS_Course_Service::get_lesson_by_wp_post( $wp_lesson );
+		return $row ? (int) $row['id'] : 0;
+	}
+
+	/** GET /teacher/courses/{id}/attendance?date=&lesson= — lista del día, lecciones presenciales y sesiones recientes. */
+	public static function attendance( WP_REST_Request $request ) {
+		$user_id = get_current_user_id();
+		$table   = absint( $request['course_id'] );
+		$wp      = $table > 0 && class_exists( 'ATORA_Attendance_Service' ) ? self::course_for_teacher( $user_id, $table ) : 0;
+		if ( ! $wp ) {
+			return self::not_found();
+		}
+		$date   = (string) ( $request->get_param( 'date' ) ?: wp_date( 'Y-m-d' ) );
+		$lesson = self::wp_lesson_for( absint( $request->get_param( 'lesson' ) ), $wp );
+		if ( $lesson < 0 ) {
+			return self::not_found();
+		}
+		$roster = ATORA_Attendance_Service::roster_for( $user_id, $wp, $lesson, $date );
+		if ( is_wp_error( $roster ) ) {
+			return $roster;
+		}
+		$in_person = array();
+		foreach ( ATORA_Attendance_Service::in_person_lessons( $wp ) as $wp_lesson ) {
+			$in_person[] = array(
+				'id'    => self::table_lesson( $wp_lesson ),
+				'title' => sanitize_text_field( (string) get_the_title( $wp_lesson ) ),
+				'date'  => (string) get_post_meta( $wp_lesson, '_atora_in_person_date', true ) ?: null,
+			);
+		}
+		$recent = array_map( function ( array $session ) use ( $table ): array {
+			$session['course_id'] = $table;
+			$session['lesson_id'] = $session['lesson_id'] ? self::table_lesson( (int) $session['lesson_id'] ) : 0;
+			return $session;
+		}, ATORA_Attendance_Service::recent_sessions( $wp ) );
+		return new WP_REST_Response( self::attendance_out( $roster, $table ) + array(
+			'today'             => wp_date( 'Y-m-d' ),
+			'site_timezone'     => wp_timezone_string(),
+			'in_person_lessons' => $in_person,
+			'recent'            => $recent,
+		), 200 );
+	}
+
+	/** POST /teacher/courses/{id}/attendance — abre la sesión del día si hace falta y guarda las marcas. */
+	public static function record_attendance( WP_REST_Request $request ) {
+		$user_id = get_current_user_id();
+		$params  = (array) $request->get_json_params();
+		$table   = absint( $request['course_id'] );
+		$wp      = $table > 0 && class_exists( 'ATORA_Attendance_Service' ) ? self::course_for_teacher( $user_id, $table ) : 0;
+		if ( ! $wp ) {
+			return self::not_found();
+		}
+		$lesson = self::wp_lesson_for( absint( $params['lesson_id'] ?? 0 ), $wp );
+		if ( $lesson < 0 ) {
+			return self::not_found();
+		}
+		$marks = is_array( $params['marks'] ?? null ) ? $params['marks'] : array();
+		if ( ! $marks ) {
+			return new WP_Error( 'atora_attendance_empty', __( 'No hay marcas para guardar.', 'atora-lms' ), array( 'status' => 400 ) );
+		}
+		$result = ATORA_Attendance_Service::record_for( $user_id, $wp, $lesson, (string) ( $params['date'] ?? '' ), $marks );
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+		$roster = ATORA_Attendance_Service::roster( $user_id, (int) $result['session']['id'] );
+		return new WP_REST_Response( array(
+			'applied' => $result['applied'],
+			'ignored' => $result['ignored'],
+		) + ( is_wp_error( $roster ) ? array() : self::attendance_out( $roster, $table ) ), 200 );
 	}
 
 	private static function notify_due_change( int $user_id, int $wp_course, int $wp_lesson, string $event ): void {

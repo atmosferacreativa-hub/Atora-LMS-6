@@ -372,6 +372,8 @@ final class ATORA_Mobile_Teacher_Controller {
 			'submissions' => $submissions,
 			'alerts'      => $alerts,
 			'pending'     => absint( $status['pending_activities'] ?? 0 ),
+			// 6.40.0: asistencia (aula y clases en vivo).
+			'attendance'  => class_exists( 'ATORA_Attendance_Service' ) ? ATORA_Attendance_Service::summary( $student_id, $wp ) : null,
 		), 200 );
 	}
 
