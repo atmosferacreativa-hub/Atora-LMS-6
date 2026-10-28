@@ -36,6 +36,17 @@ final class ATORA_Mobile_Teacher_Content_Controller {
 			array( 'methods' => 'GET', 'callback' => array( __CLASS__, 'attendance' ), 'permission_callback' => $auth ),
 			array( 'methods' => 'POST', 'callback' => array( __CLASS__, 'record_attendance' ), 'permission_callback' => $auth ),
 		) );
+		// 6.40.0: clase en vivo del docente — grabación y asistencia del proveedor.
+		register_rest_route( $ns, '/teacher/lessons/(?P<lesson_id>\d+)/recording', array(
+			'methods'             => 'POST',
+			'callback'            => array( __CLASS__, 'recording' ),
+			'permission_callback' => $auth,
+		) );
+		register_rest_route( $ns, '/teacher/lessons/(?P<lesson_id>\d+)/live-attendance', array(
+			'methods'             => 'GET',
+			'callback'            => array( __CLASS__, 'live_attendance' ),
+			'permission_callback' => $auth,
+		) );
 		register_rest_route( $ns, '/teacher/lessons/(?P<lesson_id>\d+)', array(
 			'methods'             => 'POST',
 			'callback'            => array( __CLASS__, 'update_lesson' ),
@@ -324,6 +335,64 @@ final class ATORA_Mobile_Teacher_Content_Controller {
 			'applied' => $result['applied'],
 			'ignored' => $result['ignored'],
 		) + ( is_wp_error( $roster ) ? array() : self::attendance_out( $roster, $table ) ), 200 );
+	}
+
+	// ── Clase en vivo del docente ──────────────────────────────────────────
+
+	/** Lección de tabla → post, con el curso en el alcance del docente. @return array{0:int,1:int} [wp_lesson, wp_course] */
+	private static function teacher_lesson( int $user_id, int $table_lesson ): array {
+		$lesson = \ATORA\LMS\LMS_Course_Service::get_lesson( $table_lesson );
+		$wp     = $lesson ? absint( $lesson['wp_post_id'] ?? 0 ) : 0;
+		$course = $wp ? absint( get_post_meta( $wp, '_clms_course_id', true ) ) : 0;
+		return $wp && $course && ATORA_Teacher_Scope::can_access_course( $user_id, $course ) ? array( $wp, $course ) : array( 0, 0 );
+	}
+
+	/**
+	 * POST /teacher/lessons/{id}/recording — `{url}` publica un enlace; `{clear:true}` la quita (y el proveedor ya no
+	 * la vuelve a poner). Mismas reglas que la web: solo quien gestiona la lección.
+	 */
+	public static function recording( WP_REST_Request $request ) {
+		$user_id = get_current_user_id();
+		list( $wp, $course ) = self::teacher_lesson( $user_id, absint( $request['lesson_id'] ) );
+		if ( ! $wp || ! class_exists( 'ATORA_Live_Session_Service' ) || ! ATORA_Live_Session_Service::get( $wp ) ) {
+			return self::not_found();
+		}
+		if ( ! ATORA_Live_Session_Service::can_manage( $user_id, $wp ) || ! self::can_manage( $user_id, $course ) ) {
+			return new WP_Error( 'atora_mobile_teacher_forbidden', __( 'Tu rol no permite cambiar la grabación.', 'atora-lms' ), array( 'status' => 403 ) );
+		}
+		$params = (array) $request->get_json_params();
+		if ( ! empty( $params['clear'] ) ) {
+			ATORA_Live_Session_Service::clear_recording( $wp );
+		} else {
+			$result = ATORA_Live_Session_Service::set_recording( $wp, array( 'url' => (string) ( $params['url'] ?? '' ), 'note' => (string) ( $params['note'] ?? '' ) ), $user_id );
+			if ( is_wp_error( $result ) ) {
+				$result->add_data( array( 'status' => 400 ) );
+				return $result;
+			}
+		}
+		return new WP_REST_Response( array( 'lesson' => self::lesson_row( $user_id, $wp ) ), 200 );
+	}
+
+	/** GET /teacher/lessons/{id}/live-attendance — quiénes entraron a la clase en vivo según el proveedor. */
+	public static function live_attendance( WP_REST_Request $request ) {
+		$user_id = get_current_user_id();
+		list( $wp ) = self::teacher_lesson( $user_id, absint( $request['lesson_id'] ) );
+		$session    = $wp && class_exists( '\ATORA\LiveStreaming\Live_Session_Repository' ) ? \ATORA\LiveStreaming\Live_Session_Repository::get_by_lesson( $wp ) : null;
+		if ( ! $wp ) {
+			return self::not_found();
+		}
+		$items = array();
+		foreach ( $session ? \ATORA\LiveStreaming\Live_Session_Repository::get_attendance_for_session( (int) $session['id'] ) : array() as $row ) {
+			$user    = (int) $row['user_id'] ? get_userdata( (int) $row['user_id'] ) : false;
+			$items[] = array(
+				'name'             => $user ? (string) ( $user->display_name ?: $user->user_login ) : (string) $row['display_name'],
+				'registered'       => (bool) $user,
+				'status'           => (string) $row['status'],
+				'duration_minutes' => (int) round( (int) $row['duration_seconds'] / 60 ),
+				'source'           => (string) $row['source'],
+			);
+		}
+		return new WP_REST_Response( array( 'items' => $items, 'session_status' => $session ? (string) ( $session['status'] ?? '' ) : null ), 200 );
 	}
 
 	private static function notify_due_change( int $user_id, int $wp_course, int $wp_lesson, string $event ): void {
