@@ -32,3 +32,12 @@ Las 6 pruebas fallan con `main` y pasan con este bloque.
 | Regresión: guardar la clase en vivo no pisa la sesión presencial de la misma lección | `Live_Session_Repository` excluye `presencial` | `test_saving_the_live_class_does_not_overwrite_in_person_attendance` | — |
 
 Las 4 pruebas fallan con `main` y pasan con este bloque.
+
+## Bloque 4 — Planificación híbrida nativa
+| Punto | Código | Prueba automática | Real |
+|---|---|---|---|
+| Crear (reintento no duplica), guardar con revisión (409), retomar, lista, vista previa, publicar; republicar no duplica lecciones | `ATORA_Mobile_Teacher_Plan_Controller` sobre `ATORA_Hybrid_Plan_Service` | `TeacherPlanApiTest::test_teacher_creates_saves_resumes_previews_and_publishes_once` | Pendiente |
+| El asistente prepara pero no publica (403); otro docente 404; estudiante 403; el docente publica lo preparado | mismas reglas de la web | `test_assistant_prepares_but_cannot_publish_and_stranger_is_blocked` | — |
+| Subir audio del teléfono: validado por contenido, reintento devuelve el mismo adjunto, disfrazado y WAV rechazados sin quedar en la biblioteca, estudiante 403, entra al plan como recurso | `POST /teacher/media` | `test_audio_upload_is_validated_and_idempotent` | Pendiente |
+
+Las 3 pruebas fallan con `main` (rutas inexistentes) y pasan con este bloque.
