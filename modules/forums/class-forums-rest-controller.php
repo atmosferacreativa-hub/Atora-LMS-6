@@ -28,11 +28,19 @@ final class Forums_REST_Controller {
 			'callback'            => array( __CLASS__, 'forums' ),
 			'permission_callback' => $auth,
 		) );
+		// GET y POST en un solo registro: registrar dos veces con override=true reemplazaba el GET.
 		register_rest_route( $ns, '/forums/(?P<forum_id>\d+)/topics', array(
-			'methods'             => WP_REST_Server::READABLE,
-			'callback'            => array( __CLASS__, 'topics' ),
-			'permission_callback' => $auth,
-			'args'                => array( 'forum_id' => array( 'sanitize_callback' => 'absint' ) ),
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => array( __CLASS__, 'topics' ),
+				'permission_callback' => $auth,
+				'args'                => array( 'forum_id' => array( 'sanitize_callback' => 'absint' ) ),
+			),
+			array(
+				'methods'             => WP_REST_Server::CREATABLE,
+				'callback'            => array( __CLASS__, 'create_topic' ),
+				'permission_callback' => $auth,
+			),
 		) );
 		register_rest_route( $ns, '/forums/(?P<forum_id>\d+)/similar', array(
 			'methods'             => WP_REST_Server::READABLE,
@@ -40,18 +48,18 @@ final class Forums_REST_Controller {
 			'permission_callback' => $auth,
 			'args'                => array( 'forum_id' => array( 'sanitize_callback' => 'absint' ) ),
 		) );
-		register_rest_route( $ns, '/forums/(?P<forum_id>\d+)/topics', array(
+		register_rest_route( $ns, '/forums/topics/(?P<topic_id>\d+)', array(
 			array(
-				'methods'             => WP_REST_Server::CREATABLE,
-				'callback'            => array( __CLASS__, 'create_topic' ),
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => array( __CLASS__, 'topic_detail' ),
+				'permission_callback' => $auth,
+				'args'                => array( 'topic_id' => array( 'sanitize_callback' => 'absint' ) ),
+			),
+			array(
+				'methods'             => 'PATCH',
+				'callback'            => array( __CLASS__, 'edit_topic' ),
 				'permission_callback' => $auth,
 			),
-		), true );
-		register_rest_route( $ns, '/forums/topics/(?P<topic_id>\d+)', array(
-			'methods'             => WP_REST_Server::READABLE,
-			'callback'            => array( __CLASS__, 'topic_detail' ),
-			'permission_callback' => $auth,
-			'args'                => array( 'topic_id' => array( 'sanitize_callback' => 'absint' ) ),
 		) );
 		register_rest_route( $ns, '/forums/topics/(?P<topic_id>\d+)/replies', array(
 			'methods'             => WP_REST_Server::CREATABLE,
@@ -59,13 +67,6 @@ final class Forums_REST_Controller {
 			'permission_callback' => $auth,
 			'args'                => array( 'topic_id' => array( 'sanitize_callback' => 'absint' ) ),
 		) );
-		register_rest_route( $ns, '/forums/topics/(?P<topic_id>\d+)', array(
-			array(
-				'methods'             => 'PATCH',
-				'callback'            => array( __CLASS__, 'edit_topic' ),
-				'permission_callback' => $auth,
-			),
-		), true );
 		register_rest_route( $ns, '/forums/replies/(?P<reply_id>\d+)', array(
 			array(
 				'methods'             => 'PATCH',
