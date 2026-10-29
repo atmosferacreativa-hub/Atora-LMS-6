@@ -247,13 +247,12 @@ final class ATORA_Periods_Service {
 			return array( 'active' => array(), 'past' => array() );
 		}
 
+		// Institución activa del estudiante. Sin membresía (un WordPress por institución) o con varias sin elegir, no se
+		// filtra por institución: la matrícula sigue siendo la que da acceso, como antes de los períodos.
 		$institution_id = 0;
 		if ( class_exists( Tenant_Context::class ) ) {
 			$inst = Tenant_Context::resolve_institution_for_user( $user_id );
 			$institution_id = is_wp_error( $inst ) ? 0 : absint( $inst );
-		}
-		if ( $institution_id <= 0 ) {
-			return array( 'active' => array(), 'past' => array() );
 		}
 
 		$course_ids = array();
@@ -268,7 +267,7 @@ final class ATORA_Periods_Service {
 		}
 
 		// Filtra por institución del usuario.
-		if ( class_exists( 'ATORA_Teacher_Scope' ) && method_exists( 'ATORA_Teacher_Scope', 'course_institution' ) ) {
+		if ( $institution_id > 0 && class_exists( 'ATORA_Teacher_Scope' ) && method_exists( 'ATORA_Teacher_Scope', 'course_institution' ) ) {
 			$course_ids = array_values( array_filter( $course_ids, static function ( int $wp_course_id ) use ( $institution_id ): bool {
 				$inst = absint( ATORA_Teacher_Scope::course_institution( $wp_course_id ) );
 				return $inst <= 0 || $inst === $institution_id;
@@ -314,7 +313,7 @@ final class ATORA_Periods_Service {
 				$active[] = $payload;
 				continue;
 			}
-			if ( absint( $period['institution_id'] ?? 0 ) !== $institution_id ) {
+			if ( $institution_id > 0 && absint( $period['institution_id'] ?? 0 ) !== $institution_id ) {
 				continue;
 			}
 			if ( ! self::period_is_visible_to_students( $period ) ) {
@@ -383,7 +382,8 @@ final class ATORA_Periods_Service {
 			if ( '' === $until ) {
 				return false;
 			}
-			$today = (string) current_time( 'Y-m-d', true );
+			// Fecha de la academia (zona horaria del sitio): «visible hasta el 15» incluye todo el 15 en hora local.
+			$today = (string) current_time( 'Y-m-d' );
 			return $today <= $until;
 		}
 		return true;

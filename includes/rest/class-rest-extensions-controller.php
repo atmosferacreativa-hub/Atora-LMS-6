@@ -777,7 +777,16 @@ class CLMS_REST_Extensions_Controller {
 		$user_id = get_current_user_id();
 		if ( class_exists( 'ATORA_Periods_Service' ) ) {
 			$data = ATORA_Periods_Service::grouped_courses_for_user( $user_id );
+			// `courses` y `total` se mantienen (clientes anteriores a los períodos): activos y pasados visibles, sin los ocultos.
+			$flat = $data['active'];
+			foreach ( (array) $data['past'] as $group ) {
+				foreach ( (array) ( $group['courses'] ?? array() ) as $course ) {
+					$flat[] = $course;
+				}
+			}
 			return rest_ensure_response( array(
+				'courses' => $flat,
+				'total'   => count( $flat ),
 				'active' => $data['active'],
 				'past'   => array_map( static function ( array $group ): array {
 					$period = (array) ( $group['period'] ?? array() );
@@ -797,7 +806,7 @@ class CLMS_REST_Extensions_Controller {
 			) );
 		}
 
-		return rest_ensure_response( array( 'active' => array(), 'past' => array() ) );
+		return rest_ensure_response( array( 'courses' => array(), 'total' => 0, 'active' => array(), 'past' => array() ) );
 	}
 
 	public function get_my_programs( WP_REST_Request $request ) {

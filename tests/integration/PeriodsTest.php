@@ -7,6 +7,8 @@ declare( strict_types = 1 );
 
 use ATORA\LMS\Tenant_Context;
 
+require_once __DIR__ . '/LmsRowsCleanup.php';
+
 final class PeriodsTest extends WP_UnitTestCase {
 	use LmsRowsCleanup;
 
@@ -89,6 +91,9 @@ final class PeriodsTest extends WP_UnitTestCase {
 		$this->cleanup_lms_rows( array( $this->wp_course_a1, $this->wp_course_a2, $this->wp_course_b1 ), array( $this->student_a, $this->student_b ) );
 		$this->remove_institutions();
 		update_option( 'atora_default_institution', $this->previous_default, false );
+		update_option( 'timezone_string', '' );
+		Tenant_Context::reset_cache();
+		ATORA_Teacher_Scope::reset_cache();
 		parent::tearDown();
 	}
 
@@ -167,7 +172,7 @@ final class PeriodsTest extends WP_UnitTestCase {
 		$this->assertIsArray( ATORA_Periods_Service::close_period( $this->admin_a, $pid_new, 'visible' ) );
 
 		$data = $this->rest_me_courses( $this->student_a );
-		$this->assertNotEmpty( $data['active'] );
+		$this->assertSame( array(), $data['active'], 'Los dos cursos están en períodos cerrados.' );
 		$this->assertNotEmpty( $data['past'] );
 		$this->assertSame( $pid_new, (int) ( $data['past'][0]['period']['id'] ?? 0 ) );
 		$this->assertSame( 'Periodo nuevo', (string) ( $data['past'][0]['period']['name'] ?? '' ) );
@@ -194,7 +199,7 @@ final class PeriodsTest extends WP_UnitTestCase {
 		$this->assertGreaterThan( 0, $pid );
 		$this->assertTrue( (bool) ATORA_Periods_Service::assign_course( $this->admin_a, $pid, $this->wp_course_a1 ) );
 
-		$future = gmdate( 'Y-m-d', time() + DAY_IN_SECONDS );
+		$future = wp_date( 'Y-m-d', time() + DAY_IN_SECONDS );
 		$this->assertIsArray( ATORA_Periods_Service::close_period( $this->admin_a, $pid, 'until', $future ) );
 		$data = $this->rest_me_courses( $this->student_a );
 		$this->assertNotEmpty( $data['past'] );
@@ -204,7 +209,7 @@ final class PeriodsTest extends WP_UnitTestCase {
 
 		// Fuerza visible_until en el pasado.
 		global $wpdb;
-		$past = gmdate( 'Y-m-d', time() - DAY_IN_SECONDS );
+		$past = wp_date( 'Y-m-d', time() - DAY_IN_SECONDS );
 		$wpdb->update( $wpdb->prefix . 'atora_periods', array( 'visible_until' => $past ), array( 'id' => $pid ) ); // phpcs:ignore WordPress.DB
 		$data2 = $this->rest_me_courses( $this->student_a );
 		$this->assertSame( array(), (array) $data2['past'] );
@@ -223,6 +228,72 @@ final class PeriodsTest extends WP_UnitTestCase {
 		$this->assertSame( array(), (array) $data['past'] );
 		$html = $this->render_panel_my_courses( $this->student_b );
 		$this->assertStringNotContainsString( 'Curso A1', $html );
+	}
+
+	public function test_single_institution_install_without_membership_still_lists_courses(): void {
+		// Un WordPress por institución: el estudiante no tiene membresía. Antes de los períodos veía sus cursos.
+		global $wpdb;
+		$wpdb->delete( $wpdb->prefix . 'atora_institution_members', array( 'user_id' => $this->student_a ) );
+		delete_user_meta( $this->student_a, '_atora_active_institution' );
+
+		wp_set_current_user( $this->admin_a );
+		$p   = ATORA_Periods_Service::create_period( $this->admin_a, $this->inst_a, 'Semestre 1', '2026-01-01', '2026-06-01' );
+		$pid = absint( $p['id'] );
+		ATORA_Periods_Service::assign_course( $this->admin_a, $pid, $this->wp_course_a1 );
+		ATORA_Periods_Service::close_period( $this->admin_a, $pid, 'visible' );
+
+		$data = $this->rest_me_courses( $this->student_a );
+		$this->assertSame( array( $this->wp_course_a2 ), array_map( static fn( $c ) => (int) $c['id'], $data['active'] ) );
+		$this->assertSame( $this->wp_course_a1, (int) $data['past'][0]['courses'][0]['id'] );
+		$html = $this->render_panel_my_courses( $this->student_a );
+		$this->assertStringContainsString( 'Curso A1', $html );
+		$this->assertStringContainsString( 'Curso A2', $html );
+	}
+
+	public function test_api_keeps_courses_and_total_for_older_clients(): void {
+		wp_set_current_user( $this->admin_a );
+		$p   = ATORA_Periods_Service::create_period( $this->admin_a, $this->inst_a, 'Oculto', '2026-01-01', '2026-02-01' );
+		$pid = absint( $p['id'] );
+		ATORA_Periods_Service::assign_course( $this->admin_a, $pid, $this->wp_course_a1 );
+		ATORA_Periods_Service::close_period( $this->admin_a, $pid, 'hidden' );
+
+		$data = $this->rest_me_courses( $this->student_a );
+		$this->assertSame( 1, $data['total'] );
+		$this->assertSame( array( $this->wp_course_a2 ), array_map( static fn( $c ) => (int) $c['id'], $data['courses'] ) );
+		$this->assertArrayHasKey( 'progress', $data['courses'][0] );
+	}
+
+	public function test_lms_manager_without_enrollments_sees_all_courses_in_panel(): void {
+		$html = $this->render_panel_my_courses( $this->admin_a );
+		$this->assertStringContainsString( 'Curso A1', $html );
+		$this->assertStringContainsString( 'Curso B1', $html );
+	}
+
+	public function test_visible_until_uses_the_academy_date_not_utc(): void {
+		wp_set_current_user( $this->admin_a );
+		$p   = ATORA_Periods_Service::create_period( $this->admin_a, $this->inst_a, 'Hasta', '2026-01-01', '2026-02-01' );
+		$pid = absint( $p['id'] );
+		ATORA_Periods_Service::assign_course( $this->admin_a, $pid, $this->wp_course_a1 );
+
+		// Zona elegida para que la fecha local difiera de la UTC a cualquier hora en que corra la prueba.
+		if ( (int) gmdate( 'G' ) < 12 ) {
+			update_option( 'timezone_string', 'Etc/GMT+12' ); // UTC−12: localmente aún es ayer.
+			$until  = wp_date( 'Y-m-d' );                     // «hasta hoy» en la academia.
+			$expect = true;
+		} else {
+			update_option( 'timezone_string', 'Pacific/Kiritimati' ); // UTC+14: localmente ya es mañana.
+			$until  = wp_date( 'Y-m-d', time() - DAY_IN_SECONDS );   // «hasta ayer» en la academia.
+			$expect = false;
+		}
+		$this->assertNotSame( gmdate( 'Y-m-d' ), wp_date( 'Y-m-d' ) );
+		ATORA_Periods_Service::close_period( $this->admin_a, $pid, 'until', $until );
+		$ids = array();
+		foreach ( (array) $this->rest_me_courses( $this->student_a )['past'] as $group ) {
+			foreach ( $group['courses'] as $course ) {
+				$ids[] = (int) $course['id'];
+			}
+		}
+		$this->assertSame( $expect, in_array( $this->wp_course_a1, $ids, true ) );
 	}
 }
 

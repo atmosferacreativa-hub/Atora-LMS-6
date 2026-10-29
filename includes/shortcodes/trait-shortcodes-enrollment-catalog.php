@@ -41,6 +41,8 @@ trait CLMS_Shortcodes_Enrollment_Catalog_Trait {
 				)
 			);
 			$course_ids = is_array( $course_ids ) ? array_map( 'absint', $course_ids ) : array();
+			// Quien gestiona el LMS sin matrículas ve todos los cursos como activos (como antes de los períodos).
+			$grouped = array( 'active' => array_map( static fn( int $id ): array => array( 'id' => $id ), $course_ids ), 'past' => array() );
 		}
 
 		if ( empty( $course_ids ) ) {
@@ -54,7 +56,9 @@ trait CLMS_Shortcodes_Enrollment_Catalog_Trait {
 				<div class="clms-my-courses-body">
 					<h3 class="clms-my-courses-title">Mis cursos</h3>
 
-					<h4 style="margin-top:18px">Cursos activos</h4>
+					<?php if ( ! empty( $grouped['past'] ) ) : ?>
+						<h4 class="clms-my-courses-section"><?php esc_html_e( 'Cursos activos', 'atora-lms' ); ?></h4>
+					<?php endif; ?>
 					<?php foreach ( (array) ( $grouped['active'] ?? array() ) as $course_item ) : ?>
 						<?php
 						$course_id = absint( $course_item['id'] ?? 0 );
@@ -79,10 +83,10 @@ trait CLMS_Shortcodes_Enrollment_Catalog_Trait {
 					<?php endforeach; ?>
 
 					<?php if ( ! empty( $grouped['past'] ) ) : ?>
-						<h4 style="margin-top:22px">Cursos pasados</h4>
+						<h4 class="clms-my-courses-section"><?php esc_html_e( 'Cursos de períodos anteriores', 'atora-lms' ); ?></h4>
 						<?php foreach ( (array) $grouped['past'] as $group ) : ?>
 							<?php $period = (array) ( $group['period'] ?? array() ); ?>
-							<details class="clms-my-course-item" style="padding:10px 0">
+							<details class="clms-my-course-item clms-my-courses-period">
 								<summary style="cursor:pointer;font-weight:700">
 									<?php echo esc_html( (string) ( $period['name'] ?? '' ) ); ?>
 								</summary>
@@ -101,7 +105,7 @@ trait CLMS_Shortcodes_Enrollment_Catalog_Trait {
 										<div class="clms-my-course-item" style="border-top:1px solid #e5e7eb;padding-top:10px;margin-top:10px">
 											<h4><a href="<?php echo esc_url( $course_url ); ?>"><?php echo esc_html( get_the_title( $course_id ) ); ?></a></h4>
 											<div class="clms-course-actions">
-												<a class="clms-course-link" href="<?php echo esc_url( $course_url ); ?>">Ver curso</a>
+												<a class="clms-course-link" href="<?php echo esc_url( $course_url ); ?>"><?php esc_html_e( 'Repasar', 'atora-lms' ); ?></a>
 											</div>
 										</div>
 									<?php endforeach; ?>
