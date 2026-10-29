@@ -152,10 +152,12 @@ final class CLMS_Agenda_Service {
 				}
 				$tz    = $live['timezone'];
 				$start = (int) $live['start_utc'];
-				if ( ! $start || $start < $from || $start > $to ) {
+				$end   = (int) $live['end_utc'];
+				// 6.40.1: entra si su horario se cruza con el rango; una clase que empezó ayer y sigue en curso después
+				// de medianoche aparece hoy (antes solo contaba la hora de inicio y desaparecía de Hoy).
+				if ( ! $start || $start > $to || max( $start, $end ) < $from ) {
 					continue;
 				}
-				$end     = (int) $live['end_utc'];
 				$items[] = array(
 					'type'      => 'live_class',
 					'title'     => sanitize_text_field( (string) ( $lesson['title'] ?? get_the_title( $wp_lesson ) ) ),
