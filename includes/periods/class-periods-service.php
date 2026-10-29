@@ -372,6 +372,69 @@ final class ATORA_Periods_Service {
 		);
 	}
 
+	/**
+	 * Período cerrado del curso (o null si el curso no está en un período cerrado).
+	 *
+	 * @return array<string,mixed>|null
+	 */
+	public static function closed_period_of( int $wp_course_id ): ?array {
+		$period_id = self::course_period_id( $wp_course_id );
+		if ( $period_id <= 0 ) {
+			return null;
+		}
+		$period = self::get_period( $period_id );
+		return $period && 'closed' === (string) ( $period['status'] ?? '' ) ? $period : null;
+	}
+
+	/**
+	 * ¿El cierre del período le quitó a este usuario el acceso al curso?
+	 *
+	 * El administrador o Control académico decide al cerrar: «visible» deja repasar sin límite; «visible hasta» deja
+	 * repasar hasta esa fecha (de la academia); «oculto» cierra el acceso. Solo afecta a estudiantes: quien gestiona el
+	 * LMS, el docente con el curso en su alcance y quien ve los registros académicos de la institución siguen entrando.
+	 */
+	public static function access_closed( int $user_id, int $wp_course_id ): bool {
+		$user_id      = absint( $user_id );
+		$wp_course_id = absint( $wp_course_id );
+		if ( $user_id <= 0 || $wp_course_id <= 0 ) {
+			return false;
+		}
+		$period = self::closed_period_of( $wp_course_id );
+		if ( ! $period || self::period_is_visible_to_students( $period ) ) {
+			return false;
+		}
+		if ( user_can( $user_id, 'manage_options' ) || user_can( $user_id, 'clms_manage_courses' ) ) {
+			return false;
+		}
+		if ( class_exists( 'ATORA_Teacher_Scope' ) ) {
+			if ( ATORA_Teacher_Scope::can_access_course( $user_id, $wp_course_id ) || ATORA_Teacher_Scope::views_institution( $user_id, $wp_course_id ) ) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/** Datos del período para la app (null si el curso no está en un período). @return array<string,mixed>|null */
+	public static function period_payload( int $wp_course_id ): ?array {
+		$period_id = self::course_period_id( $wp_course_id );
+		$period    = $period_id > 0 ? self::get_period( $period_id ) : null;
+		if ( ! $period ) {
+			return null;
+		}
+		return array(
+			'id'            => absint( $period['id'] ),
+			'name'          => (string) $period['name'],
+			'starts_on'     => $period['starts_on'] ? (string) $period['starts_on'] : null,
+			'ends_on'       => $period['ends_on'] ? (string) $period['ends_on'] : null,
+			'status'        => (string) $period['status'],
+			'visible_until' => 'until' === (string) $period['past_visibility'] && $period['visible_until'] ? (string) $period['visible_until'] : null,
+		);
+	}
+
+	public static function color_of( int $wp_course_id ): string {
+		return self::course_color( $wp_course_id );
+	}
+
 	private static function period_is_visible_to_students( array $period ): bool {
 		$vis = (string) ( $period['past_visibility'] ?? 'visible' );
 		if ( 'hidden' === $vis ) {

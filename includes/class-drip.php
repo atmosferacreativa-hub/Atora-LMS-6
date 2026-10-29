@@ -190,6 +190,15 @@ class CLMS_Drip {
 			);
 		}
 
+		if ( $course_id && class_exists( 'ATORA_Periods_Service' ) && ATORA_Periods_Service::access_closed( (int) $user_id, (int) $course_id ) ) {
+			return array(
+				'available'    => false,
+				'reason'       => 'period_closed',
+				'message'      => __( 'Este curso ya no está disponible: su período terminó.', 'atora-lms' ),
+				'available_at' => 0,
+			);
+		}
+
 		$drip_type = (string) get_post_meta( $lesson_id, self::META_TYPE, true );
 		if ( '' === $drip_type ) {
 			$drip_type = 'none';

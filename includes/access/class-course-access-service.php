@@ -30,6 +30,10 @@ final class ATORA_Course_Access_Service {
 		if ( $user_id <= 0 || $course <= 0 || 'lm_course' !== get_post_type( $course ) ) {
 			return false;
 		}
+		// Períodos (6.41.0): al cerrar el período, «oculto» (o «visible hasta» vencido) quita el acceso al estudiante.
+		if ( class_exists( 'ATORA_Periods_Service' ) && ATORA_Periods_Service::access_closed( $user_id, $course ) ) {
+			return false;
+		}
 		// Sin caché: un curso recién agregado a un programa da acceso de inmediato.
 		return ( class_exists( 'CLMS_Helper' ) && CLMS_Helper::user_is_enrolled_in_course( $user_id, $course ) )
 			|| self::via_program( $user_id, $course ) > 0;
