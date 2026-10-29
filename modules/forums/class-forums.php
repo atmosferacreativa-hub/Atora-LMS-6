@@ -91,7 +91,7 @@ final class ATORA_Forums {
 			return;
 		}
 		add_submenu_page(
-			'atora-lms',
+			'clms-dashboard',
 			__( 'Foros', 'atora-lms' ),
 			__( 'Foros', 'atora-lms' ),
 			'read',
