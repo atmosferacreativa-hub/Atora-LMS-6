@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class V5_Installer {
 
 	/** Versión del esquema. Incrementar para forzar re-instalación. */
-	const SCHEMA_VERSION = '6.40.0-attendance';
+	const SCHEMA_VERSION = '6.41.0-final-grades';
 
 	/** Option key que almacena la versión instalada. */
 	const OPTION_KEY = 'atora_v5_schema_version';
@@ -57,7 +57,8 @@ class V5_Installer {
 			&& self::migrate_6280_lesson_content_hash()
 			&& self::migrate_6282_video_positions()
 			&& self::migrate_6131_schema_fixes()
-			&& self::migrate_6400_attendance() ) {
+			&& self::migrate_6400_attendance()
+			&& self::migrate_6410_final_grades() ) {
 			update_option( self::OPTION_KEY, self::SCHEMA_VERSION );
 		}
 	}
@@ -87,9 +88,40 @@ class V5_Installer {
 			&& self::migrate_6280_lesson_content_hash()
 			&& self::migrate_6282_video_positions()
 			&& self::migrate_6131_schema_fixes()
-			&& self::migrate_6400_attendance() ) {
+			&& self::migrate_6400_attendance()
+			&& self::migrate_6410_final_grades() ) {
 			update_option( self::OPTION_KEY, self::SCHEMA_VERSION );
 		}
+	}
+
+	/**
+	 * 6.41.0: nota final ajustada por Control académico. Una fila por corrección (historial completo); la vigente es
+	 * la última con `active = 1` por estudiante y curso. Quitar el ajuste agrega una fila con `grade` NULL.
+	 *
+	 * @return bool
+	 */
+	private static function migrate_6410_final_grades(): bool {
+		global $wpdb;
+		$charset = $wpdb->get_charset_collate();
+		$table   = $wpdb->prefix . 'atora_final_grade_adjustments';
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$wpdb->query( "CREATE TABLE IF NOT EXISTS {$table} (
+			id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			institution_id  BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			wp_course_id    BIGINT UNSIGNED NOT NULL,
+			user_id         BIGINT UNSIGNED NOT NULL,
+			grade           DECIMAL(5,2)             DEFAULT NULL,
+			previous_grade  DECIMAL(5,2)             DEFAULT NULL,
+			calculated      DECIMAL(5,2)             DEFAULT NULL,
+			reason          VARCHAR(500)    NOT NULL DEFAULT '',
+			actor_id        BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			active          TINYINT(1)      NOT NULL DEFAULT 1,
+			created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			KEY course_user (wp_course_id, user_id, active),
+			KEY institution_id (institution_id)
+		) {$charset}" );
+		return (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) === $table;
 	}
 
 	/**

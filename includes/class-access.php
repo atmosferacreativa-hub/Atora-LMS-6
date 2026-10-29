@@ -391,6 +391,32 @@ class CLMS_Access {
 			}
 		}
 
+		// ── 6.41.0: Control académico (registro académico de la institución) ──
+		// Ve notas, asistencia y riesgo de su institución, gestiona matrículas y corrige notas finales (con motivo).
+		// No crea contenido ni califica entregas.
+		$academic_control_caps = array(
+			'read'                                 => true,
+			'clms_access_admin'                    => true,
+			'clms_manage_enrollments'              => true,
+			'clms_manage_course_access'            => true,
+			'atora_view_academic_records'          => true,
+			'atora_adjust_final_grades'            => true,
+			'atora_manage_institution_enrollments' => true,
+			'atora_close_periods'                  => true,
+			'clms_grade_submissions'               => false,
+			'clms_manage_courses'                  => false,
+			'clms_manage_lessons'                  => false,
+			'edit_lm_courses'                      => false,
+			'edit_lm_lessons'                      => false,
+		);
+		self::sync_role( 'lms_academic_control', 'Control académico', $academic_control_caps );
+
+		if ( $admin ) {
+			foreach ( array( 'atora_view_academic_records', 'atora_adjust_final_grades', 'atora_manage_institution_enrollments', 'atora_close_periods', 'atora_view_finance' ) as $cap ) {
+				$admin->add_cap( $cap, true );
+			}
+		}
+
 		// ── Añadir caps CRM al administrador ──────────────────────────────────
 		if ( $admin ) {
 			$crm_caps = array(
@@ -414,6 +440,18 @@ class CLMS_Access {
 
 		// ── Limpiar roles huérfanos de otros plugins LMS ─────────────────────
 		self::remove_orphan_lms_roles();
+	}
+
+	/** 6.41.0: crea el rol o alinea sus capacidades (las que van en false se quitan). */
+	private static function sync_role( string $slug, string $label, array $caps ): void {
+		$role = get_role( $slug );
+		if ( ! $role ) {
+			add_role( $slug, $label, array_filter( $caps ) );
+			return;
+		}
+		foreach ( $caps as $cap => $grant ) {
+			$grant ? $role->add_cap( $cap, true ) : $role->remove_cap( $cap );
+		}
 	}
 
 	/**
@@ -527,6 +565,7 @@ class CLMS_Access {
 			'crm_operator',     // ATORA — Operador CRM
 			'lms_coordinator',  // ATORA — Coordinador académico
 			'lms_instructor_assistant', // ATORA — Instructor asistente (6.41.0: faltaba en el desplegable)
+			'lms_academic_control',     // ATORA — Control académico (6.41.0)
 		);
 
 		// Si WooCommerce está activo, mantener sus roles comerciales.
@@ -688,6 +727,11 @@ class CLMS_Access {
 		// E-07: coordinador/admin por membresía institucional del recurso.
 		$resource_institution_id = self::resource_institution_id( $resource_id, $resource_type );
 		if ( $resource_institution_id > 0 && self::user_is_institution_staff( $user_id, $resource_institution_id ) ) {
+			return true;
+		}
+
+		// 6.41.0: Control académico gestiona matrículas de los cursos de su institución.
+		if ( 'course' === $resource_type && user_can( $user_id, 'atora_manage_institution_enrollments' ) && class_exists( 'ATORA_Teacher_Scope' ) && ATORA_Teacher_Scope::in_tenant( $user_id, $resource_id ) ) {
 			return true;
 		}
 

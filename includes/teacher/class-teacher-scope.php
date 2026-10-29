@@ -87,6 +87,16 @@ final class ATORA_Teacher_Scope {
 		return $inst > 0 && (int) $inst === $course_inst;
 	}
 
+	/**
+	 * 6.41.0: lectura del registro académico de la institución (Control académico, Auxiliar administrativo).
+	 * Solo lectura: no abre la calificación ni la gestión del curso (`can_access_course` no cambia).
+	 */
+	public static function views_institution( int $user_id, int $wp_course_id ): bool {
+		return $user_id > 0 && $wp_course_id > 0
+			&& user_can( $user_id, 'atora_view_academic_records' )
+			&& self::in_tenant( $user_id, $wp_course_id );
+	}
+
 	public static function is_section_teacher( int $user_id, int $wp_course_id ): bool {
 		global $wpdb;
 		$teachers = $wpdb->prefix . 'atora_section_teachers';

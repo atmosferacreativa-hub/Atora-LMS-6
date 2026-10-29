@@ -180,6 +180,11 @@ trait CLMS_Grading_Summary_Cache_Trait {
 			'updated_at'         => current_time( 'mysql' ),
 		);
 
+		// 6.41.0: nota final ajustada por Control académico.
+		if ( class_exists( 'ATORA_Final_Grade_Service' ) && ! ATORA_Final_Grade_Service::$skip ) {
+			$summary = ATORA_Final_Grade_Service::apply( $summary, $user_id, $course_id );
+		}
+
 		return $summary;
 	}
 

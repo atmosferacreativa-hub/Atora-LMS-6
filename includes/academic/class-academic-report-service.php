@@ -1603,6 +1603,10 @@ class CLMS_Academic_Report_Service {
 			if ( ATORA_Teacher_Scope::can_access_course( $viewer_id, $course_id ) ) {
 				return true;
 			}
+			// 6.41.0: Control académico y Auxiliar administrativo leen los informes de su institución.
+			if ( ATORA_Teacher_Scope::views_institution( $viewer_id, $course_id ) ) {
+				return true;
+			}
 			// `clms_access_admin` lo tienen también los instructores: no da acceso a cursos ajenos.
 			if ( in_array( $viewer_id, $teacher_ids, true ) ) {
 				return ATORA_Teacher_Scope::in_tenant( $viewer_id, $course_id );

@@ -13,7 +13,13 @@ Hallazgo: antes de 6.41.0 el asistente con delegación ya publicaba notas direct
 Las pruebas nuevas fallan con `main`.
 
 ## Bloque 2 — Control académico
-Pendiente.
+| Punto | Código | Prueba automática | Real |
+|---|---|---|---|
+| Rol `lms_academic_control` en el desplegable; no califica, no edita contenido, sin API del docente | `CLMS_Access` | `AcademicControlTest::test_does_not_grade_nor_edit_content_and_has_no_teacher_api` | — |
+| Nota final ajustada: motivo obligatorio, 0–100, historial con la anterior, la ve el estudiante, quitar vuelve a la calculada; parciales intactas; el instructor no corrige | `ATORA_Final_Grade_Service`, tabla `atora_final_grade_adjustments`, motor de evaluación | `test_corrects_final_grade_with_reason_and_history` | Pendiente |
+| Lee informes y gestiona matrículas solo de su institución; página «Notas finales» | `ATORA_Teacher_Scope::views_institution`, `can_manage_resource_context`, `ATORA_Final_Grade_Admin` | `test_reads_reports_and_manages_enrollments_of_its_institution_only` | Pendiente |
+
+Las 3 pruebas fallan con `main`.
 
 ## Bloque 3 — Auxiliar administrativo
 Pendiente.
