@@ -1,5 +1,9 @@
 # CHANGELOG — ATORA LMS
 
+## 6.40.1 (2026-10-29)
+
+- **Corrección (agenda, #128):** Hoy (estudiante y docente) solo mostraba las clases en vivo que *empiezan* ese día; una clase que empezó antes de medianoche y seguía en curso desaparecía junto con su botón para entrar. Ahora entra si su horario se cruza con el día. Prueba: `TeacherLiveApiTest::test_class_running_past_midnight_still_shows_today`.
+
 ## 6.40.0 (2026-10-28)
 
 ### App del docente (`docs/ordenes/ORDEN-APP-DOCENTE.md`; progreso en `docs/ordenes/PROGRESO-APP-DOCENTE.md`)
