@@ -131,6 +131,8 @@ final class ATORA_E2E_Seed_CLI {
 
 		$teacher  = self::user( 'docente_e2e', 'Docente E2E', 'lms_instructor', $password );
 		$teacher2 = self::user( 'docente2_e2e', 'Docente Dos E2E', 'lms_instructor', $password );
+		// 6.41.0: instructor asistente con delegación del docente sobre el curso (pre-calificación).
+		$assistant = self::user( 'asistente_e2e', 'Asistente E2E', 'lms_instructor_assistant', $password );
 		$role     = get_role( 'student' ) ? 'student' : 'subscriber';
 		$student  = self::user( 'estudiante_e2e', 'Estudiante E2E', $role, $password );
 		$student2 = self::user( 'estudiante2_e2e', 'Estudiante Dos E2E', $role, $password );
@@ -253,6 +255,7 @@ final class ATORA_E2E_Seed_CLI {
 			\ATORA\LMS\Section_Service::add_teacher( $section, $teacher2 );
 			\ATORA\LMS\Section_Service::add_student( $section, $student2 );
 		}
+		self::delegate( $teacher, $assistant, $course );
 		$submission  = self::submission( $student, $task, $course );
 		$submission2 = self::submission( $student2, $essay, $course, self::pdf( $student2 ) );
 		$submission3 = self::submission( $student2, $concurrency, $course );
@@ -298,6 +301,7 @@ final class ATORA_E2E_Seed_CLI {
 			'password'   => $password,
 			'teacher'    => array( 'id' => $teacher, 'login' => 'docente_e2e' ),
 			'teacher2'   => array( 'id' => $teacher2, 'login' => 'docente2_e2e' ),
+			'assistant'  => array( 'id' => $assistant, 'login' => 'asistente_e2e' ),
 			'student'    => array( 'id' => $student, 'login' => 'estudiante_e2e' ),
 			'student2'   => array( 'id' => $student2, 'login' => 'estudiante2_e2e' ),
 			'course'     => array( 'wp_id' => $course, 'id' => $table_course ? (int) $table_course['id'] : 0, 'section_id' => $section ),
@@ -805,6 +809,34 @@ final class ATORA_E2E_Seed_CLI {
 			return;
 		}
 		self::seed_error( $context . ': falta la clase ' . $class . ' (el plugin no la cargó en WP-CLI).' );
+	}
+
+	/** 6.41.0: miembros de la institución y delegación del curso (como lo haría el docente desde la web). */
+	private static function delegate( int $teacher, int $assistant, int $course ): void {
+		if ( ! class_exists( 'ATORA_Delegation_Service' ) ) {
+			return;
+		}
+		global $wpdb;
+		$institution = self::require_or_create_institution_id( 'Delegación E2E' );
+		$members     = $wpdb->prefix . 'atora_institution_members';
+		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $members ) ) ) === $members ) {
+			foreach ( array( $teacher => 'teacher', $assistant => 'assistant' ) as $user => $role ) {
+				$exists = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$members} WHERE institution_id = %d AND user_id = %d", $institution, $user ) ); // phpcs:ignore WordPress.DB
+				if ( ! $exists ) {
+					$wpdb->insert( $members, array( 'institution_id' => $institution, 'user_id' => $user, 'role' => $role, 'status' => 'active' ) );
+				}
+				update_user_meta( $user, '_atora_active_institution', $institution );
+			}
+		}
+		$previous = get_current_user_id();
+		wp_set_current_user( $teacher );
+		if ( class_exists( '\\ATORA\\LMS\\Tenant_Context' ) ) {
+			\ATORA\LMS\Tenant_Context::reset_cache();
+		}
+		if ( ! ATORA_Delegation_Service::grant( $teacher, $assistant, array( 'scope' => 'course', 'wp_course_id' => $course, 'perms' => array( 'content' => true ) ) ) ) {
+			self::seed_error( 'No se pudo delegar el curso E2E al asistente.' );
+		}
+		wp_set_current_user( $previous );
 	}
 
 	private static function require_or_create_institution_id( string $context ): int {
