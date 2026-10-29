@@ -108,6 +108,8 @@ final class CLMS_Student_Grades_Service {
 			'passing_grade'=> $passing,
 			'progress'     => $progress,
 			'status'       => self::academic_status( $final, $progress, $passing ),
+			// 6.41.0: nota final corregida por Control académico.
+			'adjusted'     => ! empty( $summary['final_adjusted'] ),
 		);
 	}
 

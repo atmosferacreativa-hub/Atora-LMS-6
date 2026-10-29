@@ -584,7 +584,7 @@ class CLMS_Assessment_Engine {
 		if ( class_exists( 'CLMS_Cache' ) ) {
 			$cached = CLMS_Cache::get( 'gradebook', array( 'entries', $user_id, $course_id ), array() );
 			if ( is_array( $cached ) && isset( $cached['entries'] ) ) {
-				return $cached;
+				return self::with_final_adjustment( $cached, $user_id, $course_id );
 			}
 		}
 
@@ -689,6 +689,14 @@ class CLMS_Assessment_Engine {
 			CLMS_Cache::set( 'gradebook', array( 'entries', $user_id, $course_id ), $gradebook, self::GRADEBOOK_CACHE_TTL );
 		}
 
+		return self::with_final_adjustment( $gradebook, $user_id, $course_id );
+	}
+
+	/** 6.41.0: la nota final ajustada por Control académico reemplaza a la calculada (la caché guarda la calculada). */
+	private static function with_final_adjustment( array $gradebook, int $user_id, int $course_id ): array {
+		if ( class_exists( 'ATORA_Final_Grade_Service' ) && ! ATORA_Final_Grade_Service::$skip && isset( $gradebook['summary'] ) && is_array( $gradebook['summary'] ) ) {
+			$gradebook['summary'] = ATORA_Final_Grade_Service::apply( $gradebook['summary'], $user_id, $course_id );
+		}
 		return $gradebook;
 	}
 
