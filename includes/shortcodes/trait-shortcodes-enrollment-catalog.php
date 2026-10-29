@@ -55,6 +55,9 @@ trait CLMS_Shortcodes_Enrollment_Catalog_Trait {
 			<div class="clms-my-courses-card">
 				<div class="clms-my-courses-body">
 					<h3 class="clms-my-courses-title">Mis cursos</h3>
+					<?php if ( class_exists( 'ATORA_Period_History' ) && ! CLMS_Helper::user_can_manage_lms() ) : ?>
+						<p class="clms-my-courses-history"><a class="clms-course-link" href="<?php echo esc_url( ATORA_Period_History::web_url() ); ?>"><?php esc_html_e( 'Descargar mi historial (PDF)', 'atora-lms' ); ?></a></p>
+					<?php endif; ?>
 
 					<?php if ( ! empty( $grouped['past'] ) ) : ?>
 						<h4 class="clms-my-courses-section"><?php esc_html_e( 'Cursos activos', 'atora-lms' ); ?></h4>

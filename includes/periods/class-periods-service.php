@@ -21,7 +21,7 @@ final class ATORA_Periods_Service {
 	public const CAP_CLOSE_PERIODS = 'atora_close_periods';
 
 	private const OPTION_SCHEMA_VERSION = 'atora_periods_schema_version';
-	private const SCHEMA_VERSION = '1';
+	private const SCHEMA_VERSION = '2'; // 2: start_notified_at (aviso de inicio) y CREATE TABLE sin IF NOT EXISTS (dbDelta agrega columnas).
 
 	public static function init(): void {
 		add_action( 'init', array( __CLASS__, 'ensure_schema' ), 20 );
@@ -49,7 +49,7 @@ final class ATORA_Periods_Service {
 		$periods = self::table_periods();
 		$links   = self::table_links();
 
-		dbDelta( "CREATE TABLE IF NOT EXISTS {$periods} (
+		dbDelta( "CREATE TABLE {$periods} (
 			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 			institution_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
 			name VARCHAR(255) NOT NULL DEFAULT '',
@@ -60,21 +60,22 @@ final class ATORA_Periods_Service {
 			closed_by BIGINT UNSIGNED NOT NULL DEFAULT 0,
 			past_visibility VARCHAR(20) NOT NULL DEFAULT 'visible',
 			visible_until DATE NULL DEFAULT NULL,
+			start_notified_at DATETIME NULL DEFAULT NULL,
 			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-			PRIMARY KEY (id),
+			PRIMARY KEY  (id),
 			KEY inst_status (institution_id, status),
 			KEY inst_dates (institution_id, ends_on, starts_on)
 		) {$charset};" );
 
-		dbDelta( "CREATE TABLE IF NOT EXISTS {$links} (
+		dbDelta( "CREATE TABLE {$links} (
 			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 			institution_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
 			period_id BIGINT UNSIGNED NOT NULL,
 			wp_course_id BIGINT UNSIGNED NOT NULL,
 			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-			PRIMARY KEY (id),
+			PRIMARY KEY  (id),
 			UNIQUE KEY course_unique (wp_course_id),
 			KEY inst_period (institution_id, period_id)
 		) {$charset};" );
