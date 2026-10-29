@@ -53,6 +53,7 @@ No. ATORA LMS is not designed for WordPress Multisite. Network activation is blo
 = 6.40.0 =
 * App del docente: lecciones del curso (también ocultas) con vista de estudiante, publicar u ocultar y cambiar fechas de entrega con aviso opcional; asistencia presencial en la app y en la web (la toma más reciente gana, también sin conexión); clase en vivo en Hoy, grabación y asistencia del proveedor desde la app; planificación híbrida y subida de audio desde el teléfono.
 * Corrección: guardar la clase en vivo de una lección ya no pisa la asistencia presencial de esa misma lección.
+* Corrección: el límite diario de las automatizaciones pospone al día siguiente (UTC) en lugar de a una hora ya pasada.
 
 = 6.39.0 =
 * Comunicación: webhooks firmados en los seis proveedores, baja segura con un clic, cola con límites por proveedor, editor de plantillas con variables validadas, panel de entregabilidad (SPF/DKIM/DMARC), boletín por lotes con suscriptores como contactos y doble opt-in, y automatizaciones con disparadores unificados, versiones y protecciones.

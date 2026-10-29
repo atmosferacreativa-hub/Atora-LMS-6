@@ -25,6 +25,9 @@
 - Rutas `/teacher/plans` sobre el mismo servicio de la web: crear (un reintento no duplica), guardar con revisión (409), retomar, vista previa y publicar sin duplicar lecciones. El asistente prepara y no publica.
 - `POST /teacher/media`: subir audio (MP3, M4A u OGG, validado por contenido), PDF o imagen desde el teléfono. Un reintento con el mismo `client_upload_id` devuelve el mismo archivo; lo rechazado no queda en la biblioteca.
 
+**Automatización** (#127)
+- **Corrección:** al llegar al límite diario de acciones, la siguiente se posponía a una medianoche ya pasada cerca de las 00:00 UTC y salía de inmediato. Ahora espera al día UTC siguiente, como el contador.
+
 **Validación:** pruebas de integración (`TeacherContentApiTest`, `AttendanceTest`, `TeacherLiveApiTest`, `TeacherPlanApiTest`) y recorridos de pantalla de la app 1.3.0 contra un WordPress temporal. Sin validación en teléfono real.
 
 ## 6.39.0 (2026-10-27)
