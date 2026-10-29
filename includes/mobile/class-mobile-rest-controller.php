@@ -2035,19 +2035,28 @@ final class ATORA_Mobile_REST_Controller {
 		}
 
 		// 3) Salida ordenada y deduplicada. Sin los cursos cuyo período cerrado quitó el acceso (6.41.0).
-		$out = array();
+		// Los de períodos cerrados (visibles para repasar) van después de los activos: así también los ve al final una
+		// app anterior a 1.4.0, que no los agrupa.
+		$out  = array();
+		$past = array();
 		foreach ( array_values( array_unique( array_filter( array_map( 'absint', $ordered ) ) ) ) as $course_id ) {
-			if ( isset( $by_course[ $course_id ] ) && class_exists( 'ATORA_Periods_Service' ) ) {
+			if ( ! isset( $by_course[ $course_id ] ) ) {
+				continue;
+			}
+			if ( class_exists( 'ATORA_Periods_Service' ) ) {
 				$period_course = \ATORA\LMS\LMS_Course_Service::get( $course_id );
 				$period_wp     = absint( is_array( $period_course ) ? ( $period_course['wp_post_id'] ?? 0 ) : 0 );
 				if ( $period_wp > 0 && ATORA_Periods_Service::access_closed( $user_id, $period_wp ) ) {
 					continue;
 				}
+				if ( $period_wp > 0 && ATORA_Periods_Service::closed_period_of( $period_wp ) ) {
+					$past[] = $by_course[ $course_id ];
+					continue;
+				}
 			}
-			if ( isset( $by_course[ $course_id ] ) ) {
-				$out[] = $by_course[ $course_id ];
-			}
+			$out[] = $by_course[ $course_id ];
 		}
+		$out = array_merge( $out, $past );
 
 		self::$enrollment_index_cache[ $user_id ] = $out;
 		return $out;

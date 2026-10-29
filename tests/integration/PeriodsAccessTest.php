@@ -142,4 +142,16 @@ final class PeriodsAccessTest extends WP_UnitTestCase {
 		$this->close( 'until', wp_date( 'Y-m-d', time() - DAY_IN_SECONDS ) );
 		$this->assertFalse( $this->student_has_access(), 'Venció ayer: ya no entra.' );
 	}
+
+	public function test_courses_of_closed_periods_come_after_active_ones_in_the_app_list(): void {
+		$active = self::factory()->post->create( array( 'post_type' => 'lm_course', 'post_status' => 'publish', 'post_author' => $this->teacher, 'post_title' => 'Curso activo' ) );
+		$id     = (int) \ATORA\LMS\LMS_Course_Service::get_by_wp_post( $active )['id'];
+		\ATORA\LMS\LMS_Enrollment_Service::enroll( $this->student, $id );
+		CLMS_Helper::enroll_user_in_course( $this->student, $active );
+		$this->close( 'visible' );
+
+		$titles = array_map( static fn( $c ) => (string) $c['title'], $this->mobile_courses() );
+		$this->assertSame( array( 'Curso activo', 'Curso del semestre' ), $titles, 'Una app anterior a 1.4.0 (sin agrupar) ve primero los activos.' );
+		$this->cleanup_lms_rows( array( $active ), array() );
+	}
 }
