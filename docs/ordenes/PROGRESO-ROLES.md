@@ -28,5 +28,16 @@ Las 3 pruebas fallan con `main`.
 | Nota final y estado en solo lectura; «No aprobado · debe repetir» y filtro; CSV | `ATORA_Finance_Academic_Admin` | `test_reads_final_grades_and_who_must_repeat` | Pendiente |
 | No corrige notas, no matricula, no califica, sin API del docente ni contenido | permisos | `test_cannot_change_grades_enrollments_or_content` | — |
 
-Los pedidos de WooCommerce no tienen institución: con varias instituciones, el auxiliar ve todos los pedidos de la
-tienda. El estado académico sí se limita a su institución. Las 2 pruebas fallan con `main`.
+El estado académico se limita a su institución. Las 2 pruebas fallan con `main`. Los pedidos quedaron aislados
+por institución en el bloque 4.
+
+## Bloque 4 — Pedidos por institución (varias instituciones en un mismo WordPress)
+| Punto | Código | Prueba automática | Real |
+|---|---|---|---|
+| Cada pedido guarda `_atora_institution_id` según sus productos ligados a curso/programa; mezcla o sin productos ATORA → 0 (solo administración); al crear, al pagar y, para pedidos anteriores, al consultarlo | `ATORA_Order_Institution::resolve/assign/institution_of` | `OrderInstitutionTest::test_order_takes_the_institution_of_its_course_products`, `test_program_product_uses_program_institution` | Pendiente (con WooCommerce real) |
+| El Auxiliar administrativo solo abre, edita y reembolsa pedidos de su institución (meta caps, pantalla HPOS, AJAX de reembolso, API REST de WooCommerce); administración ve todo | `map_meta_cap`, `guard_hpos_edit`, `guard_refund`, `rest_permissions` | `test_admin_assistant_only_opens_orders_of_its_institution`, `test_meta_caps_rest_and_lists_are_filtered` | Pendiente (con WooCommerce real) |
+| Listas de pedidos (HPOS y clásica) filtradas por su institución; membresía ambigua → no ve ninguno | `filter_list_args`, `filter_legacy_list`, `user_institution` | `test_meta_caps_rest_and_lists_are_filtered`, `test_ambiguous_membership_sees_nothing` | Pendiente (con WooCommerce real) |
+| Sin informes globales de WooCommerce (`view_woocommerce_reports` retirado); página «Pagos» con los pedidos de su institución y CSV | `ATORA_Order_Institution_Admin` | `test_payments_page_rows_and_role_without_global_reports` | Pendiente |
+| `wp atora orders-institution-backfill [--dry-run]` para pedidos anteriores | `ATORA_Order_Institution::backfill` | — (requiere WooCommerce) | Pendiente |
+
+CI no instala WooCommerce: las pruebas usan pedidos simulados con la misma interfaz. Las 6 pruebas fallan con `main`.

@@ -63,6 +63,23 @@ rol **no** puede hacer), e2e solo contra WordPress temporal, nada a las tiendas,
 - Calificaciones y estado académico en **solo lectura**, con la lista «Reprobados / deben repetir» por período.
 - No ve contenido de los cursos ni mensajes; no modifica notas ni matrículas académicas.
 
+## Bloque 4 — Pedidos por institución (decisión del titular: varias instituciones en un mismo WordPress)
+
+Hallazgo: los pedidos de WooCommerce no tienen institución; el Auxiliar administrativo de una institución vería los
+de toda la tienda.
+
+- **Institución del pedido** (meta `_atora_institution_id`, compatible con HPOS): se deduce de los productos ligados a
+  un curso (`_clms_linked_course_id`) o programa (`_clms_linked_program_id`) al crear el pedido y al pagarlo. Si el
+  pedido mezcla instituciones o no tiene productos de ATORA, queda sin institución: solo lo ve el administrador.
+  Comando `wp atora orders-institution-backfill` (con `--dry-run`) para los pedidos existentes.
+- **Acceso del Auxiliar administrativo:** listas de pedidos (HPOS y clásica) filtradas por su institución; abrir,
+  editar o reembolsar un pedido de otra institución se niega (pantalla, AJAX de reembolso y API REST de WooCommerce).
+- **Sin Analíticas de WooCommerce** (suman toda la tienda): se quita `view_woocommerce_reports` del rol y se agrega
+  «Pagos» con los pedidos de su institución y exportación CSV.
+- Pruebas: resolver la institución (curso, programa, mezcla, sin ATORA), decisión de acceso por pedido, filtro de
+  la lista y denegación entre instituciones. El entorno de pruebas no tiene WooCommerce: se usan pedidos simulados;
+  la prueba con WooCommerce real queda como validación real.
+
 ## Cierre
 
 6.41.0 y app 1.4.0 (cola «Por validar» y pre-calificación en la app), changelog, `ESTADO.md`, filas en
