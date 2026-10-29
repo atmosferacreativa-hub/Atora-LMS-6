@@ -27,9 +27,13 @@ final class ATORA_Avatar_Service {
 
 	public static function boot(): void {
 		add_filter( 'pre_get_avatar_data', array( __CLASS__, 'pre_get_avatar_data' ), 10, 2 );
-		add_filter( 'rest_post_dispatch', array( __CLASS__, 'rest_post_dispatch_add_avatar_urls' ), 20, 3 );
+		add_filter( 'rest_post_dispatch', array( __CLASS__, 'rest_post_dispatch_mobile_people' ), 20, 3 );
 		add_action( 'atora_account_deletion_processed', array( __CLASS__, 'on_account_deletion_processed' ), 10, 3 );
 		add_action( 'rest_api_init', array( __CLASS__, 'register_mobile_routes' ) );
+		add_action( 'show_user_profile', array( __CLASS__, 'render_admin_user_avatar_fields' ) );
+		add_action( 'edit_user_profile', array( __CLASS__, 'render_admin_user_avatar_fields' ) );
+		add_action( 'personal_options_update', array( __CLASS__, 'save_admin_user_avatar_fields' ) );
+		add_action( 'edit_user_profile_update', array( __CLASS__, 'save_admin_user_avatar_fields' ) );
 	}
 
 	public static function policy(): string {
@@ -42,6 +46,13 @@ final class ATORA_Avatar_Service {
 			return true;
 		}
 		return user_can( $user_id, 'manage_options' );
+	}
+
+	public static function can_admin_manage_user_avatar( int $admin_id, int $target_user_id ): bool {
+		if ( $admin_id <= 0 || $target_user_id <= 0 ) {
+			return false;
+		}
+		return user_can( $admin_id, 'manage_options' ) && current_user_can( 'edit_user', $target_user_id );
 	}
 
 	public static function avatar_attachment_id( int $user_id ): int {
@@ -98,6 +109,9 @@ final class ATORA_Avatar_Service {
 
 		$overrides = array( 'test_form' => false );
 		$result = wp_handle_sideload( $sideload, $overrides );
+		if ( file_exists( $prepared_path ) ) {
+			@unlink( $prepared_path );
+		}
 		if ( ! is_array( $result ) || ! empty( $result['error'] ) ) {
 			return new WP_Error( 'atora_avatar_upload', (string) ( $result['error'] ?? __( 'Error al subir la imagen.', 'atora-lms' ) ), array( 'status' => 400 ) );
 		}
@@ -183,6 +197,15 @@ final class ATORA_Avatar_Service {
 		return self::initials_svg_data_uri( $initials, (string) $user_id, $size );
 	}
 
+	private static function initials_and_color_for_user( int $user_id ): array {
+		$user = get_userdata( $user_id );
+		$initials = self::initials_from_name( $user ? (string) $user->display_name : '' );
+		$hash = md5( (string) $user_id );
+		$h = hexdec( substr( $hash, 0, 2 ) ) % 360;
+		$bg = sprintf( 'hsl(%d, 55%%, 45%%)', $h );
+		return array( 'initials' => $initials, 'color' => $bg );
+	}
+
 	private static function initials_from_name( string $name ): string {
 		$name = trim( preg_replace( '/\s+/', ' ', $name ) ?? '' );
 		if ( '' === $name ) {
@@ -208,6 +231,20 @@ final class ATORA_Avatar_Service {
 			'<text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-family="system-ui, -apple-system, Segoe UI, Roboto, Arial" font-size="' . $font . '" font-weight="700" fill="' . $fg . '">' . esc_html( $initials ) . '</text>' .
 			'</svg>';
 		return 'data:image/svg+xml;charset=utf-8,' . rawurlencode( $svg );
+	}
+
+	private static function mobile_avatar_url_or_empty( int $user_id, int $size ): string {
+		$own = self::avatar_attachment_id( $user_id );
+		if ( $own ) {
+			$url = wp_get_attachment_image_url( $own, array( $size, $size ) );
+			return is_string( $url ) && '' !== $url ? esc_url_raw( $url ) : '';
+		}
+		$teacher_photo = absint( get_user_meta( $user_id, '_clms_instructor_photo_id', true ) );
+		if ( $teacher_photo ) {
+			$url = wp_get_attachment_image_url( $teacher_photo, array( $size, $size ) );
+			return is_string( $url ) && '' !== $url ? esc_url_raw( $url ) : '';
+		}
+		return '';
 	}
 
 	private static function user_from_id_or_email( $id_or_email ): ?WP_User {
@@ -306,9 +343,7 @@ final class ATORA_Avatar_Service {
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( __CLASS__, 'mobile_post_me_avatar' ),
-				'permission_callback' => static function (): bool {
-					return is_user_logged_in();
-				},
+				'permission_callback' => array( 'ATORA_Mobile_REST_Controller', 'authorize' ),
 				'args'                => array(
 					'client_upload_id' => array( 'type' => 'string', 'required' => false ),
 				),
@@ -316,9 +351,7 @@ final class ATORA_Avatar_Service {
 			array(
 				'methods'             => 'DELETE',
 				'callback'            => array( __CLASS__, 'mobile_delete_me_avatar' ),
-				'permission_callback' => static function (): bool {
-					return is_user_logged_in();
-				},
+				'permission_callback' => array( 'ATORA_Mobile_REST_Controller', 'authorize' ),
 			),
 		) );
 	}
@@ -355,35 +388,151 @@ final class ATORA_Avatar_Service {
 	 * Sin tocar `includes/mobile/class-mobile-teacher-controller.php`, añade `avatar_url`
 	 * a objetos de tipo {id, name} cuando `id` corresponde a un usuario.
 	 */
-	public static function rest_post_dispatch_add_avatar_urls( $result, WP_REST_Server $server, WP_REST_Request $request ) {
+	public static function rest_post_dispatch_mobile_people( $result, WP_REST_Server $server, WP_REST_Request $request ) {
 		$route = (string) $request->get_route();
-		if ( false === strpos( $route, '/atora-mobile/v1/' ) ) {
+		if ( 0 !== strpos( $route, '/' . ATORA_Mobile_REST_Controller::REST_NAMESPACE . '/' ) ) {
 			return $result;
 		}
+
 		$response = rest_ensure_response( $result );
 		$data = $response->get_data();
 		$changed = false;
-		$data = self::walk_and_add_avatar_urls( $data, $changed );
+		$data = self::augment_mobile_response_people( $route, $data, $changed );
 		if ( $changed ) {
 			$response->set_data( $data );
 		}
 		return $response;
 	}
 
-	private static function walk_and_add_avatar_urls( $data, bool &$changed ) {
-		if ( is_array( $data ) ) {
-			if ( isset( $data['id'], $data['name'] ) && is_scalar( $data['id'] ) && ! isset( $data['avatar_url'] ) ) {
-				$user_id = absint( $data['id'] );
-				if ( $user_id && get_userdata( $user_id ) ) {
-					$data['avatar_url'] = self::avatar_url_for_user( $user_id, 192 );
+	private static function augment_mobile_response_people( string $route, $data, bool &$changed ) {
+		// /me and /dashboard: normalize current user payload.
+		if ( in_array( $route, array( '/' . ATORA_Mobile_REST_Controller::REST_NAMESPACE . '/me', '/' . ATORA_Mobile_REST_Controller::REST_NAMESPACE . '/dashboard' ), true ) ) {
+			if ( is_array( $data ) && isset( $data['user'] ) && is_array( $data['user'] ) ) {
+				$data['user'] = self::augment_mobile_user_card( $data['user'], $changed );
+			}
+			return $data;
+		}
+
+		// Messages: author + recipients lists.
+		if ( 0 === strpos( $route, '/' . ATORA_Mobile_REST_Controller::REST_NAMESPACE . '/messages' ) ) {
+			return self::augment_people_by_keys( $data, $changed, array( 'author', 'recipients' ) );
+		}
+
+		// Teacher endpoints: only known person keys, never generic {id,name}.
+		if ( false !== strpos( $route, '/' . ATORA_Mobile_REST_Controller::REST_NAMESPACE . '/teacher/' ) ) {
+			return self::augment_people_by_keys( $data, $changed, array( 'student', 'students', 'members', 'submitted_by', 'recipients', 'author' ) );
+		}
+
+		return $data;
+	}
+
+	private static function augment_people_by_keys( $data, bool &$changed, array $keys ) {
+		if ( ! is_array( $data ) ) {
+			return $data;
+		}
+		foreach ( $keys as $key ) {
+			if ( ! array_key_exists( $key, $data ) ) {
+				continue;
+			}
+			$value = $data[ $key ];
+			if ( is_array( $value ) ) {
+				// Single person card: {id, name}.
+				if ( isset( $value['id'], $value['name'] ) ) {
+					$data[ $key ] = self::augment_mobile_person_card( $value, $changed );
+					continue;
+				}
+				// List of person cards.
+				$list_changed = false;
+				foreach ( $value as $i => $row ) {
+					if ( is_array( $row ) && isset( $row['id'] ) && ( isset( $row['name'] ) || isset( $row['display_name'] ) ) ) {
+						$value[ $i ] = self::augment_mobile_person_card( $row, $list_changed );
+					}
+				}
+				if ( $list_changed ) {
+					$data[ $key ] = $value;
 					$changed = true;
 				}
 			}
-			foreach ( $data as $k => $v ) {
-				$data[ $k ] = self::walk_and_add_avatar_urls( $v, $changed );
+		}
+		// Nested: only follow a few known containers to avoid scanning entire response.
+		foreach ( array( 'items', 'threads', 'messages' ) as $container ) {
+			if ( isset( $data[ $container ] ) && is_array( $data[ $container ] ) ) {
+				$local_changed = false;
+				foreach ( $data[ $container ] as $i => $row ) {
+					$data[ $container ][ $i ] = self::augment_people_by_keys( $row, $local_changed, $keys );
+				}
+				if ( $local_changed ) {
+					$changed = true;
+				}
 			}
 		}
 		return $data;
+	}
+
+	private static function augment_mobile_user_card( array $user, bool &$changed ): array {
+		$user_id = absint( $user['id'] ?? 0 );
+		if ( $user_id <= 0 ) {
+			return $user;
+		}
+		$src = self::initials_and_color_for_user( $user_id );
+		$user['avatar_initials'] = (string) $src['initials'];
+		$user['avatar_color'] = (string) $src['color'];
+		$avatar = self::mobile_avatar_url_or_empty( $user_id, 192 );
+		$user['avatar_url'] = $avatar;
+		$changed = true;
+		return $user;
+	}
+
+	private static function augment_mobile_person_card( array $person, bool &$changed ): array {
+		$user_id = absint( $person['id'] ?? 0 );
+		if ( $user_id <= 0 || ! get_userdata( $user_id ) ) {
+			return $person;
+		}
+		$src = self::initials_and_color_for_user( $user_id );
+		$person['avatar_initials'] = (string) $src['initials'];
+		$person['avatar_color'] = (string) $src['color'];
+		$person['avatar_url'] = self::mobile_avatar_url_or_empty( $user_id, 192 );
+		$changed = true;
+		return $person;
+	}
+
+	public static function render_admin_user_avatar_fields( WP_User $user ): void {
+		$current = get_current_user_id();
+		if ( ! self::can_admin_manage_user_avatar( $current, (int) $user->ID ) ) {
+			return;
+		}
+		$has = self::avatar_attachment_id( (int) $user->ID );
+		$img = (string) get_avatar_url( (int) $user->ID, array( 'size' => 96 ) );
+		wp_nonce_field( 'atora_admin_avatar_' . (int) $user->ID, 'atora_admin_avatar_nonce' );
+		echo '<h2>' . esc_html__( 'Foto de perfil', 'atora-lms' ) . '</h2>';
+		echo '<table class="form-table" role="presentation"><tbody>';
+		echo '<tr><th>' . esc_html__( 'Avatar', 'atora-lms' ) . '</th><td>';
+		echo '<img src="' . esc_url( $img ) . '" alt="" width="72" height="72" style="border-radius:50%;object-fit:cover">';
+		echo '<p><input type="file" name="atora_admin_avatar_file" accept="image/jpeg,image/png,image/webp"></p>';
+		if ( $has ) {
+			echo '<p><label><input type="checkbox" name="atora_admin_avatar_remove" value="1"> ' . esc_html__( 'Quitar foto', 'atora-lms' ) . '</label></p>';
+		}
+		echo '<p class="description">' . esc_html__( 'JPG/PNG/WebP, máximo 5 MB. Se recorta a cuadrado y se guarda en la biblioteca.', 'atora-lms' ) . '</p>';
+		echo '</td></tr>';
+		echo '</tbody></table>';
+	}
+
+	public static function save_admin_user_avatar_fields( int $user_id ): void {
+		$current = get_current_user_id();
+		if ( ! self::can_admin_manage_user_avatar( $current, $user_id ) ) {
+			return;
+		}
+		$nonce = sanitize_text_field( (string) wp_unslash( $_POST['atora_admin_avatar_nonce'] ?? '' ) );
+		if ( '' === $nonce || ! wp_verify_nonce( $nonce, 'atora_admin_avatar_' . $user_id ) ) {
+			return;
+		}
+		if ( ! empty( $_POST['atora_admin_avatar_remove'] ) ) {
+			self::delete_user_avatar( $user_id );
+			return;
+		}
+		if ( ! empty( $_FILES['atora_admin_avatar_file']['tmp_name'] ) ) {
+			self::set_user_avatar_from_upload( $user_id, (array) $_FILES['atora_admin_avatar_file'] );
+		}
 	}
 }
 

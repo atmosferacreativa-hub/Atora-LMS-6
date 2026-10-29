@@ -82,6 +82,12 @@ final class AvatarProfileTest extends WP_UnitTestCase {
 		$url = (string) get_avatar_url( $this->student, array( 'size' => 96 ) );
 		$this->assertStringNotContainsString( 'gravatar.com', $url );
 		$this->assertNotEmpty( $url );
+
+		$me = rest_get_server()->dispatch( ( new WP_REST_Request( 'GET', '/atora-mobile/v1/me' ) )->set_header( 'Authorization', 'Bearer ' . $this->token ) );
+		$payload = rest_ensure_response( $me )->get_data();
+		$this->assertSame( (string) $data['avatar_url'], (string) $payload['user']['avatar_url'] );
+		$this->assertArrayHasKey( 'avatar_initials', $payload['user'] );
+		$this->assertArrayHasKey( 'avatar_color', $payload['user'] );
 	}
 
 	public function test_disguised_file_is_rejected_and_does_not_create_attachment(): void {
@@ -135,6 +141,10 @@ final class AvatarProfileTest extends WP_UnitTestCase {
 		$this->assertStringNotContainsString( 'gravatar.com', $html );
 		$url = (string) get_avatar_url( $this->student, array( 'size' => 96 ) );
 		$this->assertStringNotContainsString( 'gravatar.com', $url );
+
+		$me = rest_get_server()->dispatch( ( new WP_REST_Request( 'GET', '/atora-mobile/v1/me' ) )->set_header( 'Authorization', 'Bearer ' . $this->token ) );
+		$payload = rest_ensure_response( $me )->get_data();
+		$this->assertStringNotContainsString( 'gravatar.com', (string) $payload['user']['avatar_url'] );
 	}
 
 	public function test_avatar_is_deleted_on_account_deletion_process(): void {
