@@ -104,17 +104,53 @@ final class Forums_REST_Controller {
 		$items = array();
 
 		// Course forums.
+		$course_ids = array();
 		if ( class_exists( '\\ATORA\\LMS\\LMS_Enrollment_Service' ) && method_exists( '\\ATORA\\LMS\\LMS_Enrollment_Service', 'get_enrolled_wp_course_ids' ) ) {
 			$course_ids = (array) \ATORA\LMS\LMS_Enrollment_Service::get_enrolled_wp_course_ids( $user_id );
-			foreach ( array_values( array_unique( array_map( 'absint', $course_ids ) ) ) as $wp_course_id ) {
-				if ( $wp_course_id <= 0 ) {
-					continue;
-				}
-				$forum = Forums_Service::forum_for_scope( 'course', $wp_course_id );
-				if ( is_wp_error( $forum ) ) {
-					continue;
-				}
-				$items[] = self::forum_out( $forum );
+		}
+		if ( class_exists( 'ATORA_Teacher_Scope' ) && method_exists( 'ATORA_Teacher_Scope', 'course_ids' ) ) {
+			$course_ids = array_merge( $course_ids, (array) \ATORA_Teacher_Scope::course_ids( $user_id ) );
+		}
+		$course_ids = array_values( array_unique( array_filter( array_map( 'absint', $course_ids ) ) ) );
+		foreach ( $course_ids as $wp_course_id ) {
+			$forum = Forums_Service::forum_for_scope( 'course', $wp_course_id );
+			if ( ! is_wp_error( $forum ) ) {
+				$items[] = self::forum_out( (array) $forum );
+			}
+		}
+
+		// Program forums (enrollments).
+		global $wpdb;
+		$program_ids = (array) $wpdb->get_col( $wpdb->prepare(
+			"SELECT DISTINCT p.wp_post_id
+			 FROM {$wpdb->prefix}atora_program_enrollments pe
+			 INNER JOIN {$wpdb->prefix}atora_programs p ON p.id = pe.program_id
+			 WHERE pe.user_id = %d AND pe.status IN ('active','enrolled') AND p.wp_post_id IS NOT NULL AND p.wp_post_id > 0",
+			$user_id
+		) ); // phpcs:ignore WordPress.DB
+		foreach ( array_values( array_unique( array_filter( array_map( 'absint', $program_ids ) ) ) ) as $wp_program_id ) {
+			$forum = Forums_Service::forum_for_scope( 'program', $wp_program_id );
+			if ( ! is_wp_error( $forum ) ) {
+				$items[] = self::forum_out( (array) $forum );
+			}
+		}
+
+		// Cohort forums (internal cohort id; include student or teacher membership).
+		$cohort_rows = (array) $wpdb->get_results( $wpdb->prepare(
+			"SELECT DISTINCT c.id
+			 FROM {$wpdb->prefix}atora_cohort_members m
+			 INNER JOIN {$wpdb->prefix}atora_cohorts c ON c.id = m.cohort_id
+			 WHERE m.user_id = %d AND m.status = 'active' AND m.role IN ('student','teacher')",
+			$user_id
+		), ARRAY_A ); // phpcs:ignore WordPress.DB
+		foreach ( $cohort_rows as $row ) {
+			$cid = absint( $row['id'] ?? 0 );
+			if ( $cid <= 0 ) {
+				continue;
+			}
+			$forum = Forums_Service::forum_for_scope( 'cohort', $cid );
+			if ( ! is_wp_error( $forum ) ) {
+				$items[] = self::forum_out( (array) $forum );
 			}
 		}
 
@@ -486,6 +522,11 @@ final class Forums_REST_Controller {
 		$title = '';
 		if ( 'course' === $scope_type ) {
 			$title = (string) get_the_title( $scope_id );
+		} elseif ( 'program' === $scope_type ) {
+			$title = (string) get_the_title( $scope_id );
+		} elseif ( 'cohort' === $scope_type ) {
+			global $wpdb;
+			$title = (string) $wpdb->get_var( $wpdb->prepare( "SELECT name FROM {$wpdb->prefix}atora_cohorts WHERE id = %d LIMIT 1", $scope_id ) ); // phpcs:ignore WordPress.DB
 		}
 		return array(
 			'id'         => absint( $forum['id'] ),

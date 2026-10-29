@@ -19,6 +19,12 @@ final class ForumsBaseTest extends WP_UnitTestCase {
 	private int $course = 0;
 	private array $tokens = array();
 	private int $forum_id = 0;
+	private int $admin_a = 0;
+	private int $admin_b = 0;
+	private int $inst_a = 0;
+	private int $inst_b = 0;
+	private int $wp_course_b = 0;
+	private int $forum_b = 0;
 
 	protected function setUp(): void {
 		parent::setUp();
@@ -31,6 +37,14 @@ final class ForumsBaseTest extends WP_UnitTestCase {
 		}
 		Forums_Installer::ensure_tables();
 		do_action( 'rest_api_init', rest_get_server() );
+		global $wpdb;
+		$wpdb->query( "DELETE FROM {$wpdb->prefix}atora_institutions" );
+		$wpdb->query( "DELETE FROM {$wpdb->prefix}atora_institution_members" );
+		$wpdb->insert( $wpdb->prefix . 'atora_institutions', array( 'name' => 'Inst A', 'status' => 'active' ) );
+		$this->inst_a = (int) $wpdb->insert_id;
+		$wpdb->insert( $wpdb->prefix . 'atora_institutions', array( 'name' => 'Inst B', 'status' => 'active' ) );
+		$this->inst_b = (int) $wpdb->insert_id;
+		update_option( 'atora_default_institution', $this->inst_a, false );
 
 		$author = self::factory()->user->create( array( 'role' => 'administrator' ) );
 		$this->teacher = self::factory()->user->create( array( 'role' => 'lms_instructor', 'display_name' => 'Docente Foros' ) );
@@ -39,6 +53,15 @@ final class ForumsBaseTest extends WP_UnitTestCase {
 		$this->student = self::factory()->user->create( array( 'role' => 'subscriber', 'display_name' => 'Ana Foros' ) );
 		$this->student2 = self::factory()->user->create( array( 'role' => 'subscriber', 'display_name' => 'Beto Foros' ) );
 		$this->stranger = self::factory()->user->create( array( 'role' => 'subscriber', 'display_name' => 'No Matriculado' ) );
+		$this->admin_a = self::factory()->user->create( array( 'role' => 'administrator', 'display_name' => 'Admin A' ) );
+		$this->admin_b = self::factory()->user->create( array( 'role' => 'administrator', 'display_name' => 'Admin B' ) );
+
+		foreach ( array( $this->teacher, $this->assistant, $this->assistant_no_delegate, $this->student, $this->student2, $this->stranger, $this->admin_a, $this->admin_b ) as $u ) {
+			$wpdb->insert( $wpdb->prefix . 'atora_institution_members', array( 'institution_id' => $this->inst_a, 'user_id' => $u, 'status' => 'active' ) );
+		}
+		$wpdb->update( $wpdb->prefix . 'atora_institution_members', array( 'institution_id' => $this->inst_b ), array( 'user_id' => $this->admin_b ) );
+		update_user_meta( $this->admin_a, '_atora_active_institution', $this->inst_a );
+		update_user_meta( $this->admin_b, '_atora_active_institution', $this->inst_b );
 
 		$this->wp_course = self::factory()->post->create( array( 'post_type' => 'lm_course', 'post_status' => 'publish', 'post_author' => $author, 'post_title' => 'Curso Foros' ) );
 		$this->wp_course_draft = self::factory()->post->create( array( 'post_type' => 'lm_course', 'post_status' => 'draft', 'post_author' => $author, 'post_title' => 'Curso No Publicado' ) );
@@ -51,6 +74,16 @@ final class ForumsBaseTest extends WP_UnitTestCase {
 		$section = (int) \ATORA\LMS\Section_Service::create( array( 'wp_course_id' => $this->wp_course, 'title' => 'Sección Foros' ) );
 		\ATORA\LMS\Section_Service::add_teacher( $section, $this->teacher );
 
+		// Curso en otra institución.
+		update_option( 'atora_default_institution', $this->inst_b, false );
+		$this->wp_course_b = self::factory()->post->create( array( 'post_type' => 'lm_course', 'post_status' => 'publish', 'post_author' => $author, 'post_title' => 'Curso Inst B' ) );
+		$section_b = (int) \ATORA\LMS\Section_Service::create( array( 'wp_course_id' => $this->wp_course_b, 'title' => 'Sección B' ) );
+		\ATORA\LMS\Section_Service::add_teacher( $section_b, $this->admin_b );
+		$forum_b = \ATORA\Forums\Forums_Service::forum_for_scope( 'course', $this->wp_course_b );
+		$this->forum_b = (int) ( is_array( $forum_b ) ? $forum_b['id'] : 0 );
+		$this->assertGreaterThan( 0, $this->forum_b );
+		update_option( 'atora_default_institution', $this->inst_a, false );
+
 		// Delegación para el asistente.
 		if ( class_exists( 'ATORA_Delegation_Service' ) ) {
 			ATORA_Delegation_Service::grant( $this->teacher, $this->assistant, array(
@@ -60,7 +93,7 @@ final class ForumsBaseTest extends WP_UnitTestCase {
 			) );
 		}
 
-		foreach ( array( $this->teacher, $this->assistant, $this->assistant_no_delegate, $this->student, $this->student2, $this->stranger ) as $u ) {
+		foreach ( array( $this->teacher, $this->assistant, $this->assistant_no_delegate, $this->student, $this->student2, $this->stranger, $this->admin_a, $this->admin_b ) as $u ) {
 			$this->tokens[ $u ] = ATORA_Mobile_Token_Service::issue( $u, 'test' )['access_token'];
 		}
 
@@ -171,6 +204,13 @@ final class ForumsBaseTest extends WP_UnitTestCase {
 		$this->assertNotWPError( $forum );
 		$forum_id = (int) $forum['id'];
 		$this->assertSame( 409, $this->call( $this->student, 'POST', "/forums/{$forum_id}/topics", array( 'title' => 'x', 'body' => 'y', 'client_event_id' => 'draft1' ) )->get_status() );
+	}
+
+	public function test_admin_cannot_moderate_other_institution_forums(): void {
+		$topic = $this->call( $this->admin_b, 'POST', "/forums/{$this->forum_b}/topics", array( 'title' => 'B', 'body' => 'B', 'client_event_id' => 'b1' ) );
+		$this->assertSame( 201, $topic->get_status() );
+		$topic_id = (int) $topic->get_data()['topic']['id'];
+		$this->assertSame( 403, $this->call( $this->admin_a, 'POST', "/forums/topics/{$topic_id}/moderate", array( 'action' => 'hide' ) )->get_status() );
 	}
 }
 

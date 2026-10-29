@@ -38,7 +38,10 @@ final class Forums_Service {
 			return $inst > 0 ? $inst : absint( get_option( 'atora_default_institution', 0 ) );
 		}
 		if ( self::SCOPE_COHORT === $scope_type ) {
-			$inst = (int) $wpdb->get_var( $wpdb->prepare( "SELECT institution_id FROM {$wpdb->prefix}atora_cohorts WHERE wp_post_id = %d LIMIT 1", $scope_id ) ); // phpcs:ignore WordPress.DB
+			$inst = (int) $wpdb->get_var( $wpdb->prepare( "SELECT institution_id FROM {$wpdb->prefix}atora_cohorts WHERE id = %d LIMIT 1", $scope_id ) ); // phpcs:ignore WordPress.DB
+			if ( $inst <= 0 ) {
+				$inst = (int) $wpdb->get_var( $wpdb->prepare( "SELECT institution_id FROM {$wpdb->prefix}atora_cohorts WHERE wp_post_id = %d LIMIT 1", $scope_id ) ); // phpcs:ignore WordPress.DB
+			}
 			return $inst > 0 ? $inst : absint( get_option( 'atora_default_institution', 0 ) );
 		}
 		return absint( get_option( 'atora_default_institution', 0 ) );
@@ -81,6 +84,10 @@ final class Forums_Service {
 		}
 		if ( ! self::in_institution( $user_id, absint( $forum['institution_id'] ?? 0 ), (string) ( $forum['scope_type'] ?? '' ), absint( $forum['scope_id'] ?? 0 ) ) ) {
 			return false;
+		}
+		// Moderadores pueden leer/escribir aunque no estén matriculados como estudiantes.
+		if ( self::can_moderate( $user_id, $forum ) ) {
+			return true;
 		}
 		$scope_type = (string) ( $forum['scope_type'] ?? '' );
 		$scope_id = absint( $forum['scope_id'] ?? 0 );
@@ -130,7 +137,7 @@ final class Forums_Service {
 			return false;
 		}
 		if ( user_can( $user_id, 'manage_options' ) ) {
-			return true;
+			return self::in_institution( $user_id, absint( $forum['institution_id'] ?? 0 ), (string) ( $forum['scope_type'] ?? '' ), absint( $forum['scope_id'] ?? 0 ) );
 		}
 		$scope_type = (string) ( $forum['scope_type'] ?? '' );
 		$scope_id = absint( $forum['scope_id'] ?? 0 );
@@ -141,6 +148,30 @@ final class Forums_Service {
 			if ( class_exists( 'ATORA_Delegation_Service' ) && ( \ATORA_Delegation_Service::covers( $user_id, $scope_id, 'content' ) || \ATORA_Delegation_Service::covers( $user_id, $scope_id, 'grade' ) ) ) {
 				return true;
 			}
+			return false;
+		}
+		if ( self::SCOPE_PROGRAM === $scope_type ) {
+			foreach ( self::program_course_wp_ids( $scope_id ) as $wp_course_id ) {
+				if ( class_exists( 'ATORA_Teacher_Scope' ) && \ATORA_Teacher_Scope::can_access_course( $user_id, $wp_course_id ) ) {
+					return true;
+				}
+				if ( class_exists( 'ATORA_Delegation_Service' ) && ( \ATORA_Delegation_Service::covers( $user_id, $wp_course_id, 'content' ) || \ATORA_Delegation_Service::covers( $user_id, $wp_course_id, 'grade' ) ) ) {
+					return true;
+				}
+			}
+			return false;
+		}
+		if ( self::SCOPE_COHORT === $scope_type ) {
+			if ( self::is_teacher_in_cohort( $user_id, $scope_id ) ) {
+				return true;
+			}
+			// Delegación: si el asistente cubre cualquier curso de la cohorte.
+			foreach ( self::cohort_course_wp_ids( $scope_id ) as $wp_course_id ) {
+				if ( class_exists( 'ATORA_Delegation_Service' ) && ( \ATORA_Delegation_Service::covers( $user_id, $wp_course_id, 'content' ) || \ATORA_Delegation_Service::covers( $user_id, $wp_course_id, 'grade' ) ) ) {
+					return true;
+				}
+			}
+			return false;
 		}
 		return false;
 	}
@@ -167,12 +198,9 @@ final class Forums_Service {
 	}
 
 	private static function is_enrolled_in_course( int $user_id, int $wp_course_id ): bool {
-		if ( ! class_exists( '\\ATORA\\LMS\\LMS_Course_Service' ) || ! class_exists( '\\ATORA\\LMS\\LMS_Enrollment_Service' ) ) {
-			return false;
-		}
-		$course = \ATORA\LMS\LMS_Course_Service::get_by_wp_post( $wp_course_id );
-		$course_id = absint( is_array( $course ) ? ( $course['id'] ?? 0 ) : 0 );
-		return $course_id > 0 && \ATORA\LMS\LMS_Enrollment_Service::is_enrolled( $user_id, $course_id );
+		return class_exists( '\\ATORA\\LMS\\LMS_Enrollment_Service' )
+			&& method_exists( '\\ATORA\\LMS\\LMS_Enrollment_Service', 'is_enrolled_by_wp_id' )
+			&& \ATORA\LMS\LMS_Enrollment_Service::is_enrolled_by_wp_id( $user_id, $wp_course_id );
 	}
 
 	private static function is_enrolled_in_program( int $user_id, int $wp_program_id ): bool {
@@ -187,12 +215,42 @@ final class Forums_Service {
 
 	private static function is_in_cohort( int $user_id, int $wp_cohort_id ): bool {
 		global $wpdb;
-		$cohort_id = (int) $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$wpdb->prefix}atora_cohorts WHERE wp_post_id = %d LIMIT 1", $wp_cohort_id ) ); // phpcs:ignore WordPress.DB
+		$cohort_id = (int) $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$wpdb->prefix}atora_cohorts WHERE id = %d OR wp_post_id = %d LIMIT 1", $wp_cohort_id, $wp_cohort_id ) ); // phpcs:ignore WordPress.DB
 		if ( $cohort_id <= 0 ) {
 			return false;
 		}
 		$row = $wpdb->get_var( $wpdb->prepare( "SELECT 1 FROM {$wpdb->prefix}atora_cohort_members WHERE cohort_id = %d AND user_id = %d AND role = 'student' AND status = 'active' LIMIT 1", $cohort_id, $user_id ) ); // phpcs:ignore WordPress.DB
 		return (bool) $row;
+	}
+
+	private static function is_teacher_in_cohort( int $user_id, int $cohort_id_or_wp ): bool {
+		global $wpdb;
+		$cohort_id = (int) $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$wpdb->prefix}atora_cohorts WHERE id = %d OR wp_post_id = %d LIMIT 1", $cohort_id_or_wp, $cohort_id_or_wp ) ); // phpcs:ignore WordPress.DB
+		if ( $cohort_id <= 0 ) {
+			return false;
+		}
+		return (bool) $wpdb->get_var( $wpdb->prepare( "SELECT 1 FROM {$wpdb->prefix}atora_cohort_members WHERE cohort_id = %d AND user_id = %d AND role = 'teacher' AND status = 'active' LIMIT 1", $cohort_id, $user_id ) ); // phpcs:ignore WordPress.DB
+	}
+
+	private static function program_course_wp_ids( int $wp_program_id ): array {
+		if ( class_exists( 'CLMS_Helper' ) && method_exists( 'CLMS_Helper', 'get_program_courses' ) ) {
+			return array_values( array_unique( array_filter( array_map( 'absint', (array) \CLMS_Helper::get_program_courses( $wp_program_id ) ) ) ) );
+		}
+		return array();
+	}
+
+	private static function cohort_course_wp_ids( int $cohort_id_or_wp ): array {
+		global $wpdb;
+		$cohort_id = (int) $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$wpdb->prefix}atora_cohorts WHERE id = %d OR wp_post_id = %d LIMIT 1", $cohort_id_or_wp, $cohort_id_or_wp ) ); // phpcs:ignore WordPress.DB
+		if ( $cohort_id <= 0 ) {
+			return array();
+		}
+		$table = $wpdb->prefix . 'atora_cohort_courses';
+		if ( (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) ) !== $table ) {
+			return array();
+		}
+		$ids = (array) $wpdb->get_col( $wpdb->prepare( "SELECT course_id FROM {$table} WHERE cohort_id = %d ORDER BY course_order ASC, id ASC", $cohort_id ) ); // phpcs:ignore WordPress.DB
+		return array_values( array_unique( array_filter( array_map( 'absint', $ids ) ) ) );
 	}
 }
 
