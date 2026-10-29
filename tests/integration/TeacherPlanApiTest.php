@@ -145,20 +145,20 @@ final class TeacherPlanApiTest extends WP_UnitTestCase {
 		$this->assertSame( $before + $created_lessons, $this->lesson_count(), 'Volver a publicar no duplica lecciones.' );
 	}
 
-	public function test_assistant_prepares_but_cannot_publish_and_stranger_is_blocked(): void {
+	public function test_assistant_publishes_like_instructor_and_stranger_is_blocked(): void {
 		$created = $this->call( $this->assistant, 'POST', '/teacher/plans', array( 'course_id' => $this->course, 'data' => array( 'title' => 'Semana 2', 'remote' => array( 'before' => 'Leer.' ) ) ) );
 		$this->assertSame( 201, $created->get_status(), wp_json_encode( $created->get_data() ) );
 		$plan = $created->get_data();
-		$this->assertFalse( $plan['can_publish'] );
-		$this->assertSame( 403, $this->call( $this->assistant, 'POST', '/teacher/plans/' . $plan['id'] . '/publish', array( 'revision' => 1 ) )->get_status() );
-		$this->assertSame( 0, $this->lesson_count() );
+		// 6.41.0: con delegación, publica como el instructor.
+		$this->assertTrue( $plan['can_publish'] );
 
 		$this->assertSame( 404, $this->call( $this->stranger, 'GET', '/teacher/plans/' . $plan['id'] )->get_status() );
 		$this->assertSame( 404, $this->call( $this->stranger, 'POST', '/teacher/plans', array( 'course_id' => $this->course, 'data' => array() ) )->get_status() );
 		$this->assertSame( 403, $this->call( $this->student, 'GET', '/teacher/plans', array(), array( 'course' => $this->course ) )->get_status() );
 
-		$teacher_view = $this->call( $this->teacher, 'POST', '/teacher/plans/' . $plan['id'] . '/publish', array( 'revision' => 1 ) );
-		$this->assertSame( 200, $teacher_view->get_status(), 'El docente publica lo que preparó el asistente.' );
+		$published = $this->call( $this->assistant, 'POST', '/teacher/plans/' . $plan['id'] . '/publish', array( 'revision' => 1 ) );
+		$this->assertSame( 200, $published->get_status(), wp_json_encode( $published->get_data() ) );
+		$this->assertGreaterThan( 0, $this->lesson_count() );
 	}
 
 	public function test_audio_upload_is_validated_and_idempotent(): void {

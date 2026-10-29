@@ -404,6 +404,30 @@ trait CLMS_Grading_SpeedGrade_Trait {
 									<?php endif; ?>
 								<?php endif; ?>
 
+								<?php
+								// 6.41.0: pre-calificación del instructor asistente.
+								$pregrade_info = class_exists( 'ATORA_Pregrade' ) ? ATORA_Pregrade::info( (int) $context['submission_id'] ) : null;
+								$is_pregrader  = class_exists( 'ATORA_Pregrade' ) && ATORA_Pregrade::applies( $user_id, absint( get_post_meta( (int) $context['submission_id'], '_clms_submission_course_id', true ) ) );
+								?>
+								<?php if ( $pregrade_info && $pregrade_info['pending'] ) : ?>
+									<div class="clms-sg-flash">
+										<?php
+										/* translators: %s: nombre del asistente */
+										printf( esc_html__( 'Pre-calificación de %s · por validar. El estudiante no la ve hasta que el instructor la publique.', 'atora-lms' ), esc_html( (string) $pregrade_info['by']['name'] ) );
+										?>
+									</div>
+								<?php elseif ( $pregrade_info && ! empty( $pregrade_info['returned'] ) ) : ?>
+									<div class="clms-sg-flash">
+										<?php
+										/* translators: 1: instructor, 2: comentario */
+										printf( esc_html__( '%1$s devolvió la pre-calificación: %2$s', 'atora-lms' ), esc_html( (string) $pregrade_info['returned']['by'] ), esc_html( (string) $pregrade_info['returned']['comment'] ) );
+										?>
+									</div>
+								<?php endif; ?>
+								<?php if ( $is_pregrader ) : ?>
+									<p class="description"><?php esc_html_e( 'Como instructor asistente, al publicar queda como pre-calificación para que el instructor la valide.', 'atora-lms' ); ?></p>
+								<?php endif; ?>
+
 								<div class="clms-sg-actions">
 									<button type="submit" name="clms_sg_submit" value="save_draft" class="clms-sg-btn clms-sg-btn--secondary">
 										<?php esc_html_e( 'Guardar en revisión', 'atora-lms' ); ?>

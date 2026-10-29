@@ -252,6 +252,14 @@ class ATORA_Grading_Save_Service {
 			return new WP_Error( 'clms_moderation_required', __( 'Esta calificación pertenece a un ciclo institucional y debe aprobarse mediante moderación.', 'atora-lms' ) );
 		}
 
+		// 6.41.0: el instructor asistente (solo por delegación) pre-califica: lo que publicaría queda como borrador
+		// marcado hasta que el instructor lo valide.
+		$pregrade_action = '';
+		if ( class_exists( 'ATORA_Pregrade' ) && ATORA_Pregrade::is_final_action( (string) $submit_action ) && ATORA_Pregrade::applies( $user_id, (int) $course_id ) ) {
+			$pregrade_action = (string) $submit_action;
+			$submit_action   = 'save_draft';
+		}
+
 		if ( ! in_array( $status, array( 'submitted', 'in_review', 'graded', 'needs_revision', 'returned' ), true ) ) {
 			$status = 'in_review';
 		}
@@ -561,7 +569,16 @@ class ATORA_Grading_Save_Service {
 		}
 		do_action( 'atora_grade_revision_saved', $submission_id, $revision );
 
+		if ( class_exists( 'ATORA_Pregrade' ) ) {
+			if ( '' !== $pregrade_action ) {
+				ATORA_Pregrade::mark( $submission_id, $user_id, $pregrade_action );
+			} elseif ( in_array( $status, array( 'graded', 'needs_revision' ), true ) ) {
+				ATORA_Pregrade::resolve( $submission_id, $user_id );
+			}
+		}
+
 		return array(
+			'pregrade'      => '' !== $pregrade_action,
 			'submission_id' => $submission_id,
 			'status'        => $status,
 			'grade'         => $grade,

@@ -163,12 +163,13 @@ final class ATORA_Mobile_Teacher_Content_Controller {
 		), 200 );
 	}
 
-	/** Puede publicar, ocultar y cambiar fechas (no el asistente con delegación). */
+	/** Puede publicar, ocultar y cambiar fechas (6.41.0: también el instructor asistente con delegación). */
 	public static function can_manage( int $user_id, int $wp_course ): bool {
 		if ( ! user_can( $user_id, 'edit_lm_lessons' ) || ! ATORA_Teacher_Scope::can_access_course( $user_id, $wp_course ) ) {
 			return false;
 		}
-		return ! ( class_exists( 'ATORA_Hybrid_Plan_Service' ) && ATORA_Hybrid_Plan_Service::is_assistant_only( $user_id, $wp_course ) );
+		// 6.41.0: el instructor asistente gestiona su curso delegado como el instructor.
+		return true;
 	}
 
 	// ── POST /teacher/lessons/{id} ─────────────────────────────────────────

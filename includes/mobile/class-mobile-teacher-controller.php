@@ -45,6 +45,7 @@ final class ATORA_Mobile_Teacher_Controller {
 			'/teacher/submissions'                                            => array( 'GET', 'submissions' ),
 			'/teacher/submissions/(?P<submission_id>\d+)'                     => array( 'GET', 'submission' ),
 			'/teacher/submissions/(?P<submission_id>\d+)/grade'               => array( 'POST', 'grade' ),
+			'/teacher/submissions/(?P<submission_id>\d+)/pregrade/return'     => array( 'POST', 'return_pregrade' ),
 			'/teacher/submissions/(?P<submission_id>\d+)/files/(?P<file_id>\d+)' => array( 'GET', 'file' ),
 			'/teacher/announcements'                                          => array( 'POST', 'announce' ),
 		);
@@ -143,6 +144,7 @@ final class ATORA_Mobile_Teacher_Controller {
 			'is_late'      => '1' === (string) get_post_meta( $submission_id, '_clms_submission_is_late', true ),
 			'group'        => $group_master,
 			'submitted_at' => self::iso( (string) get_post_field( 'post_date_gmt', $submission_id ) ),
+			'pregrade'     => class_exists( 'ATORA_Pregrade' ) ? ATORA_Pregrade::info( $submission_id ) : null,
 		);
 	}
 
@@ -160,6 +162,10 @@ final class ATORA_Mobile_Teacher_Controller {
 		$filters = array( 'exclude_shadows' => true, 'order' => $order );
 		if ( 'late' === $status ) {
 			$filters['late'] = true;
+		} elseif ( 'to_validate' === $status ) {
+			// 6.41.0: pre-calificaciones del asistente por validar.
+			$filters['status']   = 'in_review';
+			$filters['pregrade'] = true;
 		} elseif ( isset( self::QUEUE_STATUSES[ $status ] ) ) {
 			$filters['status'] = self::QUEUE_STATUSES[ $status ];
 		} elseif ( 'all' === $status ) {
@@ -519,6 +525,9 @@ final class ATORA_Mobile_Teacher_Controller {
 			) : null,
 			'group'            => $group,
 			'moderated'        => ! empty( $context['moderation']['institutional'] ),
+			// 6.41.0: pre-calificación del asistente (pendiente de validar o devuelta) y si quien mira publica.
+			'pregrade'         => class_exists( 'ATORA_Pregrade' ) ? ATORA_Pregrade::info( $submission_id ) : null,
+			'can_publish'      => ! ( class_exists( 'ATORA_Pregrade' ) && ATORA_Pregrade::applies( $user_id, (int) ( $context['course_id'] ?? 0 ) ) ),
 			// 6.32.0: ¿se puede pedir sugerencia de IA? (función activa y tarea abierta, no quiz).
 			'ai_suggestion_available' => class_exists( 'ATORA_AI_Grading_Suggestion_Service' ) && ATORA_AI_Usage_Service::available( ATORA_AI_Usage_Service::SUGGESTION ) && ATORA_AI_Grading_Suggestion_Service::is_open_task( $submission_id ),
 		);
@@ -660,6 +669,27 @@ final class ATORA_Mobile_Teacher_Controller {
 		}
 		update_post_meta( $submission_id, $event_key, $result );
 		return new WP_REST_Response( array( 'result' => $result, 'submission' => self::detail( $user_id, $submission_id ), 'replayed' => false ), 200 );
+	}
+
+	// ── POST /teacher/submissions/{id}/pregrade/return ─────────────────────
+
+	/** 6.41.0: el instructor devuelve la pre-calificación al asistente con un comentario. */
+	public static function return_pregrade( WP_REST_Request $request ) {
+		$user_id       = get_current_user_id();
+		$submission_id = absint( $request['submission_id'] );
+		if ( ! ATORA_Teacher_Scope::can_grade_submission( $user_id, $submission_id ) ) {
+			return self::not_found();
+		}
+		$course = absint( get_post_meta( $submission_id, '_clms_submission_course_id', true ) );
+		if ( ATORA_Pregrade::applies( $user_id, $course ) ) {
+			return new WP_Error( 'atora_pregrade_forbidden', __( 'Solo el instructor del curso valida o devuelve una pre-calificación.', 'atora-lms' ), array( 'status' => 403 ) );
+		}
+		$params = (array) $request->get_json_params();
+		$result = ATORA_Pregrade::return_to_assistant( $submission_id, $user_id, (string) ( $params['comment'] ?? '' ) );
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+		return new WP_REST_Response( array( 'submission' => self::detail( $user_id, $submission_id ) ), 200 );
 	}
 
 	// ── POST /teacher/announcements ────────────────────────────────────────

@@ -1015,6 +1015,7 @@ add_action( 'init', static function () {
 	// 6.30.1: la regla de visibilidad decide qué hook dispara un guardado de nota;
 	// los módulos que arranca el loader se enganchan a su DRAFT_HOOK.
 	atora_lms_require_module( 'includes/grading/class-student-grade-visibility.php' );
+	atora_lms_require_module( 'includes/grading/class-pregrade.php' );
 	// 6.31.0: alcance del docente (SpeedGrader web y /teacher/*).
 	atora_lms_require_module( 'includes/teacher/class-teacher-scope.php' );
 	// 6.36.0: regla canónica de riesgo académico (estado académico, API docente, SpeedGrader).
