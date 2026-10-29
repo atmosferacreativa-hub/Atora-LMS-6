@@ -257,6 +257,8 @@ final class ATORA_E2E_Seed_CLI {
 		}
 		// 6.41.0: curso propio para la pre-calificación (no altera las colas ni las listas de «Curso E2E»).
 		$pre_course = self::pregrade_course( $teacher, $assistant, $role, $password );
+		// 6.41.0: un curso del estudiante en un período cerrado y visible («Períodos anteriores» en la app).
+		$past_course = self::past_period_course( $teacher, $student );
 		$submission  = self::submission( $student, $task, $course );
 		$submission2 = self::submission( $student2, $essay, $course, self::pdf( $student2 ) );
 		$submission3 = self::submission( $student2, $concurrency, $course );
@@ -303,6 +305,7 @@ final class ATORA_E2E_Seed_CLI {
 			'teacher'    => array( 'id' => $teacher, 'login' => 'docente_e2e' ),
 			'teacher2'   => array( 'id' => $teacher2, 'login' => 'docente2_e2e' ),
 			'assistant'  => array( 'id' => $assistant, 'login' => 'asistente_e2e', 'course' => $pre_course ),
+			'past_course' => $past_course,
 			'student'    => array( 'id' => $student, 'login' => 'estudiante_e2e' ),
 			'student2'   => array( 'id' => $student2, 'login' => 'estudiante2_e2e' ),
 			'course'     => array( 'wp_id' => $course, 'id' => $table_course ? (int) $table_course['id'] : 0, 'section_id' => $section ),
@@ -835,6 +838,50 @@ final class ATORA_E2E_Seed_CLI {
 		}
 		self::submission( $student, $lesson, $course );
 		self::delegate( $teacher, $assistant, $course );
+		return $course;
+	}
+
+	/** 6.41.0: «Curso Anterior E2E» en el período cerrado «Período 2025-2 E2E» (visible para repasar). */
+	public static function past_period_course( int $teacher, int $student ): int {
+		$existing = get_page_by_path( 'curso-anterior-e2e', OBJECT, 'lm_course' );
+		$course   = $existing ? (int) $existing->ID : (int) wp_insert_post( array(
+			'post_type'    => 'lm_course',
+			'post_status'  => 'publish',
+			'post_name'    => 'curso-anterior-e2e',
+			'post_title'   => 'Curso Anterior E2E',
+			'post_author'  => $teacher,
+			'post_content' => 'Curso de un período ya cerrado, disponible para repasar.',
+		) );
+		self::lesson( $course, $teacher, 'leccion-e2e-anterior', 'Repaso del período', 1, array() );
+		if ( method_exists( 'CLMS_Helper', 'enroll_user_in_course' ) ) {
+			CLMS_Helper::enroll_user_in_course( $student, $course );
+		}
+		$table = class_exists( '\\ATORA\\LMS\\LMS_Course_Service' ) ? \ATORA\LMS\LMS_Course_Service::get_by_wp_post( $course ) : null;
+		if ( $table && class_exists( '\\ATORA\\LMS\\LMS_Enrollment_Service' ) ) {
+			\ATORA\LMS\LMS_Enrollment_Service::enroll( $student, (int) $table['id'] );
+		}
+		self::require_class( 'ATORA_Periods_Service', 'Períodos E2E' );
+		ATORA_Periods_Service::ensure_schema();
+		global $wpdb;
+		$periods = ATORA_Periods_Service::table_periods();
+		$links   = ATORA_Periods_Service::table_links();
+		$inst    = class_exists( 'ATORA_Teacher_Scope' ) ? ATORA_Teacher_Scope::course_institution( $course ) : 0;
+		$old     = array_map( 'absint', (array) $wpdb->get_col( $wpdb->prepare( "SELECT id FROM {$periods} WHERE name = %s", 'Período 2025-2 E2E' ) ) ); // phpcs:ignore WordPress.DB
+		foreach ( $old as $id ) {
+			$wpdb->delete( $links, array( 'period_id' => $id ) );
+			$wpdb->delete( $periods, array( 'id' => $id ) );
+		}
+		$wpdb->insert( $periods, array(
+			'institution_id'  => $inst,
+			'name'            => 'Período 2025-2 E2E',
+			'starts_on'       => '2025-07-01',
+			'ends_on'         => '2025-12-15',
+			'status'          => 'closed',
+			'closed_at'       => current_time( 'mysql', true ),
+			'past_visibility' => 'visible',
+		) );
+		$wpdb->delete( $links, array( 'wp_course_id' => $course ) );
+		$wpdb->insert( $links, array( 'institution_id' => $inst, 'period_id' => (int) $wpdb->insert_id, 'wp_course_id' => $course ) );
 		return $course;
 	}
 
