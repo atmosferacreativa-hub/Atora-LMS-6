@@ -332,7 +332,36 @@ final class ATORA_Avatar_Service {
 		if ( is_wp_error( $saved ) || ! is_array( $saved ) || empty( $saved['path'] ) ) {
 			return new WP_Error( 'atora_avatar_save', __( 'No se pudo guardar la imagen.', 'atora-lms' ), array( 'status' => 500 ) );
 		}
-		return (string) $saved['path'];
+		$out = (string) $saved['path'];
+		// Imagick conserva a propósito los perfiles EXIF/IPTC/XMP (WP_Image_Editor_Imagick::strip_meta): una segunda
+		// codificación con GD garantiza que no quede la ubicación ni otros metadatos de la foto.
+		$clean = self::reencode_without_metadata( $out, $mime );
+		if ( is_wp_error( $clean ) ) {
+			return $clean;
+		}
+		return $out;
+	}
+
+	/** Vuelve a codificar con GD (nunca escribe EXIF). */
+	private static function reencode_without_metadata( string $path, string $mime ) {
+		if ( ! function_exists( 'imagecreatefromstring' ) ) {
+			return new WP_Error( 'atora_avatar_gd', __( 'El servidor no puede limpiar los metadatos de la imagen (falta GD).', 'atora-lms' ), array( 'status' => 500 ) );
+		}
+		$raw   = (string) file_get_contents( $path );
+		$image = '' !== $raw ? @imagecreatefromstring( $raw ) : false; // phpcs:ignore WordPress.PHP.NoSilencedErrors
+		if ( ! $image ) {
+			return new WP_Error( 'atora_avatar_gd', __( 'No se pudo procesar la imagen.', 'atora-lms' ), array( 'status' => 400 ) );
+		}
+		if ( 'image/png' === $mime ) {
+			imagesavealpha( $image, true );
+			$ok = imagepng( $image, $path, 6 );
+		} elseif ( 'image/webp' === $mime && function_exists( 'imagewebp' ) ) {
+			$ok = imagewebp( $image, $path, 90 );
+		} else {
+			$ok = imagejpeg( $image, $path, 90 );
+		}
+		imagedestroy( $image );
+		return $ok ? true : new WP_Error( 'atora_avatar_gd', __( 'No se pudo guardar la imagen.', 'atora-lms' ), array( 'status' => 500 ) );
 	}
 
 	public static function on_account_deletion_processed( int $user_id, string $mode, int $request_id ): void {
