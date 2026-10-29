@@ -78,7 +78,7 @@ Integración con proveedores externos: ATORA crea la reunión, entrega el enlace
 
 **TESTS**: `EmailWebhookSecurityTest`, `EmailEngineDeliveryTest`, `MessagingEmailTemplatesTest`, `EmailTemplateEditorTest`, `EmailDeliverabilityTest`, `NewsletterSendTest`, `AutomationFlowsTest`, `AutomationEditorViewTest`, `LiveClassesTest`.
 
-## 6.37.0 (2026-10-27)
+## 6.37.0 (2026-10-27, no publicada: versión de desarrollo, incluida en 6.39.0 — ver `docs/VERSIONES.md`)
 
 ### Audio en la lección y planificación híbrida (`docs/ordenes/ORDEN-AUDIO-PLANIFICACION.md`)
 
@@ -98,7 +98,7 @@ Integración con proveedores externos: ATORA crea la reunión, entrega el enlace
 
 **TESTS**: `tests/Media/LessonAudioUnitTest.php`, `LessonAudioTest`, `HybridPlanServiceTest`, `HybridPlanRestTest`.
 
-## 6.36.0 (2026-10-27)
+## 6.36.0 (2026-10-27, no publicada: versión de desarrollo, incluida en 6.39.0 — ver `docs/VERSIONES.md`)
 
 ### Analíticas y riesgo académico (`docs/ordenes/ORDEN-ANALITICAS.md`)
 
