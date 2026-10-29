@@ -814,7 +814,8 @@ final class ATORA_E2E_Seed_CLI {
 
 	/** 6.41.0: «Pre-calificación E2E»: un estudiante, una tarea entregada y el curso delegado al asistente. */
 	private static function pregrade_course( int $teacher, int $assistant, string $role, string $password ): int {
-		$student  = self::user( 'estudiante3_e2e', 'Estudiante Tres E2E', $role, $password );
+		// Login propio: `estudiante3_e2e` ya es el estudiante del programa.
+		$student  = self::user( 'estudiante_pre_e2e', 'Estudiante Tres E2E', $role, $password );
 		$existing = get_page_by_path( 'curso-pre-calificacion-e2e', OBJECT, 'lm_course' );
 		$course   = $existing ? (int) $existing->ID : (int) wp_insert_post( array(
 			'post_type'    => 'lm_course',

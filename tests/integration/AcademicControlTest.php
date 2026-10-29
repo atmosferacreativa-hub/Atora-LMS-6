@@ -10,10 +10,14 @@
 
 declare( strict_types = 1 );
 
+require_once __DIR__ . '/LmsRowsCleanup.php';
+
 use ATORA\LMS\LMS_Course_Service;
 use ATORA\LMS\LMS_Enrollment_Service;
 
 final class AcademicControlTest extends WP_UnitTestCase {
+
+	use LmsRowsCleanup;
 
 	private int $control = 0;
 	private int $teacher = 0;
@@ -21,6 +25,7 @@ final class AcademicControlTest extends WP_UnitTestCase {
 	private int $wp_course = 0;
 	private int $wp_lesson = 0;
 	private int $submission = 0;
+	private array $extra = array();
 
 	protected function setUp(): void {
 		parent::setUp();
@@ -55,6 +60,7 @@ final class AcademicControlTest extends WP_UnitTestCase {
 	}
 
 	protected function tearDown(): void {
+		$this->cleanup_lms_rows( array_merge( array( $this->wp_course ), $this->extra ), array( $this->student ) );
 		global $wpdb;
 		$wpdb->query( "DELETE FROM {$wpdb->prefix}atora_final_grade_adjustments" );
 		$wpdb->query( "DELETE FROM {$wpdb->prefix}atora_institutions WHERE slug IN ('ctrl-a','ctrl-b')" );
@@ -122,6 +128,7 @@ final class AcademicControlTest extends WP_UnitTestCase {
 		$wpdb->update( $wpdb->prefix . 'atora_courses', array( 'institution_id' => $inst_a ), array( 'wp_post_id' => $this->wp_course ) );
 		$other = self::factory()->post->create( array( 'post_type' => 'lm_course', 'post_status' => 'publish', 'post_author' => $this->teacher ) );
 		LMS_Course_Service::get_by_wp_post( $other );
+		$this->extra[] = $other;
 		$wpdb->update( $wpdb->prefix . 'atora_courses', array( 'institution_id' => $inst_b ), array( 'wp_post_id' => $other ) );
 		$wpdb->insert( $wpdb->prefix . 'atora_institution_members', array( 'institution_id' => $inst_a, 'user_id' => $this->control, 'role' => 'member', 'status' => 'active' ) );
 		update_user_meta( $this->control, '_atora_active_institution', $inst_a );
