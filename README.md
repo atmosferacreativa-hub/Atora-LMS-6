@@ -2,7 +2,10 @@
 
 ATORA LMS es un sistema de gestión del aprendizaje modular para WordPress. Reúne creación de cursos y programas, matrículas, progreso, evaluación con rúbricas, SpeedGrade, certificados, seguimiento académico, clases en vivo, integraciones, mensajería y herramientas de crecimiento.
 
-> Estado: `main` mantiene 6.26.2. La 6.26.3 está en integración y debe validarse con pruebas dinámicas y funcionales antes de utilizarse en producción pública.
+> Estado: última versión publicada **6.40.1**. `main` contiene la 6.41.0 en desarrollo (roles Instructor asistente,
+> Control académico y Auxiliar administrativo; foto de perfil propia; pedidos de WooCommerce por institución; foros):
+> no instalar en producción hasta su publicación. Compatibilidad con el tema y la app:
+> [docs/COMPATIBILIDAD.md](docs/COMPATIBILIDAD.md). Versiones no publicadas: [docs/VERSIONES.md](docs/VERSIONES.md).
 
 ## Requisitos
 
@@ -86,7 +89,8 @@ No publiques archivos `.env`, credenciales, logs, bases de datos, copias de segu
 
 ## Repositorios relacionados
 
-- ATORA Theme: https://github.com/atmosferacreativa-hub/atora-theme
+- ATORA Theme (Atora Meridian): https://github.com/atmosferacreativa-hub/atora-theme
+- ATORA Mobile: https://github.com/atmosferacreativa-hub/atora-mobile
 - ATORA Studio: https://github.com/atmosferacreativa-hub/atora-studio
 
 Sitio del proyecto: https://atora.studio
