@@ -526,6 +526,7 @@ class CLMS_Access {
 			'crm_manager',      // ATORA — CRM Manager
 			'crm_operator',     // ATORA — Operador CRM
 			'lms_coordinator',  // ATORA — Coordinador académico
+			'lms_instructor_assistant', // ATORA — Instructor asistente (6.41.0: faltaba en el desplegable)
 		);
 
 		// Si WooCommerce está activo, mantener sus roles comerciales.

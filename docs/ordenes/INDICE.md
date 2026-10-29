@@ -32,6 +32,10 @@ Un documento fusionado no es una función terminada.
 | 3 | `ORDEN-C-COMUNICACION` — Email Engine, Newsletter, Automatización | "C" (lista ejecutada) | publicada en 6.39.0 (planeada 6.38.0) | **cerrada en código y pruebas** (#116–#119); sin validación real con proveedores |
 | 4 | `ORDEN-CLASES-EN-VIVO` — Zoom, Meet y Microsoft Teams; grabación a decisión del docente | "E Streaming" (lista vieja), "F" (lista ejecutada) | 6.39.0 · app 1.2.0 | plugin **cerrado en código y pruebas** (#120); app 1.2.0 (#38); sin validación con cuentas reales |
 | 5 | `ORDEN-APP-DOCENTE` — contenido, asistencia presencial, clase en vivo y planificación híbrida en la app del docente | "7" (lista del titular) | 6.40.0 · app 1.3.0 | plugin **cerrado en código y pruebas** (#122–#125); app: #40–#43; sin validación en teléfono real |
+| 6 | `ORDEN-ROLES` — Instructor asistente (pre-calificación), Control académico (nota final ajustada), Auxiliar administrativo | "8" (lista del titular) | 6.41.0 · app 1.4.0 | en curso |
+| 7 | `ORDEN-PERFIL` — foto propia sin Gravatar, iniciales, saludo | "9" | por definir | por escribir |
+| 8 | `ORDEN-PERIODOS` — período académico, cierre de ciclo, cursos anteriores plegados, historial, inicio de período, portada y color | "10" | por definir | por escribir |
+| 9 | `ORDEN-FOROS` — foros por curso, programa y cohorte con moderación | "11" | por definir | por escribir |
 
 **Pospuestas** (no se ejecutan hasta nueva decisión):
 

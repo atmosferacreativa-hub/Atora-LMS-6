@@ -156,7 +156,7 @@ final class HybridPlanServiceTest extends WP_UnitTestCase {
 		$this->assertSame( 'atora_plan_ai_off', $suggest->get_error_code() );
 	}
 
-	public function test_assistant_prepares_but_does_not_publish_nor_change_evidence(): void {
+	public function test_assistant_with_delegation_has_instructor_privileges(): void {
 		global $wpdb;
 		$wpdb->insert( $wpdb->prefix . 'atora_institutions', array( 'slug' => 'plan-inst', 'name' => 'Plan', 'status' => 'active' ) );
 		$inst      = (int) $wpdb->insert_id;
@@ -172,25 +172,24 @@ final class HybridPlanServiceTest extends WP_UnitTestCase {
 		\ATORA\LMS\Tenant_Context::reset_cache();
 		ATORA_Teacher_Scope::reset_cache();
 
-		$this->assertTrue( ATORA_Hybrid_Plan_Service::can_edit( $assistant, $this->course ), 'El asistente con delegación prepara.' );
-		$this->assertFalse( ATORA_Hybrid_Plan_Service::can_publish( $assistant, $this->course ) );
+		// 6.41.0: con delegación, el instructor asistente tiene los mismos privilegios que el instructor.
+		$this->assertTrue( ATORA_Hybrid_Plan_Service::can_edit( $assistant, $this->course ) );
+		$this->assertTrue( ATORA_Hybrid_Plan_Service::can_publish( $assistant, $this->course ) );
 
-		$plan = ATORA_Hybrid_Plan_Service::create( $assistant, $this->course, $this->data() );
-		$this->assertFalse( $plan['data']['evidence']['enabled'], 'El asistente no define la evidencia.' );
-
-		$data             = $plan['data'];
+		$data             = $this->data();
 		$data['evidence'] = array( 'enabled' => true, 'title' => 'Examen', 'instructions' => 'x' );
-		$saved            = ATORA_Hybrid_Plan_Service::update( $assistant, $plan['id'], $data, 1 );
-		$this->assertContains( 'evidence_locked', $saved['warnings'] );
-		$this->assertFalse( $saved['data']['evidence']['enabled'] );
+		$plan             = ATORA_Hybrid_Plan_Service::create( $assistant, $this->course, $data );
+		$this->assertTrue( $plan['data']['evidence']['enabled'], 'El asistente define la evidencia.' );
+		$this->assertFalse( ATORA_Hybrid_Plan_Service::get_for_user( $assistant, $plan['id'] )['evidence_locked'] );
 
-		$result = ATORA_Hybrid_Plan_Service::publish( $assistant, $plan['id'], 2 );
-		$this->assertWPError( $result );
-		$this->assertSame( 'atora_plan_cannot_publish', $result->get_error_code() );
-		$this->assertCount( 0, $this->course_lessons() );
+		$result = ATORA_Hybrid_Plan_Service::publish( $assistant, $plan['id'], 1 );
+		$this->assertIsArray( $result, 'El asistente publica.' );
+		$this->assertNotEmpty( $this->course_lessons() );
 
-		// El docente revisa y publica lo que preparó el asistente.
-		wp_set_current_user( $this->teacher );
-		$this->assertIsArray( ATORA_Hybrid_Plan_Service::publish( $this->teacher, $plan['id'], 2 ) );
+		// Sin delegación, nada.
+		$other = self::factory()->user->create( array( 'role' => 'lms_instructor_assistant' ) );
+		ATORA_Teacher_Scope::reset_cache();
+		$this->assertFalse( ATORA_Hybrid_Plan_Service::can_edit( $other, $this->course ) );
+		$this->assertFalse( ATORA_Hybrid_Plan_Service::can_publish( $other, $this->course ) );
 	}
 }

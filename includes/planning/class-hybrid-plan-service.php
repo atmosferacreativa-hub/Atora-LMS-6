@@ -218,8 +218,7 @@ final class ATORA_Hybrid_Plan_Service {
 
 	public static function can_publish( int $user_id, int $wp_course_id ): bool {
 		return self::can_edit( $user_id, $wp_course_id )
-			&& user_can( $user_id, 'publish_lm_lessons' )
-			&& ! self::is_assistant_only( $user_id, $wp_course_id );
+			&& user_can( $user_id, 'publish_lm_lessons' );
 	}
 
 	// ── CRUD ─────────────────────────────────────────────────────────────────
@@ -231,9 +230,6 @@ final class ATORA_Hybrid_Plan_Service {
 		}
 		global $wpdb;
 		$clean = self::sanitize_data( $data );
-		if ( self::is_assistant_only( $user_id, $wp_course_id ) ) {
-			$clean['evidence'] = self::empty_data()['evidence'];
-		}
 		$ok = $wpdb->insert( self::table(), array(
 			'institution_id' => self::institution( $wp_course_id ),
 			'wp_course_id'   => $wp_course_id,
@@ -263,7 +259,8 @@ final class ATORA_Hybrid_Plan_Service {
 			return new WP_Error( 'atora_plan_not_found', self::t( 'Planificación no encontrada.' ), array( 'status' => 404 ) );
 		}
 		$plan['can_publish'] = self::can_publish( $user_id, (int) $plan['wp_course_id'] );
-		$plan['evidence_locked'] = self::is_assistant_only( $user_id, (int) $plan['wp_course_id'] );
+		// 6.41.0: el instructor asistente tiene los mismos privilegios que el instructor en su curso delegado.
+		$plan['evidence_locked'] = false;
 		return $plan;
 	}
 

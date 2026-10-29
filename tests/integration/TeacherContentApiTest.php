@@ -131,7 +131,7 @@ final class TeacherContentApiTest extends WP_UnitTestCase {
 		$this->assertSame( 403, $this->call( $this->student, 'GET', '/teacher/courses/' . $this->course . '/lessons' )->get_status(), 'Estudiante.' );
 		$assistant = $this->call( $this->assistant, 'GET', '/teacher/courses/' . $this->course . '/lessons' );
 		$this->assertSame( 200, $assistant->get_status(), wp_json_encode( $assistant->get_data() ) );
-		$this->assertFalse( $assistant->get_data()['can_manage'], 'El asistente ve, pero no gestiona.' );
+		$this->assertTrue( $assistant->get_data()['can_manage'], '6.41.0: el instructor asistente con delegación gestiona.' );
 	}
 
 	public function test_teacher_previews_lessons_including_hidden_student_does_not(): void {
@@ -173,11 +173,10 @@ final class TeacherContentApiTest extends WP_UnitTestCase {
 		$this->assertSame( 404, $this->call( $this->student, 'GET', '/lessons/' . $task )->get_status(), 'Oculta: el estudiante ya no la ve.' );
 	}
 
-	public function test_assistant_and_invalid_input_are_rejected(): void {
+	public function test_assistant_manages_and_invalid_input_is_rejected(): void {
 		$task = $this->table_lesson( $this->wp_lessons[1] );
-		$this->assertSame( 403, $this->call( $this->assistant, 'POST', '/teacher/lessons/' . $task, array( 'visible' => false, 'client_event_id' => 'a-1' ) )->get_status() );
-		$this->assertSame( 403, $this->call( $this->assistant, 'POST', '/teacher/lessons/' . $task, array( 'due_date' => '2026-12-01', 'client_event_id' => 'a-2' ) )->get_status() );
-		$this->assertSame( '2026-11-10', get_post_meta( $this->wp_lessons[1], '_clms_due_date', true ), 'Nada cambió.' );
+		$this->assertSame( 200, $this->call( $this->assistant, 'POST', '/teacher/lessons/' . $task, array( 'due_date' => '2026-12-01', 'client_event_id' => 'a-2' ) )->get_status() );
+		$this->assertSame( '2026-12-01', get_post_meta( $this->wp_lessons[1], '_clms_due_date', true ), '6.41.0: el asistente cambia la fecha.' );
 
 		$this->assertSame( 400, $this->call( $this->teacher, 'POST', '/teacher/lessons/' . $task, array( 'due_date' => '2026-02-30', 'client_event_id' => 'b-1' ) )->get_status() );
 		$this->assertSame( 400, $this->call( $this->teacher, 'POST', '/teacher/lessons/' . $task, array( 'visible' => true ) )->get_status(), 'Sin client_event_id.' );

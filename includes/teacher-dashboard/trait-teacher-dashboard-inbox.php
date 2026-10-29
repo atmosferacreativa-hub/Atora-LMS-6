@@ -124,6 +124,10 @@ trait CLMS_Teacher_Dashboard_Inbox_Trait {
 		if ( ! empty( $filters['late'] ) ) {
 			$meta_query[] = array( 'key' => '_clms_submission_is_late', 'value' => '1' );
 		}
+		// 6.41.0: pre-calificaciones del asistente por validar.
+		if ( ! empty( $filters['pregrade'] ) ) {
+			$meta_query[] = array( 'key' => '_atora_pregrade_by', 'compare' => 'EXISTS' );
+		}
 		if ( ! empty( $filters['exclude_shadows'] ) ) {
 			$meta_query[] = array( 'key' => '_clms_submission_is_shadow', 'compare' => 'NOT EXISTS' );
 		}
