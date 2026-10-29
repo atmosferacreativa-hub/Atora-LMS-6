@@ -1,5 +1,35 @@
 # CHANGELOG — ATORA LMS
 
+## 6.40.0 (2026-10-28)
+
+### App del docente (`docs/ordenes/ORDEN-APP-DOCENTE.md`; progreso en `docs/ordenes/PROGRESO-APP-DOCENTE.md`)
+
+**Contenido del curso** (#122)
+- `GET /teacher/courses/{id}/lessons`: todas las lecciones del curso para el docente (también ocultas), con tipo, vencimiento en la zona horaria del sitio, entregas por calificar, encuentro presencial y clase en vivo.
+- El docente abre una lección (también oculta) en vista de estudiante desde la app; no cuenta como actividad de estudiante.
+- `POST /teacher/lessons/{id}`: publicar u ocultar y cambiar la fecha y hora de entrega, con aviso opcional al curso. Idempotente por `client_event_id`. El asistente con delegación ve, pero no gestiona.
+
+**Asistencia presencial** (#123)
+- Tablas `atora_live_sessions` y `atora_attendance` creadas aunque el módulo de clases en vivo esté apagado (`migrate_6400_attendance`), con nota y hora de la marca.
+- Una sesión por curso, lección y fecha. La marca más reciente gana (dos teléfonos o un reenvío sin conexión no se pisan al revés); una hora futura del teléfono cuenta como «ahora».
+- Tres ausencias seguidas activan la racha del seguimiento; resumen de asistencia en la ficha del estudiante.
+- Página web «ATORA → Asistencia» con la misma lista. La planificación híbrida marca su encuentro presencial para tomar lista.
+
+**Clase en vivo del docente** (#124)
+- Hoy del docente: la clase en vivo trae el enlace al abrir la ventana.
+- Publicar o quitar la grabación desde la app (el proveedor no la vuelve a poner) y ver la asistencia que informa el proveedor, en orden estable.
+- Integración con proveedores externos; no es transmisión propia.
+- **Corrección:** guardar la clase en vivo de una lección pisaba la sesión de asistencia presencial de esa misma lección.
+
+**Planificación híbrida desde la app** (#125)
+- Rutas `/teacher/plans` sobre el mismo servicio de la web: crear (un reintento no duplica), guardar con revisión (409), retomar, vista previa y publicar sin duplicar lecciones. El asistente prepara y no publica.
+- `POST /teacher/media`: subir audio (MP3, M4A u OGG, validado por contenido), PDF o imagen desde el teléfono. Un reintento con el mismo `client_upload_id` devuelve el mismo archivo; lo rechazado no queda en la biblioteca.
+
+**Automatización** (#127)
+- **Corrección:** al llegar al límite diario de acciones, la siguiente se posponía a una medianoche ya pasada cerca de las 00:00 UTC y salía de inmediato. Ahora espera al día UTC siguiente, como el contador.
+
+**Validación:** pruebas de integración (`TeacherContentApiTest`, `AttendanceTest`, `TeacherLiveApiTest`, `TeacherPlanApiTest`) y recorridos de pantalla de la app 1.3.0 contra un WordPress temporal. Sin validación en teléfono real.
+
 ## 6.39.0 (2026-10-27)
 
 Incluye lo planeado como 6.38.0 (Comunicación): las dos ramas se fusionaron en el orden inverso y no hubo un punto de
