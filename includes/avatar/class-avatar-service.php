@@ -27,7 +27,9 @@ final class ATORA_Avatar_Service {
 
 	public static function boot(): void {
 		add_filter( 'pre_get_avatar_data', array( __CLASS__, 'pre_get_avatar_data' ), 10, 2 );
-		add_filter( 'rest_post_dispatch', array( __CLASS__, 'rest_post_dispatch_mobile_people' ), 20, 3 );
+		// `rest_request_after_callbacks` corre también en `rest_do_request()` / `dispatch()` (llamadas internas y pruebas);
+		// `rest_post_dispatch` solo al servir la petición HTTP.
+		add_filter( 'rest_request_after_callbacks', array( __CLASS__, 'rest_after_callbacks_mobile_people' ), 20, 3 );
 		add_action( 'atora_account_deletion_processed', array( __CLASS__, 'on_account_deletion_processed' ), 10, 3 );
 		add_action( 'rest_api_init', array( __CLASS__, 'register_mobile_routes' ) );
 		add_action( 'show_user_profile', array( __CLASS__, 'render_admin_user_avatar_fields' ) );
@@ -388,9 +390,9 @@ final class ATORA_Avatar_Service {
 	 * Sin tocar `includes/mobile/class-mobile-teacher-controller.php`, añade `avatar_url`
 	 * a objetos de tipo {id, name} cuando `id` corresponde a un usuario.
 	 */
-	public static function rest_post_dispatch_mobile_people( $result, WP_REST_Server $server, WP_REST_Request $request ) {
+	public static function rest_after_callbacks_mobile_people( $result, $handler, WP_REST_Request $request ) {
 		$route = (string) $request->get_route();
-		if ( 0 !== strpos( $route, '/' . ATORA_Mobile_REST_Controller::REST_NAMESPACE . '/' ) ) {
+		if ( is_wp_error( $result ) || 0 !== strpos( $route, '/' . ATORA_Mobile_REST_Controller::REST_NAMESPACE . '/' ) ) {
 			return $result;
 		}
 
@@ -455,6 +457,17 @@ final class ATORA_Avatar_Service {
 			}
 		}
 		// Nested: only follow a few known containers to avoid scanning entire response.
+		// Objetos que contienen personas: `submission` (detalle de la entrega) y `group` (sus integrantes y quién
+		// entregó; el grupo mismo nunca es una persona).
+		foreach ( array( 'submission', 'group' ) as $object ) {
+			if ( isset( $data[ $object ] ) && is_array( $data[ $object ] ) ) {
+				$object_changed  = false;
+				$data[ $object ] = self::augment_people_by_keys( $data[ $object ], $object_changed, $keys );
+				if ( $object_changed ) {
+					$changed = true;
+				}
+			}
+		}
 		foreach ( array( 'items', 'threads', 'messages' ) as $container ) {
 			if ( isset( $data[ $container ] ) && is_array( $data[ $container ] ) ) {
 				$local_changed = false;

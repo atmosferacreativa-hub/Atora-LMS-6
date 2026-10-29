@@ -244,7 +244,7 @@ final class AvatarProfileTest extends WP_UnitTestCase {
 
 		$res = $this->teacher_call( "/teacher/submissions/{$submission}" );
 		$this->assertSame( 200, $res->get_status() );
-		$data = $res->get_data();
+		$data = $res->get_data()['submission'] ?? null;
 		$this->assertIsArray( $data );
 		$this->assertIsArray( $data['group'] );
 		$this->assertSame( $group_id, (int) $data['group']['id'] );
