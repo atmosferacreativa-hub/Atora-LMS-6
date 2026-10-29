@@ -774,60 +774,39 @@ class CLMS_REST_Extensions_Controller {
 
 	public function get_my_courses( WP_REST_Request $request ) {
 		unset( $request );
-		$user_id    = get_current_user_id();
-		$course_ids = array();
-		if ( class_exists( '\\ATORA\\LMS\\LMS_Enrollment_Service' )
-			&& method_exists( '\\ATORA\\LMS\\LMS_Enrollment_Service', 'get_enrolled_wp_course_ids' ) ) {
-			$course_ids = (array) \ATORA\LMS\LMS_Enrollment_Service::get_enrolled_wp_course_ids( $user_id );
-		} elseif ( class_exists( 'CLMS_Helper' ) && method_exists( 'CLMS_Helper', 'get_user_enrolled_courses' ) ) {
-			$course_ids = (array) \CLMS_Helper::get_user_enrolled_courses( $user_id );
-		}
-		$course_ids = array_values( array_unique( array_filter( array_map( 'absint', $course_ids ) ) ) );
-
-		if ( empty( $course_ids ) ) {
-			return rest_ensure_response( array( 'courses' => array(), 'total' => 0 ) );
-		}
-
-		$posts = get_posts( array(
-			'post_type'      => 'lm_course',
-			'post_status'    => 'publish',
-			'posts_per_page' => -1,
-			'post__in'       => $course_ids,
-			'orderby'        => 'post__in',
-		) );
-
-		$completed_lessons = (array) get_user_meta( $user_id, '_clms_completed_lessons', true );
-		$completed_lessons = array_map( 'absint', $completed_lessons );
-
-		$courses = array();
-		foreach ( $posts as $course ) {
-			$lessons   = class_exists( 'CLMS_Helper' ) ? (array) CLMS_Helper::get_course_lessons( $course->ID ) : array();
-			$total     = count( $lessons );
-			$completed = 0;
-
-			foreach ( $lessons as $lesson ) {
-				$lesson_id = is_object( $lesson ) ? $lesson->ID : absint( $lesson );
-				if ( in_array( $lesson_id, $completed_lessons, true ) ) {
-					++$completed;
+		$user_id = get_current_user_id();
+		if ( class_exists( 'ATORA_Periods_Service' ) ) {
+			$data = ATORA_Periods_Service::grouped_courses_for_user( $user_id );
+			// `courses` y `total` se mantienen (clientes anteriores a los períodos): activos y pasados visibles, sin los ocultos.
+			$flat = $data['active'];
+			foreach ( (array) $data['past'] as $group ) {
+				foreach ( (array) ( $group['courses'] ?? array() ) as $course ) {
+					$flat[] = $course;
 				}
 			}
-
-			$progress = $total > 0 ? round( ( $completed / $total ) * 100 ) : 0;
-
-			$courses[] = array(
-				'id'                => $course->ID,
-				'title'             => $course->post_title,
-				'slug'              => $course->post_name,
-				'url'               => get_permalink( $course->ID ),
-				'thumbnail'         => get_the_post_thumbnail_url( $course->ID, 'medium' ) ?: null,
-				'progress'          => $progress,
-				'completed'         => 100 === $progress,
-				'total_lessons'     => $total,
-				'completed_lessons' => $completed,
-			);
+			return rest_ensure_response( array(
+				'courses' => $flat,
+				'total'   => count( $flat ),
+				'active' => $data['active'],
+				'past'   => array_map( static function ( array $group ): array {
+					$period = (array) ( $group['period'] ?? array() );
+					return array(
+						'period'  => array(
+							'id'         => absint( $period['id'] ?? 0 ),
+							'name'       => sanitize_text_field( (string) ( $period['name'] ?? '' ) ),
+							'starts_on'  => (string) ( $period['starts_on'] ?? '' ),
+							'ends_on'    => (string) ( $period['ends_on'] ?? '' ),
+							'status'     => (string) ( $period['status'] ?? '' ),
+							'visibility' => (string) ( $period['past_visibility'] ?? 'visible' ),
+							'visible_until' => $period['visible_until'] ? (string) $period['visible_until'] : null,
+						),
+						'courses' => (array) ( $group['courses'] ?? array() ),
+					);
+				}, (array) $data['past'] ),
+			) );
 		}
 
-		return rest_ensure_response( array( 'courses' => $courses, 'total' => count( $courses ) ) );
+		return rest_ensure_response( array( 'courses' => array(), 'total' => 0, 'active' => array(), 'past' => array() ) );
 	}
 
 	public function get_my_programs( WP_REST_Request $request ) {
