@@ -1353,6 +1353,7 @@ add_action( 'init', static function () {
 	// 6.41.0: Control académico — nota final ajustada.
 	atora_lms_require_module( 'includes/academic/class-final-grade-service.php' );
 	atora_lms_require_module( 'includes/academic/class-final-grade-admin.php', static function () { ATORA_Final_Grade_Admin::boot(); } );
+	atora_lms_require_module( 'includes/academic/class-finance-academic-admin.php', static function () { ATORA_Finance_Academic_Admin::boot(); } );
 	atora_lms_require_module( 'includes/mobile/class-mobile-teacher-content-controller.php' );
 	atora_lms_require_module( 'includes/mobile/class-mobile-teacher-plan-controller.php' );
 	atora_lms_require_module( 'includes/mobile/class-mobile-ai-controller.php' );

@@ -22,4 +22,11 @@ Las pruebas nuevas fallan con `main`.
 Las 3 pruebas fallan con `main`.
 
 ## Bloque 3 — Auxiliar administrativo
-Pendiente.
+| Punto | Código | Prueba automática | Real |
+|---|---|---|---|
+| Rol `lms_admin_assistant`: pedidos, pagos y reembolsos de la tienda (sin su configuración) | `CLMS_Access` | `AdminAssistantTest::test_cannot_change_grades_enrollments_or_content` | Pendiente (con WooCommerce real) |
+| Nota final y estado en solo lectura; «No aprobado · debe repetir» y filtro; CSV | `ATORA_Finance_Academic_Admin` | `test_reads_final_grades_and_who_must_repeat` | Pendiente |
+| No corrige notas, no matricula, no califica, sin API del docente ni contenido | permisos | `test_cannot_change_grades_enrollments_or_content` | — |
+
+Los pedidos de WooCommerce no tienen institución: con varias instituciones, el auxiliar ve todos los pedidos de la
+tienda. El estado académico sí se limita a su institución. Las 2 pruebas fallan con `main`.
