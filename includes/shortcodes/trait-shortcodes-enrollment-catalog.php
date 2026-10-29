@@ -14,9 +14,20 @@ trait CLMS_Shortcodes_Enrollment_Catalog_Trait {
 
 		$this->enqueue_assets();
 
-		$user_id    = get_current_user_id();
-		$course_ids = ( class_exists('\\ATORA\\LMS\\LMS_Enrollment_Service') ? array_column( (array) \ATORA\LMS\LMS_Enrollment_Service::get_user_enrollments( $user_id ), 'course_id' ) : \CLMS_Helper::get_user_enrolled_courses( $user_id ) );
-		$course_ids = is_array( $course_ids ) ? array_map( 'absint', $course_ids ) : array();
+		$user_id = get_current_user_id();
+		$grouped = class_exists( 'ATORA_Periods_Service' )
+			? ATORA_Periods_Service::grouped_courses_for_user( $user_id )
+			: array( 'active' => array(), 'past' => array() );
+		$course_ids = array();
+		foreach ( (array) ( $grouped['active'] ?? array() ) as $c ) {
+			$course_ids[] = absint( $c['id'] ?? 0 );
+		}
+		foreach ( (array) ( $grouped['past'] ?? array() ) as $g ) {
+			foreach ( (array) ( $g['courses'] ?? array() ) as $c ) {
+				$course_ids[] = absint( $c['id'] ?? 0 );
+			}
+		}
+		$course_ids = array_values( array_unique( array_filter( $course_ids ) ) );
 
 		if ( empty( $course_ids ) && CLMS_Helper::user_can_manage_lms() ) {
 			$course_ids = get_posts(
@@ -43,15 +54,15 @@ trait CLMS_Shortcodes_Enrollment_Catalog_Trait {
 				<div class="clms-my-courses-body">
 					<h3 class="clms-my-courses-title">Mis cursos</h3>
 
-					<?php foreach ( $course_ids as $course_id ) : ?>
+					<h4 style="margin-top:18px">Cursos activos</h4>
+					<?php foreach ( (array) ( $grouped['active'] ?? array() ) as $course_item ) : ?>
 						<?php
-						if ( 'lm_course' !== get_post_type( $course_id ) ) {
+						$course_id = absint( $course_item['id'] ?? 0 );
+						if ( $course_id <= 0 || 'lm_course' !== get_post_type( $course_id ) ) {
 							continue;
 						}
-
 						$course_url   = get_permalink( $course_id );
 						$continue_url = $this->get_continue_course_url( $user_id, $course_id );
-
 						if ( ! $course_url ) {
 							continue;
 						}
@@ -66,6 +77,38 @@ trait CLMS_Shortcodes_Enrollment_Catalog_Trait {
 							</div>
 						</div>
 					<?php endforeach; ?>
+
+					<?php if ( ! empty( $grouped['past'] ) ) : ?>
+						<h4 style="margin-top:22px">Cursos pasados</h4>
+						<?php foreach ( (array) $grouped['past'] as $group ) : ?>
+							<?php $period = (array) ( $group['period'] ?? array() ); ?>
+							<details class="clms-my-course-item" style="padding:10px 0">
+								<summary style="cursor:pointer;font-weight:700">
+									<?php echo esc_html( (string) ( $period['name'] ?? '' ) ); ?>
+								</summary>
+								<div style="margin-top:10px">
+									<?php foreach ( (array) ( $group['courses'] ?? array() ) as $course_item ) : ?>
+										<?php
+										$course_id = absint( $course_item['id'] ?? 0 );
+										if ( $course_id <= 0 || 'lm_course' !== get_post_type( $course_id ) ) {
+											continue;
+										}
+										$course_url = get_permalink( $course_id );
+										if ( ! $course_url ) {
+											continue;
+										}
+										?>
+										<div class="clms-my-course-item" style="border-top:1px solid #e5e7eb;padding-top:10px;margin-top:10px">
+											<h4><a href="<?php echo esc_url( $course_url ); ?>"><?php echo esc_html( get_the_title( $course_id ) ); ?></a></h4>
+											<div class="clms-course-actions">
+												<a class="clms-course-link" href="<?php echo esc_url( $course_url ); ?>">Ver curso</a>
+											</div>
+										</div>
+									<?php endforeach; ?>
+								</div>
+							</details>
+						<?php endforeach; ?>
+					<?php endif; ?>
 				</div>
 			</div>
 		</div>

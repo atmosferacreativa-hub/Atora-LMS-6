@@ -1356,6 +1356,9 @@ add_action( 'init', static function () {
 	atora_lms_require_module( 'includes/academic/class-final-grade-service.php' );
 	atora_lms_require_module( 'includes/academic/class-final-grade-admin.php', static function () { ATORA_Final_Grade_Admin::boot(); } );
 	atora_lms_require_module( 'includes/academic/class-finance-academic-admin.php', static function () { ATORA_Finance_Academic_Admin::boot(); } );
+	// Períodos — base.
+	atora_lms_require_module( 'includes/periods/class-periods-service.php', static function () { ATORA_Periods_Service::init(); } );
+	atora_lms_require_module( 'includes/periods/class-periods-admin.php', static function () { ATORA_Periods_Admin::init(); } );
 	// 6.41.0: pedidos por institución (varias instituciones en un mismo WordPress).
 	atora_lms_require_module( 'includes/commerce/class-order-institution.php', static function () { ATORA_Order_Institution::boot(); } );
 	atora_lms_require_module( 'includes/commerce/class-order-institution-admin.php', static function () { ATORA_Order_Institution_Admin::boot(); } );
