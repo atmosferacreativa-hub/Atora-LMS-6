@@ -1082,6 +1082,8 @@ add_action( 'init', static function () {
 			ATORA\V5_Modules::boot();
 		}
 	} );
+	// Foros (bloque base).
+	atora_lms_require_module( 'modules/forums/class-forums.php', static function () { ATORA_Forums::boot(); } );
 
 	/**
 	 * Fires once the plugin has fully bootstrapped all modules.
