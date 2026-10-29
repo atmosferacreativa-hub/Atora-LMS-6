@@ -263,7 +263,6 @@ trait CLMS_Admin_Menu_Main_Pages_Academic_Trait {
 							'atora_city'              => $city,
 							'atora_sex'               => $sex,
 							'atora_age'               => $age > 0 ? (string) $age : '',
-							'atora_profile_photo_url' => $avatar_url,
 							'atora_social_instagram'  => $social_instagram,
 							'atora_social_facebook'   => $social_facebook,
 							'atora_social_linkedin'   => $social_linkedin,
@@ -324,7 +323,6 @@ trait CLMS_Admin_Menu_Main_Pages_Academic_Trait {
 			'city'       => sanitize_text_field( (string) get_user_meta( $user_id, 'atora_city', true ) ),
 			'sex'        => sanitize_key( (string) get_user_meta( $user_id, 'atora_sex', true ) ),
 			'age'        => absint( get_user_meta( $user_id, 'atora_age', true ) ),
-			'avatar_url' => esc_url_raw( (string) get_user_meta( $user_id, 'atora_profile_photo_url', true ) ),
 			'instagram'  => esc_url_raw( (string) get_user_meta( $user_id, 'atora_social_instagram', true ) ),
 			'facebook'   => esc_url_raw( (string) get_user_meta( $user_id, 'atora_social_facebook', true ) ),
 			'linkedin'   => esc_url_raw( (string) get_user_meta( $user_id, 'atora_social_linkedin', true ) ),
@@ -332,12 +330,7 @@ trait CLMS_Admin_Menu_Main_Pages_Academic_Trait {
 			'tiktok'     => esc_url_raw( (string) get_user_meta( $user_id, 'atora_social_tiktok', true ) ),
 			'user_url'   => esc_url_raw( (string) $user->user_url ),
 		);
-		$avatar_html = '';
-		if ( '' !== $profile_meta['avatar_url'] ) {
-			$avatar_html = '<img class="clms-admin-profile-avatar" src="' . esc_url( $profile_meta['avatar_url'] ) . '" alt="' . esc_attr( $display_name ) . '">';
-		} else {
-			$avatar_html = get_avatar( $user_id, 120 );
-		}
+		$avatar_html = get_avatar( $user_id, 120 );
 		$country_options = class_exists( '\ATORA\Security\Extended_Registration' ) && method_exists( '\ATORA\Security\Extended_Registration', 'get_countries' )
 			? (array) \ATORA\Security\Extended_Registration::get_countries()
 			: array();

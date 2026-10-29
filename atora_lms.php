@@ -1365,6 +1365,8 @@ add_action( 'init', static function () {
 	atora_lms_require_module( 'includes/certificates/class-certificate-verify.php', static function () { ATORA_Certificate_Verify::boot(); } );
 	// 6.33.2: acceso a cursos por matrícula o programa vigente (matrícula al agregar un curso, `wp atora reconcile-program-access`).
 	atora_lms_require_module( 'includes/access/class-course-access-service.php', static function () { ATORA_Course_Access_Service::boot(); } );
+	// Perfil (bloque 1): avatares propios (sin Gravatar).
+	atora_lms_require_module( 'includes/avatar/class-avatar-service.php', static function () { ATORA_Avatar_Service::boot(); } );
 	// 6.33.0: eliminación de cuenta (app, página pública y administración).
 	atora_lms_require_module( 'includes/account/class-privacy-erasers.php', static function () { ATORA_Privacy_Erasers::boot(); } );
 	atora_lms_require_module( 'includes/account/class-account-deletion.php', static function () { ATORA_Account_Deletion::boot(); } );

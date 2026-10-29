@@ -151,6 +151,26 @@ class CLMS_Student_Profile {
 
 		$this->enqueue_assets();
 
+		$avatar_errors = array();
+		$avatar_success = false;
+		if ( $is_own_profile && isset( $_POST['atora_avatar_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['atora_avatar_nonce'] ) ), 'atora_student_avatar_' . $viewer_id ) ) {
+			if ( ! class_exists( 'ATORA_Avatar_Service' ) ) {
+				$avatar_errors[] = __( 'El servicio de avatar no está disponible.', 'atora-lms' );
+			} elseif ( ! ATORA_Avatar_Service::can_user_manage_own_avatar( $viewer_id ) ) {
+				$avatar_errors[] = __( 'La institución no permite que el usuario cambie su foto.', 'atora-lms' );
+			} elseif ( ! empty( $_POST['atora_avatar_remove'] ) ) {
+				ATORA_Avatar_Service::delete_user_avatar( $viewer_id );
+				$avatar_success = true;
+			} elseif ( ! empty( $_FILES['atora_avatar_file']['tmp_name'] ) ) {
+				$upload = ATORA_Avatar_Service::set_user_avatar_from_upload( $viewer_id, (array) $_FILES['atora_avatar_file'] );
+				if ( is_wp_error( $upload ) ) {
+					$avatar_errors[] = $upload->get_error_message();
+				} else {
+					$avatar_success = true;
+				}
+			}
+		}
+
 		// ── Datos ──────────────────────────────────────────────────────────────
 		$display_name   = $user->display_name ?: $user->user_login;
 		$bio            = get_user_meta( $profile_user_id, 'description', true );
@@ -241,6 +261,12 @@ class CLMS_Student_Profile {
 		ob_start();
 		?>
 		<div class="clms-sp">
+			<?php if ( $is_own_profile && $avatar_success ) : ?>
+				<p class="clms-sp-notice" role="status" style="margin:0 0 12px 0;color:#166534"><?php esc_html_e( 'Foto de perfil actualizada.', 'atora-lms' ); ?></p>
+			<?php endif; ?>
+			<?php if ( $is_own_profile && ! empty( $avatar_errors ) ) : ?>
+				<p class="clms-sp-notice" role="alert" style="margin:0 0 12px 0;color:#991b1b"><?php echo esc_html( implode( ' ', $avatar_errors ) ); ?></p>
+			<?php endif; ?>
 
 			<!-- ── Header de perfil ─────────────────────────────────────────── -->
 			<div class="clms-sp-hero">
@@ -248,6 +274,20 @@ class CLMS_Student_Profile {
 				<div class="clms-sp-hero__identity">
 					<div class="clms-sp-avatar">
 						<img src="<?php echo esc_url( $avatar_url ); ?>" alt="<?php echo esc_attr( $display_name ); ?>" width="96" height="96">
+						<?php if ( $is_own_profile && class_exists( 'ATORA_Avatar_Service' ) ) : ?>
+							<form method="post" enctype="multipart/form-data" style="margin-top:10px">
+								<?php wp_nonce_field( 'atora_student_avatar_' . $viewer_id, 'atora_avatar_nonce' ); ?>
+								<?php if ( ATORA_Avatar_Service::can_user_manage_own_avatar( $viewer_id ) ) : ?>
+									<input type="file" name="atora_avatar_file" accept="image/jpeg,image/png,image/webp" style="max-width:220px">
+									<button class="clms-sp-btn clms-sp-btn--ghost" type="submit" style="margin-top:6px"><?php esc_html_e( 'Subir', 'atora-lms' ); ?></button>
+									<?php if ( ATORA_Avatar_Service::avatar_attachment_id( $viewer_id ) ) : ?>
+										<button class="clms-sp-btn clms-sp-btn--ghost" type="submit" name="atora_avatar_remove" value="1" style="margin-top:6px"><?php esc_html_e( 'Quitar', 'atora-lms' ); ?></button>
+									<?php endif; ?>
+								<?php else : ?>
+									<small><?php esc_html_e( 'La institución administra las fotos de perfil.', 'atora-lms' ); ?></small>
+								<?php endif; ?>
+							</form>
+						<?php endif; ?>
 					</div>
 					<div class="clms-sp-hero__info">
 						<h1 class="clms-sp-hero__name"><?php echo esc_html( $display_name ); ?></h1>

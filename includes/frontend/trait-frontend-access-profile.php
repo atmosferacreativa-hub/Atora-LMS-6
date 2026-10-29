@@ -167,7 +167,7 @@ trait CLMS_Frontend_Access_Profile_Trait {
 			$sex          = isset( $_POST['clms_sex'] ) ? sanitize_key( wp_unslash( $_POST['clms_sex'] ) ) : '';
 			$age_raw      = isset( $_POST['clms_age'] ) ? (string) wp_unslash( $_POST['clms_age'] ) : '';
 			$age          = '' !== trim( $age_raw ) ? absint( $age_raw ) : 0;
-			$avatar_url   = isset( $_POST['clms_profile_photo_url'] ) ? esc_url_raw( wp_unslash( $_POST['clms_profile_photo_url'] ) ) : '';
+			$avatar_remove = ! empty( $_POST['atora_avatar_remove'] );
 			$socials      = array(
 				'atora_social_instagram' => isset( $_POST['clms_social_instagram'] ) ? esc_url_raw( wp_unslash( $_POST['clms_social_instagram'] ) ) : '',
 				'atora_social_facebook'  => isset( $_POST['clms_social_facebook'] ) ? esc_url_raw( wp_unslash( $_POST['clms_social_facebook'] ) ) : '',
@@ -247,9 +247,23 @@ trait CLMS_Frontend_Access_Profile_Trait {
 					update_user_meta( $user_id, 'atora_city', $city );
 					update_user_meta( $user_id, 'atora_sex', $sex );
 					update_user_meta( $user_id, 'atora_age', $age > 0 ? (string) $age : '' );
-					update_user_meta( $user_id, 'atora_profile_photo_url', $avatar_url );
 					foreach ( $socials as $social_key => $social_value ) {
 						update_user_meta( $user_id, $social_key, $social_value );
+					}
+
+					if ( class_exists( 'ATORA_Avatar_Service' ) ) {
+						if ( $avatar_remove ) {
+							if ( ATORA_Avatar_Service::can_user_manage_own_avatar( $user_id ) ) {
+								ATORA_Avatar_Service::delete_user_avatar( $user_id );
+							} else {
+								$errors[] = __( 'La institución no permite que el usuario cambie su foto.', 'atora-lms' );
+							}
+						} elseif ( ! empty( $_FILES['atora_avatar_file']['tmp_name'] ) ) {
+							$upload = ATORA_Avatar_Service::set_user_avatar_from_upload( $user_id, (array) $_FILES['atora_avatar_file'] );
+							if ( is_wp_error( $upload ) ) {
+								$errors[] = $upload->get_error_message();
+							}
+						}
 					}
 
 					$core = clms_core( 'CLMS_Contacts_Core_Service' );
@@ -271,7 +285,7 @@ trait CLMS_Frontend_Access_Profile_Trait {
 						);
 					}
 
-					$success = true;
+					$success = empty( $errors );
 					$user    = get_userdata( $user_id ); // Refresh after update
 					if ( ! empty( $update_data['user_pass'] ) ) {
 						wp_set_auth_cookie( $user_id, true ); // Keep logged in after password change
@@ -287,10 +301,7 @@ trait CLMS_Frontend_Access_Profile_Trait {
 		}
 
 		$completion_status = $this->get_profile_completion_status( $user_id );
-		$avatar_url  = (string) get_user_meta( $user_id, 'atora_profile_photo_url', true );
-		if ( '' === trim( $avatar_url ) ) {
-			$avatar_url = (string) get_avatar_url( $user_id, array( 'size' => 96 ) );
-		}
+		$avatar_url = (string) get_avatar_url( $user_id, array( 'size' => 96 ) );
 		$first_name  = get_user_meta( $user_id, 'first_name', true );
 		$last_name   = get_user_meta( $user_id, 'last_name', true );
 		$description = get_user_meta( $user_id, 'description', true );
@@ -384,17 +395,27 @@ CSS;
 				</div>
 			<?php endif; ?>
 
-			<form method="post">
+			<form method="post" enctype="multipart/form-data">
 				<?php wp_nonce_field( 'clms_update_profile_' . $user_id, 'clms_profile_nonce' ); ?>
 
 				<div class="clms-profile-avatar-row">
 					<img src="<?php echo esc_url( $avatar_url ); ?>" alt="<?php echo esc_attr( $user->display_name ); ?>">
 					<div class="clms-profile-avatar-note">
 						<strong><?php echo esc_html( $user->display_name ); ?></strong><br>
-						<span><?php echo esc_html( $user->user_email ); ?></span><br>
-						<a href="https://gravatar.com" target="_blank" rel="noopener noreferrer">
-							<?php esc_html_e( 'Cambiar foto en Gravatar.com', 'atora-lms' ); ?>
-						</a>
+						<span><?php echo esc_html( $user->user_email ); ?></span>
+						<?php if ( class_exists( 'ATORA_Avatar_Service' ) && ATORA_Avatar_Service::can_user_manage_own_avatar( $user_id ) ) : ?>
+							<br><label style="display:block;margin-top:8px">
+								<span class="screen-reader-text"><?php esc_html_e( 'Subir foto de perfil', 'atora-lms' ); ?></span>
+								<input type="file" name="atora_avatar_file" accept="image/jpeg,image/png,image/webp">
+							</label>
+							<?php if ( class_exists( 'ATORA_Avatar_Service' ) && ATORA_Avatar_Service::avatar_attachment_id( $user_id ) ) : ?>
+								<button type="submit" name="atora_avatar_remove" value="1" class="button" style="margin-top:8px">
+									<?php esc_html_e( 'Quitar foto', 'atora-lms' ); ?>
+								</button>
+							<?php endif; ?>
+						<?php elseif ( class_exists( 'ATORA_Avatar_Service' ) && ATORA_Avatar_Service::POLICY_ADMIN_ONLY === ATORA_Avatar_Service::policy() ) : ?>
+							<br><em><?php esc_html_e( 'La institución administra las fotos de perfil.', 'atora-lms' ); ?></em>
+						<?php endif; ?>
 					</div>
 				</div>
 
@@ -479,11 +500,6 @@ CSS;
 							<label for="clms_age"><?php esc_html_e( 'Edad', 'atora-lms' ); ?></label>
 							<input type="number" id="clms_age" name="clms_age" min="1" max="120" value="<?php echo esc_attr( $age > 0 ? (string) $age : '' ); ?>">
 						</div>
-					</div>
-
-					<div class="clms-profile-row">
-						<label for="clms_profile_photo_url"><?php esc_html_e( 'Foto (URL)', 'atora-lms' ); ?></label>
-						<input type="url" id="clms_profile_photo_url" name="clms_profile_photo_url" value="<?php echo esc_attr( (string) get_user_meta( $user_id, 'atora_profile_photo_url', true ) ); ?>" placeholder="https://.../foto.jpg">
 					</div>
 
 					<div class="clms-profile-row">
