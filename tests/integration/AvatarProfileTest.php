@@ -217,6 +217,20 @@ final class AvatarProfileTest extends WP_UnitTestCase {
 		$this->assertNull( get_post( $attach_id ) );
 	}
 
+	public function test_teacher_students_list_brings_photo_or_initials(): void {
+		if ( 0 === $this->course ) {
+			$this->markTestSkipped( 'Sin curso.' );
+		}
+		$this->rest_upload( $this->make_jpeg_with_exif_marker(), 'list1' );
+		$items = $this->teacher_call( "/teacher/courses/{$this->course}/students" )->get_data()['items'] ?? array();
+		$by    = array_column( $items, null, 'id' );
+		$this->assertArrayHasKey( $this->student, $by );
+		$this->assertNotSame( '', (string) $by[ $this->student ]['avatar_url'], 'Con foto: la URL.' );
+		$this->assertSame( '', (string) $by[ $this->student2 ]['avatar_url'], 'Sin foto: vacío.' );
+		$this->assertNotEmpty( $by[ $this->student2 ]['avatar_initials'] );
+		$this->assertNotEmpty( $by[ $this->student2 ]['avatar_color'] );
+	}
+
 	public function test_teacher_submission_group_never_gets_avatar_even_if_group_id_matches_a_user_id(): void {
 		if ( ! class_exists( '\\ATORA\\Groups\\Group_Service' ) || 0 === $this->wp_course || 0 === $this->wp_lesson ) {
 			$this->markTestSkipped( 'Groups module or course context not available.' );

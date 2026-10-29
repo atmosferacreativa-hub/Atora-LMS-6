@@ -471,6 +471,16 @@ final class ATORA_Avatar_Service {
 			return self::augment_people_by_keys( $data, $changed, array( 'author', 'recipients' ) );
 		}
 
+		// Lista de estudiantes del docente: cada fila de `items` es una persona.
+		if ( 1 === preg_match( '#^/' . preg_quote( ATORA_Mobile_REST_Controller::REST_NAMESPACE, '#' ) . '/teacher/courses/\d+/students$#', $route ) && is_array( $data ) && isset( $data['items'] ) && is_array( $data['items'] ) ) {
+			foreach ( $data['items'] as $i => $row ) {
+				if ( is_array( $row ) && isset( $row['id'], $row['name'] ) ) {
+					$data['items'][ $i ] = self::augment_mobile_person_card( $row, $changed );
+				}
+			}
+			return $data;
+		}
+
 		// Teacher endpoints: only known person keys, never generic {id,name}.
 		if ( false !== strpos( $route, '/' . ATORA_Mobile_REST_Controller::REST_NAMESPACE . '/teacher/' ) ) {
 			return self::augment_people_by_keys( $data, $changed, array( 'student', 'students', 'members', 'submitted_by', 'recipients', 'author' ) );
