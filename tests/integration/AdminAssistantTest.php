@@ -9,10 +9,14 @@
 
 declare( strict_types = 1 );
 
+require_once __DIR__ . '/LmsRowsCleanup.php';
+
 use ATORA\LMS\LMS_Course_Service;
 use ATORA\LMS\LMS_Enrollment_Service;
 
 final class AdminAssistantTest extends WP_UnitTestCase {
+
+	use LmsRowsCleanup;
 
 	private int $finance = 0;
 	private int $passed = 0;
@@ -57,6 +61,11 @@ final class AdminAssistantTest extends WP_UnitTestCase {
 				}
 			}
 		}
+	}
+
+	protected function tearDown(): void {
+		$this->cleanup_lms_rows( array( $this->wp_course ), array( $this->passed, $this->failed ) );
+		parent::tearDown();
 	}
 
 	public function test_reads_final_grades_and_who_must_repeat(): void {
