@@ -96,6 +96,31 @@ final class TeacherLiveApiTest extends WP_UnitTestCase {
 		$this->assertSame( 'open', $live[0]['live']['status'] );
 	}
 
+	public function test_class_running_past_midnight_still_shows_today(): void {
+		$midnight = ( new DateTimeImmutable( 'today', wp_timezone() ) );
+		Live_Streaming::save_session( $this->wp_lesson, array(
+			'provider'         => 'custom',
+			'start_datetime'   => $midnight->modify( '-1 hour' )->format( 'Y-m-d H:i' ),
+			'duration_minutes' => 180,
+			'timezone'         => wp_timezone_string(),
+			'recording_mode'   => 'provider',
+			'custom_url'       => 'https://meet.example.test/clase',
+		), $this->teacher );
+		$today = $this->call( $this->teacher, 'GET', '/teacher/today' )->get_data()['today'];
+		$this->assertCount( 1, array_filter( $today, static fn( $i ) => 'live_class' === $i['type'] ), 'Empezó ayer y termina hoy: está en Hoy.' );
+
+		Live_Streaming::save_session( $this->wp_lesson, array(
+			'provider'         => 'custom',
+			'start_datetime'   => $midnight->modify( '-10 hours' )->format( 'Y-m-d H:i' ),
+			'duration_minutes' => 60,
+			'timezone'         => wp_timezone_string(),
+			'recording_mode'   => 'provider',
+			'custom_url'       => 'https://meet.example.test/clase',
+		), $this->teacher );
+		$today = $this->call( $this->teacher, 'GET', '/teacher/today' )->get_data()['today'];
+		$this->assertCount( 0, array_filter( $today, static fn( $i ) => 'live_class' === $i['type'] ), 'Terminó ayer: no está en Hoy.' );
+	}
+
 	public function test_teacher_publishes_and_clears_the_recording(): void {
 		$this->live_in( -3 * HOUR_IN_SECONDS );
 		$route = '/teacher/lessons/' . $this->lesson . '/recording';
