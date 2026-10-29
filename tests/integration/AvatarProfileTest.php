@@ -203,7 +203,18 @@ final class AvatarProfileTest extends WP_UnitTestCase {
 		$request = ATORA_Account_Deletion::request( $this->student, 'web' );
 		$this->assertTrue( ATORA_Account_Deletion::process( (int) $request['request_id'], 'anonymize', $this->admin ) );
 		$this->assertSame( 0, ATORA_Avatar_Service::avatar_attachment_id( $this->student ) );
-		$this->assertFalse( get_post( $attach_id ) );
+		$this->assertNull( get_post( $attach_id ) );
+	}
+
+	public function test_privacy_eraser_removes_the_photo(): void {
+		$r = $this->rest_upload( $this->make_jpeg_with_exif_marker(), 'erase1' );
+		$attach_id = (int) $r->get_data()['avatar_id'];
+		$erasers = apply_filters( 'wp_privacy_personal_data_erasers', array() );
+		$this->assertArrayHasKey( 'atora-avatar', $erasers, 'Registrada como dato personal (corre antes de anonimizar la cuenta).' );
+		$result = call_user_func( $erasers['atora-avatar']['callback'], get_userdata( $this->student )->user_email, 1 );
+		$this->assertTrue( $result['items_removed'] );
+		$this->assertSame( 0, ATORA_Avatar_Service::avatar_attachment_id( $this->student ) );
+		$this->assertNull( get_post( $attach_id ) );
 	}
 
 	public function test_teacher_submission_group_never_gets_avatar_even_if_group_id_matches_a_user_id(): void {

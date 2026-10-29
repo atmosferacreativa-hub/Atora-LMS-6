@@ -31,6 +31,9 @@ final class ATORA_Avatar_Service {
 		// `rest_post_dispatch` solo al servir la petición HTTP.
 		add_filter( 'rest_request_after_callbacks', array( __CLASS__, 'rest_after_callbacks_mobile_people' ), 20, 3 );
 		add_action( 'atora_account_deletion_processed', array( __CLASS__, 'on_account_deletion_processed' ), 10, 3 );
+		// La eliminación de cuenta anonimiza (borra los metadatos) antes de avisar que terminó: la foto se borra como dato
+		// personal, en la etapa de borradores de privacidad (también la usa «Borrar datos personales» de WordPress).
+		add_filter( 'wp_privacy_personal_data_erasers', array( __CLASS__, 'register_privacy_eraser' ) );
 		add_action( 'rest_api_init', array( __CLASS__, 'register_mobile_routes' ) );
 		add_action( 'show_user_profile', array( __CLASS__, 'render_admin_user_avatar_fields' ) );
 		add_action( 'edit_user_profile', array( __CLASS__, 'render_admin_user_avatar_fields' ) );
@@ -362,6 +365,25 @@ final class ATORA_Avatar_Service {
 		}
 		imagedestroy( $image );
 		return $ok ? true : new WP_Error( 'atora_avatar_gd', __( 'No se pudo guardar la imagen.', 'atora-lms' ), array( 'status' => 500 ) );
+	}
+
+	public static function register_privacy_eraser( array $erasers ): array {
+		$erasers['atora-avatar'] = array(
+			'eraser_friendly_name' => __( 'Foto de perfil (ATORA)', 'atora-lms' ),
+			'callback'             => array( __CLASS__, 'privacy_erase' ),
+		);
+		return $erasers;
+	}
+
+	/** @return array{items_removed:bool,items_retained:bool,messages:array,done:bool} */
+	public static function privacy_erase( string $email, int $page = 1 ): array {
+		$user    = get_user_by( 'email', $email );
+		$removed = false;
+		if ( $user && self::avatar_attachment_id( (int) $user->ID ) ) {
+			self::delete_user_avatar( (int) $user->ID );
+			$removed = true;
+		}
+		return array( 'items_removed' => $removed, 'items_retained' => false, 'messages' => array(), 'done' => true );
 	}
 
 	public static function on_account_deletion_processed( int $user_id, string $mode, int $request_id ): void {
