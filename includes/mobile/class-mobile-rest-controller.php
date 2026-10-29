@@ -1770,6 +1770,9 @@ final class ATORA_Mobile_REST_Controller {
 					'progress'          => absint( $progress['progress_pct'] ?? 0 ),
 					'is_complete'       => ! empty( $progress['is_complete'] ),
 					'last_activity'     => sanitize_text_field( (string) ( $row['last_activity'] ?? '' ) ),
+					// 6.41.0: período (null si el curso no tiene) y color para agrupar «cursos anteriores» en la app.
+					'period'            => class_exists( 'ATORA_Periods_Service' ) ? ATORA_Periods_Service::period_payload( absint( $course['wp_post_id'] ?? 0 ) ) : null,
+					'color'             => class_exists( 'ATORA_Periods_Service' ) ? ATORA_Periods_Service::color_of( absint( $course['wp_post_id'] ?? 0 ) ) : null,
 				)
 			);
 		}
@@ -2031,9 +2034,16 @@ final class ATORA_Mobile_REST_Controller {
 			}
 		}
 
-		// 3) Salida ordenada y deduplicada.
+		// 3) Salida ordenada y deduplicada. Sin los cursos cuyo período cerrado quitó el acceso (6.41.0).
 		$out = array();
 		foreach ( array_values( array_unique( array_filter( array_map( 'absint', $ordered ) ) ) ) as $course_id ) {
+			if ( isset( $by_course[ $course_id ] ) && class_exists( 'ATORA_Periods_Service' ) ) {
+				$period_course = \ATORA\LMS\LMS_Course_Service::get( $course_id );
+				$period_wp     = absint( is_array( $period_course ) ? ( $period_course['wp_post_id'] ?? 0 ) : 0 );
+				if ( $period_wp > 0 && ATORA_Periods_Service::access_closed( $user_id, $period_wp ) ) {
+					continue;
+				}
+			}
 			if ( isset( $by_course[ $course_id ] ) ) {
 				$out[] = $by_course[ $course_id ];
 			}
@@ -2069,6 +2079,14 @@ final class ATORA_Mobile_REST_Controller {
 		}
 		if ( $course_id <= 0 ) {
 			return new WP_Error( 'atora_mobile_course_not_found', __( 'Curso no encontrado.', 'atora-lms' ), array( 'status' => 404 ) );
+		}
+
+		if ( class_exists( 'ATORA_Periods_Service' ) ) {
+			$period_course = \ATORA\LMS\LMS_Course_Service::get( $course_id );
+			$period_wp     = absint( is_array( $period_course ) ? ( $period_course['wp_post_id'] ?? 0 ) : 0 );
+			if ( $period_wp > 0 && ATORA_Periods_Service::access_closed( $user_id, $period_wp ) ) {
+				return new WP_Error( 'atora_period_closed', __( 'Este curso ya no está disponible: su período terminó.', 'atora-lms' ), array( 'status' => 403 ) );
+			}
 		}
 
 		$index = self::enrollment_index( $user_id );
