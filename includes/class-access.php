@@ -411,6 +411,27 @@ class CLMS_Access {
 		);
 		self::sync_role( 'lms_academic_control', 'Control académico', $academic_control_caps );
 
+		// ── 6.41.0: Auxiliar administrativo (contabilidad de la institución) ──
+		// Pedidos, pagos y reembolsos; calificaciones y estado académico solo en lectura (quien reprueba repite y la
+		// institución vuelve a cobrar). No ve contenido ni mensajes, no modifica notas ni matrículas.
+		$admin_assistant_caps = array(
+			'read'                        => true,
+			'atora_view_finance'          => true,
+			'atora_view_academic_records' => true,
+			'read_shop_order'             => true,
+			'read_private_shop_orders'    => true,
+			'edit_shop_orders'            => true,
+			'edit_others_shop_orders'     => true,
+			'view_woocommerce_reports'    => true,
+			'atora_adjust_final_grades'   => false,
+			'clms_manage_enrollments'     => false,
+			'clms_grade_submissions'      => false,
+			'clms_access_admin'           => false,
+			'edit_lm_courses'             => false,
+			'edit_lm_lessons'             => false,
+		);
+		self::sync_role( 'lms_admin_assistant', 'Auxiliar administrativo', $admin_assistant_caps );
+
 		if ( $admin ) {
 			foreach ( array( 'atora_view_academic_records', 'atora_adjust_final_grades', 'atora_manage_institution_enrollments', 'atora_close_periods', 'atora_view_finance' ) as $cap ) {
 				$admin->add_cap( $cap, true );
@@ -566,6 +587,7 @@ class CLMS_Access {
 			'lms_coordinator',  // ATORA — Coordinador académico
 			'lms_instructor_assistant', // ATORA — Instructor asistente (6.41.0: faltaba en el desplegable)
 			'lms_academic_control',     // ATORA — Control académico (6.41.0)
+			'lms_admin_assistant',      // ATORA — Auxiliar administrativo (6.41.0)
 		);
 
 		// Si WooCommerce está activo, mantener sus roles comerciales.
