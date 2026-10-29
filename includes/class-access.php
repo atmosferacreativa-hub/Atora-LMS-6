@@ -422,7 +422,8 @@ class CLMS_Access {
 			'read_private_shop_orders'    => true,
 			'edit_shop_orders'            => true,
 			'edit_others_shop_orders'     => true,
-			'view_woocommerce_reports'    => true,
+			// Los informes globales de WooCommerce mezclan instituciones: su página es «Pagos» (pedidos de su institución).
+			'view_woocommerce_reports'    => false,
 			'atora_adjust_final_grades'   => false,
 			'clms_manage_enrollments'     => false,
 			'clms_grade_submissions'      => false,
