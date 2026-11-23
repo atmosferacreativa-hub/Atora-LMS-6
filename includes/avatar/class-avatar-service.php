@@ -150,6 +150,24 @@ final class ATORA_Avatar_Service {
 	 */
 	public static function pre_get_avatar_data( ?array $args, $id_or_email ): array {
 		$args = is_array( $args ) ? $args : array();
+		// WordPress 6.8+ (y más aún en 7.x) accede a múltiples claves en
+		// `processed_args` dentro de `wp-includes/pluggable.php`. Si un filtro
+		// devuelve `processed_args` incompleto, PHP 8.1+ emite warnings
+		// "Undefined array key". Mantener un set mínimo de defaults evita que
+		// el panel/admin se ensucie cuando WP_DEBUG_DISPLAY está activo.
+		$processed_args = array_merge(
+			array(
+				'force_default' => false,
+				'loading'       => '',
+				'fetchpriority' => '',
+				'decoding'      => '',
+				'alt'           => '',
+				'height'        => 0,
+				'width'         => 0,
+				'default'       => '',
+			),
+			$args
+		);
 		$size = absint( $args['size'] ?? 96 );
 		$size = $size > 0 ? $size : 96;
 		$user = self::user_from_id_or_email( $id_or_email );
@@ -161,7 +179,7 @@ final class ATORA_Avatar_Service {
 				'size'           => $size,
 				'class'          => array( 'atora-avatar' ),
 				'extra_attr'     => '',
-				'processed_args' => $args,
+				'processed_args' => $processed_args,
 			);
 		}
 
@@ -177,7 +195,7 @@ final class ATORA_Avatar_Service {
 			'size'           => $size,
 			'class'          => array( 'atora-avatar' ),
 			'extra_attr'     => '',
-			'processed_args' => $args,
+			'processed_args' => $processed_args,
 		);
 	}
 
