@@ -173,13 +173,16 @@ final class ATORA_Avatar_Service {
 		$user = self::user_from_id_or_email( $id_or_email );
 		if ( $user ) {
 			$url = self::avatar_url_for_user( (int) $user->ID, $size );
-			return array(
-				'url'            => $url,
-				'found_avatar'   => true,
-				'size'           => $size,
-				'class'          => array( 'atora-avatar' ),
-				'extra_attr'     => '',
-				'processed_args' => $processed_args,
+			return array_merge(
+				$processed_args,
+				array(
+					'url'            => $url,
+					'found_avatar'   => true,
+					'size'           => $size,
+					'class'          => array( 'atora-avatar' ),
+					'extra_attr'     => '',
+					'processed_args' => $processed_args,
+				)
 			);
 		}
 
@@ -189,13 +192,16 @@ final class ATORA_Avatar_Service {
 		} elseif ( is_object( $id_or_email ) && isset( $id_or_email->comment_author_email ) ) {
 			$seed = strtolower( trim( (string) $id_or_email->comment_author_email ) );
 		}
-		return array(
-			'url'            => self::initials_svg_data_uri( '?', $seed, $size ),
-			'found_avatar'   => true,
-			'size'           => $size,
-			'class'          => array( 'atora-avatar' ),
-			'extra_attr'     => '',
-			'processed_args' => $processed_args,
+		return array_merge(
+			$processed_args,
+			array(
+				'url'            => self::initials_svg_data_uri( '?', $seed, $size ),
+				'found_avatar'   => true,
+				'size'           => $size,
+				'class'          => array( 'atora-avatar' ),
+				'extra_attr'     => '',
+				'processed_args' => $processed_args,
+			)
 		);
 	}
 
