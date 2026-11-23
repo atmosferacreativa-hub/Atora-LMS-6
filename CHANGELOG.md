@@ -1,10 +1,12 @@
 # CHANGELOG — ATORA LMS
 
-## 6.40.4 (2026-11-23)
+## 6.40.5 (2026-11-23)
 
 - **Corrección (Comunicaciones / Emails):** la pestaña **Prueba de envío** podía romper el HTML del panel y dejar el aviso de error incrustado dentro del campo “Mensaje”, ocultando los botones de envío. Causa: se llamaba a `esc_textarea_e()` (función inexistente). Ahora usa `esc_textarea( __( ... ) )` y se añadió una prueba de regresión que renderiza la vista.
 
 - **Corrección (Avatares / WP_DEBUG):** con `WP_DEBUG_DISPLAY` activo, WordPress podía emitir warnings (`Undefined array key`) en `wp-includes/pluggable.php` al renderizar avatares. Causa: el filtro `pre_get_avatar_data` devolvía args incompletos. Ahora se devuelven defaults mínimos tanto en `processed_args` como en el array raíz para evitar warnings sin alterar la URL del avatar.
+
+- **Corrección (Admin / PHP 8.2+):** evitado un deprecation de `strip_tags(null)` en el header del admin (`wp-admin/admin-header.php`) al navegar por pantallas del hub de Comunicación. Causa: páginas registradas con parent slug vacío. Ahora se registran bajo `atora-communication-hub`.
 
 ## 6.40.1 (2026-10-29)
 
