@@ -1,5 +1,9 @@
 # CHANGELOG — ATORA LMS
 
+## 6.40.2 (2026-11-23)
+
+- **Corrección (Comunicaciones / Emails):** la pestaña **Prueba de envío** podía romper el HTML del panel y dejar el aviso de error incrustado dentro del campo “Mensaje”, ocultando los botones de envío. Causa: se llamaba a `esc_textarea_e()` (función inexistente). Ahora usa `esc_textarea( __( ... ) )` y se añadió una prueba de regresión que renderiza la vista.
+
 ## 6.40.1 (2026-10-29)
 
 - **Corrección (agenda, #128):** Hoy (estudiante y docente) solo mostraba las clases en vivo que *empiezan* ese día; una clase que empezó antes de medianoche y seguía en curso desaparecía junto con su botón para entrar. Ahora entra si su horario se cruza con el día. Prueba: `TeacherLiveApiTest::test_class_running_past_midnight_still_shows_today`.
