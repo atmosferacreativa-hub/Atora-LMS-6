@@ -123,7 +123,7 @@ if ( in_array( $selected_identity, array( 'docencia', 'docente', 'teacher', 'com
 		<tr>
 			<th><label for="test_message"><?php esc_html_e( 'Mensaje', 'atora-lms' ); ?></label></th>
 			<td>
-				<textarea class="large-text" rows="5" id="test_message" name="test_message"><?php esc_textarea_e( 'Este es un envío de prueba desde ATORA.', 'atora-lms' ); ?></textarea>
+				<textarea class="large-text" rows="5" id="test_message" name="test_message"><?php echo esc_textarea( __( 'Este es un envío de prueba desde ATORA.', 'atora-lms' ) ); ?></textarea>
 				<p class="description"><?php esc_html_e( 'Si seleccionas una plantilla, este mensaje se ignora automáticamente.', 'atora-lms' ); ?></p>
 			</td>
 		</tr>

@@ -28,7 +28,7 @@ require_once $autoload;
 
 // Definir constantes WP mínimas
 if ( ! defined( 'ABSPATH' ) )         { define( 'ABSPATH', '/tmp/wp/' ); }
-if ( ! defined( 'ATORA_LMS_VERSION' ) ) { define( 'ATORA_LMS_VERSION', '6.29.1' ); }
+if ( ! defined( 'ATORA_LMS_VERSION' ) ) { define( 'ATORA_LMS_VERSION', '6.40.5' ); }
 if ( ! defined( 'DAY_IN_SECONDS' ) )  { define( 'DAY_IN_SECONDS', 86400 ); }
 if ( ! defined( 'HOUR_IN_SECONDS' ) ) { define( 'HOUR_IN_SECONDS', 3600 ); }
 if ( ! defined( 'MINUTE_IN_SECONDS' ) ) { define( 'MINUTE_IN_SECONDS', 60 ); }
@@ -76,6 +76,7 @@ if ( ! function_exists( 'sanitize_title' ) ) {
 	}
 }
 if ( ! function_exists( 'sanitize_email' ) )   { function sanitize_email( $s ): string { return filter_var( (string) $s, FILTER_SANITIZE_EMAIL ) ?: ''; } }
+	if ( ! function_exists( 'is_email' ) ) { function is_email( $email ): bool { return false !== filter_var( (string) $email, FILTER_VALIDATE_EMAIL ); } }
 	if ( ! function_exists( 'sanitize_key' ) )     { function sanitize_key( $s ): string { return strtolower( preg_replace( '/[^a-z0-9_\-]/i', '', (string) $s ) ); } }
 	if ( ! function_exists( 'esc_url_raw' ) )      { function esc_url_raw( $s ): string { return filter_var( (string) $s, FILTER_SANITIZE_URL ) ?: ''; } }
 	if ( ! function_exists( 'wp_parse_url' ) )     { function wp_parse_url( string $url ) { return parse_url( $url ); } }
@@ -639,8 +640,29 @@ if ( ! function_exists( 'number_format_i18n' ) ) { function number_format_i18n( 
 if ( ! function_exists( '__' ) )               { function __( string $s, string $d = '' ): string { return $s; } }
 if ( ! function_exists( 'esc_html__' ) )       { function esc_html__( string $s, string $d = '' ): string { return esc_html( __( $s, $d ) ); } }
 if ( ! function_exists( 'esc_attr__' ) )       { function esc_attr__( string $s, string $d = '' ): string { return esc_attr( __( $s, $d ) ); } }
+	if ( ! function_exists( 'esc_textarea' ) )     { function esc_textarea( string $s ): string { return htmlspecialchars( $s, ENT_QUOTES ); } }
 if ( ! function_exists( 'esc_html_e' ) )       { function esc_html_e( string $s, string $d = '' ): void { echo esc_html__( $s, $d ); } }
 if ( ! function_exists( 'esc_attr_e' ) )       { function esc_attr_e( string $s, string $d = '' ): void { echo esc_attr__( $s, $d ); } }
+	if ( ! function_exists( 'wp_nonce_field' ) ) {
+		function wp_nonce_field( $action = -1, $name = '_wpnonce', bool $referer = true, bool $echo = true ) {
+			$field = '<input type="hidden" name="' . esc_attr( (string) $name ) . '" value="' . esc_attr( wp_create_nonce( (string) $action ) ) . '">';
+			if ( $echo ) {
+				echo $field;
+				return null;
+			}
+			return $field;
+		}
+	}
+	if ( ! function_exists( 'selected' ) ) {
+		function selected( $selected, $current = true, bool $echo = true ) {
+			$result = (string) $selected === (string) $current ? ' selected="selected"' : '';
+			if ( $echo ) {
+				echo $result;
+				return null;
+			}
+			return $result;
+		}
+	}
 if ( ! function_exists( 'esc_html' ) )         { function esc_html( string $s ): string { return htmlspecialchars( $s, ENT_QUOTES ); } }
 if ( ! function_exists( 'esc_attr' ) )         { function esc_attr( string $s ): string { return htmlspecialchars( $s, ENT_QUOTES ); } }
 if ( ! function_exists( 'wp_send_json_success' ) ) { function wp_send_json_success( $d = null ): void { exit( json_encode( array( 'success' => true, 'data' => $d ) ) ); } }

@@ -1390,7 +1390,7 @@ class Messaging_Router {
 		}
 
 		add_submenu_page(
-			'', // PT-4.4.3: reubicado bajo el hub "Comunicación" (atora-communication-hub).
+			'atora-communication-hub', // PT-4.4.3: reubicado bajo el hub "Comunicación".
 			__( 'Mensajería', 'atora-lms' ),
 			__( 'Mensajería', 'atora-lms' ),
 			'manage_options',
